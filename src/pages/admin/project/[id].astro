@@ -26,6 +26,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       </div>
       <div class="si-links">
         <span class="live mono" data-si-live>loading…</span>
+        <a class="btn btn-ghost btn-sm" href={`/admin/project/${file.id}/groups`}>Groups &amp; ideas</a>
         <a class="btn btn-ghost btn-sm" href={`/submit/${file.id}`} target="_blank" rel="noopener">Student page ↗</a>
         <a class="btn btn-ghost btn-sm" href={`/api/admin/project/entries?file=${encodeURIComponent(file.id)}&format=csv`}>Export CSV</a>
         <button class="btn btn-primary btn-sm" type="button" data-si-zip-all>Download all (ZIP)</button>

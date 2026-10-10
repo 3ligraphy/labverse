@@ -121,7 +121,7 @@ const initials = who.split(/\s+/).map((p) => p[0]).slice(0, 2).join('');
   /* pages inside the shell: no extra top gap on desktop beside the sidebar */
   .ash-main > :first-child { padding-left: clamp(16px, 3vw, 40px) !important; padding-right: clamp(16px, 3vw, 40px) !important; max-width: 1400px; margin-inline: 0; }
   /* shared admin look: frosted cards with a soft gradient rim */
-  .ash-main :is(.adm-card, .ac-card, .bh-card, .tm-card, .pf-card, .si-card, .as-card, .ss, .bh-mod, .cat-card) {
+  .ash-main :is(.adm-card, .ac-card, .bh-card, .tm-card, .pf-card, .si-card, .gp-card, .as-card, .ss, .bh-mod, .cat-card) {
     background: linear-gradient(180deg, color-mix(in oklab, var(--surface) 92%, transparent), color-mix(in oklab, var(--surface) 80%, transparent));
     border-color: color-mix(in oklab, var(--line-2) 80%, transparent); box-shadow: 0 1px 0 color-mix(in oklab, var(--text) 5%, transparent) inset, 0 20px 50px -34px rgb(0 0 0 / .45);
     backdrop-filter: blur(10px); }
