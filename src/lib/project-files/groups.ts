@@ -6,8 +6,8 @@
  */
 import { ID_RE, type Entry } from './core.ts';
 
-/** Teams are "max 3 students" (src/content/project/course-project.md). */
-export const TEAM_SIZE = 3;
+/** The largest team size. */
+export const TEAM_SIZE = 4;
 export const MAX_ROSTER = 2000;
 export const MAX_IDEAS = 12;
 const MAX_IDEA_LEN = 200;

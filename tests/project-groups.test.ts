@@ -84,9 +84,9 @@ test('conflicts lists a student who appears in two groups', () => {
 
 test('assignRandom fills only open seats and never reuses a student', () => {
   const groups = buildGroups(entries, roster.students, plan);
-  const r = assignRandom(groups, roster.students, plan, { G1: 5, G2: 2 }, seeded(7));
-  assert.equal(r.added.G1.length, 1); // G1 already has 2 of 3
-  assert.equal(r.added.G2.length, 2);
+  const r = assignRandom(groups, roster.students, plan, { G1: 5, G2: 1 }, seeded(7));
+  assert.equal(r.added.G1.length, 2); // G1 already has 2 of 4
+  assert.equal(r.added.G2.length, 1);
   const all = [...r.added.G1, ...r.added.G2];
   assert.equal(new Set(all).size, 3);
   for (const id of all) assert.ok(['23CS0003', '23CS0005', '23CS0006'].includes(id));
