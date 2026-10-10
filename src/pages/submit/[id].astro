@@ -87,7 +87,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
               <label><span>Full name</span><input class="input" name="name" autocomplete="name" required maxlength="60" /></label>
               <div class="sb-row">
                 <label><span>Student ID</span><input class="input" name="studentId" required maxlength="20" autocapitalize="characters" spellcheck="false" /></label>
-                <label><span>Project team number</span><input class="input" name="group" required maxlength="30" placeholder="e.g. 7" autocomplete="off" /></label>
+                <label><span>Project group number</span><input class="input" name="group" required maxlength="30" placeholder="e.g. 7" autocomplete="off" /></label>
               </div>
               <label><span>Note for your TA <small>(optional)</small></span><textarea class="input" name="note" rows="2" maxlength="500"></textarea></label>
               <label class="sb-drop" data-sb-drop>
@@ -277,7 +277,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
       const file = fileIn.files?.[0];
       if (name.length < 2) return say('Please type your full name.', 'err'), field('name').focus();
       if (!/^[A-Za-z0-9-]{3,20}$/.test(studentId)) return say('Your student ID should be 3–20 letters or numbers.', 'err'), field('studentId').focus();
-      if (!group) return say('Enter your project team number (for example, 7).', 'err'), field('group').focus();
+      if (!group) return say('Enter your project group number (for example, 7).', 'err'), field('group').focus();
       if (notATeamNumber(group)) return say(TEAM_NUMBER_ERROR, 'err'), field('group').focus();
       if (!file) return say('Choose your file.', 'err');
       const ext = (/\.([a-z0-9]+)$/i.exec(file.name)?.[1] ?? '').toLowerCase();

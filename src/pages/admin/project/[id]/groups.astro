@@ -94,6 +94,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         <div class="gp-row">
           <button class="btn btn-primary btn-sm" type="button" data-gp-assign disabled>Assign random members</button>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-undo>Undo additions</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-renumber>Renumber all</button>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-sheet="groups">Download sheet</button>
         </div>
       </div>
@@ -298,10 +299,10 @@ if (!file) return Astro.redirect('/admin/project', 303);
   import { readDocText } from '@/scripts/doc-text';
   import { playBox } from '@/scripts/box-shuffle';
   import {
-    SCAN_VERSION, TEAM_SIZE, assignRandom, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
+    SCAN_VERSION, TEAM_SIZE, assignRandom, autoNumber, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
     randomIdea, unassigned, type Group, type Plan, type Student,
   } from '@/lib/project-files/groups';
-  import type { Entry } from '@/lib/project-files/core';
+  import { notATeamNumber, type Entry } from '@/lib/project-files/core';
 
   const PARALLEL = 3;
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -377,7 +378,9 @@ if (!file) return Astro.redirect('/admin/project', 303);
         : 'No hand-ins yet.';
       const items: string[] = [];
       const unnumbered = groups.filter((g) => !g.numbered);
-      if (unnumbered.length) items.push(`<li>${plural(unnumbered.reduce((n, g) => n + g.entries.length, 0), 'hand-in')} typed a student ID or lab group code instead of a project team number. They are grouped by who is named in their contribution tables (${plural(unnumbered.length, 'group')} marked “No number”). Type each one's team number in step 3.</li>`);
+      const codes = entries.filter((e) => notATeamNumber(e.group_name)).length;
+      if (unnumbered.length) items.push(`<li>${plural(unnumbered.reduce((n, g) => n + g.entries.length, 0), 'hand-in')} typed a student ID or lab group code instead of a group number. They are grouped by who is named in their contribution tables, and get a group number from the platform once every file is read${roster.length ? '' : ' and the class list (step 1) is saved'}.</li>`);
+      else if (codes) items.push(`<li class="info">${plural(codes, 'hand-in')} typed a student ID or lab group code instead of a group number. Their groups were put together from the contribution tables and given a group number by the platform, drawn at random. Change any number in step 3.</li>`);
       for (const c of conflicts(groups)) items.push(`<li><b>${esc(c.name)}</b> (${esc(c.id)}) is listed in ${c.groups.map(esc).join(' and ')}. Check the files; a student should be in one group.</li>`);
       for (const e of failed) items.push(`<li>${esc(e.group_name)} · ${esc(e.name)}: ${esc(plan.scans[e.id]!.error!)} <a href="${esc(e.url)}" target="_blank" rel="noopener">Open file ↗</a></li>`);
       if (!roster.length && entries.length) items.push('<li class="info">Add the class list (step 1) so names and IDs in the contribution tables can be recognised.</li>');
@@ -385,9 +388,9 @@ if (!file) return Astro.redirect('/admin/project', 303);
     }
 
     const titleOf = (key: string) => groups.find((g) => g.key === key)?.title ?? key;
-    /** Team-number box: always open for a group without a number, behind "Change number" for the others. */
+    /** Group-number box: open for a group without a number, behind "Change number" for the others. */
     const teamForm = (g: Group) => `<form class="gp-team ${g.numbered ? '' : 'need'}" data-team-for="${esc(g.key)}" ${g.numbered ? 'hidden' : ''}>
-        <input class="input mono" maxlength="20" placeholder="Team no." aria-label="Team number for ${esc(g.title)}" value="" />
+        <input class="input mono" maxlength="20" placeholder="Group no." aria-label="Group number for ${esc(g.title)}" value="" />
         <button class="btn btn-ghost btn-sm" type="submit">${g.numbered ? 'Save' : 'Set number'}</button></form>${
         g.numbered ? `<button class="gp-link" type="button" data-team-edit="${esc(g.key)}">Change number</button>` : ''}`;
 
@@ -510,8 +513,20 @@ if (!file) return Astro.redirect('/admin/project', 303);
         for (const g of groups) if (plan.choices[g.key]?.idea && !g.ideas.includes(plan.choices[g.key].idea)) plan.choices[g.key].idea = '';
         if (plan.autoAll) drawAll(false);
         render();
+        numberNew();
         save();
       }
+    }
+
+    /** The platform's group numbers: once every file is read, groups still without a number get one at random. */
+    function numberNew() {
+      const pending = entries.some((e) => plan.scans[e.id]?.updatedAt !== e.updated_at || plan.scans[e.id]?.v !== SCAN_VERSION);
+      if (scanning || pending || !roster.length || !groups.some((g) => !g.numbered)) return;
+      const titles = new Map(groups.map((g) => [g.key, g.title]));
+      const moves = autoNumber(groups, plan);
+      render();
+      save();
+      say(`The platform gave ${plural(Object.keys(moves).length, 'group')} a group number at random: ${Object.entries(moves).map(([from, to]) => `${titles.get(from)} → ${to}`).join(' · ')}.`, false, $('[data-gp-assign-msg]'));
     }
 
     async function load() {
@@ -530,6 +545,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         live.textContent = 'loaded';
         render();
         await scan();
+        numberNew();
       } catch (error) {
         live.classList.remove('on');
         live.textContent = error instanceof Error ? error.message : 'Could not load.';
@@ -597,6 +613,16 @@ if (!file) return Astro.redirect('/admin/project', 303);
       btn.dataset.armed = ''; btn.textContent = 'Undo additions';
       plan.added = {};
       say('Removed every member added on this page.', false, assignMsg);
+      render();
+      save();
+    });
+    $('[data-gp-renumber]').addEventListener('click', (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      if (!groups.length) return;
+      if (btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Confirm renumber'; setTimeout(() => { btn.dataset.armed = ''; btn.textContent = 'Renumber all'; }, 4000); return; }
+      btn.dataset.armed = ''; btn.textContent = 'Renumber all';
+      autoNumber(groups, plan, undefined, true);
+      say(`The platform drew new group numbers for all ${plural(groups.length, 'group')} (1 to ${groups.length}).`, false, assignMsg);
       render();
       save();
     });
@@ -696,7 +722,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       const g = groups.find((x) => x.key === team.dataset.teamFor);
       const value = cleanTeam(team.querySelector('input')!.value);
       if (!g) return;
-      if (!value) return say('Type a short team number, like 7 or G7 (not a student ID or lab group code).', true, assignMsg);
+      if (!value) return say('Type a short group number, like 7 or G7 (not a student ID or lab group code).', true, assignMsg);
       const to = numberGroup(plan, g, value);
       const merged = groups.some((x) => x.key === to && x !== g);
       say(merged ? `${g.title} joined ${to}.` : `${g.title} is now ${to}.`, false, assignMsg);

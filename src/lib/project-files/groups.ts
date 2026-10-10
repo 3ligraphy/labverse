@@ -18,7 +18,7 @@ export type Source = 'submitted' | 'document' | 'added';
 export type Member = Student & { source: Source };
 
 /** Bump when reading files changes (e.g. better idea finding), so saved results are refreshed automatically. */
-export const SCAN_VERSION = 2;
+export const SCAN_VERSION = 3;
 
 /** What the browser read out of one hand-in's file. Kept so files are only read again when re-submitted. */
 export type Scan = {
@@ -155,9 +155,9 @@ export function findStudents(text: string, roster: readonly Student[]): string[]
 /* How proposals name their ideas. ORD: "1", "B", "two", "second"…; LEAD: "1. ", "a) ", "First ", "2nd "… */
 const ORD = String.raw`(?:\d{1,2}|[a-e]|one|two|three|four|five)`;
 const LEAD = String.raw`(?:(?:\d{1,2}|[a-z])[.)]\s*)?(?:(?:first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\s+)?`;
-const KIND = String.raw`(?:(?:proposed|suggested|selected|chosen|main|our|project|app|application|mobile\s+app)\s+)*(?:idea|option|suggestion)`;
+const KIND = String.raw`(?:(?:the|our|my|proposed|suggested|selected|chosen|main|project|app|application|mobile\s+app)\s+)*(?:idea|option|suggestion)s?`;
 const SEP = String.raw`\s*[:.)\-–—|]\s*`;
-/** "Idea 1: X", "Proposed idea – X", "Second idea: X", "Option B) X", "Idea title: X", "Proposal 2: X". */
+/** "Idea 1: X", "Proposed idea – X", "Second idea: X", "Option B) X", "Idea title: X", "Proposal 2: X", "The ideas : X, Y". */
 const IDEA_LINE = new RegExp(String.raw`^${LEAD}(?:${KIND}|proposal)\s*(?:#|no\.?|number)?\s*${ORD}?\s*(?:title|name)?${SEP}(.{3,})$`, 'i');
 /** "Project title: X", "App name - X", "Name of the app: X", "Project title | X" (a two-column table row). */
 const TITLE_LINE = new RegExp(String.raw`^${LEAD}(?:(?:project|app|application|mobile\s+app|idea)\s+(?:title|name)|(?:title|name)\s+of\s+(?:the\s+)?(?:project|app|application|idea))${SEP}(.{3,})$`, 'i');
@@ -165,7 +165,10 @@ const TITLE_LINE = new RegExp(String.raw`^${LEAD}(?:(?:project|app|application|m
 const IDEA_IS = /^(?:our|the|my)\s+(?:project\s+|app\s+|main\s+)?idea\s+(?:is|will\s+be)\s+(?:to\s+(?:build|create|make|develop)\s+)?(.{3,})$/i;
 /** A heading on its own line: "Idea 1", "Second idea", "Proposed ideas", "Project idea:", "Project title". */
 const IDEA_HEADING = new RegExp(String.raw`^${LEAD}${KIND}s?\s*(?:#|no\.?|number)?\s*${ORD}?\s*(?:title|name|list|options|proposals?)?\s*:?$`, 'i');
-const TITLE_HEADING = /^(?:\d+[.)]\s*)?(?:project|app|application|idea)\s+(?:title|name)s?\s*:?$/i;
+const TITLE_HEADING = /^(?:\d+[.)]\s*)?(?:(?:project|app|application|mobile\s+app|idea)\s+(?:title|name)s?|(?:title|name)\s+of\s+(?:the\s+)?(?:project|app|application|mobile\s+app|idea))\s*:?$/i;
+/** "CookBook Project Proposal", "StudyBuddy – App Proposal": the app's name in the document title (used when nothing else is found). */
+const PROPOSAL_TITLE = /^(.{3,60}?)\s*[-–—:]?\s*(?:(?:mobile\s+)?app(?:lication)?\s+)?(?:project\s+)?proposal$/i;
+const GENERIC_TITLE = /^(?:the|our|my|a|an)?\s*(?:mobile|project|app|application|course|module|coursework|cw|final|group|team)\b/i;
 /** A table column that holds ideas. */
 const IDEA_COLUMN = /^(?:proposed\s+|project\s+|app\s+)?(?:ideas?|idea\s+(?:title|name)|(?:project|app|application)\s+(?:title|name)|title|name\s+of\s+(?:the\s+)?(?:app|idea|project))$/i;
 const NUMBERED = /^\(?(?:\d{1,2}|[a-e])[.)]\s*(.{3,})$/i;
@@ -202,7 +205,13 @@ export function extractIdeas(lines: readonly string[]): string[] {
       if (column >= 0) { if (cells[column]) ideas.push(cells[column].replace(NUMBERED, '$1')); continue; }
     } else column = -1;
     const direct = IDEA_LINE.exec(line) ?? TITLE_LINE.exec(line) ?? IDEA_IS.exec(line);
-    if (direct) { ideas.push(direct[1]); state = 'none'; continue; }
+    if (direct) {
+      // "The ideas : restaurant app ,Fitness Challenge App": several ideas on one line
+      const plural = /\b(?:ideas|options|suggestions)\b/i.test(line.slice(0, line.length - direct[1].length));
+      ideas.push(...(plural ? direct[1].split(/\s*[,;]\s*/) : [direct[1]]));
+      state = 'none';
+      continue;
+    }
     if (IDEA_HEADING.test(line) || TITLE_HEADING.test(line)) { state = 'await'; style = null; continue; }
     if (state === 'none') continue;
     const numbered = NUMBERED.exec(line);
@@ -218,6 +227,13 @@ export function extractIdeas(lines: readonly string[]): string[] {
     const same = style?.exec(line);
     if (same) ideas.push(same[1]);
     else if (!item && (OTHER_SECTION.test(line) || line.length < 60)) state = 'none';
+  }
+  // Nothing labelled as an idea: fall back to the app name in the document title ("CookBook Project Proposal").
+  if (!ideas.length) {
+    for (const raw of lines) {
+      const t = PROPOSAL_TITLE.exec(raw.replace(/\s+/g, ' ').trim());
+      if (t && !GENERIC_TITLE.test(t[1])) { ideas.push(t[1]); break; }
+    }
   }
   const seen = new Set<string>();
   return ideas.map(tidyIdea)
@@ -440,6 +456,23 @@ export function numberGroup(plan: Plan, group: Pick<Group, 'key' | 'entries'>, t
   if (plan.choices[from]) { plan.choices[to] ??= plan.choices[from]; delete plan.choices[from]; }
   plan.later = [...new Set(plan.later.map((k) => (k === from ? to : k)))];
   return to;
+}
+
+/**
+ * The platform's group numbers, drawn like lots: groups without a number (or every group, with `all`) get the
+ * lowest numbers not already in use, in random order. Saved in the plan, so they don't change on reload.
+ * Returns each renumbered group's old key → new key.
+ */
+export function autoNumber(groups: readonly Group[], plan: Plan, rand: Rand = cryptoRand, all = false): Record<string, string> {
+  const targets = groups.filter((g) => all || !g.numbered);
+  if (!targets.length) return {};
+  const taken = new Set(all ? [] : groups.filter((g) => g.numbered).map((g) => /^G(\d+)$/.exec(g.key)?.[1]).filter(Boolean).map(Number));
+  const free: number[] = [];
+  for (let n = 1; free.length < targets.length; n++) if (!taken.has(n)) free.push(n);
+  for (let i = free.length - 1; i > 0; i--) { const j = rand(i + 1); [free[i], free[j]] = [free[j], free[i]]; }
+  // Two steps when renumbering everyone, so a group never lands on a number another group still holds.
+  const moved = targets.map((g, i) => (all ? { key: numberGroup(plan, g, `renumber-${i}`), entries: g.entries } : g));
+  return Object.fromEntries(targets.map((g, i) => [g.key, numberGroup(plan, moved[i], String(free[i]))]));
 }
 
 /* ------------------------------------------------------------------- sheet */

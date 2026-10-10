@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  assignRandom, buildGroups, cleanTeam, entryKeys, numberGroup, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
+  assignRandom, autoNumber, buildGroups, cleanTeam, entryKeys, numberGroup, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
   parseRoster, randomIdea, unassigned, type Plan,
 } from '../src/lib/project-files/groups.ts';
 
@@ -184,4 +184,51 @@ test('numberGroup gives every hand-in the number and moves what was saved for th
   assert.equal(after.key, 'G7');
   assert.deepEqual(after.members.map((m) => m.id), ['23CS0004', '23CS0006', '23CS0005']);
   assert.deepEqual(cleanPlan(p).teams, { c: 'Team 7', d: 'Team 7' });
+});
+
+test('autoNumber gives groups without a number the lowest free numbers, at random', () => {
+  const es = [
+    entry('a', '23CS0001', 'Sara Ali', '2'),
+    entry('b', '23CS0003', 'Mona Adel', 'Group 269411'),
+    entry('c', '23CS0004', 'Youssef Nabil', '269496'),
+    entry('d', '23CS0005', 'Laila Samir', '293938'),
+  ];
+  const p: Plan = { ...emptyPlan(), added: { '?23CS0003': ['23CS0006'] } };
+  const moves = autoNumber(buildGroups(es, roster.students, p), p, seeded(5));
+  // G2 is taken by the group that typed 2, so the three others get 1, 3 and 4 in some order
+  assert.deepEqual(Object.values(moves).sort(), ['G1', 'G3', 'G4']);
+  const after = buildGroups(es, roster.students, p);
+  assert.deepEqual(after.map((g) => g.key), ['G1', 'G2', 'G3', 'G4']);
+  assert.ok(after.every((g) => g.numbered));
+  // what was saved for a group moves with it
+  assert.deepEqual(p.added[moves['?23CS0003']], ['23CS0006']);
+  assert.deepEqual(autoNumber(after, p, seeded(5)), {}); // nothing left to number
+});
+
+test('autoNumber with all renumbers every group without two groups sharing a number', () => {
+  const es = [entry('a', '23CS0001', 'Sara Ali', '1'), entry('b', '23CS0003', 'Mona Adel', '2'), entry('c', '23CS0004', 'Youssef Nabil', '3')];
+  const p: Plan = { ...emptyPlan(), choices: { G1: { mode: 'manual', idea: 'Gym' } } };
+  const moves = autoNumber(buildGroups(es, roster.students, p), p, seeded(9), true);
+  assert.deepEqual(Object.values(moves).sort(), ['G1', 'G2', 'G3']);
+  const after = buildGroups(es, roster.students, p);
+  assert.equal(after.length, 3);
+  const sara = after.find((g) => g.members.some((m) => m.id === '23CS0001'))!;
+  assert.deepEqual(p.choices, { [sara.key]: { mode: 'manual', idea: 'Gym' } });
+});
+
+test('extractIdeas reads real proposals from the course', () => {
+  const cookbook = [
+    'Mobile Application Development', 'Project Proposal', 'CookBook Project Proposal', 'Recipe and Meal Organizer', 'Course code: 26CSCI38H',
+    'Module Leader: Dr. Amira Sayed Abdelaziz', 'Team Members and Proposed Roles', 'Member | Student name and ID | Proposed contribution',
+    'A | Mohamed Haitham | 235994 | Recipe browsing and the summary', 'B | Omar Waleed | 239688 | Recipe forms, camera and shopping',
+    'C | Meal scheduling and YouTube', 'Title of the Application', 'CookBook — Recipe and Meal',
+  ];
+  assert.deepEqual(extractIdeas(cookbook), ['CookBook — Recipe and Meal']);
+  // without the "Title of the Application" section, the app's name in the document title is used
+  assert.deepEqual(extractIdeas(cookbook.slice(0, -2)), ['CookBook']);
+  assert.deepEqual(extractIdeas(['Mobile Application Development', 'Project Proposal']), []);
+  assert.deepEqual(extractIdeas([
+    'Number | Name | ID | Group', '1 | Rawan Ahmed', 'Osman', '246108 | A3', '2 | Fatma Ahmed | 246613 | A3', '3 | Merna Attwa | 247689 | A3',
+    'The ideas : restaurant app ,Fitness Challenge App',
+  ]), ['restaurant app', 'Fitness Challenge App']);
 });
