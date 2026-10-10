@@ -442,6 +442,23 @@ export function numberGroup(plan: Plan, group: Pick<Group, 'key' | 'entries'>, t
   return to;
 }
 
+/**
+ * The platform's group numbers, drawn like lots: groups without a number (or every group, with `all`) get the
+ * lowest numbers not already in use, in random order. Saved in the plan, so they don't change on reload.
+ * Returns each renumbered group's old key → new key.
+ */
+export function autoNumber(groups: readonly Group[], plan: Plan, rand: Rand = cryptoRand, all = false): Record<string, string> {
+  const targets = groups.filter((g) => all || !g.numbered);
+  if (!targets.length) return {};
+  const taken = new Set(all ? [] : groups.filter((g) => g.numbered).map((g) => /^G(\d+)$/.exec(g.key)?.[1]).filter(Boolean).map(Number));
+  const free: number[] = [];
+  for (let n = 1; free.length < targets.length; n++) if (!taken.has(n)) free.push(n);
+  for (let i = free.length - 1; i > 0; i--) { const j = rand(i + 1); [free[i], free[j]] = [free[j], free[i]]; }
+  // Two steps when renumbering everyone, so a group never lands on a number another group still holds.
+  const moved = targets.map((g, i) => (all ? { key: numberGroup(plan, g, `renumber-${i}`), entries: g.entries } : g));
+  return Object.fromEntries(targets.map((g, i) => [g.key, numberGroup(plan, moved[i], String(free[i]))]));
+}
+
 /* ------------------------------------------------------------------- sheet */
 
 const who = (m: Student) => `${m.name} (${m.id})`;
