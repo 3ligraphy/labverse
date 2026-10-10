@@ -45,7 +45,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         <p class="muted small">One student per line: name and ID in either order, separated by a tab, comma or semicolon. Pasting two columns from Excel or Google Sheets works. Saving replaces the whole list.</p>
         <textarea class="input gp-textarea mono" rows="10" placeholder={'Sara Ali, 23CS0001\nOmar Hassan, 23CS0002'} data-gp-roster-text spellcheck="false"></textarea>
         <div class="gp-row">
-          <label class="btn btn-ghost btn-sm gp-file">Load a CSV file<input type="file" accept=".csv,.txt,.tsv" data-gp-roster-file hidden /></label>
+          <label class="btn btn-ghost btn-sm gp-file">Load CSV file<input type="file" accept=".csv,.txt,.tsv" data-gp-roster-file hidden /></label>
           <button class="btn btn-primary btn-sm" type="button" data-gp-roster-save>Save class list</button>
           <span class="small faint" data-gp-roster-msg></span>
         </div>
@@ -83,13 +83,13 @@ if (!file) return Astro.redirect('/admin/project', 303);
         <div class="gp-row">
           <button class="btn btn-ghost btn-sm" type="button" data-gp-select-under>Select all under {TEAM_SIZE}</button>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-select-none>Clear</button>
-          <label class="gp-num small">Members to add to each selected group
+          <label class="gp-num small">Members to add per group
             <input class="input mono" type="number" min="1" max={TEAM_SIZE - 1} value="1" data-gp-count /></label>
         </div>
         <div class="gp-row">
           <button class="btn btn-primary btn-sm" type="button" data-gp-assign disabled>Assign random members</button>
-          <button class="btn btn-ghost btn-sm" type="button" data-gp-undo>Remove all added members</button>
-          <button class="btn btn-ghost btn-sm" type="button" data-gp-sheet="groups">Download groups sheet</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-undo>Undo additions</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-sheet="groups">Download sheet</button>
         </div>
       </div>
       <p class="gp-msg" role="status" data-gp-assign-msg></p>
@@ -188,45 +188,50 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-foot { padding-top: 6px; border-top: 1px solid var(--line); }
   .gp-msg { min-height: 20px; font-size: 13px; color: var(--accent-text); }
   .gp-msg.err { color: var(--danger); }
-  /* random assignment: the bucket show (src/scripts/bucket-shuffle.ts) */
-  .bk { width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid var(--line-2); border-radius: 22px; background: var(--surface); color: var(--text); box-shadow: 0 40px 120px -30px rgb(0 0 0 / .6); overflow: auto; }
-  .bk::backdrop { background: rgb(5 8 12 / .55); backdrop-filter: blur(6px); }
-  .bk-box { display: grid; gap: 16px; padding: clamp(16px, 4vw, 26px); }
-  .bk-top { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
-  .bk-k { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-text); }
-  .bk-top h2 { font-size: var(--fs-lg); letter-spacing: -.02em; margin-top: 2px; }
-  .bk-stage { display: grid; gap: 18px; justify-items: center; min-height: 290px; }
-  .bk-stage.done { min-height: 0; }
-  .bk-stage.done .bk-tray { display: none; }
-  .bk-tray { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 640px; min-height: 30px; }
-  .bk-tok { display: inline-block; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface-2); font-size: 12.5px; white-space: nowrap; will-change: transform; }
-  .bk-tok.grp { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
-  .bk-tok.more { color: var(--text-3); }
-  .bk-tok.fly { position: absolute; left: 50%; top: 22%; translate: -50% -50%; z-index: 3; background: var(--accent-soft); border-color: var(--accent-text); font-weight: 600; opacity: 0; pointer-events: none; }
-  .bk-bucket { --bk-a: color-mix(in oklab, var(--accent) 55%, #1d2733); --bk-b: color-mix(in oklab, var(--accent) 85%, white); position: relative; width: 200px; aspect-ratio: 220 / 190; transform-origin: 50% 90%; }
-  .bk-stage.done .bk-bucket { width: 120px; }
-  .bk-bucket svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-  .bk-handle { fill: none; stroke: var(--text-3); stroke-width: 5; stroke-linecap: round; }
-  .bk-mouth { fill: color-mix(in oklab, var(--bk-a) 55%, black); }
-  .bk-body { stroke: color-mix(in oklab, var(--bk-a) 70%, black); stroke-width: 2; }
-  .bk-rim { fill: none; stroke: var(--bk-b); stroke-width: 7; stroke-linecap: round; }
-  .bk-band { fill: none; stroke: color-mix(in oklab, var(--bk-a) 75%, black); stroke-width: 3; opacity: .5; }
-  .bk-label { font: 800 15px var(--font-mono); letter-spacing: .2em; fill: color-mix(in oklab, var(--bk-a) 50%, black); opacity: .55; }
-  .bk-inside { position: absolute; left: 12%; right: 12%; top: 8%; height: 20%; z-index: 1; }
-  .bk-front { z-index: 2; }
-  .bk-ball { position: absolute; bottom: 0; width: 15px; height: 15px; border-radius: 50%; box-shadow: inset -3px -3px 0 rgb(0 0 0 / .18); }
-  .bk-results { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
-  .bk-results li { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); transition: border-color .2s, background .2s; }
-  .bk-results li.on { border-color: var(--accent-text); background: var(--accent-soft); }
-  .bk-slots { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }
-  .bk-slot { padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--line-2); color: transparent; font-size: 12.5px; transition: color .25s, background .25s, border-color .25s; }
-  .bk-slot small { color: inherit; font-size: 10.5px; }
-  .bk-slot.in { color: var(--text); background: var(--accent-soft); border: 1px solid var(--accent-text); animation: bk-pop .35s cubic-bezier(.3,1.6,.5,1); }
-  .bk-slot.in small { color: var(--text-3); }
-  .bk-none { font-size: 12.5px; color: var(--warn); }
-  .bk-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
-  .bk-btns { display: flex; gap: 8px; flex-wrap: wrap; }
-  @keyframes bk-pop { from { transform: scale(.6); } to { transform: scale(1); } }
+  /* random assignment: the cardboard-box show (src/scripts/box-shuffle.ts) */
+  .bx { width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid var(--line-2); border-radius: 22px; background: var(--surface); color: var(--text); box-shadow: 0 40px 120px -30px rgb(0 0 0 / .6); overflow: auto; }
+  .bx::backdrop { background: rgb(5 8 12 / .55); backdrop-filter: blur(6px); }
+  .bx-wrap { display: grid; gap: 16px; padding: clamp(16px, 4vw, 26px); }
+  .bx-top { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+  .bx-k { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-text); }
+  .bx-top h2 { font-size: var(--fs-lg); letter-spacing: -.02em; margin-top: 2px; }
+  .bx-stage { display: grid; gap: 18px; justify-items: center; min-height: 300px; }
+  .bx-stage.done { min-height: 0; }
+  .bx-stage.done .bx-tray { display: none; }
+  .bx-tray { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 640px; min-height: 30px; }
+  .bx-tok { display: inline-block; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface-2); font-size: 12.5px; white-space: nowrap; will-change: transform; }
+  .bx-tok.grp { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+  .bx-tok.more { color: var(--text-3); }
+  .bx-tok.fly { position: absolute; left: 52%; top: 30%; translate: -50% -50%; z-index: 3; background: var(--accent-soft); border-color: var(--accent-text); font-weight: 600; opacity: 0; pointer-events: none; }
+  .bx-box { position: relative; width: 220px; aspect-ratio: 240 / 220; transform-origin: 50% 92%; }
+  .bx-stage.done .bx-box { width: 130px; }
+  .bx-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .bx-body { transform-box: view-box; transform-origin: 50% 92%; }
+  .bx-shadow { fill: rgb(0 0 0 / .22); }
+  .bx-inside-wall { fill: #2c1a0b; opacity: .6; }
+  .bx-face, .bx-flap { stroke: #7a4d22; stroke-width: 1.4; stroke-linejoin: round; }
+  .bx-crease { fill: none; stroke: #f1c98f; stroke-width: 1.2; opacity: .55; }
+  .bx-tape-front { fill: #f3dfb4; opacity: .78; }
+  .bx-tape-top { fill: none; stroke: #f3dfb4; stroke-width: 20; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transform-box: fill-box; transform-origin: 50% 50%; }
+  .bx-stamp rect { fill: none; stroke: #8b2f1a; stroke-width: 2.4; opacity: .75; }
+  .bx-stamp text { font: 800 12.5px var(--font-mono); letter-spacing: .16em; fill: #8b2f1a; opacity: .8; }
+  .bx-arrows path { fill: none; stroke: #4a2e14; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+  .bx-arrows rect { fill: #4a2e14; opacity: .55; }
+  .bx-dust { position: absolute; top: 40%; width: 22px; height: 34px; opacity: 0; border-left: 3px solid var(--text-3); border-right: 3px solid var(--text-3); border-radius: 50%; pointer-events: none; }
+  .bx-dust.l { left: -30px; clip-path: inset(0 50% 0 0); }
+  .bx-dust.r { right: -30px; clip-path: inset(0 0 0 50%); }
+  .bx-results { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .bx-results li { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); transition: border-color .2s, background .2s; }
+  .bx-results li.on { border-color: var(--accent-text); background: var(--accent-soft); }
+  .bx-slots { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }
+  .bx-slot { padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--line-2); color: transparent; font-size: 12.5px; transition: color .25s, background .25s, border-color .25s; }
+  .bx-slot small { color: inherit; font-size: 10.5px; }
+  .bx-slot.in { color: var(--text); background: var(--accent-soft); border: 1px solid var(--accent-text); animation: bx-pop .35s cubic-bezier(.3,1.6,.5,1); }
+  .bx-slot.in small { color: var(--text-3); }
+  .bx-none { font-size: 12.5px; color: var(--warn); }
+  .bx-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
+  .bx-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  @keyframes bx-pop { from { transform: scale(.6); } to { transform: scale(1); } }
 
   /* phones */
   @media (max-width: 720px) {
@@ -234,7 +239,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
     .gp-top { align-items: start; }
     .gp-head > .btn, .gp-head > .gp-row { width: 100%; }
     .gp-head > .btn { justify-content: center; }
-    .gp-shell .btn { white-space: normal; text-align: center; min-width: 0; }
+    .gp-shell .btn { white-space: nowrap; justify-content: center; min-height: 40px; }
     .gp-tools { display: grid; gap: 8px; width: 100%; }
     .gp-tools .gp-row { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
     .gp-tools .btn { justify-content: center; }
@@ -262,17 +267,19 @@ if (!file) return Astro.redirect('/admin/project', 303);
     .gp-chip { font-size: 12px; }
     .gp-ideas { grid-template-columns: 1fr; }
     .gp-seg { width: 100%; } .gp-seg button { flex: 1; padding: 8px; }
-    .gp-short .btn { flex: 1; justify-content: center; }
-    .bk-stage { min-height: 250px; }
-    .bk-bucket { width: 160px; }
-    .bk-foot .bk-btns, .bk-foot .btn { width: 100%; justify-content: center; }
+    .gp-short .btn { flex: 2; justify-content: center; padding-inline: 10px; }
+    .gp-short .btn-ghost { flex: 1; }
+    .bx-stage { min-height: 260px; }
+    .bx-box { width: 180px; }
+    .bx-foot .bx-btns { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+    .bx-foot .btn { justify-content: center; min-height: 42px; }
   }
 </style>
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
   import { readDocText } from '@/scripts/doc-text';
-  import { playBucket } from '@/scripts/bucket-shuffle';
+  import { playBox } from '@/scripts/box-shuffle';
   import {
     TEAM_SIZE, assignRandom, buildGroups, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
     randomIdea, unassigned, type Group, type Plan, type Student,
@@ -393,7 +400,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
           ${short ? later
             ? `<p class="small faint">Fill later · <button class="btn btn-ghost btn-sm" type="button" data-unlater="${esc(g.key)}">Show options</button></p>`
             : `<div class="gp-short"><span>This group has ${g.members.length} of ${TEAM_SIZE} members. Add a random student who is in no group now (optional), or do it later.</span>
-                <div class="gp-row"><button class="btn btn-primary btn-sm" type="button" data-add-one="${esc(g.key)}" ${pool && !scanning ? '' : 'disabled'}>Assign a random member</button>
+                <div class="gp-row"><button class="btn btn-primary btn-sm" type="button" data-add-one="${esc(g.key)}" ${pool && !scanning ? '' : 'disabled'}>Add random member</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-later="${esc(g.key)}">Later</button>${pool ? '' : '<small class="faint">No unassigned students left.</small>'}</div></div>` : ''}
           <div class="gp-row"><div class="gp-seg" role="group" aria-label="How to choose ${esc(g.key)}'s idea">
             <button type="button" data-mode="manual" data-for="${esc(g.key)}" aria-pressed="${mode === 'manual'}" ${auto ? 'disabled' : ''}>Choose myself</button>
@@ -525,25 +532,25 @@ if (!file) return Astro.redirect('/admin/project', 303);
         : 'No one was added: there are no unassigned students left.', !n, el);
       render();
       save();
-      // The draw is made and saved; now show it: groups thrown in a bucket, shuffled, students drawn out.
+      // The draw is made and saved; now show it: groups thrown in a box, shaken, students drawn out.
       const draws = [
         ...Object.entries(r.placed).map(([group, students]) => ({ group, students })),
         ...Object.keys(requests).filter((k) => requests[k] > 0 && !r.placed[k]).map((group) => ({ group, students: [] })),
       ];
-      if (draws.length) void playBucket({ draws, pool, short: r.short, onSheet: () => download('groups') });
+      if (draws.length) void playBox({ draws, pool, short: r.short, onSheet: () => download('groups') });
       return n;
     }
     $('[data-gp-assign]').addEventListener('click', () => {
       const requests = Object.fromEntries(groups.filter((g) => selected.has(g.key)).map((g) => [g.key, wantFor(g)]));
-      if (assign(requests, assignMsg)) assignMsg.insertAdjacentHTML('beforeend', ' <button class="btn btn-ghost btn-sm" type="button" data-gp-sheet="groups">Download groups sheet</button>');
+      if (assign(requests, assignMsg)) assignMsg.insertAdjacentHTML('beforeend', ' <button class="btn btn-ghost btn-sm" type="button" data-gp-sheet="groups">Download sheet</button>');
       selected.clear();
       renderRows();
     });
     $('[data-gp-undo]').addEventListener('click', (e) => {
       const btn = e.currentTarget as HTMLButtonElement;
       if (!Object.keys(plan.added).length) return say('No members have been added on this page.', false, assignMsg);
-      if (btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Confirm: remove all added'; setTimeout(() => { btn.dataset.armed = ''; btn.textContent = 'Remove all added members'; }, 4000); return; }
-      btn.dataset.armed = ''; btn.textContent = 'Remove all added members';
+      if (btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Confirm undo'; setTimeout(() => { btn.dataset.armed = ''; btn.textContent = 'Undo additions'; }, 4000); return; }
+      btn.dataset.armed = ''; btn.textContent = 'Undo additions';
       plan.added = {};
       say('Removed every member added on this page.', false, assignMsg);
       render();
