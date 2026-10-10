@@ -31,6 +31,7 @@
     "astro": "^7.3.5",
     "client-zip": "^2.5.1",
     "codemirror": "^6.0.2",
+    "pdfjs-dist": "^6.3.289",
     "pg": "^8.23.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

@@ -1,0 +1,327 @@
+/**
+ * PROJECT GROUPS — rules for /admin/project/[id]/groups. Balances project teams from one submission item
+ * (usually the proposal): who is in which group (the student who handed in + everyone named in the
+ * contribution table of their file), random members for groups under the team size, and the idea each group
+ * works on. Pure functions only, so they are unit-tested (tests/project-groups.test.ts).
+ */
+import { ID_RE, type Entry } from './core.ts';
+
+/** The largest team size. */
+export const TEAM_SIZE = 4;
+export const MAX_ROSTER = 2000;
+export const MAX_IDEAS = 12;
+const MAX_IDEA_LEN = 200;
+
+export type Student = { id: string; name: string };
+/** How a member got into a group: they handed in, they are named in a group's file, or they were added here. */
+export type Source = 'submitted' | 'document' | 'added';
+export type Member = Student & { source: Source };
+
+/** What the browser read out of one hand-in's file. Kept so files are only read again when re-submitted. */
+export type Scan = {
+  updatedAt: string;
+  /** Roster student IDs found in the file (by ID or by full name). */
+  ids: string[];
+  ideas: string[];
+  /** Why the file could not be read (unsupported type, download failed…). */
+  error?: string;
+};
+
+export type Choice = { mode: 'manual' | 'auto'; idea: string };
+
+/** The saved state of the page for one submission item. */
+export type Plan = {
+  /** Group key → IDs of students added to it on this page, in the order they were added. */
+  added: Record<string, string[]>;
+  /** Group key → IDs of students found in the group's files whom the admin took out (a wrong match, or a student in two groups). */
+  removed: Record<string, string[]>;
+  /** Group key → ideas typed in by the admin (on top of those found in the files). */
+  extraIdeas: Record<string, string[]>;
+  /** Group key → the chosen idea and how it was chosen. */
+  choices: Record<string, Choice>;
+  /** Choose every group's idea at random. */
+  autoAll: boolean;
+  /** Groups under the team size the admin chose to fill later. */
+  later: string[];
+  /** Entry ID → what its file contained. */
+  scans: Record<string, Scan>;
+};
+
+export const emptyPlan = (): Plan => ({ added: {}, removed: {}, extraIdeas: {}, choices: {}, autoAll: false, later: [], scans: {} });
+
+type Result<T> = { ok: true; value: T } | { ok: false; error: string };
+
+/* ------------------------------------------------------------- normalising */
+
+export const normId = (s: string) => s.trim().toUpperCase();
+/** Lowercase, no accents, letters and digits only, single spaces: for matching names written differently. */
+export const normName = (s: string) =>
+  s.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const cleanName = (s: string) => s.normalize('NFC').replace(/\s+/g, ' ').trim();
+
+/** "g1", "Group 01", "team 1" and "G 1" are the same group: "G1". Anything else is kept, uppercased. */
+export function groupKey(name: string): string {
+  const s = name.trim().replace(/\s+/g, ' ');
+  const n = /^(?:g|grp|group|team|t)?\s*[-#.:]?\s*0*(\d+)$/i.exec(s);
+  if (n) return `G${n[1] || '0'}`;
+  return s.toUpperCase() || 'NO GROUP';
+}
+/** Natural order: G2 before G10, named groups after numbered ones. */
+export function compareGroups(a: string, b: string): number {
+  const na = /^G(\d+)$/.exec(a);
+  const nb = /^G(\d+)$/.exec(b);
+  if (na && nb) return Number(na[1]) - Number(nb[1]);
+  if (na || nb) return na ? -1 : 1;
+  return a.localeCompare(b);
+}
+
+/* ------------------------------------------------------------------ roster */
+
+const looksLikeId = (s: string) => ID_RE.test(s) && /\d/.test(s);
+
+/**
+ * Reads a class list pasted from a spreadsheet or a CSV file: one student per line, a name and an ID in either
+ * order, separated by a tab, comma or semicolon (or just a space before/after the ID). Header lines and blank
+ * lines are skipped; lines that don't fit are reported with their line number.
+ */
+export function parseRoster(text: string): { students: Student[]; skipped: string[] } {
+  const students = new Map<string, Student>();
+  const skipped: string[] = [];
+  text.replace(/^﻿/, '').split(/\r?\n/).forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line) return;
+    let cells = line.split(/\t|;|,/).map((c) => c.trim().replace(/^"(.*)"$/, '$1').trim()).filter(Boolean);
+    if (cells.length === 1) {
+      const m = /^(\S+)\s+(.+)$/.exec(line) ?? null;
+      const n = /^(.+?)\s+(\S+)$/.exec(line) ?? null;
+      cells = m && looksLikeId(m[1]) ? [m[1], m[2]] : n && looksLikeId(n[2]) ? [n[1], n[2]] : cells;
+    }
+    const idAt = cells.findIndex(looksLikeId);
+    const nameAt = cells.findIndex((c, j) => j !== idAt && /\p{L}/u.test(c) && !looksLikeId(c));
+    if (idAt < 0 || nameAt < 0) {
+      // A header row ("Name, Student ID") is expected, not an error.
+      if (!(i === 0 && /name|id/i.test(line))) skipped.push(`Line ${i + 1}: ${line.slice(0, 60)}`);
+      return;
+    }
+    const id = normId(cells[idAt]);
+    if (!students.has(id)) students.set(id, { id, name: cleanName(cells[nameAt]).slice(0, 80) });
+  });
+  return { students: [...students.values()].slice(0, MAX_ROSTER), skipped };
+}
+
+/** Server-side check of a saved roster. */
+export function cleanRoster(input: unknown): Result<Student[]> {
+  if (!Array.isArray(input)) return { ok: false, error: 'Send the class list as a list.' };
+  if (input.length > MAX_ROSTER) return { ok: false, error: `The class list can hold up to ${MAX_ROSTER} students.` };
+  const seen = new Map<string, Student>();
+  for (const s of input) {
+    const id = normId(String(s?.id ?? ''));
+    const name = cleanName(String(s?.name ?? '')).slice(0, 80);
+    if (!ID_RE.test(id) || !name) return { ok: false, error: `Check the student “${name || id || '?'}”: it needs a name and a 3–20 character ID.` };
+    if (!seen.has(id)) seen.set(id, { id, name });
+  }
+  return { ok: true, value: [...seen.values()] };
+}
+
+/* ------------------------------------------------------- reading the files */
+
+/** Roster students named in a file: by student ID (as a whole word) or by full name (two words or more). */
+export function findStudents(text: string, roster: readonly Student[]): string[] {
+  const tokens = new Set(text.toUpperCase().match(/[A-Z0-9-]{3,20}/g) ?? []);
+  const words = ` ${normName(text)} `;
+  return roster
+    .filter((s) => tokens.has(s.id) || (normName(s.name).includes(' ') && words.includes(` ${normName(s.name)} `)))
+    .map((s) => s.id);
+}
+
+const IDEA_LINE = /^(?:proposed\s+|app\s+|project\s+)*idea\s*(?:#|no\.?|number)?\s*(?:\d+|[a-e]|one|two|three|four|five)?\s*[:.)\-–—]\s*(.{3,})$/i;
+const IDEA_HEADING = /^(?:\d+[.)]?\s*)?(?:our\s+|the\s+)?(?:proposed\s+|project\s+|app\s+)*ideas?(?:\s+(?:list|proposals?|options))?\s*:?$/i;
+const LIST_ITEM = /^(?:\(?(?:\d{1,2}|[a-e])[.)]|[•\-*▪◦●○■□➢►–])\s*(.{3,})$/i;
+const OTHER_SECTION = /^(?:\d+[.)]?\s*)?(?:contribution|team|group|members?|student|name|signature|declaration|introduction|problem|objectives?|features?|requirements?|references?|conclusion)\b/i;
+
+const tidyIdea = (s: string) => {
+  const t = s.replace(/\s+/g, ' ').replace(/^["“”']+|["“”']+$/g, '').trim();
+  return t.length > MAX_IDEA_LEN ? `${t.slice(0, MAX_IDEA_LEN - 1).trimEnd()}…` : t;
+};
+
+/**
+ * Proposed ideas in a file's text, one per line: "Idea 1: Campus Companion – …" lines, and the numbered or
+ * bulleted items under an "Ideas" / "Proposed ideas" heading.
+ */
+export function extractIdeas(lines: readonly string[]): string[] {
+  const ideas: string[] = [];
+  let inList = false;
+  for (const raw of lines) {
+    const line = raw.replace(/\s+/g, ' ').trim();
+    if (!line) continue;
+    const direct = IDEA_LINE.exec(line);
+    if (direct) { ideas.push(direct[1]); inList = true; continue; }
+    if (IDEA_HEADING.test(line)) { inList = true; continue; }
+    if (!inList) continue;
+    if (OTHER_SECTION.test(line) && !LIST_ITEM.test(line)) { inList = false; continue; }
+    const item = LIST_ITEM.exec(line);
+    if (item) ideas.push(item[1]);
+  }
+  const seen = new Set<string>();
+  return ideas.map(tidyIdea).filter((i) => i.length >= 3 && !seen.has(i.toLowerCase()) && seen.add(i.toLowerCase())).slice(0, MAX_IDEAS);
+}
+
+/* ------------------------------------------------------------------ groups */
+
+export type Group = {
+  key: string;
+  /** The group names students typed for it ("G1", "group 1"). */
+  labels: string[];
+  members: Member[];
+  ideas: string[];
+  /** Entries whose files could not be read. */
+  unread: number;
+};
+
+/**
+ * Builds the groups: submitters, then students named in the group's files, then students added on this page.
+ * A student is listed once per group (the first source wins).
+ */
+export function buildGroups(entries: readonly Pick<Entry, 'id' | 'student_id' | 'name' | 'group_name' | 'note'>[], roster: readonly Student[], plan: Plan): Group[] {
+  const byId = new Map(roster.map((s) => [s.id, s]));
+  const groups = new Map<string, Group>();
+  const get = (key: string) => {
+    let g = groups.get(key);
+    if (!g) groups.set(key, (g = { key, labels: [], members: [], ideas: [], unread: 0 }));
+    return g;
+  };
+  const add = (g: Group, id: string, name: string, source: Source) => {
+    if (!g.members.some((m) => m.id === id)) g.members.push({ id, name, source });
+  };
+  for (const e of entries) {
+    const g = get(groupKey(e.group_name));
+    if (!g.labels.includes(e.group_name)) g.labels.push(e.group_name);
+    add(g, normId(e.student_id), byId.get(normId(e.student_id))?.name ?? e.name, 'submitted');
+  }
+  for (const e of entries) {
+    const g = get(groupKey(e.group_name));
+    const scan = plan.scans[e.id];
+    if (scan?.error) g.unread++;
+    for (const id of scan?.ids ?? []) { const s = byId.get(id); if (s && !plan.removed[g.key]?.includes(id)) add(g, s.id, s.name, 'document'); }
+    g.ideas.push(...(scan?.ideas ?? []), ...extractIdeas(e.note.split(/\r?\n/)));
+  }
+  for (const [key, ids] of Object.entries(plan.added)) {
+    const g = groups.get(key);
+    if (!g) continue;
+    for (const id of ids) add(g, id, byId.get(id)?.name ?? id, 'added');
+  }
+  for (const g of groups.values()) {
+    const seen = new Set<string>();
+    g.ideas = [...g.ideas, ...(plan.extraIdeas[g.key] ?? [])].map(tidyIdea).filter((i) => i && !seen.has(i.toLowerCase()) && seen.add(i.toLowerCase()));
+  }
+  return [...groups.values()].sort((a, b) => compareGroups(a.key, b.key));
+}
+
+/** Students listed in more than one group (each should be in exactly one). */
+export function conflicts(groups: readonly Group[]): { id: string; name: string; groups: string[] }[] {
+  const where = new Map<string, { name: string; groups: string[] }>();
+  for (const g of groups) for (const m of g.members) {
+    const w = where.get(m.id) ?? { name: m.name, groups: [] };
+    w.groups.push(g.key);
+    where.set(m.id, w);
+  }
+  return [...where].filter(([, w]) => w.groups.length > 1).map(([id, w]) => ({ id, ...w }));
+}
+
+/** Roster students who are in no group yet: the only ones who may be added to a group. */
+export function unassigned(groups: readonly Group[], roster: readonly Student[]): Student[] {
+  const taken = new Set(groups.flatMap((g) => g.members.map((m) => m.id)));
+  return roster.filter((s) => !taken.has(s.id));
+}
+
+/** How many more members a group can take. */
+export const openSeats = (g: Pick<Group, 'members'>) => Math.max(0, TEAM_SIZE - g.members.length);
+
+/** A random whole number in [0, n). Pass a seeded one in tests. */
+export type Rand = (n: number) => number;
+export const cryptoRand: Rand = (n) => {
+  const buf = new Uint32Array(1);
+  const limit = Math.floor(0x100000000 / n) * n; // reject the tail so every value is equally likely
+  do crypto.getRandomValues(buf); while (buf[0] >= limit);
+  return buf[0] % n;
+};
+
+/**
+ * Adds random unassigned students to the requested groups. Each request is capped at the group's open seats,
+ * and a student is never added to two groups. Groups are served in random order, so when there aren't enough
+ * students for everyone, which groups miss out is random too. Returns the new `added` map and what happened.
+ */
+export function assignRandom(
+  groups: readonly Group[], roster: readonly Student[], plan: Plan, requests: Record<string, number>, rand: Rand = cryptoRand,
+): { added: Record<string, string[]>; placed: Record<string, Student[]>; short: number } {
+  const pool = unassigned(groups, roster).slice();
+  const added: Record<string, string[]> = Object.fromEntries(Object.entries(plan.added).map(([k, v]) => [k, [...v]]));
+  const placed: Record<string, Student[]> = {};
+  let short = 0;
+  const order = groups.filter((g) => (requests[g.key] ?? 0) > 0);
+  for (let i = order.length - 1; i > 0; i--) { const j = rand(i + 1); [order[i], order[j]] = [order[j], order[i]]; }
+  for (const g of order) {
+    const want = Math.min(Math.floor(requests[g.key]), openSeats(g));
+    for (let n = 0; n < want; n++) {
+      if (!pool.length) { short += want - n; break; }
+      const [s] = pool.splice(rand(pool.length), 1);
+      (added[g.key] ??= []).push(s.id);
+      (placed[g.key] ??= []).push(s);
+    }
+  }
+  return { added, placed, short };
+}
+
+/** A random idea from the list (null when there are none). */
+export const randomIdea = (ideas: readonly string[], rand: Rand = cryptoRand) => (ideas.length ? ideas[rand(ideas.length)] : null);
+
+/* ------------------------------------------------------------- saved plan */
+
+const strList = (v: unknown, max: number, len: number) =>
+  Array.isArray(v) ? [...new Set(v.map((x) => String(x).trim().slice(0, len)).filter(Boolean))].slice(0, max) : [];
+const record = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.entries(v as Record<string, unknown>).slice(0, 1000) : []);
+const keyOk = (k: string) => k.length > 0 && k.length <= 40;
+
+/** Server-side check of a saved plan: drops anything malformed, caps every list. */
+export function cleanPlan(input: unknown): Plan {
+  const p = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+  const plan = emptyPlan();
+  for (const [k, v] of record(p.added)) if (keyOk(k)) { const ids = strList(v, TEAM_SIZE, 20).map(normId).filter((id) => ID_RE.test(id)); if (ids.length) plan.added[k] = ids; }
+  for (const [k, v] of record(p.removed)) if (keyOk(k)) { const ids = strList(v, 20, 20).map(normId).filter((id) => ID_RE.test(id)); if (ids.length) plan.removed[k] = ids; }
+  for (const [k, v] of record(p.extraIdeas)) if (keyOk(k)) { const ideas = strList(v, MAX_IDEAS, MAX_IDEA_LEN); if (ideas.length) plan.extraIdeas[k] = ideas; }
+  for (const [k, v] of record(p.choices)) {
+    const c = v as Partial<Choice> | null;
+    if (keyOk(k) && c && (c.mode === 'manual' || c.mode === 'auto')) plan.choices[k] = { mode: c.mode, idea: String(c.idea ?? '').trim().slice(0, MAX_IDEA_LEN) };
+  }
+  plan.autoAll = p.autoAll === true;
+  plan.later = strList(p.later, 1000, 40);
+  for (const [k, v] of record(p.scans)) {
+    const s = v as Partial<Scan> | null;
+    if (!keyOk(k) || !s || typeof s.updatedAt !== 'string') continue;
+    plan.scans[k] = { updatedAt: s.updatedAt.slice(0, 40), ids: strList(s.ids, 20, 20).map(normId), ideas: strList(s.ideas, MAX_IDEAS, MAX_IDEA_LEN), ...(s.error ? { error: String(s.error).slice(0, 200) } : {}) };
+  }
+  return plan;
+}
+
+/* ------------------------------------------------------------------- sheet */
+
+const who = (m: Student) => `${m.name} (${m.id})`;
+
+/** The groups sheet (CSV, opens in Excel/Sheets). Same columns after the random assignment and after choosing ideas. */
+export function groupsCsv(groups: readonly Group[], plan: Plan, only?: ReadonlySet<string>): string {
+  const cell = (v: string) => {
+    const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+    return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  };
+  const rows = [['Group number', 'Group name(s) submitted', 'All members', 'Newly added members', 'Members added', 'Total members', 'Idea selected', 'How the idea was chosen']];
+  for (const g of groups) {
+    if (only && !only.has(g.key)) continue;
+    const added = g.members.filter((m) => m.source === 'added');
+    const choice = plan.choices[g.key];
+    rows.push([
+      g.key, g.labels.join(' / '), g.members.map(who).join('; '), added.map(who).join('; '), String(added.length), String(g.members.length),
+      choice?.idea ?? '', choice?.idea ? (choice.mode === 'auto' ? 'Random' : 'Manual') : '',
+    ]);
+  }
+  return rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
+}

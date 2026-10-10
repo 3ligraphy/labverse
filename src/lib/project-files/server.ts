@@ -52,6 +52,7 @@ class FilesStore {
   private ready: Promise<void> | null = null;
   private files: string;
   private entries: string;
+  private groups: string;
 
   constructor(url: string, prefix: string, driver: 'neon' | 'postgres') {
     if (driver === 'postgres') {
@@ -63,6 +64,7 @@ class FilesStore {
     }
     this.files = `${prefix}_files`;
     this.entries = `${prefix}_entries`;
+    this.groups = `${prefix}_groups`;
   }
 
   /** Tables are created and migrated on first use (idempotent). */
@@ -87,6 +89,8 @@ class FilesStore {
         device_key text not null, url text not null, pathname text not null, size bigint not null,
         created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
         unique (file_id, student_id))`,
+      // v4: the class list and each item's group plan (/admin/project/[id]/groups), stored as JSON
+      `create table if not exists ${this.groups} (key text primary key, data jsonb not null, updated_at timestamptz not null default now())`,
     ];
     for (const s of statements) await this.run(s);
   }
@@ -139,6 +143,7 @@ class FilesStore {
   async remove(id: string): Promise<{ file: ProjectFile; entries: Entry[] } | null> {
     const entries = (await this.q(`select * from ${this.entries} where file_id = $1`, [id])).map(toEntry);
     const [row] = await this.q(`delete from ${this.files} where id = $1 returning *`, [id]);
+    if (row) await this.q(`delete from ${this.groups} where key = $1`, [`plan:${id}`]);
     return row ? { file: toFile(row), entries } : null;
   }
 
@@ -182,6 +187,20 @@ class FilesStore {
       [like, limit],
     );
     return rows.map((r) => ({ ...toEntry(r), file_title: r.file_title, due_at: iso(r.due_at) }));
+  }
+
+  /** The class list ('roster') or one item's group plan ('plan:<file id>'); null when never saved. */
+  async getGroupData<T>(key: string): Promise<T | null> {
+    const [row] = await this.q(`select data from ${this.groups} where key = $1`, [key]);
+    return row ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : null;
+  }
+
+  async setGroupData(key: string, data: unknown): Promise<void> {
+    await this.q(
+      `insert into ${this.groups} (key, data) values ($1, $2::jsonb)
+       on conflict (key) do update set data = excluded.data, updated_at = now()`,
+      [key, JSON.stringify(data)],
+    );
   }
 
   async removeEntry(id: string): Promise<Entry | null> {

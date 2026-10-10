@@ -1,0 +1,658 @@
+---
+/**
+ * Groups & ideas for one submission item (usually the proposal). Builds each group from the students who handed
+ * in and everyone named in their file's contribution table, adds random unassigned students from the class list
+ * to groups under the team size, lets the admin pick (or draw) each group's idea, and exports the sheet.
+ * Rules: src/lib/project-files/groups.ts · files are read in the browser by src/scripts/doc-text.ts.
+ */
+import Base from '@/layouts/Base.astro';
+import AdminShell from '@/components/admin/AdminShell.astro';
+import { canManageSubmissions } from '@/lib/accounts/labscope';
+import { TEAM_SIZE } from '@/lib/project-files/groups';
+import { getFilesStore } from '@/lib/project-files/server';
+
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store, max-age=0');
+if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin', 303);
+
+const store = getFilesStore();
+const file = store ? await store.get(Astro.params.id ?? '').catch(() => null) : null;
+if (!file) return Astro.redirect('/admin/project', 303);
+---
+<Base title={`Groups & ideas · ${file.title}`} noindex>
+<AdminShell active="submissions">
+  <section class="gp-shell container" data-gp data-id={file.id} data-title={file.title}>
+    <header class="gp-top">
+      <div>
+        <p class="gp-k mono"><a href="/admin/project">← Project submissions</a> · <a href={`/admin/project/${file.id}`}>{file.title}</a></p>
+        <h1>Groups &amp; ideas</h1>
+        <p class="muted">Each group is built from the students who handed in and everyone named in their file's contribution table. Teams have up to {TEAM_SIZE} members.</p>
+      </div>
+      <span class="live mono" data-gp-live>loading…</span>
+    </header>
+
+    <!-- 1 · class list -->
+    <section class="gp-card">
+      <div class="gp-head">
+        <div>
+          <p class="gp-step mono">Step 1</p>
+          <h2>Class list</h2>
+          <p class="muted small" data-gp-roster-sum>Paste every student's name and ID, one per line.</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="button" data-gp-roster-toggle aria-expanded="false">Edit class list</button>
+      </div>
+      <div class="gp-roster" data-gp-roster-edit hidden>
+        <p class="muted small">One student per line: name and ID in either order, separated by a tab, comma or semicolon. Pasting two columns from Excel or Google Sheets works. Saving replaces the whole list.</p>
+        <textarea class="input gp-textarea mono" rows="10" placeholder={'Sara Ali, 23CS0001\nOmar Hassan, 23CS0002'} data-gp-roster-text spellcheck="false"></textarea>
+        <div class="gp-row">
+          <label class="btn btn-ghost btn-sm gp-file">Load CSV file<input type="file" accept=".csv,.txt,.tsv" data-gp-roster-file hidden /></label>
+          <button class="btn btn-primary btn-sm" type="button" data-gp-roster-save>Save class list</button>
+          <span class="small faint" data-gp-roster-msg></span>
+        </div>
+      </div>
+      <details class="gp-pool" data-gp-pool-box>
+        <summary data-gp-pool-sum>Students in no group</summary>
+        <ul class="gp-chips" data-gp-pool></ul>
+      </details>
+    </section>
+
+    <!-- 2 · files -->
+    <section class="gp-card">
+      <div class="gp-head">
+        <div>
+          <p class="gp-step mono">Step 2</p>
+          <h2>Read the hand-ins</h2>
+          <p class="muted small" data-gp-scan-sum>Each file is checked for class-list names and IDs (the contribution table) and for proposed ideas.</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="button" data-gp-rescan>Read all files again</button>
+      </div>
+      <div class="gp-progress" data-gp-scan-bar hidden><progress max="1" value="0"></progress><span class="mono small" data-gp-scan-text></span></div>
+      <ul class="gp-warn" data-gp-warn></ul>
+    </section>
+
+    <!-- 3 · random members -->
+    <section class="gp-card">
+      <div class="gp-head">
+        <div>
+          <p class="gp-step mono">Step 3</p>
+          <h2>Add random members</h2>
+          <p class="muted small">Select groups with fewer than {TEAM_SIZE} members and how many to add. Only students who are in no group can be picked, and each one goes to one group.</p>
+        </div>
+      </div>
+      <div class="gp-tools">
+        <div class="gp-row">
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-select-under>Select all under {TEAM_SIZE}</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-select-none>Clear</button>
+          <label class="gp-num small">Members to add per group
+            <input class="input mono" type="number" min="1" max={TEAM_SIZE - 1} value="1" data-gp-count /></label>
+        </div>
+        <div class="gp-row">
+          <button class="btn btn-primary btn-sm" type="button" data-gp-assign disabled>Assign random members</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-undo>Undo additions</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-sheet="groups">Download sheet</button>
+        </div>
+      </div>
+      <p class="gp-msg" role="status" data-gp-assign-msg></p>
+      <div class="table-wrap">
+        <table class="table gp-table">
+          <thead><tr><th class="gp-cb"></th><th>Group</th><th>Members</th><th>Size</th><th>Add</th></tr></thead>
+          <tbody data-gp-rows><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4 · ideas -->
+    <section class="gp-card">
+      <div class="gp-head">
+        <div>
+          <p class="gp-step mono">Step 4</p>
+          <h2>Choose each group's idea</h2>
+          <p class="muted small">Pick an idea yourself, or let the system draw one at random, for each group.</p>
+        </div>
+        <div class="gp-row">
+          <label class="gp-check"><input type="checkbox" data-gp-auto-all /> Choose every group's idea at random</label>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-redraw-all hidden>Draw again for all</button>
+        </div>
+      </div>
+      <div class="gp-ideas" data-gp-ideas></div>
+      <div class="gp-row gp-foot">
+        <button class="btn btn-primary btn-sm" type="button" data-gp-sheet="ideas">Download groups &amp; ideas sheet</button>
+        <span class="small faint" data-gp-ideas-sum></span>
+      </div>
+    </section>
+    <p class="gp-msg" role="status" data-gp-msg></p>
+  </section>
+</AdminShell>
+</Base>
+
+<style is:global>
+  .gp-shell { min-height: 85dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 20px; align-content: start; }
+  .gp-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; }
+  .gp-k a:hover { text-decoration: underline; }
+  .gp-top { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
+  .gp-top h1 { font-size: var(--fs-xl); letter-spacing: -.04em; margin-top: 3px; }
+  .gp-card { border: 1px solid var(--line-2); background: var(--surface); border-radius: var(--r-lg); padding: clamp(16px, 3vw, 24px); min-width: 0; display: grid; gap: 14px; }
+  .gp-card h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
+  .gp-step { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+  .gp-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; flex-wrap: wrap; }
+  .gp-head p.small { margin-top: 4px; max-width: 70ch; }
+  .gp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .gp-tools { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .gp-roster { display: grid; gap: 10px; }
+  .gp-textarea { width: 100%; min-height: 180px; padding: 12px; font-size: 13px; resize: vertical; }
+  .gp-file { cursor: pointer; }
+  .gp-num { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); }
+  .gp-num input, .gp-add { width: 64px; height: 34px; padding: 0 8px; }
+  .gp-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
+  .gp-check input, .gp-cb input, .gp-idea input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  .gp-cb { width: 32px; }
+  .gp-table td { vertical-align: top; }
+  .gp-table tr.sel td { background: var(--accent-soft); }
+  .gp-table tr.full td { opacity: .75; }
+  .gp-chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .gp-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 12.5px; background: var(--surface-2); }
+  .gp-chip small { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3); }
+  .gp-chip.document { border-style: dashed; }
+  .gp-chip.added { border-color: var(--accent-text); background: var(--accent-soft); }
+  .gp-chip.clash { border-color: var(--warn); }
+  .gp-chip button { border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 0 0 0 2px; font-size: 14px; line-height: 1; }
+  .gp-chip button:hover { color: var(--danger); }
+  .gp-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-3); }
+  .gp-size { font-family: var(--font-mono); white-space: nowrap; }
+  .gp-size.short { color: var(--warn); }
+  .gp-pool summary { cursor: pointer; font-size: 13.5px; color: var(--text-2); }
+  .gp-pool ul { margin-top: 10px; }
+  .gp-progress { display: flex; align-items: center; gap: 10px; }
+  .gp-progress progress { flex: 1; max-width: 360px; accent-color: var(--accent); }
+  .gp-warn { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 13px; }
+  .gp-warn li { padding: 8px 12px; border-radius: 10px; background: color-mix(in oklab, var(--warn) 12%, transparent); color: var(--text-2); }
+  .gp-warn li.info { background: var(--surface-2); }
+  .gp-ideas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+  .gp-group { border: 1px solid var(--line-2); border-radius: var(--r-md, 12px); padding: 14px; display: grid; gap: 10px; align-content: start; background: color-mix(in oklab, var(--surface-2) 50%, transparent); }
+  .gp-group h3 { font-size: 15px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .gp-group .members { font-size: 12.5px; color: var(--text-3); }
+  .gp-short { display: grid; gap: 8px; padding: 10px; border-radius: 10px; background: color-mix(in oklab, var(--warn) 12%, transparent); font-size: 12.5px; }
+  .gp-seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; overflow: hidden; }
+  .gp-seg button { border: 0; background: none; padding: 5px 12px; font: 500 12px var(--font-body); color: var(--text-2); cursor: pointer; }
+  .gp-seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); }
+  .gp-seg button:disabled { cursor: not-allowed; opacity: .6; }
+  .gp-idea-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+  .gp-idea { display: flex; gap: 8px; align-items: start; padding: 6px 8px; border-radius: 8px; font-size: 13px; }
+  .gp-idea.on { background: var(--accent-soft); }
+  .gp-idea label { display: flex; gap: 8px; align-items: start; flex: 1; cursor: pointer; }
+  .gp-idea button { border: 0; background: none; color: var(--text-3); cursor: pointer; }
+  .gp-pick { padding: 10px; border-radius: 10px; border: 1px solid var(--accent-text); background: var(--accent-soft); font-size: 13.5px; }
+  .gp-pick small { display: block; color: var(--text-3); font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+  .gp-new { display: flex; gap: 6px; }
+  .gp-new input { flex: 1; height: 34px; padding: 0 10px; font-size: 13px; }
+  .gp-foot { padding-top: 6px; border-top: 1px solid var(--line); }
+  .gp-msg { min-height: 20px; font-size: 13px; color: var(--accent-text); }
+  .gp-msg.err { color: var(--danger); }
+  /* random assignment: the cardboard-box show (src/scripts/box-shuffle.ts) */
+  .bx { width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid var(--line-2); border-radius: 22px; background: var(--surface); color: var(--text); box-shadow: 0 40px 120px -30px rgb(0 0 0 / .6); overflow: auto; }
+  .bx::backdrop { background: rgb(5 8 12 / .55); backdrop-filter: blur(6px); }
+  .bx-wrap { display: grid; gap: 16px; padding: clamp(16px, 4vw, 26px); }
+  .bx-top { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+  .bx-k { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-text); }
+  .bx-top h2 { font-size: var(--fs-lg); letter-spacing: -.02em; margin-top: 2px; }
+  .bx-stage { display: grid; gap: 18px; justify-items: center; min-height: 300px; }
+  .bx-stage.done { min-height: 0; }
+  .bx-stage.done .bx-tray { display: none; }
+  .bx-tray { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 640px; min-height: 30px; }
+  .bx-tok { display: inline-block; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface-2); font-size: 12.5px; white-space: nowrap; will-change: transform; }
+  .bx-tok.grp { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+  .bx-tok.more { color: var(--text-3); }
+  .bx-tok.fly { position: absolute; left: 52%; top: 30%; translate: -50% -50%; z-index: 3; background: var(--accent-soft); border-color: var(--accent-text); font-weight: 600; opacity: 0; pointer-events: none; }
+  .bx-box { position: relative; width: 220px; aspect-ratio: 240 / 220; transform-origin: 50% 92%; }
+  .bx-stage.done .bx-box { width: 130px; }
+  .bx-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .bx-body { transform-box: view-box; transform-origin: 50% 92%; }
+  .bx-shadow { fill: rgb(0 0 0 / .22); }
+  .bx-inside-wall { fill: #2c1a0b; opacity: .6; }
+  .bx-face, .bx-flap { stroke: #7a4d22; stroke-width: 1.4; stroke-linejoin: round; }
+  .bx-crease { fill: none; stroke: #f1c98f; stroke-width: 1.2; opacity: .55; }
+  .bx-tape-front { fill: #f3dfb4; opacity: .78; }
+  .bx-tape-top { fill: none; stroke: #f3dfb4; stroke-width: 20; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transform-box: fill-box; transform-origin: 50% 50%; }
+  .bx-stamp rect { fill: none; stroke: #8b2f1a; stroke-width: 2.4; opacity: .75; }
+  .bx-stamp text { font: 800 12.5px var(--font-mono); letter-spacing: .16em; fill: #8b2f1a; opacity: .8; }
+  .bx-arrows path { fill: none; stroke: #4a2e14; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+  .bx-arrows rect { fill: #4a2e14; opacity: .55; }
+  .bx-dust { position: absolute; top: 40%; width: 22px; height: 34px; opacity: 0; border-left: 3px solid var(--text-3); border-right: 3px solid var(--text-3); border-radius: 50%; pointer-events: none; }
+  .bx-dust.l { left: -30px; clip-path: inset(0 50% 0 0); }
+  .bx-dust.r { right: -30px; clip-path: inset(0 0 0 50%); }
+  .bx-results { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .bx-results li { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); transition: border-color .2s, background .2s; }
+  .bx-results li.on { border-color: var(--accent-text); background: var(--accent-soft); }
+  .bx-slots { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }
+  .bx-slot { padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--line-2); color: transparent; font-size: 12.5px; transition: color .25s, background .25s, border-color .25s; }
+  .bx-slot small { color: inherit; font-size: 10.5px; }
+  .bx-slot.in { color: var(--text); background: var(--accent-soft); border: 1px solid var(--accent-text); animation: bx-pop .35s cubic-bezier(.3,1.6,.5,1); }
+  .bx-slot.in small { color: var(--text-3); }
+  .bx-none { font-size: 12.5px; color: var(--warn); }
+  .bx-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
+  .bx-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  @keyframes bx-pop { from { transform: scale(.6); } to { transform: scale(1); } }
+
+  /* phones */
+  @media (max-width: 720px) {
+    .gp-shell { padding-top: 24px; gap: 14px; }
+    .gp-top { align-items: start; }
+    .gp-head > .btn, .gp-head > .gp-row { width: 100%; }
+    .gp-head > .btn { justify-content: center; }
+    .gp-shell .btn { white-space: nowrap; justify-content: center; min-height: 40px; }
+    .gp-tools { display: grid; gap: 8px; width: 100%; }
+    .gp-tools .gp-row { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+    .gp-tools .btn { justify-content: center; }
+    .gp-tools .gp-num { grid-column: 1 / -1; justify-content: space-between; }
+    .gp-tools .gp-num input { flex: none; }
+    .gp-tools [data-gp-assign] { grid-column: 1 / -1; min-height: 42px; }
+    .gp-row.gp-foot { display: grid; }
+    .gp-foot .btn { justify-content: center; min-height: 42px; }
+    .gp-table, .gp-table tbody { display: block; min-width: 0; }
+    .gp-table td { min-width: 0; }
+    .gp-chip { max-width: 100%; flex-wrap: wrap; }
+    .gp-table thead { display: none; }
+    .gp-table tr { display: grid; grid-template-columns: 28px 1fr auto; grid-template-areas: "cb name size" "cb members members" "cb add add"; gap: 6px 10px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+    .gp-table td { display: block; padding: 0; border: 0; }
+    .gp-table td:nth-child(1) { grid-area: cb; }
+    .gp-table td:nth-child(2) { grid-area: name; }
+    .gp-table td:nth-child(3) { grid-area: members; }
+    .gp-table td:nth-child(4) { grid-area: size; text-align: right; }
+    .gp-table td:nth-child(5) { grid-area: add; }
+    .gp-table td:nth-child(5):has(input)::before { content: 'Members to add'; margin-right: 10px; font-size: 12px; color: var(--text-3); }
+    .gp-table td[colspan] { grid-column: 1 / -1; grid-area: auto; }
+    .gp-table tr:has(td[colspan]) { display: block; }
+    .gp-table br { display: none; }
+    .gp-table td:nth-child(2) small { margin-left: 6px; }
+    .gp-chip { font-size: 12px; }
+    .gp-ideas { grid-template-columns: 1fr; }
+    .gp-seg { width: 100%; } .gp-seg button { flex: 1; padding: 8px; }
+    .gp-short .btn { flex: 2; justify-content: center; padding-inline: 10px; }
+    .gp-short .btn-ghost { flex: 1; }
+    .bx-stage { min-height: 260px; }
+    .bx-box { width: 180px; }
+    .bx-foot .bx-btns { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+    .bx-foot .btn { justify-content: center; min-height: 42px; }
+  }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  import { readDocText } from '@/scripts/doc-text';
+  import { playBox } from '@/scripts/box-shuffle';
+  import {
+    TEAM_SIZE, assignRandom, buildGroups, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
+    randomIdea, unassigned, type Group, type Plan, type Student,
+  } from '@/lib/project-files/groups';
+  import type { Entry } from '@/lib/project-files/core';
+
+  const PARALLEL = 3;
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const SOURCE_LABEL = { submitted: 'handed in', document: 'named in the file', added: 'added here' } as const;
+
+  onPageLoad(() => {
+    const root = document.querySelector<HTMLElement>('[data-gp]');
+    if (!root || root.dataset.wired) return;
+    root.dataset.wired = '1';
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const fileId = root.dataset.id!;
+    const title = root.dataset.title ?? 'project';
+
+    let entries: Entry[] = [];
+    let roster: Student[] = [];
+    let plan: Plan = emptyPlan();
+    let groups: Group[] = [];
+    const selected = new Set<string>();
+    const counts = new Map<string, number>();
+    let scanning = false;
+
+    const live = $('[data-gp-live]');
+    const msg = $('[data-gp-msg]');
+    const say = (text: string, err = false, el = msg) => { el.className = `gp-msg ${err ? 'err' : ''}`; el.textContent = text; };
+
+    /* ------------------------------------------------------------- saving */
+    let saveTimer: ReturnType<typeof setTimeout> | undefined;
+    const save = () => {
+      clearTimeout(saveTimer);
+      live.textContent = 'saving…';
+      saveTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/admin/project/groups?file=${encodeURIComponent(fileId)}`, {
+            method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan }),
+          });
+          if (res.status === 401) return location.reload();
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Could not save.');
+          live.classList.add('on');
+          live.textContent = `saved · ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+        } catch (error) {
+          live.classList.remove('on');
+          live.textContent = error instanceof Error ? error.message : 'Could not save.';
+        }
+      }, 500);
+    };
+
+    /* ------------------------------------------------------------ rendering */
+    const clashIds = () => new Set(conflicts(groups).map((c) => c.id));
+    const chip = (m: Group['members'][number], key: string, clash: Set<string>) =>
+      `<li class="gp-chip ${m.source} ${clash.has(m.id) ? 'clash' : ''}" title="${esc(SOURCE_LABEL[m.source])}${clash.has(m.id) ? ' · also in another group' : ''}">${esc(m.name)} <small>${esc(m.id)}</small>${
+        m.source === 'added' ? `<button type="button" data-unadd="${esc(key)}" data-sid="${esc(m.id)}" aria-label="Remove ${esc(m.name)} from ${esc(key)}">×</button>`
+        : m.source === 'document' ? `<button type="button" data-drop-member="${esc(key)}" data-sid="${esc(m.id)}" aria-label="Take ${esc(m.name)} out of ${esc(key)}" title="Take out of this group">×</button>` : ''}</li>`;
+
+    const wantFor = (g: Group) => Math.min(counts.get(g.key) ?? Number($<HTMLInputElement>('[data-gp-count]').value || 1), openSeats(g));
+
+    function renderRoster() {
+      const pool = unassigned(groups, roster);
+      $('[data-gp-roster-sum]').textContent = roster.length
+        ? `${plural(roster.length, 'student')} in the class list · ${roster.length - pool.length} in a group · ${pool.length} in no group.`
+        : 'No class list yet. Paste every student\'s name and ID: random members are picked from it, and it is how names in the files are recognised.';
+      $('[data-gp-pool-sum]').textContent = `Students in no group (${pool.length})`;
+      $('[data-gp-pool-box]').hidden = !roster.length;
+      $('[data-gp-pool]').innerHTML = pool.map((s) => `<li class="gp-chip">${esc(s.name)} <small>${esc(s.id)}</small></li>`).join('') || '<li class="muted small">Everyone is in a group.</li>';
+      if (!roster.length && $('[data-gp-roster-edit]').hidden) toggleRoster(true);
+    }
+
+    function renderWarnings() {
+      const scanned = entries.filter((e) => plan.scans[e.id]?.updatedAt === e.updated_at);
+      const failed = entries.filter((e) => plan.scans[e.id]?.error);
+      $('[data-gp-scan-sum]').textContent = entries.length
+        ? `${scanned.length} of ${plural(entries.length, 'file')} read · ${plural(groups.length, 'group')} · ${groups.reduce((n, g) => n + g.ideas.length, 0)} ideas found.`
+        : 'No hand-ins yet.';
+      const items: string[] = [];
+      for (const c of conflicts(groups)) items.push(`<li><b>${esc(c.name)}</b> (${esc(c.id)}) is listed in ${c.groups.map(esc).join(' and ')}. Check the files; a student should be in one group.</li>`);
+      for (const e of failed) items.push(`<li>${esc(e.group_name)} · ${esc(e.name)}: ${esc(plan.scans[e.id]!.error!)} <a href="${esc(e.url)}" target="_blank" rel="noopener">Open file ↗</a></li>`);
+      if (!roster.length && entries.length) items.push('<li class="info">Add the class list (step 1) so names and IDs in the contribution tables can be recognised.</li>');
+      $('[data-gp-warn]').innerHTML = items.join('');
+    }
+
+    function renderRows() {
+      const clash = clashIds();
+      const rows = $('[data-gp-rows]');
+      rows.innerHTML = groups.length ? groups.map((g) => {
+        const open = openSeats(g);
+        const on = selected.has(g.key);
+        return `<tr class="${on ? 'sel' : ''} ${open ? '' : 'full'}">
+          <td class="gp-cb"><input type="checkbox" data-pick="${esc(g.key)}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'} aria-label="Select ${esc(g.key)}" /></td>
+          <td><b class="mono">${esc(g.key)}</b>${g.labels.length && g.labels.join() !== g.key ? `<br><small class="faint">${g.labels.map(esc).join(' / ')}</small>` : ''}</td>
+          <td><ul class="gp-chips">${g.members.map((m) => chip(m, g.key, clash)).join('')}</ul>${g.unread ? `<small class="faint">${plural(g.unread, 'file')} could not be read</small>` : ''}${plan.removed[g.key]?.length ? `<small class="faint">${plural(plan.removed[g.key].length, 'student')} taken out · <button class="btn btn-ghost btn-sm" type="button" data-restore="${esc(g.key)}">Restore</button></small>` : ''}</td>
+          <td><span class="gp-size ${open ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></td>
+          <td>${open ? `<input class="input mono gp-add" type="number" min="1" max="${open}" value="${wantFor(g)}" data-count-for="${esc(g.key)}" aria-label="Members to add to ${esc(g.key)}" />` : '<small class="faint">full</small>'}</td>
+        </tr>`;
+      }).join('') + `<tr><td colspan="5"><div class="gp-legend"><span class="gp-chip">handed in</span><span class="gp-chip document">named in the file</span><span class="gp-chip added">added here</span><span class="gp-chip clash">in two groups</span></div></td></tr>`
+        : `<tr><td colspan="5" class="muted">${entries.length ? 'Reading files…' : 'No hand-ins yet.'}</td></tr>`;
+      $<HTMLButtonElement>('[data-gp-assign]').disabled = scanning || !roster.length || ![...selected].some((k) => groups.some((g) => g.key === k && openSeats(g)));
+    }
+
+    function renderIdeas() {
+      const auto = plan.autoAll;
+      $<HTMLInputElement>('[data-gp-auto-all]').checked = auto;
+      $('[data-gp-redraw-all]').hidden = !auto;
+      const pool = unassigned(groups, roster).length;
+      $('[data-gp-ideas]').innerHTML = groups.map((g) => {
+        const choice = plan.choices[g.key];
+        const mode = auto ? 'auto' : choice?.mode ?? 'manual';
+        const extra = new Set(plan.extraIdeas[g.key] ?? []);
+        const short = openSeats(g) > 0;
+        const later = plan.later.includes(g.key);
+        return `<article class="gp-group" data-group="${esc(g.key)}">
+          <h3><span class="mono">${esc(g.key)}</span><span class="gp-size ${short ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></h3>
+          <p class="members">${g.members.map((m) => `${esc(m.name)}${m.source === 'added' ? ' <b>(new)</b>' : ''}`).join(', ') || 'No members found'}</p>
+          ${short ? later
+            ? `<p class="small faint">Fill later · <button class="btn btn-ghost btn-sm" type="button" data-unlater="${esc(g.key)}">Show options</button></p>`
+            : `<div class="gp-short"><span>This group has ${g.members.length} of ${TEAM_SIZE} members. Add a random student who is in no group now (optional), or do it later.</span>
+                <div class="gp-row"><button class="btn btn-primary btn-sm" type="button" data-add-one="${esc(g.key)}" ${pool && !scanning ? '' : 'disabled'}>Add random member</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-later="${esc(g.key)}">Later</button>${pool ? '' : '<small class="faint">No unassigned students left.</small>'}</div></div>` : ''}
+          <div class="gp-row"><div class="gp-seg" role="group" aria-label="How to choose ${esc(g.key)}'s idea">
+            <button type="button" data-mode="manual" data-for="${esc(g.key)}" aria-pressed="${mode === 'manual'}" ${auto ? 'disabled' : ''}>Choose myself</button>
+            <button type="button" data-mode="auto" data-for="${esc(g.key)}" aria-pressed="${mode === 'auto'}" ${auto ? 'disabled' : ''}>Random</button>
+          </div>${mode === 'auto' && g.ideas.length > 1 ? `<button class="btn btn-ghost btn-sm" type="button" data-redraw="${esc(g.key)}">Draw again</button>` : ''}</div>
+          ${mode === 'auto'
+            ? `<div class="gp-pick"><small>Drawn at random from ${plural(g.ideas.length, 'idea')}</small>${choice?.idea ? esc(choice.idea) : '<span class="faint">No ideas to draw from yet. Add some below.</span>'}</div>`
+            : ''}
+          <ul class="gp-idea-list">${g.ideas.map((idea, i) => `<li class="gp-idea ${choice?.idea === idea ? 'on' : ''}">
+              ${mode === 'manual'
+                ? `<label><input type="radio" name="idea-${esc(g.key)}" data-choose="${esc(g.key)}" value="${i}" ${choice?.idea === idea ? 'checked' : ''} /> <span>${esc(idea)}</span></label>`
+                : `<span>${esc(idea)}</span>`}
+              ${extra.has(idea) ? `<button type="button" data-drop-idea="${esc(g.key)}" data-i="${i}" aria-label="Remove this idea">×</button>` : ''}
+            </li>`).join('') || '<li class="small faint">No ideas found in this group\'s file.</li>'}</ul>
+          <form class="gp-new" data-new-idea="${esc(g.key)}"><input class="input" maxlength="200" placeholder="Add an idea" aria-label="Add an idea for ${esc(g.key)}" /><button class="btn btn-ghost btn-sm" type="submit">Add</button></form>
+        </article>`;
+      }).join('') || '<p class="muted">Groups appear here once students hand in.</p>';
+      const chosen = groups.filter((g) => plan.choices[g.key]?.idea).length;
+      $('[data-gp-ideas-sum]').textContent = groups.length ? `${chosen} of ${plural(groups.length, 'group')} have an idea selected.` : '';
+    }
+
+    function render() {
+      groups = buildGroups(entries, roster, plan);
+      for (const k of [...selected]) if (!groups.some((g) => g.key === k && openSeats(g))) selected.delete(k);
+      renderRoster();
+      renderWarnings();
+      renderRows();
+      renderIdeas();
+    }
+
+    /* ------------------------------------------------------- reading files */
+    async function scan(force = false) {
+      if (scanning) return;
+      const todo = entries.filter((e) => force || plan.scans[e.id]?.updatedAt !== e.updated_at);
+      if (!todo.length) return;
+      scanning = true;
+      const bar = $('[data-gp-scan-bar]');
+      const progress = bar.querySelector('progress')!;
+      const text = $('[data-gp-scan-text]');
+      bar.hidden = false;
+      progress.max = todo.length;
+      progress.value = 0;
+      let done = 0;
+      const queue = [...todo];
+      const worker = async () => {
+        for (let e = queue.shift(); e; e = queue.shift()) {
+          const doc = await readDocText(e.url);
+          plan.scans[e.id] = 'error' in doc
+            ? { updatedAt: e.updated_at, ids: [], ideas: [], error: doc.error }
+            : { updatedAt: e.updated_at, ids: findStudents(doc.lines.join('\n'), roster).slice(0, 20), ideas: extractIdeas(doc.lines) };
+          progress.value = ++done;
+          text.textContent = `Reading ${done} of ${plural(todo.length, 'file')}…`;
+          render();
+        }
+      };
+      try {
+        await Promise.all(Array.from({ length: Math.min(PARALLEL, todo.length) }, worker));
+      } finally {
+        scanning = false;
+        bar.hidden = true;
+        // Choices for ideas that no longer exist (a re-submitted file) are dropped.
+        render();
+        for (const g of groups) if (plan.choices[g.key]?.idea && !g.ideas.includes(plan.choices[g.key].idea)) plan.choices[g.key].idea = '';
+        if (plan.autoAll) drawAll(false);
+        render();
+        save();
+      }
+    }
+
+    async function load() {
+      try {
+        const res = await fetch(`/api/admin/project/groups?file=${encodeURIComponent(fileId)}`, { cache: 'no-store' });
+        if (res.status === 401) return location.reload();
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Could not load.');
+        entries = data.entries;
+        roster = data.roster;
+        plan = data.plan;
+        $<HTMLTextAreaElement>('[data-gp-roster-text]').value = roster.map((s) => `${s.name}, ${s.id}`).join('\n');
+        // Hand-ins that were deleted take their scans with them.
+        for (const id of Object.keys(plan.scans)) if (!entries.some((e) => e.id === id)) delete plan.scans[id];
+        live.classList.add('on');
+        live.textContent = 'loaded';
+        render();
+        await scan();
+      } catch (error) {
+        live.classList.remove('on');
+        live.textContent = error instanceof Error ? error.message : 'Could not load.';
+      }
+    }
+
+    /* ---------------------------------------------------------- class list */
+    function toggleRoster(open: boolean) {
+      $('[data-gp-roster-edit]').hidden = !open;
+      $('[data-gp-roster-toggle]').setAttribute('aria-expanded', String(open));
+      $('[data-gp-roster-toggle]').textContent = open ? 'Close' : 'Edit class list';
+    }
+    $('[data-gp-roster-toggle]').addEventListener('click', () => toggleRoster($('[data-gp-roster-edit]').hidden));
+    $<HTMLInputElement>('[data-gp-roster-file]').addEventListener('change', async (e) => {
+      const f = (e.target as HTMLInputElement).files?.[0];
+      if (f) $<HTMLTextAreaElement>('[data-gp-roster-text]').value = await f.text();
+    });
+    $('[data-gp-roster-save]').addEventListener('click', async () => {
+      const out = $('[data-gp-roster-msg]');
+      const parsed = parseRoster($<HTMLTextAreaElement>('[data-gp-roster-text]').value);
+      if (!parsed.students.length) { out.textContent = 'No students found. Each line needs a name and an ID.'; return; }
+      const res = await fetch('/api/admin/project/groups', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ roster: parsed.students }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { out.textContent = data.error ?? 'Could not save.'; return; }
+      roster = data.roster;
+      out.textContent = `Saved ${plural(roster.length, 'student')}.${parsed.skipped.length ? ` Skipped ${parsed.skipped.length} line(s): ${parsed.skipped.slice(0, 3).join(' · ')}${parsed.skipped.length > 3 ? '…' : ''}` : ''}`;
+      // Names in the files are matched against the class list, so read them again with the new one.
+      render();
+      await scan(true);
+    });
+    $('[data-gp-rescan]').addEventListener('click', () => scan(true));
+
+    /* ----------------------------------------------------- random members */
+    const assignMsg = $('[data-gp-assign-msg]');
+    function assign(requests: Record<string, number>, el: HTMLElement) {
+      const pool = unassigned(groups, roster);
+      const r = assignRandom(groups, roster, plan, requests);
+      plan.added = r.added;
+      plan.later = plan.later.filter((k) => !r.placed[k]);
+      const placed = Object.entries(r.placed);
+      const n = placed.reduce((a, [, s]) => a + s.length, 0);
+      say(n
+        ? `Added ${plural(n, 'student')}: ${placed.map(([k, s]) => `${k} ← ${s.map((x) => x.name).join(', ')}`).join(' · ')}.${r.short ? ` ${plural(r.short, 'seat')} could not be filled: no unassigned students left.` : ''}`
+        : 'No one was added: there are no unassigned students left.', !n, el);
+      render();
+      save();
+      // The draw is made and saved; now show it: groups thrown in a box, shaken, students drawn out.
+      const draws = [
+        ...Object.entries(r.placed).map(([group, students]) => ({ group, students })),
+        ...Object.keys(requests).filter((k) => requests[k] > 0 && !r.placed[k]).map((group) => ({ group, students: [] })),
+      ];
+      if (draws.length) void playBox({ draws, pool, short: r.short, onSheet: () => download('groups') });
+      return n;
+    }
+    $('[data-gp-assign]').addEventListener('click', () => {
+      const requests = Object.fromEntries(groups.filter((g) => selected.has(g.key)).map((g) => [g.key, wantFor(g)]));
+      if (assign(requests, assignMsg)) assignMsg.insertAdjacentHTML('beforeend', ' <button class="btn btn-ghost btn-sm" type="button" data-gp-sheet="groups">Download sheet</button>');
+      selected.clear();
+      renderRows();
+    });
+    $('[data-gp-undo]').addEventListener('click', (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      if (!Object.keys(plan.added).length) return say('No members have been added on this page.', false, assignMsg);
+      if (btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Confirm undo'; setTimeout(() => { btn.dataset.armed = ''; btn.textContent = 'Undo additions'; }, 4000); return; }
+      btn.dataset.armed = ''; btn.textContent = 'Undo additions';
+      plan.added = {};
+      say('Removed every member added on this page.', false, assignMsg);
+      render();
+      save();
+    });
+    $('[data-gp-select-under]').addEventListener('click', () => { for (const g of groups) if (openSeats(g)) selected.add(g.key); renderRows(); });
+    $('[data-gp-select-none]').addEventListener('click', () => { selected.clear(); renderRows(); });
+    $('[data-gp-count]').addEventListener('input', () => { counts.clear(); renderRows(); });
+
+    const rows = $('[data-gp-rows]');
+    rows.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.dataset.pick) { if (t.checked) selected.add(t.dataset.pick); else selected.delete(t.dataset.pick); renderRows(); }
+      if (t.dataset.countFor) { counts.set(t.dataset.countFor, Math.max(1, Math.floor(Number(t.value) || 1))); renderRows(); }
+    });
+
+    /* --------------------------------------------------------------- ideas */
+    const draw = (g: Group) => { plan.choices[g.key] = { mode: 'auto', idea: randomIdea(g.ideas) ?? '' }; };
+    function drawAll(all: boolean) {
+      for (const g of groups) if (all || !plan.choices[g.key]?.idea || plan.choices[g.key].mode !== 'auto') draw(g);
+    }
+    $<HTMLInputElement>('[data-gp-auto-all]').addEventListener('change', (e) => {
+      plan.autoAll = (e.target as HTMLInputElement).checked;
+      if (plan.autoAll) drawAll(true);
+      render();
+      save();
+    });
+    $('[data-gp-redraw-all]').addEventListener('click', () => { drawAll(true); render(); save(); });
+
+    // Also handles the × on members in the table (remove an added member, take out one found in a file).
+    root.addEventListener('click', (e) => {
+      const t = (e.target as HTMLElement).closest<HTMLElement>('button');
+      if (!t) return;
+      const d = t.dataset;
+      const g = groups.find((x) => x.key === (d.for ?? d.redraw ?? d.addOne ?? d.later ?? d.unlater ?? d.dropIdea ?? d.unadd ?? d.dropMember ?? d.restore));
+      if (d.gpSheet) return download(d.gpSheet as 'groups' | 'ideas');
+      if (!g) return;
+      if (d.mode) {
+        const mode = d.mode as 'manual' | 'auto';
+        if (mode === 'auto') draw(g); else plan.choices[g.key] = { mode, idea: plan.choices[g.key]?.idea ?? '' };
+      } else if (d.redraw) {
+        const others = g.ideas.filter((i) => i !== plan.choices[g.key]?.idea);
+        plan.choices[g.key] = { mode: 'auto', idea: randomIdea(others.length ? others : g.ideas) ?? '' };
+      } else if (d.addOne) {
+        assign({ [g.key]: 1 }, msg);
+      } else if (d.later) {
+        plan.later = [...new Set([...plan.later, g.key])];
+      } else if (d.unlater) {
+        plan.later = plan.later.filter((k) => k !== g.key);
+      } else if (d.dropIdea) {
+        const idea = g.ideas[Number(d.i)];
+        plan.extraIdeas[g.key] = (plan.extraIdeas[g.key] ?? []).filter((i) => i !== idea);
+        if (plan.choices[g.key]?.idea === idea) plan.choices[g.key].idea = '';
+      } else if (d.unadd) {
+        plan.added[g.key] = (plan.added[g.key] ?? []).filter((id) => id !== d.sid);
+        if (!plan.added[g.key].length) delete plan.added[g.key];
+      } else if (d.dropMember) {
+        plan.removed[g.key] = [...new Set([...(plan.removed[g.key] ?? []), d.sid!])];
+      } else if (d.restore) {
+        delete plan.removed[g.key];
+      } else return;
+      render();
+      save();
+    });
+    root.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (!t.dataset.choose) return;
+      const g = groups.find((x) => x.key === t.dataset.choose);
+      if (!g) return;
+      plan.choices[g.key] = { mode: 'manual', idea: g.ideas[Number(t.value)] ?? '' };
+      render();
+      save();
+    });
+    root.addEventListener('submit', (e) => {
+      const form = (e.target as HTMLElement).closest<HTMLFormElement>('[data-new-idea]');
+      if (!form) return;
+      e.preventDefault();
+      const key = form.dataset.newIdea!;
+      const idea = form.querySelector('input')!.value.replace(/\s+/g, ' ').trim();
+      if (idea.length < 3) return;
+      plan.extraIdeas[key] = [...new Set([...(plan.extraIdeas[key] ?? []), idea])];
+      const g = groups.find((x) => x.key === key);
+      if (g && (plan.autoAll || plan.choices[key]?.mode === 'auto') && !plan.choices[key]?.idea) plan.choices[key] = { mode: 'auto', idea };
+      render();
+      save();
+      root.querySelector<HTMLInputElement>(`[data-new-idea="${CSS.escape(key)}"] input`)?.focus();
+    });
+
+    /* --------------------------------------------------------------- sheet */
+    function download(kind: 'groups' | 'ideas') {
+      const missing = kind === 'ideas' ? groups.filter((g) => !plan.choices[g.key]?.idea).length : 0;
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project';
+      const blob = new Blob(['﻿' + groupsCsv(groups, plan)], { type: 'text/csv;charset=utf-8' });
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${slug}-${kind === 'ideas' ? 'groups-and-ideas' : 'groups'}.csv` });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+      const shortGroups = groups.filter((g) => openSeats(g)).length;
+      say(`Sheet downloaded: ${plural(groups.length, 'group')}.${missing ? ` ${plural(missing, 'group')} still ${missing === 1 ? 'has' : 'have'} no idea selected.` : ''}${shortGroups ? ` ${plural(shortGroups, 'group')} ${shortGroups === 1 ? 'has' : 'have'} fewer than ${TEAM_SIZE} members.` : ''}`);
+    }
+
+    load();
+  });
+</script>
