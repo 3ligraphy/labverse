@@ -127,6 +127,10 @@ test('parseEntry rejects bad names, IDs, groups, long notes and missing device k
   assert.equal(parseEntry({ ...ok, studentId: '12' }).ok, false);
   assert.equal(parseEntry({ ...ok, studentId: '23 CS 42' }).ok, false);
   assert.equal(parseEntry({ ...ok, group: '' }).ok, false);
+  // a student ID or lab group code is not a team number
+  assert.equal(parseEntry({ ...ok, group: 'Group 269411' }).ok, false);
+  assert.equal(parseEntry({ ...ok, group: '245793' }).ok, false);
+  assert.equal(parseEntry({ ...ok, group: 'Team 12' }).ok, true);
   assert.equal(parseEntry({ ...ok, note: 'x'.repeat(501) }).ok, false);
   assert.equal(parseEntry({ ...ok, deviceKey: 'short' }).ok, false);
   assert.equal(parseEntry(ok).ok, true);

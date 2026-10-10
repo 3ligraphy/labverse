@@ -4,7 +4,7 @@
  * contribution table of their file), random members for groups under the team size, and the idea each group
  * works on. Pure functions only, so they are unit-tested (tests/project-groups.test.ts).
  */
-import { ID_RE, type Entry } from './core.ts';
+import { ID_RE, notATeamNumber, type Entry } from './core.ts';
 
 /** The largest team size. */
 export const TEAM_SIZE = 4;
@@ -45,9 +45,11 @@ export type Plan = {
   later: string[];
   /** Entry ID → what its file contained. */
   scans: Record<string, Scan>;
+  /** Entry ID → the team number the admin typed for it (when the student typed an ID or a lab group code). */
+  teams: Record<string, string>;
 };
 
-export const emptyPlan = (): Plan => ({ added: {}, removed: {}, extraIdeas: {}, choices: {}, autoAll: false, later: [], scans: {} });
+export const emptyPlan = (): Plan => ({ added: {}, removed: {}, extraIdeas: {}, choices: {}, autoAll: false, later: [], scans: {}, teams: {} });
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -66,8 +68,19 @@ export function groupKey(name: string): string {
   if (n) return `G${n[1] || '0'}`;
   return s.toUpperCase() || 'NO GROUP';
 }
-/** Natural order: G2 before G10, named groups after numbered ones. */
+/** Keys of groups that have no team number yet start with this (followed by a student ID, to keep them apart). */
+export const NO_NUMBER = '?';
+export const isNumbered = (key: string) => !key.startsWith(NO_NUMBER);
+
+/** A team number the admin typed: short, letters/digits, and not an ID or lab code. Null when it isn't one. */
+export function cleanTeam(v: unknown): string | null {
+  const s = String(v ?? '').replace(/\s+/g, ' ').trim();
+  return s && s.length <= 20 && /^[\p{L}\p{N} #.-]+$/u.test(s) && !notATeamNumber(s) ? s : null;
+}
+
+/** Natural order: G2 before G10, named groups after numbered ones, groups without a number last. */
 export function compareGroups(a: string, b: string): number {
+  if (isNumbered(a) !== isNumbered(b)) return isNumbered(a) ? -1 : 1;
   const na = /^G(\d+)$/.exec(a);
   const nb = /^G(\d+)$/.exec(b);
   if (na && nb) return Number(na[1]) - Number(nb[1]);
@@ -170,36 +183,92 @@ export function extractIdeas(lines: readonly string[]): string[] {
 
 export type Group = {
   key: string;
-  /** The group names students typed for it ("G1", "group 1"). */
+  /** "G7", or "No number · Mourad" for a group still waiting for its team number. */
+  title: string;
+  numbered: boolean;
+  /** The group names students typed for it ("G1", "group 1", or the lab code they typed by mistake). */
   labels: string[];
+  /** IDs of the hand-ins in this group. */
+  entries: string[];
   members: Member[];
   ideas: string[];
   /** Entries whose files could not be read. */
   unread: number;
 };
 
+type EntryLike = Pick<Entry, 'id' | 'student_id' | 'name' | 'group_name' | 'note'>;
+
+/**
+ * Which group each hand-in belongs to. The team number the admin typed wins, then the one the student typed.
+ * A hand-in whose "group" is really a student ID or lab group code has no number: it joins the numbered group
+ * that shares the most people with it (by the submitter and the contribution table), or else the hand-ins that
+ * share people with each other form one group, keyed "?<smallest submitter ID>" until the admin numbers it.
+ */
+export function entryKeys(entries: readonly EntryLike[], plan: Plan): Map<string, string> {
+  const keys = new Map<string, string>();
+  const people = (e: EntryLike) => new Set([normId(e.student_id), ...(plan.scans[e.id]?.ids ?? [])]);
+  const pending: EntryLike[] = [];
+  for (const e of entries) {
+    const team = cleanTeam(plan.teams[e.id]) ?? (notATeamNumber(e.group_name) ? null : e.group_name);
+    if (team) keys.set(e.id, groupKey(team)); else pending.push(e);
+  }
+  const inGroup = new Map<string, Set<string>>();
+  for (const e of entries) if (keys.has(e.id)) {
+    const set = inGroup.get(keys.get(e.id)!) ?? new Set<string>();
+    for (const id of people(e)) set.add(id);
+    inGroup.set(keys.get(e.id)!, set);
+  }
+  const left: EntryLike[] = [];
+  for (const e of pending) {
+    const mine = people(e);
+    let best: [string, number] | null = null;
+    for (const [key, set] of inGroup) {
+      const n = [...mine].filter((id) => set.has(id)).length;
+      if (n && (!best || n > best[1])) best = [key, n];
+    }
+    if (best) keys.set(e.id, best[0]); else left.push(e);
+  }
+  // The rest: hand-ins that share anyone end up together (union-find over shared people).
+  const parent = left.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const sets = left.map(people);
+  for (let i = 0; i < left.length; i++) for (let j = i + 1; j < left.length; j++) {
+    if ([...sets[i]].some((id) => sets[j].has(id))) parent[find(i)] = find(j);
+  }
+  const keyOf = new Map<number, string>();
+  left.forEach((e, i) => {
+    const root = find(i);
+    const id = normId(e.student_id);
+    if (!keyOf.has(root) || id < keyOf.get(root)!.slice(1)) keyOf.set(root, NO_NUMBER + id);
+  });
+  left.forEach((e, i) => keys.set(e.id, keyOf.get(find(i))!));
+  return keys;
+}
+
 /**
  * Builds the groups: submitters, then students named in the group's files, then students added on this page.
  * A student is listed once per group (the first source wins).
  */
-export function buildGroups(entries: readonly Pick<Entry, 'id' | 'student_id' | 'name' | 'group_name' | 'note'>[], roster: readonly Student[], plan: Plan): Group[] {
+export function buildGroups(entries: readonly EntryLike[], roster: readonly Student[], plan: Plan): Group[] {
   const byId = new Map(roster.map((s) => [s.id, s]));
+  const keys = entryKeys(entries, plan);
   const groups = new Map<string, Group>();
   const get = (key: string) => {
     let g = groups.get(key);
-    if (!g) groups.set(key, (g = { key, labels: [], members: [], ideas: [], unread: 0 }));
+    if (!g) groups.set(key, (g = { key, title: key, numbered: isNumbered(key), labels: [], entries: [], members: [], ideas: [], unread: 0 }));
     return g;
   };
   const add = (g: Group, id: string, name: string, source: Source) => {
     if (!g.members.some((m) => m.id === id)) g.members.push({ id, name, source });
   };
   for (const e of entries) {
-    const g = get(groupKey(e.group_name));
+    const g = get(keys.get(e.id)!);
+    g.entries.push(e.id);
     if (!g.labels.includes(e.group_name)) g.labels.push(e.group_name);
     add(g, normId(e.student_id), byId.get(normId(e.student_id))?.name ?? e.name, 'submitted');
   }
   for (const e of entries) {
-    const g = get(groupKey(e.group_name));
+    const g = get(keys.get(e.id)!);
     const scan = plan.scans[e.id];
     if (scan?.error) g.unread++;
     for (const id of scan?.ids ?? []) { const s = byId.get(id); if (s && !plan.removed[g.key]?.includes(id)) add(g, s.id, s.name, 'document'); }
@@ -211,6 +280,7 @@ export function buildGroups(entries: readonly Pick<Entry, 'id' | 'student_id' | 
     for (const id of ids) add(g, id, byId.get(id)?.name ?? id, 'added');
   }
   for (const g of groups.values()) {
+    if (!g.numbered) g.title = `No number · ${g.members[0]?.name ?? g.key.slice(1)}`;
     const seen = new Set<string>();
     g.ideas = [...g.ideas, ...(plan.extraIdeas[g.key] ?? [])].map(tidyIdea).filter((i) => i && !seen.has(i.toLowerCase()) && seen.add(i.toLowerCase()));
   }
@@ -222,7 +292,7 @@ export function conflicts(groups: readonly Group[]): { id: string; name: string;
   const where = new Map<string, { name: string; groups: string[] }>();
   for (const g of groups) for (const m of g.members) {
     const w = where.get(m.id) ?? { name: m.name, groups: [] };
-    w.groups.push(g.key);
+    w.groups.push(g.title);
     where.set(m.id, w);
   }
   return [...where].filter(([, w]) => w.groups.length > 1).map(([id, w]) => ({ id, ...w }));
@@ -300,7 +370,30 @@ export function cleanPlan(input: unknown): Plan {
     if (!keyOk(k) || !s || typeof s.updatedAt !== 'string') continue;
     plan.scans[k] = { updatedAt: s.updatedAt.slice(0, 40), ids: strList(s.ids, 20, 20).map(normId), ideas: strList(s.ideas, MAX_IDEAS, MAX_IDEA_LEN), ...(s.error ? { error: String(s.error).slice(0, 200) } : {}) };
   }
+  for (const [k, v] of record(p.teams)) { const team = cleanTeam(v); if (keyOk(k) && team) plan.teams[k] = team; }
   return plan;
+}
+
+/**
+ * Gives a group its team number: every hand-in in it gets the number, and what was saved under its old key
+ * (added members, taken-out members, ideas, the chosen idea, "later") moves to the new key. Returns the new key.
+ */
+export function numberGroup(plan: Plan, group: Pick<Group, 'key' | 'entries'>, team: string): string {
+  const to = groupKey(team);
+  for (const id of group.entries) plan.teams[id] = team;
+  const from = group.key;
+  if (from === to) return to;
+  const merge = (m: Record<string, string[]>) => {
+    if (!m[from]) return;
+    m[to] = [...new Set([...(m[to] ?? []), ...m[from]])];
+    delete m[from];
+  };
+  merge(plan.added);
+  merge(plan.removed);
+  merge(plan.extraIdeas);
+  if (plan.choices[from]) { plan.choices[to] ??= plan.choices[from]; delete plan.choices[from]; }
+  plan.later = [...new Set(plan.later.map((k) => (k === from ? to : k)))];
+  return to;
 }
 
 /* ------------------------------------------------------------------- sheet */
@@ -319,7 +412,7 @@ export function groupsCsv(groups: readonly Group[], plan: Plan, only?: ReadonlyS
     const added = g.members.filter((m) => m.source === 'added');
     const choice = plan.choices[g.key];
     rows.push([
-      g.key, g.labels.join(' / '), g.members.map(who).join('; '), added.map(who).join('; '), String(added.length), String(g.members.length),
+      g.numbered ? g.key : 'No team number yet', g.labels.join(' / '), g.members.map(who).join('; '), added.map(who).join('; '), String(added.length), String(g.members.length),
       choice?.idea ?? '', choice?.idea ? (choice.mode === 'auto' ? 'Random' : 'Manual') : '',
     ]);
   }

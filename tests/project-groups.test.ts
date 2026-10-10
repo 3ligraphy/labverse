@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  assignRandom, buildGroups, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
+  assignRandom, buildGroups, cleanTeam, entryKeys, numberGroup, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
   parseRoster, randomIdea, unassigned, type Plan,
 } from '../src/lib/project-files/groups.ts';
 
@@ -120,4 +120,47 @@ test('groupsCsv lists members, new members and the chosen idea', () => {
   assert.equal(lines[0], 'Group number,Group name(s) submitted,All members,Newly added members,Members added,Total members,Idea selected,How the idea was chosen');
   assert.equal(lines[1], 'G1,G1,Sara Ali (23CS0001); Omar Hassan (23CS0002),,0,2,Gym tracker,Manual');
   assert.equal(lines[2], 'G2,group 2,Youssef Nabil (23CS0004); Laila Samir (23CS0005),Laila Samir (23CS0005),1,2,,');
+});
+
+test('a student ID or lab group code is not used as a group number', () => {
+  assert.equal(cleanTeam('7'), '7');
+  assert.equal(cleanTeam('Group 269411'), null);
+  assert.equal(cleanTeam('<b>'), null);
+  // Mourad typed his lab group; his contribution table names Sara, who handed in for G1 → he joins G1.
+  const es = [
+    entry('a', '23CS0001', 'Sara Ali', 'G1'),
+    entry('b', '23CS0003', 'Mona Adel', 'Group 269411'),
+    entry('c', '23CS0004', 'Youssef Nabil', '269496'),
+    entry('d', '23CS0006', 'Karim Fathy', 'Group 269496'),
+    entry('e', '23CS0005', 'Laila Samir', '293938'),
+  ];
+  const p: Plan = { ...emptyPlan(), scans: {
+    b: { updatedAt: 'x', ids: ['23CS0001'], ideas: [] },
+    c: { updatedAt: 'x', ids: ['23CS0006'], ideas: [] },
+  } };
+  const keys = entryKeys(es, p);
+  assert.equal(keys.get('b'), 'G1');
+  // Youssef's file names Karim, so their two unnumbered hand-ins are one group; Laila is on her own.
+  assert.equal(keys.get('c'), '?23CS0004');
+  assert.equal(keys.get('d'), '?23CS0004');
+  assert.equal(keys.get('e'), '?23CS0005');
+  const groups = buildGroups(es, roster.students, p);
+  assert.deepEqual(groups.map((g) => g.title), ['G1', 'No number · Youssef Nabil', 'No number · Laila Samir']);
+  assert.equal(groupsCsv(groups, p).split('\r\n')[2].split(',')[0], 'No team number yet');
+});
+
+test('numberGroup gives every hand-in the number and moves what was saved for the group', () => {
+  const es = [entry('c', '23CS0004', 'Youssef Nabil', '269496'), entry('d', '23CS0006', 'Karim Fathy', '269496')];
+  const p: Plan = { ...emptyPlan(), scans: { c: { updatedAt: 'x', ids: ['23CS0006'], ideas: [] } },
+    added: { '?23CS0004': ['23CS0005'] }, choices: { '?23CS0004': { mode: 'manual', idea: 'Gym' } }, later: ['?23CS0004'] };
+  const [g] = buildGroups(es, roster.students, p);
+  assert.equal(numberGroup(p, g, 'Team 7'), 'G7');
+  assert.deepEqual(p.teams, { c: 'Team 7', d: 'Team 7' });
+  assert.deepEqual(p.added, { G7: ['23CS0005'] });
+  assert.deepEqual(p.choices, { G7: { mode: 'manual', idea: 'Gym' } });
+  assert.deepEqual(p.later, ['G7']);
+  const [after] = buildGroups(es, roster.students, p);
+  assert.equal(after.key, 'G7');
+  assert.deepEqual(after.members.map((m) => m.id), ['23CS0004', '23CS0006', '23CS0005']);
+  assert.deepEqual(cleanPlan(p).teams, { c: 'Team 7', d: 'Team 7' });
 });
