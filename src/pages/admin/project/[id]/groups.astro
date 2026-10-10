@@ -470,7 +470,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       for (const k of [...selected]) if (!groups.some((g) => g.key === k && openSeats(g))) selected.delete(k);
       renderRoster();
       renderWarnings();
-      if (!root.querySelector('.gp-text:not([hidden])')) renderFiles(); // keep an open text view while files are read
+      if (!$('[data-gp-files]').querySelector('.gp-text:not([hidden])')) renderFiles(); // keep an open text view while files are read
       renderRows();
       renderIdeas();
     }
