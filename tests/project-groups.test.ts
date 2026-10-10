@@ -215,3 +215,20 @@ test('autoNumber with all renumbers every group without two groups sharing a num
   const sara = after.find((g) => g.members.some((m) => m.id === '23CS0001'))!;
   assert.deepEqual(p.choices, { [sara.key]: { mode: 'manual', idea: 'Gym' } });
 });
+
+test('extractIdeas reads real proposals from the course', () => {
+  const cookbook = [
+    'Mobile Application Development', 'Project Proposal', 'CookBook Project Proposal', 'Recipe and Meal Organizer', 'Course code: 26CSCI38H',
+    'Module Leader: Dr. Amira Sayed Abdelaziz', 'Team Members and Proposed Roles', 'Member | Student name and ID | Proposed contribution',
+    'A | Mohamed Haitham | 235994 | Recipe browsing and the summary', 'B | Omar Waleed | 239688 | Recipe forms, camera and shopping',
+    'C | Meal scheduling and YouTube', 'Title of the Application', 'CookBook — Recipe and Meal',
+  ];
+  assert.deepEqual(extractIdeas(cookbook), ['CookBook — Recipe and Meal']);
+  // without the "Title of the Application" section, the app's name in the document title is used
+  assert.deepEqual(extractIdeas(cookbook.slice(0, -2)), ['CookBook']);
+  assert.deepEqual(extractIdeas(['Mobile Application Development', 'Project Proposal']), []);
+  assert.deepEqual(extractIdeas([
+    'Number | Name | ID | Group', '1 | Rawan Ahmed', 'Osman', '246108 | A3', '2 | Fatma Ahmed | 246613 | A3', '3 | Merna Attwa | 247689 | A3',
+    'The ideas : restaurant app ,Fitness Challenge App',
+  ]), ['restaurant app', 'Fitness Challenge App']);
+});
