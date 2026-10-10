@@ -47,7 +47,7 @@ test('findStudents finds roster students by ID or full name in a contribution ta
 
 test('extractIdeas reads "Idea n:" lines and lists under an ideas heading', () => {
   assert.deepEqual(extractIdeas(['Idea 1: Campus Companion – events', 'Idea 2 - Gym tracker', 'Something else']), ['Campus Companion – events', 'Gym tracker']);
-  assert.deepEqual(extractIdeas(['Proposed ideas', '1. Recipe planner', '• Bus tracker', 'Long description of the bus tracker that wraps.', 'Contribution table', '1. Sara Ali']), ['Recipe planner', 'Bus tracker']);
+  assert.deepEqual(extractIdeas(['Proposed ideas', '1. Recipe planner', 'Long description of the recipe planner that wraps onto a second line.', '2. Bus tracker', 'Contribution table', '1. Sara Ali']), ['Recipe planner', 'Bus tracker']);
   assert.deepEqual(extractIdeas(['Introduction', '1. Not an idea']), []);
 });
 
@@ -120,6 +120,27 @@ test('groupsCsv lists members, new members and the chosen idea', () => {
   assert.equal(lines[0], 'Group number,Group name(s) submitted,All members,Newly added members,Members added,Total members,Idea selected,How the idea was chosen');
   assert.equal(lines[1], 'G1,G1,Sara Ali (23CS0001); Omar Hassan (23CS0002),,0,2,Gym tracker,Manual');
   assert.equal(lines[2], 'G2,group 2,Youssef Nabil (23CS0004); Laila Samir (23CS0005),Laila Samir (23CS0005),1,2,,');
+});
+
+test('extractIdeas understands the usual proposal layouts', () => {
+  // labelled lines
+  assert.deepEqual(extractIdeas(['Project Title: Campus Companion', 'App name - StudyBuddy', 'Our idea is to build a parking finder for the campus']),
+    ['Campus Companion', 'StudyBuddy', 'a parking finder for the campus']);
+  assert.deepEqual(extractIdeas(['First idea: Gym tracker', 'Second Idea – Clinic booking', 'Option B) Book swap']), ['Gym tracker', 'Clinic booking', 'Book swap']);
+  // "Idea 1" heading, title on the next line, then its description and feature bullets
+  assert.deepEqual(extractIdeas([
+    'Mobile Development – Project Proposal', 'Idea 1', 'Smart Parking', 'An app that shows free parking spots near the university gates in real time.',
+    '• Live map', '• Notifications', 'Idea 2', 'Lost & Found', 'Students post lost items with photos.',
+  ]), ['Smart Parking', 'Lost & Found']);
+  // a plain "Project idea" heading with a paragraph under it
+  assert.deepEqual(extractIdeas(['Project idea:', 'A food ordering app for the campus cafeteria', 'Features', '• Menu']), ['A food ordering app for the campus cafeteria']);
+  // an ideas table
+  assert.deepEqual(extractIdeas(['No. | Idea | Description', '1 | Campus parking finder | shows free spots', '2 | Clinic booking | appointments', 'Contribution table']),
+    ['Campus parking finder', 'Clinic booking']);
+  // bulleted ideas with bulleted sub-points at the same level are still read; the document title is not an idea
+  assert.deepEqual(extractIdeas(['Project Proposal', 'Proposed ideas:', '• Bus tracker', '• Recipe planner', 'Team members']), ['Bus tracker', 'Recipe planner']);
+  // a contribution table is not an ideas table
+  assert.deepEqual(extractIdeas(['Name | Student ID | Contribution', 'Sara Ali | 245793 | UI']), []);
 });
 
 test('a student ID or lab group code is not used as a group number', () => {

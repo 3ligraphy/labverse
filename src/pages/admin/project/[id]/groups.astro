@@ -68,6 +68,11 @@ if (!file) return Astro.redirect('/admin/project', 303);
       </div>
       <div class="gp-progress" data-gp-scan-bar hidden><progress max="1" value="0"></progress><span class="mono small" data-gp-scan-text></span></div>
       <ul class="gp-warn" data-gp-warn></ul>
+      <details class="gp-files">
+        <summary>What was read from each file</summary>
+        <p class="small faint">If a file's ideas or members are missing, open its text to see what the page could read from it. You can always add ideas by hand in step 4.</p>
+        <ul data-gp-files></ul>
+      </details>
     </section>
 
     <!-- 3 · random members -->
@@ -158,6 +163,12 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-chip button { border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 0 0 0 2px; font-size: 14px; line-height: 1; }
   .gp-chip button:hover { color: var(--danger); }
   .gp-nonum { color: var(--warn); }
+  .gp-files summary { cursor: pointer; font-size: 13.5px; color: var(--text-2); }
+  .gp-files > p { margin: 8px 0; }
+  .gp-files ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .gp-file-row { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; }
+  .gp-bad { color: var(--danger); }
+  .gp-text { max-height: 320px; overflow: auto; padding: 10px; border-radius: 10px; background: var(--surface-2); font: 12px/1.5 var(--font-mono); white-space: pre-wrap; word-break: break-word; }
   .gp-team { display: flex; gap: 6px; margin-top: 6px; }
   .gp-team input { width: 96px; height: 32px; padding: 0 8px; }
   .gp-team.need input { border-color: var(--warn); }
@@ -287,7 +298,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   import { readDocText } from '@/scripts/doc-text';
   import { playBox } from '@/scripts/box-shuffle';
   import {
-    TEAM_SIZE, assignRandom, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
+    SCAN_VERSION, TEAM_SIZE, assignRandom, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
     randomIdea, unassigned, type Group, type Plan, type Student,
   } from '@/lib/project-files/groups';
   import type { Entry } from '@/lib/project-files/core';
@@ -359,7 +370,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
     }
 
     function renderWarnings() {
-      const scanned = entries.filter((e) => plan.scans[e.id]?.updatedAt === e.updated_at);
+      const scanned = entries.filter((e) => plan.scans[e.id]?.updatedAt === e.updated_at && plan.scans[e.id]?.v === SCAN_VERSION);
       const failed = entries.filter((e) => plan.scans[e.id]?.error);
       $('[data-gp-scan-sum]').textContent = entries.length
         ? `${scanned.length} of ${plural(entries.length, 'file')} read · ${plural(groups.length, 'group')} · ${groups.reduce((n, g) => n + g.ideas.length, 0)} ideas found.`
@@ -379,6 +390,23 @@ if (!file) return Astro.redirect('/admin/project', 303);
         <input class="input mono" maxlength="20" placeholder="Team no." aria-label="Team number for ${esc(g.title)}" value="" />
         <button class="btn btn-ghost btn-sm" type="submit">${g.numbered ? 'Save' : 'Set number'}</button></form>${
         g.numbered ? `<button class="gp-link" type="button" data-team-edit="${esc(g.key)}">Change number</button>` : ''}`;
+
+    function renderFiles() {
+      const byEntry = new Map(groups.flatMap((g) => g.entries.map((id) => [id, g] as const)));
+      const names = new Map(roster.map((s) => [s.id, s.name]));
+      $('[data-gp-files]').innerHTML = entries.map((e) => {
+        const scan = plan.scans[e.id];
+        const found = (scan?.ids ?? []).map((id) => names.get(id) ?? id);
+        return `<li class="gp-file-row">
+          <div><b>${esc(byEntry.get(e.id)?.title ?? e.group_name)}</b> · ${esc(e.name)}
+            ${!scan ? '<span class="faint">not read yet</span>'
+              : scan.error ? `<span class="gp-bad">${esc(scan.error)}</span>`
+              : `<span class="faint">${found.length ? `found ${found.map(esc).join(', ')}` : 'no class-list names or IDs found'} · ${plural(scan.ideas.length, 'idea')}${scan.ideas.length ? `: ${scan.ideas.map(esc).join(' · ')}` : ''}</span>`}</div>
+          <div class="gp-row"><button class="btn btn-ghost btn-sm" type="button" data-show-text="${esc(e.id)}">Show text</button><a class="btn btn-ghost btn-sm" href="${esc(e.url)}" target="_blank" rel="noopener">Open file ↗</a></div>
+          <pre class="gp-text" data-text-for="${esc(e.id)}" hidden></pre>
+        </li>`;
+      }).join('') || '<li class="faint">No hand-ins yet.</li>';
+    }
 
     function renderRows() {
       const clash = clashIds();
@@ -442,6 +470,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       for (const k of [...selected]) if (!groups.some((g) => g.key === k && openSeats(g))) selected.delete(k);
       renderRoster();
       renderWarnings();
+      if (!root.querySelector('.gp-text:not([hidden])')) renderFiles(); // keep an open text view while files are read
       renderRows();
       renderIdeas();
     }
@@ -449,7 +478,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
     /* ------------------------------------------------------- reading files */
     async function scan(force = false) {
       if (scanning) return;
-      const todo = entries.filter((e) => force || plan.scans[e.id]?.updatedAt !== e.updated_at);
+      const todo = entries.filter((e) => force || plan.scans[e.id]?.updatedAt !== e.updated_at || plan.scans[e.id]?.v !== SCAN_VERSION);
       if (!todo.length) return;
       scanning = true;
       const bar = $('[data-gp-scan-bar]');
@@ -464,8 +493,8 @@ if (!file) return Astro.redirect('/admin/project', 303);
         for (let e = queue.shift(); e; e = queue.shift()) {
           const doc = await readDocText(e.url);
           plan.scans[e.id] = 'error' in doc
-            ? { updatedAt: e.updated_at, ids: [], ideas: [], error: doc.error }
-            : { updatedAt: e.updated_at, ids: findStudents(doc.lines.join('\n'), roster).slice(0, 20), ideas: extractIdeas(doc.lines) };
+            ? { updatedAt: e.updated_at, v: SCAN_VERSION, ids: [], ideas: [], error: doc.error }
+            : { updatedAt: e.updated_at, v: SCAN_VERSION, ids: findStudents(doc.lines.join('\n'), roster).slice(0, 20), ideas: extractIdeas(doc.lines) };
           progress.value = ++done;
           text.textContent = `Reading ${done} of ${plural(todo.length, 'file')}…`;
           render();
@@ -638,6 +667,21 @@ if (!file) return Astro.redirect('/admin/project', 303);
       plan.choices[g.key] = { mode: 'manual', idea: g.ideas[Number(t.value)] ?? '' };
       render();
       save();
+    });
+    root.addEventListener('click', async (e) => {
+      const show = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-show-text]');
+      if (!show) return;
+      const pre = root.querySelector<HTMLElement>(`[data-text-for="${CSS.escape(show.dataset.showText!)}"]`)!;
+      if (!pre.hidden) { pre.hidden = true; show.textContent = 'Show text'; return; }
+      const entry = entries.find((x) => x.id === show.dataset.showText);
+      if (!entry) return;
+      show.disabled = true;
+      show.textContent = 'Reading…';
+      const doc = await readDocText(entry.url);
+      pre.textContent = 'error' in doc ? doc.error : doc.lines.join('\n') || '(no text: the file may be a scanned image)';
+      pre.hidden = false;
+      show.disabled = false;
+      show.textContent = 'Hide text';
     });
     root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-team-edit]');

@@ -17,9 +17,14 @@ export type Student = { id: string; name: string };
 export type Source = 'submitted' | 'document' | 'added';
 export type Member = Student & { source: Source };
 
+/** Bump when reading files changes (e.g. better idea finding), so saved results are refreshed automatically. */
+export const SCAN_VERSION = 2;
+
 /** What the browser read out of one hand-in's file. Kept so files are only read again when re-submitted. */
 export type Scan = {
   updatedAt: string;
+  /** SCAN_VERSION when it was read: files read by an older reader are read again. */
+  v?: number;
   /** Roster student IDs found in the file (by ID or by full name). */
   ids: string[];
   ideas: string[];
@@ -147,36 +152,77 @@ export function findStudents(text: string, roster: readonly Student[]): string[]
     .map((s) => s.id);
 }
 
-const IDEA_LINE = /^(?:proposed\s+|app\s+|project\s+)*idea\s*(?:#|no\.?|number)?\s*(?:\d+|[a-e]|one|two|three|four|five)?\s*[:.)\-–—]\s*(.{3,})$/i;
-const IDEA_HEADING = /^(?:\d+[.)]?\s*)?(?:our\s+|the\s+)?(?:proposed\s+|project\s+|app\s+)*ideas?(?:\s+(?:list|proposals?|options))?\s*:?$/i;
-const LIST_ITEM = /^(?:\(?(?:\d{1,2}|[a-e])[.)]|[•\-*▪◦●○■□➢►–])\s*(.{3,})$/i;
-const OTHER_SECTION = /^(?:\d+[.)]?\s*)?(?:contribution|team|group|members?|student|name|signature|declaration|introduction|problem|objectives?|features?|requirements?|references?|conclusion)\b/i;
+/* How proposals name their ideas. ORD: "1", "B", "two", "second"…; LEAD: "1. ", "a) ", "First ", "2nd "… */
+const ORD = String.raw`(?:\d{1,2}|[a-e]|one|two|three|four|five)`;
+const LEAD = String.raw`(?:(?:\d{1,2}|[a-z])[.)]\s*)?(?:(?:first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\s+)?`;
+const KIND = String.raw`(?:(?:proposed|suggested|selected|chosen|main|our|project|app|application|mobile\s+app)\s+)*(?:idea|option|suggestion)`;
+const SEP = String.raw`\s*[:.)\-–—|]\s*`;
+/** "Idea 1: X", "Proposed idea – X", "Second idea: X", "Option B) X", "Idea title: X", "Proposal 2: X". */
+const IDEA_LINE = new RegExp(String.raw`^${LEAD}(?:${KIND}|proposal)\s*(?:#|no\.?|number)?\s*${ORD}?\s*(?:title|name)?${SEP}(.{3,})$`, 'i');
+/** "Project title: X", "App name - X", "Name of the app: X", "Project title | X" (a two-column table row). */
+const TITLE_LINE = new RegExp(String.raw`^${LEAD}(?:(?:project|app|application|mobile\s+app|idea)\s+(?:title|name)|(?:title|name)\s+of\s+(?:the\s+)?(?:project|app|application|idea))${SEP}(.{3,})$`, 'i');
+/** "Our idea is to build X", "The app idea is X". */
+const IDEA_IS = /^(?:our|the|my)\s+(?:project\s+|app\s+|main\s+)?idea\s+(?:is|will\s+be)\s+(?:to\s+(?:build|create|make|develop)\s+)?(.{3,})$/i;
+/** A heading on its own line: "Idea 1", "Second idea", "Proposed ideas", "Project idea:", "Project title". */
+const IDEA_HEADING = new RegExp(String.raw`^${LEAD}${KIND}s?\s*(?:#|no\.?|number)?\s*${ORD}?\s*(?:title|name|list|options|proposals?)?\s*:?$`, 'i');
+const TITLE_HEADING = /^(?:\d+[.)]\s*)?(?:project|app|application|idea)\s+(?:title|name)s?\s*:?$/i;
+/** A table column that holds ideas. */
+const IDEA_COLUMN = /^(?:proposed\s+|project\s+|app\s+)?(?:ideas?|idea\s+(?:title|name)|(?:project|app|application)\s+(?:title|name)|title|name\s+of\s+(?:the\s+)?(?:app|idea|project))$/i;
+const NUMBERED = /^\(?(?:\d{1,2}|[a-e])[.)]\s*(.{3,})$/i;
+const BULLET = /^[•\-*▪◦●○■□➢►–✓✔]\s*(.{3,})$/;
+const OTHER_SECTION = /^(?:\d+[.)]?\s*)?(?:contribution|team|group|members?|student|names?|signature|declaration|introduction|problem|objectives?|features?|requirements?|references?|conclusion|description|overview|target|users?|scope|technolog|tools?|timeline|plan)\b/i;
+/** Lines that are the document's own title, not an idea. */
+const NOT_AN_IDEA = /^(?:mobile\s+(?:app(?:lication)?\s+)?development|(?:project\s+)?proposal|course\s*work|cw\s*\d|module|phase\s*\d|(?:group|team)\s*#?\s*\d+)\b|^[\d\s.#|-]*$/i;
 
 const tidyIdea = (s: string) => {
-  const t = s.replace(/\s+/g, ' ').replace(/^["“”']+|["“”']+$/g, '').trim();
+  const t = s.replace(/\s+/g, ' ').replace(/^["“”']+|["“”']+$/g, '').replace(/\s*\|\s*$/, '').trim();
   return t.length > MAX_IDEA_LEN ? `${t.slice(0, MAX_IDEA_LEN - 1).trimEnd()}…` : t;
 };
 
 /**
- * Proposed ideas in a file's text, one per line: "Idea 1: Campus Companion – …" lines, and the numbered or
- * bulleted items under an "Ideas" / "Proposed ideas" heading.
+ * Proposed ideas in a file's text. Recognises:
+ * - labelled lines: "Idea 1: X", "Second idea – X", "Project title: X", "App name: X", "Our idea is to build X"
+ * - a heading on its own ("Idea 1", "Proposed ideas", "Project title"), then the line under it, or the
+ *   numbered/bulleted list under it (a feature list under one idea is not read as more ideas)
+ * - a table with an "Idea" / "Title" / "App name" column (rows read as "cell | cell | cell")
  */
 export function extractIdeas(lines: readonly string[]): string[] {
   const ideas: string[] = [];
-  let inList = false;
+  // after a heading: 'await' the idea under it; 'list' while reading its list (numbered or bulleted)
+  let state: 'none' | 'await' | 'list' = 'none';
+  let style: RegExp | null = null;
+  let column = -1;
   for (const raw of lines) {
     const line = raw.replace(/\s+/g, ' ').trim();
     if (!line) continue;
-    const direct = IDEA_LINE.exec(line);
-    if (direct) { ideas.push(direct[1]); inList = true; continue; }
-    if (IDEA_HEADING.test(line)) { inList = true; continue; }
-    if (!inList) continue;
-    if (OTHER_SECTION.test(line) && !LIST_ITEM.test(line)) { inList = false; continue; }
-    const item = LIST_ITEM.exec(line);
-    if (item) ideas.push(item[1]);
+    const cells = line.includes(' | ') ? line.split(' | ').map((c) => c.trim()) : null;
+    if (cells) {
+      const at = cells.findIndex((c) => IDEA_COLUMN.test(c));
+      if (at >= 0 && cells.length > 1 && !TITLE_LINE.test(line) && !IDEA_LINE.test(line)) { column = at; state = 'none'; continue; }
+      if (column >= 0) { if (cells[column]) ideas.push(cells[column].replace(NUMBERED, '$1')); continue; }
+    } else column = -1;
+    const direct = IDEA_LINE.exec(line) ?? TITLE_LINE.exec(line) ?? IDEA_IS.exec(line);
+    if (direct) { ideas.push(direct[1]); state = 'none'; continue; }
+    if (IDEA_HEADING.test(line) || TITLE_HEADING.test(line)) { state = 'await'; style = null; continue; }
+    if (state === 'none') continue;
+    const numbered = NUMBERED.exec(line);
+    const bullet = BULLET.exec(line);
+    const item = numbered ?? bullet;
+    if (state === 'await') {
+      if (item) { ideas.push(item[1]); style = numbered ? NUMBERED : BULLET; state = 'list'; }
+      else if (OTHER_SECTION.test(line)) state = 'none';
+      else { ideas.push(line); state = 'none'; } // the title under the heading; its description follows
+      continue;
+    }
+    // state === 'list': only items of the list's own kind count (sub-bullets are features, not ideas)
+    const same = style?.exec(line);
+    if (same) ideas.push(same[1]);
+    else if (!item && (OTHER_SECTION.test(line) || line.length < 60)) state = 'none';
   }
   const seen = new Set<string>();
-  return ideas.map(tidyIdea).filter((i) => i.length >= 3 && !seen.has(i.toLowerCase()) && seen.add(i.toLowerCase())).slice(0, MAX_IDEAS);
+  return ideas.map(tidyIdea)
+    .filter((i) => i.length >= 3 && /\p{L}{2}/u.test(i) && !NOT_AN_IDEA.test(i) && !seen.has(i.toLowerCase()) && seen.add(i.toLowerCase()))
+    .slice(0, MAX_IDEAS);
 }
 
 /* ------------------------------------------------------------------ groups */
@@ -368,7 +414,7 @@ export function cleanPlan(input: unknown): Plan {
   for (const [k, v] of record(p.scans)) {
     const s = v as Partial<Scan> | null;
     if (!keyOk(k) || !s || typeof s.updatedAt !== 'string') continue;
-    plan.scans[k] = { updatedAt: s.updatedAt.slice(0, 40), ids: strList(s.ids, 20, 20).map(normId), ideas: strList(s.ideas, MAX_IDEAS, MAX_IDEA_LEN), ...(s.error ? { error: String(s.error).slice(0, 200) } : {}) };
+    plan.scans[k] = { updatedAt: s.updatedAt.slice(0, 40), ...(Number.isInteger(s.v) ? { v: s.v } : {}), ids: strList(s.ids, 20, 20).map(normId), ideas: strList(s.ideas, MAX_IDEAS, MAX_IDEA_LEN), ...(s.error ? { error: String(s.error).slice(0, 200) } : {}) };
   }
   for (const [k, v] of record(p.teams)) { const team = cleanTeam(v); if (keyOk(k) && team) plan.teams[k] = team; }
   return plan;

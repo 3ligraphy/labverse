@@ -70,16 +70,20 @@ async function pdfLines(bytes: Uint8Array): Promise<string[]> {
     for (let p = 1; p <= Math.min(doc.numPages, MAX_PDF_PAGES); p++) {
       const page = await doc.getPage(p);
       const content = await page.getTextContent();
-      // Items on one visual row share a y position; a big gap between them is a table cell boundary.
+      // Items on one visual row share a y position; a gap wider than about half a letter is a table cell
+      // boundary (a space between words is about a quarter). Space-only items are skipped when measuring:
+      // Word and browsers put one wide "space" between cells that would hide the gap.
       let line = '';
       let lastY: number | null = null;
       let lastEnd = 0;
       for (const item of content.items) {
         if (!('str' in item)) continue;
-        const [, , , , x, y] = item.transform as number[];
+        if (!item.str.trim()) { if (item.hasEOL) { if (line) lines.push(line); line = ''; lastY = null; } continue; }
+        const [size, , , , x, y] = item.transform as number[];
+        const gap = x - lastEnd;
         if (lastY !== null && Math.abs(y - lastY) > 2) { lines.push(line); line = ''; }
-        else if (line && x - lastEnd > 12) line += ' | ';
-        else if (line && x - lastEnd > 1 && !line.endsWith(' ') && !item.str.startsWith(' ')) line += ' ';
+        else if (line && gap > Math.max(5, Math.abs(size) * 0.6)) line += ' | ';
+        else if (line && gap > 0.5 && !line.endsWith(' ') && !item.str.startsWith(' ')) line += ' ';
         line += item.str;
         lastY = y;
         lastEnd = x + (item.width ?? 0);
