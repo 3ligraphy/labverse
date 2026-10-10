@@ -48,4 +48,16 @@ const items = await getCoursework();
   .cw-meta .warn { color: var(--warn); white-space: nowrap; }
   .cw-row .go { grid-row: 1; grid-column: 3; }
   @media (min-width: 960px) { .cw-row .go { grid-column: 4; } }
+  /* phones: a stacked card — "CW 01" as a small label above the title, details underneath */
+  @media (max-width: 719px) {
+    .cw-row { grid-template-columns: 1fr 36px; gap: 10px 12px; padding: 18px 16px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+    .cw-no { grid-column: 1; display: flex; align-items: baseline; gap: 6px; }
+    .cw-no b { font-size: 15px; }
+    .cw-main { grid-column: 1 / -1; }
+    .cw-t { font-size: 22px; line-height: 1.2; }
+    .cw-d { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .cw-meta { grid-column: 1 / -1; justify-self: stretch; justify-content: flex-start; gap: 18px; flex-wrap: wrap; margin: 4px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
+    .cw-meta > * { min-width: 0; }
+    .cw-row .go { grid-column: 2; grid-row: 1; }
+  }
 </style>

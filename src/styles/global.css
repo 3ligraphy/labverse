@@ -367,11 +367,11 @@ code, kbd, pre, samp { font-family: var(--font-mono); font-size: 0.92em; }
 
 /* inline command line (non-markdown) */
 .cmd-line {
-  display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 6px 0 16px;
+  display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 6px 0 16px; min-width: 0; max-width: 100%;
   border-radius: var(--r-md); background: var(--code-bg); border: 1px solid var(--line);
   font-family: var(--font-mono); font-size: 13.5px;
 }
-.cmd-line code { flex: 1; overflow-x: auto; white-space: nowrap; padding-block: 12px; scrollbar-width: none; background: none; border: 0; padding-inline: 0; font-size: inherit; }
+.cmd-line code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding-block: 12px; scrollbar-width: none; background: none; border: 0; padding-inline: 0; font-size: inherit; }
 .cmd-line code::-webkit-scrollbar { display: none; }
 .cmd-line .prompt { color: var(--accent-text); user-select: none; }
 .tok-cmd { color: var(--text); font-weight: 600; }
@@ -560,3 +560,13 @@ a.row:hover .go { background: var(--accent); color: var(--accent-ink); border-co
 .glass::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; background: linear-gradient(130deg, color-mix(in oklab, var(--g1, #c8ff4d) 70%, transparent), transparent 40%, transparent 60%, color-mix(in oklab, var(--g2, #7cb1ff) 60%, transparent));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
 
+
+/* ---------------------------------------------------------------- phones: tables never widen the page */
+@media (max-width: 719px) {
+  .prose table, .table { min-width: 0; }
+  /* a reading table wraps its text; if it is still too wide it scrolls in place */
+  .prose table { display: block; max-width: 100%; overflow-x: auto; contain: inline-size; -webkit-overflow-scrolling: touch; }
+  .prose th, .prose td, .table th, .table td { padding: 10px 12px; }
+  /* a scrolling table box must not size its parents from the table inside it */
+  .table-wrap { contain: inline-size; max-width: 100%; }
+}

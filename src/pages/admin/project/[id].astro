@@ -109,6 +109,29 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .si-table tr.sel td { background: var(--accent-soft); }
   .si-table mark { background: color-mix(in oklab, var(--accent) 45%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
   .si-table td { vertical-align: top; }
+  /* phones: one card per hand-in */
+  @media (max-width: 719px) {
+    .si-card .table-wrap:has(.si-table) { border: 0; overflow: visible; contain: none; }
+    .si-table, .si-table tbody, .si-table tr, .si-table td { display: block; }
+    .si-table thead { display: none; }
+    .si-table tbody tr { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-bottom: 10px; padding: 12px 14px 12px 44px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+    .si-table td { padding: 0; border: 0; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+    .si-table td.si-cb { position: absolute; left: 14px; top: 14px; }
+    .si-table td:nth-child(2) { grid-column: 1 / -1; font-size: 15px; }
+    .si-table td:nth-child(n+3):not(:last-child)::before { display: block; margin-bottom: 2px; font: 600 9.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+    .si-table td:nth-child(3)::before { content: 'Student ID'; }
+    .si-table td:nth-child(4)::before { content: 'Group'; }
+    .si-table td:nth-child(5)::before { content: 'Submitted'; }
+    .si-table td:nth-child(6)::before { content: 'Status'; }
+    .si-table td:nth-child(7)::before { content: 'Size'; }
+    .si-table td:last-child { grid-column: 1 / -1; }
+    .si-table td:last-child .si-row-act { justify-content: flex-start; }
+    .si-table td[colspan] { grid-column: 1 / -1; padding: 0; }
+    .si-table td[colspan]::before { content: none !important; }
+    .si-table tr:has(td[colspan]) { padding-left: 14px; }
+    .si-tools, .si-head { align-items: stretch; }
+    .si-search { max-width: none; width: 100%; }
+  }
   .si-table .note { display: block; margin-top: 4px; max-width: 38ch; font-size: 12.5px; color: var(--text-3); }
   .si-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font: 600 10.5px/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; }
   .si-tag.ok { background: var(--accent-soft); color: var(--accent-text); }

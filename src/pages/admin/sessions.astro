@@ -182,6 +182,12 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .board-count b { color: var(--accent-text); font-variant-numeric: tabular-nums; }
   .board-count span { font-size: 0.45em; color: var(--text-2); font-weight: 500; letter-spacing: -0.01em; }
   .board-actions { display: flex; align-items: center; gap: 10px; }
+  @media (max-width: 719px) {
+    .board-actions { flex-wrap: wrap; gap: 8px; }
+    .board-actions :global(.btn), .board-actions :global(form) { flex: 1 1 auto; }
+    .board-actions :global(form .btn) { width: 100%; }
+    .board-head > * { min-width: 0; max-width: 100%; }
+  }
   .practice-toggle { display: flex; align-items: center; gap: 12px; max-width: 360px; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--surface); cursor: pointer; }
   .practice-toggle input { position: absolute; opacity: 0; pointer-events: none; }
   .practice-track { flex: none; position: relative; width: 40px; height: 22px; border-radius: 999px; background: var(--line-2); transition: background var(--t-fast); }
@@ -197,6 +203,24 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .live.on { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, transparent); }
   .live.on::before { background: var(--ok); animation: pulse-ring 2s infinite; }
   .board-table .table { min-width: 0; }
+  /* phones: one card per student, each value with its column name */
+  @media (max-width: 719px) {
+    .board-table { border: 0; overflow: visible; contain: none; }
+    .board-table .table, .board-table :global(tbody), .board-table :global(tr), .board-table :global(td) { display: block; }
+    .board-table :global(thead) { display: none; }
+    .board-table :global(tbody tr) { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-bottom: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+    .board-table :global(td) { padding: 0; border: 0; white-space: normal !important; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+    .board-table :global(td:first-child) { grid-column: 1 / -1; font-size: 15px; }
+    .board-table :global(td:not(:first-child)::before) { display: block; margin-bottom: 2px; font: 600 9.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+    .board-table :global(td:nth-child(2)::before) { content: 'Student ID'; }
+    .board-table :global(td:nth-child(3)::before) { content: 'Group'; }
+    .board-table :global(td:nth-child(4)::before) { content: 'Started'; }
+    .board-table :global(td:nth-child(5)::before) { content: 'Last seen'; }
+    .board-table :global(td:nth-child(6)::before) { content: 'Progress'; }
+    .board-table :global(td:nth-child(7)::before) { content: 'Attendance'; }
+    .board-table :global(td[colspan]) { grid-column: 1 / -1; }
+    .board-table :global(td[colspan]::before) { content: none; }
+  }
   /* :global — rows added live by the script don't carry this page's scoped attribute */
   .board-table :global(td), .board-table :global(th) { white-space: nowrap; }
   .board-table :global(td:first-child) { white-space: normal; font-weight: 550; }

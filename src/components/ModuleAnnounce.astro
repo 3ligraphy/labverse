@@ -24,7 +24,17 @@ const { module, color = '#7cb1ff' } = Astro.props;
   .mann.out { animation: mann-out .22s ease-in both; }
   @keyframes mann-in { from { opacity: 0; translate: -50% 24px; } }
   @keyframes mann-out { to { opacity: 0; translate: -50% 24px; } }
-  @media (max-width: 640px) { .mann-inner { grid-template-columns: auto 1fr auto; } .mann-cta { grid-column: 1 / -1; text-align: center; } }
+  /* phones: one slim row above the bottom tab bar (and above the course banner when both show) */
+  @media (max-width: 719px) {
+    .mann { bottom: calc(env(safe-area-inset-bottom) + 72px); width: calc(100% - 20px); border-radius: 14px; }
+    body:has(.ann:not([hidden])) .mann { bottom: calc(env(safe-area-inset-bottom) + 122px); }
+    .mann-inner { gap: 8px; padding: 7px 7px 7px 9px; }
+    .mann-new { padding: 4px 6px; font-size: 9.5px; border-radius: 6px; }
+    .mann p { display: block; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mann p span { display: none; }
+    .mann-cta { padding: 7px 11px; border-radius: 10px; font-size: 12.5px; }
+    .mann-close { width: 28px; height: 28px; border-radius: 8px; font-size: 11px; }
+  }
   @media (prefers-reduced-motion: reduce) { .mann { animation: none; } }
 </style>
 
