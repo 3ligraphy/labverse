@@ -1,7 +1,7 @@
 ---
 title: The Course Project
 tagline: Design, build and ship one complete mobile app.
-description: 'In teams of up to 3, you build a mobile app from your own new idea: analysis, design, implementation, testing and a live demo. It is worth 60% of the module.'
+description: 'In teams of up to 4, you build a mobile app from your own new idea: analysis, design, implementation, testing and a live demo. It is worth 60% of the module.'
 problem: 'Choose a realistic problem for a specific group of users and get it approved by the instructor. It must be a **new idea**, not a previous project. A list of ideas will be provided if you need inspiration.'
 deadline: Week 12
 objectives:
@@ -10,7 +10,7 @@ objectives:
   - Integrate and refine that code into one coherent, working system
   - Present and defend your engineering decisions
 requirements:
-  - 'Team of **max 3 students**, with a **new**, instructor-approved idea'
+  - 'Team of **max 4 students**, with a **new**, instructor-approved idea'
   - '**Git & GitHub are mandatory**: one branch per member, with commits from each member''s own account'
   - At least 9 screens (3 per member), excluding sign-in and registration
   - Architecture / design pattern applied. **Monolithic = 0 for Phase 2**
@@ -55,7 +55,7 @@ resources:
   - { label: Lab 01 — Git & GitHub basics, href: /labs/lab-01 }
   - { label: Command Handbook, href: /commands }
 faq:
-  - { q: How many students per team?, a: Maximum 3. }
+  - { q: How many students per team?, a: Maximum 4. }
   - { q: Can we use AI?, a: 'Yes, as a development aid. Log every significant interaction (prompt → output → your changes → rationale). Reports must be written by you, not AI. Paraphrasing is limited to 20%.' }
   - { q: What if I miss the demo?, a: 'You are marked absent for the presentation & demo deliverable (20 marks).' }
   - { q: Do all members get the same mark?, a: 'Not necessarily. Marks depend on individual contribution and discussion, and your Git commits are part of the evidence.' }
