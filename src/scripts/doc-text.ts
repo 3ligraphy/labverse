@@ -56,12 +56,46 @@ async function zipLines(bytes: Uint8Array): Promise<string[]> {
 
 /* --------------------------------------------------------------------- PDF */
 
+/**
+ * Makes a ReadableStream usable with `for await` where the browser can't yet (Safari): pdf.js reads text and
+ * unpacks compressed data that way. Self-contained, because it is also copied into the PDF worker as text.
+ */
+function installStreamIterator() {
+  const proto = globalThis.ReadableStream?.prototype as (ReadableStream & { values?: unknown; [Symbol.asyncIterator]?: unknown }) | undefined;
+  if (!proto || proto[Symbol.asyncIterator]) return;
+  const values = function (this: ReadableStream, { preventCancel = false } = {}) {
+    const reader = this.getReader();
+    return {
+      next: () => reader.read(),
+      async return(value?: unknown) {
+        try { if (!preventCancel) await reader.cancel(value); } finally { reader.releaseLock(); }
+        return { done: true, value };
+      },
+      [Symbol.asyncIterator]() { return this; },
+    };
+  };
+  Object.defineProperty(proto, 'values', { value: values, configurable: true, writable: true });
+  Object.defineProperty(proto, Symbol.asyncIterator, { value: values, configurable: true, writable: true });
+}
+
+/**
+ * The PDF worker, started from a copy that installs the stream fix first (a worker has its own globals).
+ * Not on the dev server: there Vite serves the worker with imports that only resolve from its own URL.
+ */
+let workerSrc: Promise<string> | null = null;
+const pdfWorker = (url: string) => (import.meta.env.DEV ? Promise.resolve(url) : workerSrc ??= fetch(url)
+  .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+  .then((code) => URL.createObjectURL(new Blob([`(${installStreamIterator.toString()})();\n`, code], { type: 'text/javascript' })))
+  .catch(() => url));
+
 async function pdfLines(bytes: Uint8Array): Promise<string[]> {
   // The legacy build: the standard one calls brand-new JavaScript (Promise.try, Math.sumPrecise,
   // Map.getOrInsertComputed…) directly, which Safari on iPhone doesn't have yet, so every PDF failed there.
+  // Safari also can't `for await` over a stream, which pdf.js does on the page and in its worker.
+  installStreamIterator();
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default;
+    pdfjs.GlobalWorkerOptions.workerSrc = await pdfWorker((await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default);
   }
   const task = pdfjs.getDocument({ data: bytes });
   const doc = await task.promise;
