@@ -8,6 +8,9 @@
  *   Nodes:   the number on a node is its place in the lab/module (following the links from the root);
  *            unconnected nodes are drafts and are not shown to students.
  *   Keys:    Delete removes the selection · Ctrl+D duplicates · Ctrl+S saves · Esc deselects.
+ * Phones:  an app layout (Canvas.astro): a Steps list (tap to edit, ↑/↓ to reorder, + between steps to insert,
+ *          drafts added back with one tap) or the canvas (pinch to zoom, tap a node to edit), a bottom tab bar,
+ *          and the palette, inspector and tools as bottom sheets.
  * The flow is saved as JSON through the admin API and validated again on the server (lib/platform/core).
  */
 import { nodeDefs, orderFlow, parseChecks, type Field, type Flow, type FlowKind, type FlowNode, type NodeDef } from '@/lib/platform/core';
@@ -53,6 +56,10 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
   const warningsBox = $('[data-cv-warnings]');
   const publishBtn = $<HTMLButtonElement>('[data-cv-publish]');
   const zoomLabel = $('[data-cv-zoom]');
+  const outline = $('[data-cv-outline]');
+  const phone = matchMedia('(max-width: 760px)');
+  /** Phone "+" between two steps: the new node goes after this one. */
+  let insertAfter: string | null = null;
 
   /* ------------------------------------------------------------ helpers */
 
@@ -88,6 +95,7 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     dirty = v;
     status.textContent = v ? 'Unsaved changes' : 'All changes saved';
     status.dataset.state = v ? 'dirty' : 'saved';
+    root.querySelector<HTMLElement>('[data-cv-save-m]')?.setAttribute('data-state', v ? 'dirty' : 'saved');
   };
 
   /** Module flows remain a chain on disk, but the editor treats each Week + following labs as one group. */
@@ -165,6 +173,87 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     renderWeekGroups();
     renderEdges();
     refreshWeekPicker();
+    renderOutline();
+  }
+
+  /* --------------------------------------------------- phone: Steps list */
+
+  /** The flow as a vertical list in reading order, then the drafts (not connected, not shown to students). */
+  function renderOutline() {
+    const order = orderFlow(flow, cfg.kind);
+    const inChain = new Set(order.map((n) => n.id));
+    const drafts = flow.nodes.filter((n) => !inChain.has(n.id));
+    const lastMovable = order.length - 1 - (order.length > 1 && defs[order.at(-1)!.type].terminal ? 1 : 0);
+    const counts = new Map<string, number>();
+    for (const n of order) if (!isRoot(n)) counts.set(defs[n.type].label, (counts.get(defs[n.type].label) ?? 0) + 1);
+    const card = (n: FlowNode, i: number | null) => {
+      const def = defs[n.type];
+      const color = n.type === 'module' && n.data.color ? n.data.color : def.color;
+      const move = i === null || isRoot(n) || def.terminal ? '' : `<span class="cv-step-move">
+          <button type="button" data-move="${esc(n.id)}" data-dir="-1" aria-label="Move up" ${i <= 1 ? 'disabled' : ''}>↑</button>
+          <button type="button" data-move="${esc(n.id)}" data-dir="1" aria-label="Move down" ${i >= lastMovable ? 'disabled' : ''}>↓</button></span>`;
+      return `<li class="cv-step ${n.type === 'divider' ? 'is-week' : ''} ${i === null ? 'cv-o-draft' : ''} ${selected === n.id ? 'is-selected' : ''}" data-step="${esc(n.id)}" style="--nc:${esc(color)}">
+          <span class="cv-glyph">${esc(def.glyph)}</span>
+          <span class="cv-step-main"><span class="cv-step-k">${esc(def.label)}${i === null ? '<i>draft</i>' : isRoot(n) ? '<i>start</i>' : `<i>#${i}</i>`}</span>
+            <span class="cv-step-t">${esc(title(n))}</span>${summary(n) ? `<span class="cv-step-s">${esc(summary(n))}</span>` : ''}</span>
+          ${i === null ? `<button type="button" class="cv-o-add" data-add-draft="${esc(n.id)}">Add to flow</button>` : move}
+        </li>`;
+    };
+    const gap = (after: FlowNode) => defs[after.type].terminal ? ''
+      : `<li class="cv-gap"><button type="button" data-insert-after="${esc(after.id)}" aria-label="Add a step after ${esc(title(after))}"><span>+</span>Add here</button></li>`;
+    outline.innerHTML = `
+      <div class="cv-o-sum">${[...counts].map(([label, n]) => `<span class="cv-o-pill"><b>${n}</b> ${esc(label.toLowerCase())}${n === 1 ? '' : 's'}</span>`).join('')}
+        ${drafts.length ? `<span class="cv-o-pill warn"><b>${drafts.length}</b> draft${drafts.length === 1 ? '' : 's'}</span>` : ''}</div>
+      <ol class="cv-steps">${order.map((n, i) => card(n, i) + gap(n)).join('')}</ol>
+      ${order.length <= 1 ? '<p class="cv-o-empty">Nothing here yet. Tap ＋ to add the first step.</p>' : ''}
+      ${drafts.length ? `<p class="cv-o-h">Drafts · not shown to students</p><ol class="cv-steps">${drafts.map((n) => card(n, null)).join('')}</ol>` : ''}`;
+  }
+
+  /** Puts the chain in a new order (one way in, one way out) and lays it out again. */
+  function reorder(ids: string[]) {
+    const inChain = new Set(ids);
+    flow.edges = flow.edges.filter((e) => !inChain.has(e.from) && !inChain.has(e.to));
+    for (let k = 0; k < ids.length - 1; k++) flow.edges.push({ from: ids[k], to: ids[k + 1] });
+    relayout();
+    renderNodes();
+    setDirty();
+  }
+  function moveStep(id: string, dir: number) {
+    const ids = orderFlow(flow, cfg.kind).map((n) => n.id);
+    const i = ids.indexOf(id), j = i + dir;
+    if (i < 1 || j < 1 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    if (ids.slice(0, -1).some((x) => defs[nodeById(x)!.type].terminal)) return; // an end node stays last
+    reorder(ids);
+  }
+  /** A draft goes to the end of the flow (before an end node, if there is one). */
+  function addDraft(id: string) {
+    const ids = orderFlow(flow, cfg.kind).map((n) => n.id);
+    const end = ids.length > 1 && defs[nodeById(ids.at(-1)!)!.type].terminal ? ids.pop()! : null;
+    flow.edges = flow.edges.filter((e) => e.from !== id && e.to !== id);
+    reorder([...ids, id, ...(end ? [end] : [])]);
+  }
+  /** The last node a new step can follow (the one before an end node). */
+  const appendPoint = () => {
+    const order = orderFlow(flow, cfg.kind);
+    const last = order.at(-1);
+    return last && defs[last.type].terminal && order.length > 1 ? order.at(-2)! : last ?? null;
+  };
+
+  /* ------------------------------------------------------ phone: sheets */
+
+  let sheetOpenedAt = 0;
+  const openSheet = (name: 'palette' | 'inspector' | 'more') => {
+    root.dataset.sheet = name;
+    sheetOpenedAt = Date.now();
+    const sheet = root.querySelector<HTMLElement>(name === 'palette' ? '.cv-palette' : name === 'inspector' ? '.cv-inspector' : '.cv-more');
+    if (sheet) { sheet.scrollTop = 0; sheet.style.transform = ''; }
+  };
+  const closeSheet = () => { root.dataset.sheet = ''; insertAfter = null; };
+  function setMode(mode: 'outline' | 'canvas') {
+    root.dataset.mode = mode;
+    root.querySelectorAll<HTMLElement>('[data-cv-mode-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cvModeBtn === mode)));
+    if (mode === 'canvas') requestAnimationFrame(() => { renderEdges(); fit(); });
   }
 
   const portPos = (n: FlowNode, side: 'in' | 'out') => {
@@ -215,11 +304,13 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     }
   }
 
+  const sheetHead = (label: string) => `<div class="cv-sheet-head" data-cv-sheet-head><span class="cv-grab" aria-hidden="true"></span><b>${esc(label)}</b><button type="button" class="cv-x" data-cv-close aria-label="Close">✕</button></div>`;
+
   function renderInspector() {
     const n = selected ? nodeById(selected) : null;
     if (!n) {
       const order = orderFlow(flow, cfg.kind);
-      inspector.innerHTML = `<p class="cv-k mono">Inspector</p><h3>Nothing selected</h3>
+      inspector.innerHTML = `${sheetHead('Inspector')}<p class="cv-k mono">Inspector</p><h3>Nothing selected</h3>
         <p class="muted">Click a node to edit it. Drag from a node's right-hand port to another node to connect them.</p>
         <dl class="cv-stats"><div><dt>Nodes</dt><dd>${flow.nodes.length}</dd></div><div><dt>In order</dt><dd>${order.length}</dd></div><div><dt>Drafts</dt><dd>${flow.nodes.length - order.length}</dd></div></dl>`;
       return;
@@ -227,7 +318,7 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     const def: NodeDef = defs[n.type];
     const fields = n.type === 'lab' ? [] : def.fields;
     const labInfo = n.type === 'lab' ? labs.get(n.data.slug) : null;
-    inspector.innerHTML = `<p class="cv-k mono" style="--nc:${def.color}"><span class="cv-glyph">${esc(def.glyph)}</span> ${esc(def.label)} node</p>
+    inspector.innerHTML = `${sheetHead(`Edit ${def.label.toLowerCase()}`)}<p class="cv-k mono" style="--nc:${def.color}"><span class="cv-glyph">${esc(def.glyph)}</span> ${esc(def.label)} node</p>
       <h3>${esc(title(n))}</h3>
       ${n.type === 'lab' ? (labInfo
         ? `<p class="muted">/${esc(cfg.module ?? '')}/${esc(n.data.slug)} · ${labInfo.published ? 'published' : 'draft'}</p>
@@ -271,6 +362,7 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     world.querySelectorAll('.cv-node').forEach((el) => el.classList.toggle('is-selected', (el as HTMLElement).dataset.node === id));
     renderInspector();
     refreshWeekPicker();
+    outline.querySelectorAll<HTMLElement>('[data-step]').forEach((el) => el.classList.toggle('is-selected', el.dataset.step === id));
   }
 
   /* -------------------------------------------------------------- edits */
@@ -329,6 +421,7 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     flow.edges = flow.edges.filter((e) => e.from !== id && e.to !== id);
     if (inE && outE) flow.edges.push({ from: inE.from, to: outE.to }); // keep the chain whole
     selected = null;
+    if (root.dataset.sheet === 'inspector') closeSheet();
     renderNodes();
     renderInspector();
     setDirty();
@@ -358,13 +451,13 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
 
   /** chain in reading order on rows of four, drafts parked underneath */
   function autoLayout() {
-    if (cfg.kind === 'module') {
-      layoutModuleGroups();
-      renderNodes();
-      fit();
-      setDirty();
-      return;
-    }
+    relayout();
+    renderNodes();
+    fit();
+    setDirty();
+  }
+  function relayout() {
+    if (cfg.kind === 'module') { layoutModuleGroups(); return; }
     const order = orderFlow(flow, cfg.kind);
     const inChain = new Set(order.map((n) => n.id));
     const perRow = 4;
@@ -376,9 +469,6 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     });
     const rows = Math.ceil(order.length / perRow);
     flow.nodes.filter((n) => !inChain.has(n.id)).forEach((n, i) => { n.x = 40 + (i % perRow) * (NODE_W + 80); n.y = 80 + (rows + Math.floor(i / perRow)) * 200; });
-    renderNodes();
-    fit();
-    setDirty();
   }
 
   /** Three week columns per row, with every lab stacked beneath its week heading. */
@@ -433,12 +523,34 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
   type Drag =
     | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
     | { kind: 'move'; id: string; ox: number; oy: number; moved: boolean }
-    | { kind: 'link'; from: string };
+    | { kind: 'link'; from: string }
+    | { kind: 'pinch'; d0: number; k0: number; wx: number; wy: number };
   let drag: Drag | null = null;
   let lastDown = { id: '', at: 0 };
+  /** Fingers on the stage, for pinch-to-zoom. */
+  const touches = new Map<number, { x: number; y: number }>();
+  const pinchInfo = () => {
+    const [a, b] = [...touches.values()];
+    return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+  };
+
+  /** Keeps getting a pointer's moves while it is outside the stage (some browsers refuse for synthetic pointers). */
+  const capture = (id: number) => { try { stage.setPointerCapture(id); } catch { /* not an active pointer */ } };
 
   stage.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) {
+      // second finger: whatever the first one started becomes a pinch
+      world.querySelectorAll('.cv-node.is-target').forEach((el) => el.classList.remove('is-target'));
+      if (drag?.kind === 'link') renderEdges();
+      const { d, mx, my } = pinchInfo();
+      const w = toWorld(mx, my);
+      drag = { kind: 'pinch', d0: d, k0: view.k, wx: w.x, wy: w.y };
+      capture(e.pointerId);
+      return;
+    }
+    if (touches.size > 2) return;
     const t = e.target as Element;
     const cut = t.closest('[data-cut]');
     if (cut) {
@@ -467,11 +579,20 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
       drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
       stage.classList.add('is-panning');
     }
-    stage.setPointerCapture(e.pointerId);
+    capture(e.pointerId);
   });
   stage.addEventListener('pointermove', (e) => {
+    if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (!drag) return;
-    if (drag.kind === 'pan') {
+    if (drag.kind === 'pinch') {
+      if (touches.size < 2) return;
+      const { d, mx, my } = pinchInfo();
+      const r = stage.getBoundingClientRect();
+      view.k = Math.max(0.25, Math.min(2, drag.k0 * (d / drag.d0)));
+      view.x = mx - r.left - drag.wx * view.k;
+      view.y = my - r.top - drag.wy * view.k;
+      applyView();
+    } else if (drag.kind === 'pan') {
       view.x = drag.vx + e.clientX - drag.sx;
       view.y = drag.vy + e.clientY - drag.sy;
       applyView();
@@ -492,13 +613,16 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     }
   });
   const endDrag = (e: PointerEvent) => {
+    touches.delete(e.pointerId);
     if (!drag) return;
+    if (drag.kind === 'pinch') { if (!touches.size) drag = null; return; }
     if (drag.kind === 'link') {
       const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-node]');
       world.querySelectorAll('.cv-node.is-target').forEach((el) => el.classList.remove('is-target'));
       if (over) connect(drag.from, over.dataset.node!);
       else renderEdges();
     } else if (drag.kind === 'move' && drag.moved) setDirty();
+    else if (drag.kind === 'move' && phone.matches) openSheet('inspector'); // a tap on a node edits it
     else if (drag.kind === 'pan' && Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) < 4) select(null);
     stage.classList.remove('is-panning');
     drag = null;
@@ -511,7 +635,15 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
 
   root.querySelectorAll<HTMLElement>('[data-palette]').forEach((item) => {
     item.addEventListener('dragstart', (e) => { e.dataTransfer!.setData('text/x-node', item.dataset.palette!); e.dataTransfer!.effectAllowed = 'copy'; });
-    item.addEventListener('click', () => addNode(item.dataset.palette!));
+    item.addEventListener('click', () => {
+      if (!phone.matches) { addNode(item.dataset.palette!); return; }
+      // phone: after the "+" that was tapped, or at the end of the flow
+      const after = insertAfter ?? appendPoint()?.id ?? null;
+      selected = after;
+      const n = addNode(item.dataset.palette!);
+      insertAfter = null;
+      if (n) { relayout(); renderNodes(); openSheet('inspector'); }
+    });
   });
   stage.addEventListener('dragover', (e) => { if (e.dataTransfer?.types.includes('text/x-node') || e.dataTransfer?.types.includes('text/x-lab')) e.preventDefault(); });
   stage.addEventListener('drop', (e) => {
@@ -632,6 +764,11 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     }
   }
   function showWarnings(list: string[], stats?: { tasks: number; exercises: number }) {
+    const phoneBox = root.querySelector<HTMLElement>('[data-cv-warnings-m]');
+    if (phoneBox) {
+      phoneBox.hidden = !list.length && !stats;
+      phoneBox.innerHTML = `${stats ? `<p class="mono">${stats.tasks} task${stats.tasks === 1 ? '' : 's'} · ${stats.exercises} exercise${stats.exercises === 1 ? '' : 's'}</p>` : ''}${list.map((w) => `<p>⚠ ${esc(w)}</p>`).join('')}`;
+    }
     warningsBox.hidden = !list.length && !stats;
     warningsBox.innerHTML = `${stats ? `<p class="mono">${stats.tasks} task${stats.tasks === 1 ? '' : 's'} · ${stats.exercises} exercise${stats.exercises === 1 ? '' : 's'}</p>` : ''}${list.map((w) => `<p>⚠ ${esc(w)}</p>`).join('')}`;
   }
@@ -654,12 +791,61 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
   $('[data-cv-layout]').addEventListener('click', autoLayout);
   $('[data-cv-zoom-in]').addEventListener('click', () => zoomAt(1.2));
   $('[data-cv-zoom-out]').addEventListener('click', () => zoomAt(1 / 1.2));
-  root.querySelector<HTMLAnchorElement>('[data-cv-preview]')?.addEventListener('click', async (e) => {
+  root.querySelectorAll<HTMLAnchorElement>('[data-cv-preview]').forEach((a) => a.addEventListener('click', async (e) => {
     if (!dirty) return;
     e.preventDefault();
     const href = (e.currentTarget as HTMLAnchorElement).href;
     if (await save()) window.open(href, '_blank', 'noopener');
+  }));
+
+  /* ----------------------------------------------------- phone: wiring */
+
+  outline.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    const move = t.closest<HTMLElement>('[data-move]');
+    if (move) { moveStep(move.dataset.move!, Number(move.dataset.dir)); return; }
+    const draft = t.closest<HTMLElement>('[data-add-draft]');
+    if (draft) { addDraft(draft.dataset.addDraft!); return; }
+    const gap = t.closest<HTMLElement>('[data-insert-after]');
+    if (gap) { insertAfter = gap.dataset.insertAfter!; openSheet('palette'); return; }
+    const step = t.closest<HTMLElement>('[data-step]');
+    if (step) { select(step.dataset.step!); openSheet('inspector'); }
   });
+  root.querySelectorAll<HTMLElement>('[data-cv-mode-btn]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.cvModeBtn as 'outline' | 'canvas')));
+  root.querySelector('[data-cv-add]')?.addEventListener('click', () => { insertAfter = null; openSheet('palette'); });
+  root.querySelector('[data-cv-save-m]')?.addEventListener('click', () => void save());
+  root.querySelector('[data-cv-more]')?.addEventListener('click', () => openSheet('more'));
+  // The tap that opened a sheet from the canvas is followed by a click that would land on the backdrop.
+  root.querySelector('[data-cv-scrim]')?.addEventListener('click', () => { if (Date.now() - sheetOpenedAt > 400) closeSheet(); });
+  root.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest('[data-cv-close]')) { closeSheet(); return; }
+    const proxy = t.closest<HTMLElement>('[data-proxy]');
+    if (proxy) {
+      closeSheet();
+      setMode('canvas'); // the canvas tools act on the canvas, so show it
+      requestAnimationFrame(() => root.querySelector<HTMLElement>(proxy.dataset.proxy!)?.click());
+    }
+  });
+  // drag a sheet's handle down to close it
+  root.addEventListener('pointerdown', (e) => {
+    const head = (e.target as HTMLElement).closest<HTMLElement>('[data-cv-sheet-head]');
+    if (!head || (e.target as HTMLElement).closest('button')) return;
+    const sheet = head.closest<HTMLElement>('.cv-sheet')!;
+    const y0 = e.clientY;
+    sheet.classList.add('is-dragging');
+    const move = (ev: PointerEvent) => { sheet.style.transform = `translateY(${Math.max(0, ev.clientY - y0)}px)`; };
+    const up = (ev: PointerEvent) => {
+      sheet.classList.remove('is-dragging');
+      sheet.style.transform = '';
+      if (ev.clientY - y0 > 80) closeSheet();
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  });
+  root.querySelector<HTMLElement>('[data-cv-palette-title]')!.textContent = cfg.kind === 'module' ? 'Add to the module' : 'Add a step';
 
   document.addEventListener('keydown', (e) => {
     if (!root.isConnected) return;
@@ -668,7 +854,7 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     if (typing) return;
     if ((e.key === 'Delete' || e.key === 'Backspace') && selected) { e.preventDefault(); removeNode(selected); }
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && selected) { e.preventDefault(); duplicate(selected); }
-    else if (e.key === 'Escape') select(null);
+    else if (e.key === 'Escape') { if (root.dataset.sheet) closeSheet(); else select(null); }
   });
   window.addEventListener('beforeunload', (e) => { if (dirty) e.preventDefault(); });
 
