@@ -17,6 +17,18 @@ const context = module
   : COURSE.test(path) ? { title: course.name, color: '#c8ff4d', items: nav } : null;
 const items = context?.items ?? [];
 const isActive = (href: string) => path === href.replace(/#.*$/, '') || (href !== `/m/${module?.slug}` && !href.includes('#') && path.startsWith(href + '/'));
+
+/** Phones: the main sections as a bottom tab bar, like an app. "More" opens the full menu. */
+type Tab = { label: string; icon: 'grid' | 'book' | 'flask' | 'search' | 'file' | 'rocket' | 'key'; href?: string; kind?: 'search' | 'account'; on?: boolean };
+const tabs: Tab[] = module
+  ? [{ label: 'Modules', icon: 'grid', href: '/' }, { label: 'Overview', icon: 'book', href: `/m/${module.slug}`, on: path === `/m/${module.slug}` },
+     { label: 'Labs', icon: 'flask', href: `/m/${module.slug}#labs`, on: path.startsWith(`/m/${module.slug}/`) }, { label: 'Search', icon: 'search', kind: 'search' }]
+  : COURSE.test(path)
+    ? [{ label: 'Course', icon: 'book', href: '/course' }, { label: 'Labs', icon: 'flask', href: '/labs' },
+       { label: 'Coursework', icon: 'file', href: '/coursework' }, { label: 'Project', icon: 'rocket', href: '/project' }]
+    : [{ label: 'Modules', icon: 'grid', href: '/', on: path === '/' || path === '/modules' }, { label: 'Search', icon: 'search', kind: 'search' },
+       { label: 'Account', icon: 'key', href: '/login', kind: 'account', on: path === '/login' || path === '/account' }];
+for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.href));
 ---
 <header class="nav" data-nav>
   <div class="nav-inner container">
@@ -82,6 +94,13 @@ const isActive = (href: string) => path === href.replace(/#.*$/, '') || (href !=
   </div>
 </header>
 
+<nav class="tabbar" aria-label="Sections">
+  {tabs.map((t) => t.kind === 'search'
+    ? <button type="button" class="tab" data-search-open><Icon name={t.icon} size={20} /><span>{t.label}</span></button>
+    : <a class="tab" href={t.href} aria-current={t.on ? 'page' : undefined} data-tab-account={t.kind === 'account' ? '' : undefined}><Icon name={t.icon} size={20} /><span>{t.label}</span></a>)}
+  <button type="button" class="tab" data-menu-open aria-controls="mobile-menu"><Icon name="menu" size={20} /><span>More</span></button>
+</nav>
+
 <style>
   .nav-modules { color: var(--mc) !important; font-weight: 600; }
   :global(:root[data-theme='light']) .nav-modules { color: color-mix(in oklab, var(--mc) 50%, #000) !important; }
@@ -90,6 +109,24 @@ const isActive = (href: string) => path === href.replace(/#.*$/, '') || (href !=
   .nav-account:hover { border-color: var(--accent-text); }
   .nav-account.in { background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent-text) 40%, var(--line-2)); }
   @media (max-width: 640px) { .nav-account { display: none; } }
+
+  /* phones: an app-style bottom tab bar; the header keeps the brand, search and theme */
+  .tabbar { display: none; }
+  @media (max-width: 719px) {
+    .nav-inner { gap: 8px; }
+    .menu-btn { display: none !important; }
+    .tabbar { position: fixed; z-index: 95; left: 0; right: 0; bottom: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+      padding: 6px 6px calc(env(safe-area-inset-bottom) + 6px); background: color-mix(in oklab, var(--surface) 92%, transparent); border-top: 1px solid var(--line);
+      backdrop-filter: saturate(160%) blur(16px); -webkit-backdrop-filter: saturate(160%) blur(16px); }
+    .tab { position: relative; display: grid; justify-items: center; gap: 3px; padding: 6px 0 4px; border: 0; background: none; color: var(--text-3);
+      font: 600 10.5px var(--font-body); letter-spacing: .01em; -webkit-tap-highlight-color: transparent; }
+    .tab:active { transform: scale(.94); }
+    .tab[aria-current='page'] { color: var(--text); }
+    .tab[aria-current='page']::before { content: ''; position: absolute; top: -6px; left: 50%; width: 22px; height: 3px; translate: -50% 0; border-radius: 0 0 3px 3px; background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+    .tab[aria-current='page'] :global(svg) { color: var(--accent-text); }
+    :global(body:not(:has(.ash, .cv))) { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+    :global(body:has(.ash, .cv)) .tabbar { display: none; } /* admin pages and the builder have their own */
+  }
   .nav {
     position: fixed; inset: 0 0 auto; z-index: 100; height: var(--nav-h);
     transition: background var(--t-med), border-color var(--t-med), height var(--t-med) var(--ease-out);
@@ -177,6 +214,8 @@ const isActive = (href: string) => path === href.replace(/#.*$/, '') || (href !=
     a.textContent = `${first} · ${({ super_admin: 'super admin', doctor: 'Dr.', ta: 'TA', student: 'student' } as Record<string, string>)[me.user.role] ?? me.user.role}`;
     a.href = '/account';
     a.classList.add('in');
+    const tab = document.querySelector<HTMLAnchorElement>('[data-tab-account]');
+    if (tab) { tab.href = me.user.role === 'student' ? '/account' : '/admin'; tab.querySelector('span')!.textContent = first; }
   }
   onPageLoad( () => void account());
 </script>

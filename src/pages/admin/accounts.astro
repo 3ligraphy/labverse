@@ -143,6 +143,11 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   @media (min-width: 1040px) { .ac-grid { grid-template-columns: 380px 1fr; align-items: start; } }
   .ac-col { display: grid; gap: 18px; align-content: start; }
   .ac-card { border: 1px solid var(--line-2); background: var(--surface); border-radius: var(--r-lg); padding: 22px; display: grid; gap: 12px; align-content: start; }
+  @media (max-width: 719px) {
+    .ac-grid, .ac-card { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+    .ac-card { padding: 18px 16px; }
+    .ac-teams { grid-template-columns: minmax(0, 1fr); }
+  }
   .ac-card h2 { font-size: var(--fs-lg); }
   .ac-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .ac-pill { padding: 3px 10px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 10.5px; }
