@@ -2,11 +2,14 @@
  * Reads the text of a student's hand-in in the admin's browser, line by line, so the groups page can find the
  * contribution table and the proposed ideas. Files come straight from Vercel Blob (public, CORS-enabled), like
  * the ZIP download. PDF goes through pdf.js (loaded only when needed); Word and PowerPoint files are ZIPs of XML,
- * read with the browser's own DecompressionStream. Table rows become one line with cells joined by " | ", and
+ * read with the browser's own DecompressionStream. A ZIP hand-in is opened and the PDF/Word/PowerPoint files
+ * inside it are read. Table rows become one line with cells joined by " | ", and
  * Word list paragraphs start with "• " so numbered ideas are still recognisable.
  */
 
 const MAX_PDF_PAGES = 15;
+const MAX_FILES_IN_ZIP = 6;
+const READABLE = ['pdf', 'docx', 'pptx'];
 
 export type DocText = { lines: string[] } | { error: string };
 
@@ -14,7 +17,7 @@ const extOf = (url: string) => (/\.([a-z0-9]+)(?:$|[?#])/i.exec(new URL(url, loc
 
 export async function readDocText(url: string): Promise<DocText> {
   const ext = extOf(url);
-  if (!['pdf', 'docx', 'pptx'].includes(ext)) return { error: `${ext.toUpperCase() || 'This'} files can't be read; add the members and ideas by hand.` };
+  if (![...READABLE, 'zip'].includes(ext)) return { error: `${ext.toUpperCase() || 'This'} files can't be read; add the members and ideas by hand.` };
   let bytes: Uint8Array;
   try {
     const res = await fetch(url, { cache: 'no-store' });
@@ -24,20 +27,41 @@ export async function readDocText(url: string): Promise<DocText> {
     return { error: 'Download failed.' };
   }
   try {
-    const lines = ext === 'pdf' ? await pdfLines(bytes) : ext === 'docx' ? await docxLines(bytes) : await pptxLines(bytes);
+    const lines = await linesOf(ext, bytes);
     return { lines: lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean) };
   } catch (error) {
     console.warn('[doc-text] could not read', url, error);
-    return { error: `The ${ext.toUpperCase()} file could not be read.` };
+    const why = error instanceof Error && error.message ? ` (${error.message.slice(0, 120)})` : '';
+    return { error: `The ${ext.toUpperCase()} file could not be read${why}.` };
   }
+}
+
+async function linesOf(ext: string, bytes: Uint8Array): Promise<string[]> {
+  if (ext === 'pdf') return pdfLines(bytes);
+  if (ext === 'docx') return docxLines(bytes);
+  if (ext === 'pptx') return pptxLines(bytes);
+  return zipLines(bytes);
+}
+
+/** A ZIP hand-in: reads the PDF, Word and PowerPoint files inside it (macOS "._" leftovers skipped). */
+async function zipLines(bytes: Uint8Array): Promise<string[]> {
+  const inside = await unzip(bytes, (n) => READABLE.includes(n.split('.').pop()!.toLowerCase()) && !/(^|\/)(__MACOSX\/|\._)/.test(n));
+  if (!inside.size) throw new Error('no PDF, Word or PowerPoint file inside');
+  const lines: string[] = [];
+  for (const [name, data] of [...inside].slice(0, MAX_FILES_IN_ZIP)) {
+    lines.push(...await linesOf(name.split('.').pop()!.toLowerCase(), data).catch(() => []));
+  }
+  return lines;
 }
 
 /* --------------------------------------------------------------------- PDF */
 
 async function pdfLines(bytes: Uint8Array): Promise<string[]> {
-  const pdfjs = await import('pdfjs-dist');
+  // The legacy build: the standard one calls brand-new JavaScript (Promise.try, Math.sumPrecise,
+  // Map.getOrInsertComputed…) directly, which Safari on iPhone doesn't have yet, so every PDF failed there.
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
+    pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default;
   }
   const task = pdfjs.getDocument({ data: bytes });
   const doc = await task.promise;
@@ -72,15 +96,15 @@ async function pdfLines(bytes: Uint8Array): Promise<string[]> {
 
 /* -------------------------------------------------------------- Word, PPTX */
 
-/** Reads one file out of a ZIP (stored or deflated). */
-async function unzip(bytes: Uint8Array, name: (n: string) => boolean): Promise<Map<string, string>> {
+/** Reads the files whose names pass `name` out of a ZIP (stored or deflated). */
+async function unzip(bytes: Uint8Array, name: (n: string) => boolean): Promise<Map<string, Uint8Array>> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let eocd = -1;
   for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65_557); i--) if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
   if (eocd < 0) throw new Error('not a zip');
   const count = view.getUint16(eocd + 10, true);
   let at = view.getUint32(eocd + 16, true);
-  const out = new Map<string, string>();
+  const out = new Map<string, Uint8Array>();
   const dec = new TextDecoder();
   for (let n = 0; n < count && view.getUint32(at, true) === 0x02014b50; n++) {
     const method = view.getUint16(at + 10, true);
@@ -93,13 +117,13 @@ async function unzip(bytes: Uint8Array, name: (n: string) => boolean): Promise<M
     if (!name(file)) continue;
     const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
     const data = bytes.slice(start, start + size);
-    if (method === 0) out.set(file, dec.decode(data));
-    else if (method === 8) out.set(file, await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text());
+    if (method === 0) out.set(file, data);
+    else if (method === 8) out.set(file, new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()));
   }
   return out;
 }
 
-const xml = (text: string) => new DOMParser().parseFromString(text, 'application/xml');
+const xml = (data: Uint8Array) => new DOMParser().parseFromString(new TextDecoder().decode(data), 'application/xml');
 const kids = (el: Element) => [...el.children];
 const named = (el: Element, local: string) => el.localName === local;
 

@@ -157,6 +157,12 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-chip.clash { border-color: var(--warn); }
   .gp-chip button { border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 0 0 0 2px; font-size: 14px; line-height: 1; }
   .gp-chip button:hover { color: var(--danger); }
+  .gp-nonum { color: var(--warn); }
+  .gp-team { display: flex; gap: 6px; margin-top: 6px; }
+  .gp-team input { width: 96px; height: 32px; padding: 0 8px; }
+  .gp-team.need input { border-color: var(--warn); }
+  .gp-link { border: 0; background: none; padding: 2px 0; margin-top: 2px; display: block; color: var(--text-3); font-size: 11.5px; cursor: pointer; text-decoration: underline; }
+  .gp-link:hover { color: var(--text); }
   .gp-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-3); }
   .gp-size { font-family: var(--font-mono); white-space: nowrap; }
   .gp-size.short { color: var(--warn); }
@@ -281,7 +287,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   import { readDocText } from '@/scripts/doc-text';
   import { playBox } from '@/scripts/box-shuffle';
   import {
-    TEAM_SIZE, assignRandom, buildGroups, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
+    TEAM_SIZE, assignRandom, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
     randomIdea, unassigned, type Group, type Plan, type Student,
   } from '@/lib/project-files/groups';
   import type { Entry } from '@/lib/project-files/core';
@@ -359,11 +365,20 @@ if (!file) return Astro.redirect('/admin/project', 303);
         ? `${scanned.length} of ${plural(entries.length, 'file')} read · ${plural(groups.length, 'group')} · ${groups.reduce((n, g) => n + g.ideas.length, 0)} ideas found.`
         : 'No hand-ins yet.';
       const items: string[] = [];
+      const unnumbered = groups.filter((g) => !g.numbered);
+      if (unnumbered.length) items.push(`<li>${plural(unnumbered.reduce((n, g) => n + g.entries.length, 0), 'hand-in')} typed a student ID or lab group code instead of a project team number. They are grouped by who is named in their contribution tables (${plural(unnumbered.length, 'group')} marked “No number”). Type each one's team number in step 3.</li>`);
       for (const c of conflicts(groups)) items.push(`<li><b>${esc(c.name)}</b> (${esc(c.id)}) is listed in ${c.groups.map(esc).join(' and ')}. Check the files; a student should be in one group.</li>`);
       for (const e of failed) items.push(`<li>${esc(e.group_name)} · ${esc(e.name)}: ${esc(plan.scans[e.id]!.error!)} <a href="${esc(e.url)}" target="_blank" rel="noopener">Open file ↗</a></li>`);
       if (!roster.length && entries.length) items.push('<li class="info">Add the class list (step 1) so names and IDs in the contribution tables can be recognised.</li>');
       $('[data-gp-warn]').innerHTML = items.join('');
     }
+
+    const titleOf = (key: string) => groups.find((g) => g.key === key)?.title ?? key;
+    /** Team-number box: always open for a group without a number, behind "Change number" for the others. */
+    const teamForm = (g: Group) => `<form class="gp-team ${g.numbered ? '' : 'need'}" data-team-for="${esc(g.key)}" ${g.numbered ? 'hidden' : ''}>
+        <input class="input mono" maxlength="20" placeholder="Team no." aria-label="Team number for ${esc(g.title)}" value="" />
+        <button class="btn btn-ghost btn-sm" type="submit">${g.numbered ? 'Save' : 'Set number'}</button></form>${
+        g.numbered ? `<button class="gp-link" type="button" data-team-edit="${esc(g.key)}">Change number</button>` : ''}`;
 
     function renderRows() {
       const clash = clashIds();
@@ -372,11 +387,11 @@ if (!file) return Astro.redirect('/admin/project', 303);
         const open = openSeats(g);
         const on = selected.has(g.key);
         return `<tr class="${on ? 'sel' : ''} ${open ? '' : 'full'}">
-          <td class="gp-cb"><input type="checkbox" data-pick="${esc(g.key)}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'} aria-label="Select ${esc(g.key)}" /></td>
-          <td><b class="mono">${esc(g.key)}</b>${g.labels.length && g.labels.join() !== g.key ? `<br><small class="faint">${g.labels.map(esc).join(' / ')}</small>` : ''}</td>
+          <td class="gp-cb"><input type="checkbox" data-pick="${esc(g.key)}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'} aria-label="Select ${esc(g.title)}" /></td>
+          <td><b class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</b>${g.labels.length && g.labels.join() !== g.key ? `<br><small class="faint">typed: ${g.labels.map(esc).join(' / ')}</small>` : ''}${teamForm(g)}</td>
           <td><ul class="gp-chips">${g.members.map((m) => chip(m, g.key, clash)).join('')}</ul>${g.unread ? `<small class="faint">${plural(g.unread, 'file')} could not be read</small>` : ''}${plan.removed[g.key]?.length ? `<small class="faint">${plural(plan.removed[g.key].length, 'student')} taken out · <button class="btn btn-ghost btn-sm" type="button" data-restore="${esc(g.key)}">Restore</button></small>` : ''}</td>
           <td><span class="gp-size ${open ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></td>
-          <td>${open ? `<input class="input mono gp-add" type="number" min="1" max="${open}" value="${wantFor(g)}" data-count-for="${esc(g.key)}" aria-label="Members to add to ${esc(g.key)}" />` : '<small class="faint">full</small>'}</td>
+          <td>${open ? `<input class="input mono gp-add" type="number" min="1" max="${open}" value="${wantFor(g)}" data-count-for="${esc(g.key)}" aria-label="Members to add to ${esc(g.title)}" />` : '<small class="faint">full</small>'}</td>
         </tr>`;
       }).join('') + `<tr><td colspan="5"><div class="gp-legend"><span class="gp-chip">handed in</span><span class="gp-chip document">named in the file</span><span class="gp-chip added">added here</span><span class="gp-chip clash">in two groups</span></div></td></tr>`
         : `<tr><td colspan="5" class="muted">${entries.length ? 'Reading files…' : 'No hand-ins yet.'}</td></tr>`;
@@ -395,14 +410,14 @@ if (!file) return Astro.redirect('/admin/project', 303);
         const short = openSeats(g) > 0;
         const later = plan.later.includes(g.key);
         return `<article class="gp-group" data-group="${esc(g.key)}">
-          <h3><span class="mono">${esc(g.key)}</span><span class="gp-size ${short ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></h3>
+          <h3><span class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</span><span class="gp-size ${short ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></h3>
           <p class="members">${g.members.map((m) => `${esc(m.name)}${m.source === 'added' ? ' <b>(new)</b>' : ''}`).join(', ') || 'No members found'}</p>
           ${short ? later
             ? `<p class="small faint">Fill later · <button class="btn btn-ghost btn-sm" type="button" data-unlater="${esc(g.key)}">Show options</button></p>`
             : `<div class="gp-short"><span>This group has ${g.members.length} of ${TEAM_SIZE} members. Add a random student who is in no group now (optional), or do it later.</span>
                 <div class="gp-row"><button class="btn btn-primary btn-sm" type="button" data-add-one="${esc(g.key)}" ${pool && !scanning ? '' : 'disabled'}>Add random member</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-later="${esc(g.key)}">Later</button>${pool ? '' : '<small class="faint">No unassigned students left.</small>'}</div></div>` : ''}
-          <div class="gp-row"><div class="gp-seg" role="group" aria-label="How to choose ${esc(g.key)}'s idea">
+          <div class="gp-row"><div class="gp-seg" role="group" aria-label="How to choose ${esc(g.title)}'s idea">
             <button type="button" data-mode="manual" data-for="${esc(g.key)}" aria-pressed="${mode === 'manual'}" ${auto ? 'disabled' : ''}>Choose myself</button>
             <button type="button" data-mode="auto" data-for="${esc(g.key)}" aria-pressed="${mode === 'auto'}" ${auto ? 'disabled' : ''}>Random</button>
           </div>${mode === 'auto' && g.ideas.length > 1 ? `<button class="btn btn-ghost btn-sm" type="button" data-redraw="${esc(g.key)}">Draw again</button>` : ''}</div>
@@ -415,7 +430,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
                 : `<span>${esc(idea)}</span>`}
               ${extra.has(idea) ? `<button type="button" data-drop-idea="${esc(g.key)}" data-i="${i}" aria-label="Remove this idea">×</button>` : ''}
             </li>`).join('') || '<li class="small faint">No ideas found in this group\'s file.</li>'}</ul>
-          <form class="gp-new" data-new-idea="${esc(g.key)}"><input class="input" maxlength="200" placeholder="Add an idea" aria-label="Add an idea for ${esc(g.key)}" /><button class="btn btn-ghost btn-sm" type="submit">Add</button></form>
+          <form class="gp-new" data-new-idea="${esc(g.key)}"><input class="input" maxlength="200" placeholder="Add an idea" aria-label="Add an idea for ${esc(g.title)}" /><button class="btn btn-ghost btn-sm" type="submit">Add</button></form>
         </article>`;
       }).join('') || '<p class="muted">Groups appear here once students hand in.</p>';
       const chosen = groups.filter((g) => plan.choices[g.key]?.idea).length;
@@ -528,14 +543,14 @@ if (!file) return Astro.redirect('/admin/project', 303);
       const placed = Object.entries(r.placed);
       const n = placed.reduce((a, [, s]) => a + s.length, 0);
       say(n
-        ? `Added ${plural(n, 'student')}: ${placed.map(([k, s]) => `${k} ← ${s.map((x) => x.name).join(', ')}`).join(' · ')}.${r.short ? ` ${plural(r.short, 'seat')} could not be filled: no unassigned students left.` : ''}`
+        ? `Added ${plural(n, 'student')}: ${placed.map(([k, s]) => `${titleOf(k)} ← ${s.map((x) => x.name).join(', ')}`).join(' · ')}.${r.short ? ` ${plural(r.short, 'seat')} could not be filled: no unassigned students left.` : ''}`
         : 'No one was added: there are no unassigned students left.', !n, el);
       render();
       save();
       // The draw is made and saved; now show it: groups thrown in a box, shaken, students drawn out.
       const draws = [
-        ...Object.entries(r.placed).map(([group, students]) => ({ group, students })),
-        ...Object.keys(requests).filter((k) => requests[k] > 0 && !r.placed[k]).map((group) => ({ group, students: [] })),
+        ...Object.entries(r.placed).map(([k, students]) => ({ group: titleOf(k), students })),
+        ...Object.keys(requests).filter((k) => requests[k] > 0 && !r.placed[k]).map((k) => ({ group: titleOf(k), students: [] })),
       ];
       if (draws.length) void playBox({ draws, pool, short: r.short, onSheet: () => download('groups') });
       return n;
@@ -621,6 +636,26 @@ if (!file) return Astro.redirect('/admin/project', 303);
       const g = groups.find((x) => x.key === t.dataset.choose);
       if (!g) return;
       plan.choices[g.key] = { mode: 'manual', idea: g.ideas[Number(t.value)] ?? '' };
+      render();
+      save();
+    });
+    root.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-team-edit]');
+      if (!btn) return;
+      const form = root.querySelector<HTMLFormElement>(`[data-team-for="${CSS.escape(btn.dataset.teamEdit!)}"]`);
+      if (form) { form.hidden = false; btn.hidden = true; form.querySelector('input')!.focus(); }
+    });
+    root.addEventListener('submit', (e) => {
+      const team = (e.target as HTMLElement).closest<HTMLFormElement>('[data-team-for]');
+      if (!team) return;
+      e.preventDefault();
+      const g = groups.find((x) => x.key === team.dataset.teamFor);
+      const value = cleanTeam(team.querySelector('input')!.value);
+      if (!g) return;
+      if (!value) return say('Type a short team number, like 7 or G7 (not a student ID or lab group code).', true, assignMsg);
+      const to = numberGroup(plan, g, value);
+      const merged = groups.some((x) => x.key === to && x !== g);
+      say(merged ? `${g.title} joined ${to}.` : `${g.title} is now ${to}.`, false, assignMsg);
       render();
       save();
     });
