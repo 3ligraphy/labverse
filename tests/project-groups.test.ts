@@ -249,6 +249,8 @@ test('sortGroups orders by newest hand-in by default, and by number, size or mis
   assert.deepEqual(keys('number'), ['G1', 'G2', 'G3']);
   assert.deepEqual(keys('members'), ['G1', 'G2', 'G3']);
   assert.deepEqual(keys('unchosen'), ['G3', 'G2', 'G1']);
+});
+
 test('extractIdeas reads numbered app headings that have no "Idea" label', () => {
   const kino = [
     'Faculty of Informatics and Computer Science', 'Mobile Application Development Proposal', '26CSSE24H', 'Group Participants',
