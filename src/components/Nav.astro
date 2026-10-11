@@ -70,29 +70,32 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
     </div>
   </div>
 
-  <div id="mobile-menu" class="mobile-menu" data-menu hidden>
-    <div class="mm-top container">
-      <a href="/" class="brand"><Logo /><span class="brand-name">{platform.name}</span></a>
-      <button class="icon-btn" data-menu-close aria-label="Close menu"><Icon name="close" /></button>
-    </div>
-    <nav aria-label="Mobile" class="container mm-body">
-      <ol class="mm-list">
-        <li style="--i:0"><a href="/"><span class="mono ix">00</span><span>All modules</span></a></li>
-        {items.map((item, i) => (
-          <li style={`--i:${i}`}>
-            <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
-              <span class="mono ix">{String(i + 1).padStart(2, '0')}</span>
-              <span>{item.label}</span>
-            </a>
-          </li>
-        ))}
-      </ol>
-      <div class="mm-secondary" hidden={!context || Boolean(module)}>
-        {secondaryNav.map((item) => <a href={item.href} class="chip">{item.label}</a>)}
-      </div>
-    </nav>
-  </div>
 </header>
+
+<!-- Outside <header>: the scrolled header uses backdrop-filter, which would make it the containing block of this
+     position:fixed menu and squeeze the menu into the header bar. -->
+<div id="mobile-menu" class="mobile-menu" data-menu role="dialog" aria-modal="true" aria-label="Menu" hidden>
+  <div class="mm-top container">
+    <a href="/" class="brand"><Logo /><span class="brand-name">{platform.name}</span></a>
+    <button class="icon-btn" data-menu-close aria-label="Close menu"><Icon name="close" /></button>
+  </div>
+  <nav aria-label="Mobile" class="container mm-body">
+    <ol class="mm-list">
+      <li style="--i:0"><a href="/"><span class="mono ix">00</span><span>All modules</span></a></li>
+      {items.map((item, i) => (
+        <li style={`--i:${i}`}>
+          <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+            <span class="mono ix">{String(i + 1).padStart(2, '0')}</span>
+            <span>{item.label}</span>
+          </a>
+        </li>
+      ))}
+    </ol>
+    <div class="mm-secondary" hidden={!context || Boolean(module)}>
+      {secondaryNav.map((item) => <a href={item.href} class="chip">{item.label}</a>)}
+    </div>
+  </nav>
+</div>
 
 <nav class="tabbar" aria-label="Sections">
   {tabs.map((t) => t.kind === 'search'
@@ -152,7 +155,14 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
     position: relative; display: block; padding: 7px 13px; border-radius: var(--r-full);
     font-size: 13.5px; font-weight: 500; color: var(--text-2); transition: color var(--t-fast), background var(--t-fast);
   }
+  .nav-links a { white-space: nowrap; }
   .nav-links a:hover { color: var(--text); background: var(--surface-2); }
+  /* laptops: the course nav has 9 links; keep them on one line beside search and sign-in */
+  @media (min-width: 1180px) and (max-width: 1360px) {
+    .nav-inner { gap: 14px; }
+    .nav-links a { padding: 7px 9px; font-size: 13px; }
+    .search-trigger .keys { display: none; }
+  }
   .nav-links a[aria-current='page'] { color: var(--text); background: var(--surface-2); box-shadow: 0 0 0 1px var(--line-2) inset; }
   .nav-links a[aria-current='page']::after {
     content: ''; position: absolute; left: 50%; bottom: -6px; width: 4px; height: 4px; border-radius: 50%;

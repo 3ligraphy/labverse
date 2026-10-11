@@ -31,17 +31,31 @@ function openMenu() {
   m.hidden = false;
   m.classList.add('open');
   document.body.style.overflow = 'hidden';
-  $('[data-menu-open]')?.setAttribute('aria-expanded', 'true');
+  $$('[data-menu-open]').forEach((b) => b.setAttribute('aria-expanded', 'true'));
   $<HTMLElement>('[data-menu-close]', m)?.focus();
 }
+/** the opener the user can see (the header ☰ on tablets, "More" in the phone tab bar) */
+const visibleOpener = () => $$('[data-menu-open]').find((b) => b.offsetParent !== null);
 function closeMenu() {
   const m = $('[data-menu]');
   if (!m || m.hidden) return;
   m.hidden = true;
   m.classList.remove('open');
   document.body.style.overflow = '';
-  $('[data-menu-open]')?.setAttribute('aria-expanded', 'false');
-  lastFocus?.focus();
+  $$('[data-menu-open]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  // back to where the user was; if that was inside the menu or nowhere, to the button that opens it
+  const back = lastFocus && lastFocus !== document.body && !m.contains(lastFocus) ? lastFocus : visibleOpener();
+  back?.focus();
+}
+/** Tab and Shift+Tab stay inside the open menu (it is a modal dialog). */
+function trapMenuFocus(e: KeyboardEvent) {
+  const m = $('[data-menu]');
+  if (e.key !== 'Tab' || !m || m.hidden) return;
+  const items = $$<HTMLElement>('a[href], button:not([disabled])', m).filter((el) => el.offsetParent !== null);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && (document.activeElement === first || !m.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && (document.activeElement === last || !m.contains(document.activeElement))) { e.preventDefault(); first.focus(); }
 }
 
 /* ---------- copy ---------- */
@@ -270,6 +284,7 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeMenu();
+  trapMenuFocus(e);
   const tab = (e.target as HTMLElement).closest?.('.os-tab');
   if (tab && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
     const tabs = $$('.os-tab', tab.parentElement!);
