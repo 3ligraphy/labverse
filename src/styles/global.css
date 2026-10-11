@@ -526,8 +526,13 @@ a.row:hover .go { background: var(--accent); color: var(--accent-ink); border-co
 .empty p { color: var(--text-2); max-width: 44ch; }
 
 /* ---------- 16. MOTION -------------------------------------------------- */
-[data-reveal] { opacity: 0; transform: translateY(18px); transition: opacity 800ms var(--ease-out), transform 800ms var(--ease-out); transition-delay: var(--d, 0ms); }
-[data-reveal].in { opacity: 1; transform: none; }
+/* Reveal on scroll. If the page script is late (slow phone or network), a CSS fallback shows everything after
+   1.2s so nothing stays invisible; once the script runs (html.reveal-ready) the fallback is switched off for
+   blocks not yet scrolled to, which then fade in as usual. */
+[data-reveal] { opacity: 0; transform: translateY(18px); transition: opacity 800ms var(--ease-out), transform 800ms var(--ease-out); transition-delay: var(--d, 0ms); animation: reveal-now 1ms 1.2s both; }
+@keyframes reveal-now { to { opacity: 1; transform: none; } }
+html.reveal-ready [data-reveal]:not(.in) { animation: none; }
+[data-reveal].in { opacity: 1; transform: none; animation: none; }
 .no-js [data-reveal] { opacity: 1; transform: none; }
 @keyframes float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -10px; } }
 @keyframes blink { 50% { opacity: 0; } }
@@ -570,4 +575,64 @@ a.row:hover .go { background: var(--accent); color: var(--accent-ink); border-co
   .prose th, .prose td, .table th, .table td { padding: 10px 12px; }
   /* a scrolling table box must not size its parents from the table inside it */
   .table-wrap { contain: inline-size; max-width: 100%; }
+}
+
+/* ---------- PRINT: labs and guides print as readable pages ---------------- */
+@media print {
+  :root, :root[data-theme] {
+    color-scheme: light;
+    --bg: #f5f4ef;
+    --bg-2: #eeede6;
+    --surface: #ffffff;
+    --surface-2: #f8f7f3;
+    --surface-3: #efeee8;
+    --line: #e3e1d9;
+    --line-2: #d2cfc4;
+    --text: #0e1013;
+    --text-2: #464c56;
+    --text-3: #6e7480;
+    --accent: #c2f03a;
+    --accent-2: #b0e02a;
+    --accent-ink: #0e1013;
+    --accent-text: #4a6b00;
+    --accent-soft: rgb(120 170 0 / 0.1);
+    --accent-glow: rgb(170 230 30 / 0.35);
+    --info: #1f5fd1;
+    --info-soft: rgb(31 95 209 / 0.08);
+    --warn: #a45f00;
+    --warn-soft: rgb(220 140 20 / 0.12);
+    --danger: #c0352a;
+    --danger-soft: rgb(192 53 42 / 0.08);
+    --ok: #1d8a4a;
+    --ok-soft: rgb(29 138 74 / 0.1);
+    --code-bg: #fbfaf7;
+    --code-line: #efede6;
+    --shadow-sm: 0 1px 2px rgb(20 20 10 / 0.06);
+    --shadow-md: 0 10px 30px -12px rgb(30 30 10 / 0.18), 0 0 0 1px var(--line);
+    --shadow-lg: 0 40px 80px -30px rgb(30 30 10 / 0.25), 0 0 0 1px var(--line);
+    --grid-dot: rgb(0 0 0 / 0.07);
+    --glass: rgb(245 244 239 / 0.78);
+    --hero-bg: #eceade;
+    --hero-text: #0e1013;
+    --hero-lead: #464c56;
+    --hero-muted: #5b616b;
+    --hero-dim: #6e7480;
+    --hero-line: #d2cfc4;
+    --hero-grid: rgb(14 16 19 / 0.06);
+    --hero-glow: rgb(170 230 30 / 0.45);
+    --hero-accent: #4a6b00;
+    --hero-warn: #a45f00;
+    --hero-danger: #c0352a;
+  }
+  html, body { background: #fff !important; color: var(--text); }
+  body { padding: 0 !important; }
+  /* content waiting for scroll-reveal would print blank */
+  [data-reveal] { opacity: 1 !important; transform: none !important; animation: none !important; transition: none !important; }
+  /* diagrams inside revealed blocks (app.ts marks every block revealed on beforeprint): show their end state */
+  *, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition: none !important; }
+  .nav, .tabbar, .mobile-menu, .footer, .skip-link, .sp, .ash-side, .ash-tabbar, .ash-sheet, .rp, .doc-aside, .ann, .mann { display: none !important; }
+  main { padding-top: 0 !important; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.8em; color: var(--text-3); word-break: break-all; }
+  pre, .astro-code, figure, table, .task, .callout { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
 }

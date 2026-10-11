@@ -202,6 +202,7 @@ function buildOSTabs() {
 let io: IntersectionObserver | null = null;
 function initReveal() {
   io?.disconnect();
+  document.documentElement.classList.add('reveal-ready'); // switches off the CSS fallback (global.css)
   const els = $$('[data-reveal]');
   if (reduced() || !('IntersectionObserver' in window)) { els.forEach((e) => e.classList.add('in')); return; }
   io = new IntersectionObserver(
@@ -212,10 +213,12 @@ function initReveal() {
 }
 
 /* ---------- count-up numbers: <b data-count="60">60</b> ---------- */
+/** only elements whose data-count is a number (a bare data-count is someone else's hook, not a target) */
+const countable = () => $$('[data-count]').filter((el) => el.dataset.count !== '' && Number.isFinite(Number(el.dataset.count)));
 let countIO: IntersectionObserver | null = null;
 function initCount() {
   countIO?.disconnect();
-  const els = $$('[data-count]');
+  const els = countable();
   if (!els.length || reduced() || !('IntersectionObserver' in window)) return;
   els.forEach((el) => (el.textContent = '0'));
   countIO = new IntersectionObserver(
@@ -295,6 +298,12 @@ document.addEventListener('keydown', (e) => {
   }
 });
 window.addEventListener('scroll', onScroll, { passive: true });
+// printing or saving as PDF: blocks never scrolled to would print blank, so reveal everything first
+window.addEventListener('beforeprint', () => {
+  $$('[data-reveal]').forEach((el) => el.classList.add('in'));
+  countIO?.disconnect();
+  countable().forEach((el) => (el.textContent = el.dataset.count!)); // numbers still waiting to count up
+});
 
 const live = Object.assign(document.createElement('div'), { id: 'copy-live', className: 'sr-only' });
 live.setAttribute('aria-live', 'polite');
