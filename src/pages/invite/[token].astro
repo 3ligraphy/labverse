@@ -85,7 +85,6 @@ const role = invite ? (invite.module_role ? ROLE_NAMES[invite.module_role] : ROL
         body: JSON.stringify({ token: form.dataset.token, name: fd.get('name'), studentId: fd.get('studentId'), password: fd.get('password') }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { msg.textContent = d.error ?? 'Could not accept the invitation.'; return; }
-      try { sessionStorage.removeItem('mdx:me'); } catch { /* ignore */ }
       const staff = d.user.role !== 'student';
       location.href = d.module ? (d.module === 'mobile-development' ? '/course' : `/m/${d.module}`) : staff ? '/admin' : '/';
     });

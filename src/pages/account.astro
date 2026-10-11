@@ -148,7 +148,7 @@ const optionalCards = cards.filter((c) => optional.includes(c.slug));
         msg.className = `pr-msg ${r.ok ? 'ok' : 'err'}`;
         msg.textContent = r.ok ? (kind === 'password' ? 'Password changed.' : 'Saved.') : d.error ?? 'Could not save.';
         if (r.ok) {
-          try { sessionStorage.removeItem('mdx:me'); localStorage.setItem('mdx:profile', JSON.stringify(d.user.profile)); } catch { /* ignore */ }
+          try { localStorage.setItem('mdx:profile', JSON.stringify(d.user.profile)); } catch { /* ignore */ }
           if (kind === 'name') document.querySelector('[data-pr-name]')!.textContent = d.user.name;
           if (kind === 'password') form.reset();
         }
@@ -156,7 +156,6 @@ const optionalCards = cards.filter((c) => optional.includes(c.slug));
     });
     document.querySelector('[data-pr-out]')?.addEventListener('click', async () => {
       await fetch('/api/auth/logout', { method: 'POST' });
-      try { sessionStorage.removeItem('mdx:me'); } catch { /* ignore */ }
       location.href = '/';
     });
   });

@@ -190,6 +190,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
 
 <script>
   import { GENERAL, hasSpecialization, inSemester, type Semester } from '@/lib/accounts/core';
+  import { getMe } from '@/scripts/me';
   type Card = { slug: string; code: string; title: string; term: string; description: string; color: string; href: string; labs: number; builtIn: boolean; category: string; kind: 'core' | 'elective'; open: boolean; years: string[]; specializations: string[]; semester: 'Both' | Semester };
   type Profile = { year: string; specialization: string; modules: string[] };
   type Me = { user: { name: string; role: string; studentId: string | null; profile: Profile } | null; staff: boolean; doctor: boolean; accounts: boolean; enrolled: string[]; staffModules: Record<string, string>; builderModules: string[] };
@@ -229,7 +230,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
     const specialized = (year: string) => hasSpecialization(data, year, data.activeSemester);
     const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
     const ob = $('[data-ob]'), mine = $('[data-mine]'), who = $('[data-hub-who]');
-    const me: Me = await fetch('/api/auth/me', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ user: null, staff: false, doctor: false, accounts: false, enrolled: [], staffModules: {}, builderModules: [] }));
+    const me: Me = (await getMe<Me>()) ?? { user: null, staff: false, doctor: false, accounts: false, enrolled: [], staffModules: {}, builderModules: [] };
     membership = { enrolled: me.enrolled ?? [], staff: me.staffModules ?? {} };
     builderModules = new Set(me.builderModules ?? []);
     const student = me.user?.role === 'student' ? me.user : null;
@@ -243,7 +244,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
       who.innerHTML = `Signed in as <b>${esc(me.user.name)}</b> · ${esc(me.user.role === 'ta' ? 'TA' : me.user.role)}
         <a href="/account">Profile</a>${me.staff ? '<a href="/admin">Admin</a>' : ''}${me.doctor ? '<a href="/admin/builder">Builder</a><a href="/admin/accounts">Accounts</a>' : ''}
         <button type="button" data-logout>Sign out</button>`;
-      who.querySelector('[data-logout]')!.addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST' }); try { sessionStorage.removeItem('mdx:me'); } catch { /* ignore */ } location.reload(); });
+      who.querySelector('[data-logout]')!.addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST' }); location.reload(); });
     } else {
       who.innerHTML = `Signing in is optional. Without an account, you type your name and ID in each lab.
         ${me.accounts ? '<a href="/login" class="pri">Sign in</a><a href="/login#signup">Create account</a>' : ''}`;

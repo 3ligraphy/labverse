@@ -199,22 +199,23 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
+  import { getMe } from '@/scripts/me';
   /** Sign in → "Name · role" once signed in (doctors and TAs go to /admin, students to their modules). */
   async function account() {
     const a = document.querySelector<HTMLAnchorElement>('[data-nav-account]');
     if (!a) return;
-    let me: { user: { name: string; role: string } | null } | null = null;
-    try { me = JSON.parse(sessionStorage.getItem('mdx:me') ?? 'null'); } catch { /* ignore */ }
-    if (!me) {
-      me = await fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-      try { sessionStorage.setItem('mdx:me', JSON.stringify(me)); } catch { /* ignore */ }
-    }
+    const tab = document.querySelector<HTMLAnchorElement>('[data-tab-account]');
+    // signed out: come back to this page after signing in (the login page only accepts same-site paths)
+    const here = location.pathname + location.search;
+    const signIn = location.pathname.startsWith('/login') ? '/login' : `/login?next=${encodeURIComponent(here)}`;
+    a.href = signIn;
+    if (tab) tab.href = signIn;
+    const me = await getMe<{ user: { name: string; role: string } | null }>();
     if (!me?.user) return;
     const first = me.user.name.split(' ')[0];
     a.textContent = `${first} · ${({ super_admin: 'super admin', doctor: 'Dr.', ta: 'TA', student: 'student' } as Record<string, string>)[me.user.role] ?? me.user.role}`;
     a.href = '/account';
     a.classList.add('in');
-    const tab = document.querySelector<HTMLAnchorElement>('[data-tab-account]');
     if (tab) { tab.href = me.user.role === 'student' ? '/account' : '/admin'; tab.querySelector('span')!.textContent = first; }
   }
   onPageLoad( () => void account());

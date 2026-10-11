@@ -1,6 +1,7 @@
 /** The session-aware Start Lab card: name, student ID and group are required. */
 import { clearStudent, deviceId, getStudent, ID_RE, NAME_RE, setStudent } from './store.ts';
 import { clearProgressIdentity, getIdentity, setProgressIdentity } from '@/scripts/progress';
+import { getMe } from '@/scripts/me';
 
 type PublicSession = { id: string; open: boolean; ta_name?: string; time_slot?: string };
 type PublicSessionResponse = PublicSession & { sessions?: PublicSession[]; practice?: boolean };
@@ -160,9 +161,7 @@ export function mountStart(lab: string) {
 
   // Signed-in students: name and ID come from their account (locked); signing in is optional.
   void (async () => {
-    let me: { user: { name: string; role: string; studentId: string | null } | null } | null = null;
-    try { me = JSON.parse(sessionStorage.getItem('mdx:me') ?? 'null'); } catch { /* ignore */ }
-    me ??= await fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const me = await getMe<{ user: { name: string; role: string; studentId: string | null } | null }>();
     const u = me?.user;
     if (!u || u.role !== 'student' || !u.studentId) return;
     nameIn.value = u.name;
