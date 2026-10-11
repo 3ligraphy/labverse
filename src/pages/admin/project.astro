@@ -126,6 +126,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 <script>
   import { onPageLoad } from '@/scripts/page-load';
   import { upload } from '@vercel/blob/client';
+  import { enablePreviewButtons } from '@/scripts/file-preview';
 
   type Item = { id: string; title: string; kind: string; description: string; due_at: string | null; cutoff_at: string | null; accept_types: string[]; max_mb: number; url: string | null; size: number | null; accepting: boolean; created_at: string; published_by: string; entries: number; entryBytes: number };
 
@@ -174,7 +175,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
               <span class="meta mono">${esc(h.file_title)} · ${when(h.updated_at)}${h.late ? ' · <span class="pf-late">late</span>' : ''} · ${mb(h.size)}</span>
             </div>
             <div class="actions">
-              <a class="btn btn-ghost btn-sm" href="${esc(h.url)}" target="_blank" rel="noopener">Open PDF</a>
+              <button class="btn btn-ghost btn-sm" type="button" data-preview-url="${esc(h.url)}" data-preview-title="${esc(h.name)}" data-preview-meta="${esc(`${h.student_id} · ${h.file_title}`)}" data-preview-group="search">Preview</button>
+              <a class="btn btn-ghost btn-sm" href="${esc(h.url)}" target="_blank" rel="noopener">Open file</a>
               <a class="btn btn-ghost btn-sm" href="/admin/project/${encodeURIComponent(h.file_id)}?q=${encodeURIComponent(h.student_id)}">In list →</a>
             </div>
           </li>`).join('') : `<li class="muted">${res.ok ? 'No submissions match.' : esc(data.error ?? 'Search failed.')}</li>`;
@@ -183,6 +185,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   }
 
   onPageLoad( () => {
+    enablePreviewButtons();
     wireFind();
     const root = document.querySelector<HTMLElement>('[data-pf]');
     if (!root || root.dataset.wired) return;
@@ -210,6 +213,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
           </div>
           <div class="actions">
             <a class="btn btn-ghost btn-sm" href="/admin/project/${encodeURIComponent(f.id)}"><span class="pf-count">${f.entries}</span>&nbsp;submissions →</a>
+            ${f.url ? `<button class="btn btn-ghost btn-sm" type="button" data-preview-url="${esc(f.url)}" data-preview-title="${esc(f.title)}" data-preview-meta="Attached PDF" data-preview-group="briefs">Preview PDF</button>` : ''}
             <button class="btn btn-ghost btn-sm" type="button" data-toggle="${esc(f.id)}" data-on="${f.accepting ? '1' : ''}">${f.accepting ? 'Close' : 'Open'}</button>
             <a class="btn btn-ghost btn-sm" href="/admin/project/${encodeURIComponent(f.id)}#settings">Manage</a>
             <a class="btn btn-ghost btn-sm" href="/submit/${encodeURIComponent(f.id)}" target="_blank" rel="noopener">View ↗</a>

@@ -152,6 +152,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 <script>
   import { onPageLoad } from '@/scripts/page-load';
   import { downloadSubmissions } from '@/scripts/submissions-zip';
+  import { enablePreviewButtons } from '@/scripts/file-preview';
 
   type Entry = { id: string; file_id: string; pathname: string; student_id: string; name: string; group_name: string; note: string; url: string; size: number; created_at: string; updated_at: string; late: boolean };
   type File_ = { id: string; title: string; due_at: string | null; accepting: boolean };
@@ -161,6 +162,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   const when = (s: string) => new Date(s).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   onPageLoad( () => {
+    enablePreviewButtons();
     const root = document.querySelector<HTMLElement>('[data-si]');
     if (!root || root.dataset.wired) return;
     root.dataset.wired = '1';
@@ -228,7 +230,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
           <td class="mono">${when(e.updated_at)}${e.updated_at !== e.created_at ? '<br><small class="faint">resubmitted</small>' : ''}</td>
           <td><span class="si-tag ${e.late ? 'late' : 'ok'}">${e.late ? 'late' : 'on time'}</span></td>
           <td class="mono">${kb(e.size)}</td>
-          <td><div class="si-row-act"><a class="btn btn-ghost btn-sm" href="${esc(e.url)}" target="_blank" rel="noopener">Open file</a><button class="btn btn-ghost btn-sm si-del" type="button" data-del="${esc(e.id)}" data-name="${esc(e.name)}">Delete</button></div></td>
+          <td><div class="si-row-act"><button class="btn btn-ghost btn-sm" type="button" data-preview-url="${esc(e.url)}" data-preview-title="${esc(e.name)}" data-preview-meta="${esc(`${e.student_id} · group ${e.group_name} · ${e.late ? 'late' : 'on time'}`)}" data-preview-group="hand-ins">Preview</button><a class="btn btn-ghost btn-sm" href="${esc(e.url)}" target="_blank" rel="noopener">Open file</a><button class="btn btn-ghost btn-sm si-del" type="button" data-del="${esc(e.id)}" data-name="${esc(e.name)}">Delete</button></div></td>
         </tr>`).join('') : `<tr><td colspan="8" class="muted">${entries.length ? 'No matches.' : 'No submissions yet. Share the student page link with your class.'}</td></tr>`;
       syncSelection();
     };

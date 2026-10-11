@@ -89,11 +89,11 @@ const pdfWorker = (url: string) => (import.meta.env.DEV ? Promise.resolve(url) :
   .catch(() => url));
 
 /**
- * pdf.js, set up once. The legacy build: the standard one calls brand-new JavaScript (Promise.try,
+ * pdf.js, set up once (also used by the file preview, src/scripts/file-preview.ts). The legacy build: the standard one calls brand-new JavaScript (Promise.try,
  * Math.sumPrecise, Map.getOrInsertComputed…) directly, which Safari on iPhone doesn't have yet. Safari also
  * can't `for await` over a stream, which pdf.js does on the page and in its worker.
  */
-async function loadPdfjs() {
+export async function loadPdfjs() {
   installStreamIterator();
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
@@ -172,8 +172,8 @@ async function pdfLines(bytes: Uint8Array): Promise<string[]> {
 
 /* -------------------------------------------------------------- Word, PPTX */
 
-/** Reads the files whose names pass `name` out of a ZIP (stored or deflated). */
-async function unzip(bytes: Uint8Array, name: (n: string) => boolean): Promise<Map<string, Uint8Array>> {
+/** Reads the files whose names pass `name` out of a ZIP (stored or deflated). Also used by the file preview. */
+export async function unzip(bytes: Uint8Array, name: (n: string) => boolean): Promise<Map<string, Uint8Array>> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let eocd = -1;
   for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65_557); i--) if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
@@ -245,11 +245,17 @@ async function docxLines(bytes: Uint8Array): Promise<string[]> {
   return lines;
 }
 
-async function pptxLines(bytes: Uint8Array): Promise<string[]> {
+/** Word or PowerPoint text for the file preview; each PowerPoint slide starts with a "§ Slide N" line. */
+export async function officeLines(ext: 'docx' | 'pptx', bytes: Uint8Array): Promise<string[]> {
+  return ext === 'docx' ? docxLines(bytes) : pptxLines(bytes, true);
+}
+
+async function pptxLines(bytes: Uint8Array, slideHeadings = false): Promise<string[]> {
   const files = await unzip(bytes, (n) => /^ppt\/slides\/slide\d+\.xml$/.test(n));
   const slides = [...files].sort(([a], [b]) => Number(/\d+/.exec(a)![0]) - Number(/\d+/.exec(b)![0]));
   const lines: string[] = [];
-  for (const [, text] of slides) {
+  for (const [i, [, text]] of slides.entries()) {
+    if (slideHeadings) lines.push(`§ Slide ${i + 1}`);
     const doc = xml(text);
     for (const el of doc.getElementsByTagName('*')) {
       if (named(el, 'tr')) lines.push(kids(el).filter((c) => named(c, 'tc')).map((tc) => [...tc.getElementsByTagName('*')].filter((t) => named(t, 't')).map((t) => t.textContent).join('')).join(' | '));

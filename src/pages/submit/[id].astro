@@ -64,6 +64,9 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
               <span aria-hidden="true">↓</span>
             </a>
           )}
+          {file.url && (
+            <button type="button" class="btn btn-ghost btn-sm sb-brief-preview" data-preview-url={file.url} data-preview-title={file.title} data-preview-meta="Brief">Preview the brief here</button>
+          )}
           <ul class="sb-rules">
             <li>One file: <b>{typeText}</b>, up to <b>{file.max_mb} MB</b>.</li>
             <li>Use your real name and student ID. Your TA sees exactly what you type.</li>
@@ -95,6 +98,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
                 <span class="sb-drop-icon mono" aria-hidden="true">{iconText}</span>
                 <span data-sb-filename><b>Choose your file</b> or drop it here <small>({typeText}, {file.max_mb} MB max)</small></span>
               </label>
+              <button type="button" class="btn btn-ghost btn-sm sb-check-file" data-sb-preview hidden>Preview your file before you hand it in</button>
               <p class="sb-status" data-sb-status role="status"></p>
               <progress max="100" value="0" hidden data-sb-progress></progress>
               <button class="btn btn-primary" type="submit" data-sb-submit>Submit</button>
@@ -135,6 +139,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
   .sb-info { display: grid; gap: 22px; align-content: start; }
   .sb-desc { display: grid; gap: 12px; font-size: 1.05rem; color: var(--text-2); white-space: pre-line; }
   .sb-attach { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); transition: border-color var(--t-fast), transform var(--t-fast); }
+  .sb-brief-preview, .sb-check-file { justify-self: start; }
   .sb-attach:hover { border-color: var(--accent-text); transform: translateY(-1px); }
   .sb-attach b { display: block; }
   .sb-attach small { color: var(--text-3); font-size: 12px; }
@@ -169,6 +174,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
   import { upload } from '@vercel/blob/client';
+  import { enablePreviewButtons, openPreview } from '@/scripts/file-preview';
   import { TEAM_NUMBER_ERROR, notATeamNumber } from '@/lib/project-files/core';
 
   type Status = { submitted: boolean; locked?: boolean; at?: string; late?: boolean };
@@ -205,6 +211,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
 
   function wire() {
     countdown();
+    enablePreviewButtons();
     const card = document.querySelector<HTMLElement>('[data-submit]');
     if (!card) return;
     const id = card.dataset.id!;
@@ -257,7 +264,15 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
     field('studentId').addEventListener('blur', check);
     if (field('studentId').value) void check();
 
+    const previewBtn = card.querySelector<HTMLButtonElement>('[data-sb-preview]')!;
+    let picked: File | null = null;
+    // checked in this browser only: the file is not uploaded until the student presses Submit
+    previewBtn.addEventListener('click', () => {
+      if (picked) openPreview([{ title: 'Your file (not handed in yet)', file: picked, fileName: picked.name, meta: `${Math.max(1, Math.round(picked.size / 1024))} KB · only on this device` }]);
+    });
     const pick = (f: File | null) => {
+      picked = f;
+      previewBtn.hidden = !f;
       drop.classList.toggle('has-file', Boolean(f));
       fileName.innerHTML = '';
       const b = document.createElement('b');
