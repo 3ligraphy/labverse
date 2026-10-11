@@ -18,7 +18,7 @@ export type Source = 'submitted' | 'document' | 'added';
 export type Member = Student & { source: Source };
 
 /** Bump when reading files changes (e.g. better idea finding), so saved results are refreshed automatically. */
-export const SCAN_VERSION = 4;
+export const SCAN_VERSION = 5;
 
 /** What the browser read out of one hand-in's file. Kept so files are only read again when re-submitted. */
 export type Scan = {
@@ -157,8 +157,13 @@ const ORD = String.raw`(?:\d{1,2}|[a-e]|one|two|three|four|five)`;
 const LEAD = String.raw`(?:(?:\d{1,2}|[a-z])[.)]\s*)?(?:(?:first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\s+)?`;
 const KIND = String.raw`(?:(?:the|our|my|proposed|suggested|selected|chosen|main|project|app|application|mobile\s+app)\s+)*(?:idea|option|suggestion)s?`;
 const SEP = String.raw`\s*[:.)\-–—|]\s*`;
-/** "Idea 1: X", "Proposed idea – X", "Second idea: X", "Option B) X", "Idea title: X", "Proposal 2: X", "The ideas : X, Y". */
-const IDEA_LINE = new RegExp(String.raw`^${LEAD}(?:${KIND}|proposal)\s*(?:#|no\.?|number)?\s*${ORD}?\s*(?:title|name)?${SEP}(.{3,})$`, 'i');
+/**
+ * "Idea 1: X", "Proposed idea – X", "Second idea: X", "Option B) X", "Idea title: X", "Proposal 2: X", "The ideas : X, Y",
+ * "Idea 1 Description: X", "Project Proposal: X".
+ */
+const IDEA_LINE = new RegExp(String.raw`^${LEAD}(?:${KIND}|(?:(?:project|app|application|mobile\s+app)\s+)?proposal)\s*(?:#|no\.?|number)?\s*${ORD}?\s*(title|name|description|summary)?${SEP}(.{3,})$`, 'i');
+/** After "Idea 1 Description:", only a short name counts (not the description's first sentence). */
+const looksLikeName = (s: string) => s.length <= 80 && !/[.!?]$/.test(s.trim());
 /** "Project title: X", "App name - X", "Name of the app: X", "Project title | X" (a two-column table row). */
 const TITLE_LINE = new RegExp(String.raw`^${LEAD}(?:(?:project|app|application|mobile\s+app|idea)\s+(?:title|name)|(?:title|name)\s+of\s+(?:the\s+)?(?:project|app|application|idea))${SEP}(.{3,})$`, 'i');
 /** "Our idea is to build X", "The app idea is X". */
@@ -209,11 +214,18 @@ export function extractIdeas(lines: readonly string[]): string[] {
       if (at >= 0 && cells.length > 1 && !TITLE_LINE.test(line) && !IDEA_LINE.test(line)) { column = at; state = 'none'; continue; }
       if (column >= 0) { if (cells[column]) ideas.push(cells[column].replace(NUMBERED, '$1')); continue; }
     } else column = -1;
-    const direct = IDEA_LINE.exec(line) ?? TITLE_LINE.exec(line) ?? IDEA_IS.exec(line);
-    if (direct) {
+    const labelled = IDEA_LINE.exec(line);
+    if (labelled && /^(?:description|summary)$/i.test(labelled[1] ?? '')) {
+      // "Idea 1 Description: Campus Lost and Found" names the idea; "Idea description: This app helps…" doesn't.
+      if (looksLikeName(labelled[2])) ideas.push(labelled[2]);
+      state = 'none';
+      continue;
+    }
+    const found = labelled?.[2] ?? (TITLE_LINE.exec(line) ?? IDEA_IS.exec(line))?.[1];
+    if (found) {
       // "The ideas : restaurant app ,Fitness Challenge App": several ideas on one line
-      const plural = /\b(?:ideas|options|suggestions)\b/i.test(line.slice(0, line.length - direct[1].length));
-      ideas.push(...(plural ? direct[1].split(/\s*[,;]\s*/) : [direct[1]]));
+      const plural = /\b(?:ideas|options|suggestions)\b/i.test(line.slice(0, line.length - found.length));
+      ideas.push(...(plural ? found.split(/\s*[,;]\s*/) : [found]));
       state = 'none';
       continue;
     }
