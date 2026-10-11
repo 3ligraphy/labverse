@@ -35,7 +35,7 @@ const json = JSON.stringify({ id: ex, files: def.files, checks: def.checks }).re
   <div class="pg-body">
     <div class="pg-code">
       <div class="pg-tabs" role="tablist" aria-label="Files">
-        {names.map((f, i) => <button type="button" role="tab" class="pg-tab mono" data-pg-file={f} aria-selected={String(i === 0)}>{f}</button>)}
+        {names.map((f, i) => <button type="button" role="tab" class="pg-tab mono" data-pg-file={f} aria-selected={i === 0 ? 'true' : 'false'}>{f}</button>)}
         <span class="pg-kbd mono" aria-hidden="true"><kbd>Ctrl</kbd>+<kbd>↵</kbd> run</span>
       </div>
       <div class="pg-editor" data-pg-editor>

@@ -30,7 +30,7 @@ const deny = (msg = 'You do not have permission for this.') => json({ error: msg
 
 export const GET: APIRoute = async ({ cookies }) => {
   const g = await base(cookies);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const { store, a } = g;
   const perms = Object.fromEntries(PERMISSION_KEYS.map((p) => [p, a.can(p)]));
   if (!Object.values(perms).some(Boolean)) return deny();
@@ -49,7 +49,7 @@ export const GET: APIRoute = async ({ cookies }) => {
 
 export const POST: APIRoute = async ({ cookies, request, url }) => {
   const g = await base(cookies);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const { store, a } = g;
   if (!a.can('accounts.staff')) return deny('Only people who create staff accounts can do this.');
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
@@ -78,7 +78,7 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
 
 export const PATCH: APIRoute = async ({ cookies, request, url }) => {
   const g = await base(cookies);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const { store, a } = g;
   if (!a.can('accounts.manage')) return deny();
   const id = url.searchParams.get('id') ?? '';
@@ -120,7 +120,7 @@ export const PATCH: APIRoute = async ({ cookies, request, url }) => {
 
 export const DELETE: APIRoute = async ({ cookies, url }) => {
   const g = await base(cookies);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const { store, a } = g;
   try {
     const invite = url.searchParams.get('invite');
@@ -142,7 +142,7 @@ export const DELETE: APIRoute = async ({ cookies, url }) => {
 
 export const PUT: APIRoute = async ({ cookies, request }) => {
   const g = await base(cookies);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const { store, a } = g;
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   try {

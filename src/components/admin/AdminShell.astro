@@ -237,7 +237,7 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
     if (more && sheet && scrim && !more.dataset.wired) {
       more.dataset.wired = '1';
       const show = (open: boolean) => { sheet.hidden = !open; scrim.hidden = !open; more.setAttribute('aria-expanded', String(open)); document.body.style.overflow = open ? 'hidden' : ''; };
-      more.addEventListener('click', () => show(sheet.hidden));
+      more.addEventListener('click', () => show(sheet.hidden !== false));
       scrim.addEventListener('click', () => show(false));
       sheet.querySelector('[data-ash-close]')?.addEventListener('click', () => show(false));
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !sheet.hidden) show(false); });

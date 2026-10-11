@@ -640,7 +640,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       $('[data-gp-roster-toggle]').setAttribute('aria-expanded', String(open));
       $('[data-gp-roster-toggle]').textContent = open ? 'Close' : 'Edit class list';
     }
-    $('[data-gp-roster-toggle]').addEventListener('click', () => toggleRoster($('[data-gp-roster-edit]').hidden));
+    $('[data-gp-roster-toggle]').addEventListener('click', () => toggleRoster($('[data-gp-roster-edit]').hidden !== false));
     $<HTMLInputElement>('[data-gp-roster-file]').addEventListener('change', async (e) => {
       const f = (e.target as HTMLInputElement).files?.[0];
       if (f) $<HTMLTextAreaElement>('[data-gp-roster-text]').value = await f.text();

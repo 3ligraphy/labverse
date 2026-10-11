@@ -158,13 +158,13 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       const r = await fetch(api(), { cache: 'no-store' });
       const d = await r.json();
       if (!r.ok) { say(d.error ?? 'Could not load.', false); return; }
-      root.querySelector<HTMLElement>('[data-mail-note]')!.textContent = d.mail
+      root!.querySelector<HTMLElement>('[data-mail-note]')!.textContent = d.mail
         ? 'Invitations are emailed automatically, and you also get the link.'
         : 'Email sending is not set up (RESEND_API_KEY + MAIL_FROM), so share the link yourself: copy it, or open your email app with a ready message.';
-      root.querySelector<HTMLOptionElement>('[data-leader]')!.hidden = !d.canAssignLeader;
-      root.querySelector('[data-n="staff"]')!.textContent = String(d.staff.length);
-      root.querySelector('[data-n="students"]')!.textContent = String(d.students.length);
-      root.querySelector('[data-n="invites"]')!.textContent = String(d.invites.length);
+      root!.querySelector<HTMLOptionElement>('[data-leader]')!.hidden = !d.canAssignLeader;
+      root!.querySelector('[data-n="staff"]')!.textContent = String(d.staff.length);
+      root!.querySelector('[data-n="students"]')!.textContent = String(d.students.length);
+      root!.querySelector('[data-n="invites"]')!.textContent = String(d.invites.length);
       list('staff').innerHTML = (d.staff as Staff[]).map((s) => `<div class="tm-row"><span class="tm-av">${esc(initials(s.name ?? s.email))}</span>
         <div><b>${esc(s.name ?? s.email)}<span class="tm-role">${ROLE[s.role] ?? s.role}</span></b><small class="mono">${esc(s.email)} · ${s.hasAccount ? `${ROLE[s.platformRole ?? ''] ?? ''} account` : 'no account yet'}</small></div>
         <div class="tm-ra"><select class="input" data-setrole="${esc(s.email)}" aria-label="Module role">${['ta', 'admin', ...(d.canAssignLeader || s.role === 'leader' ? ['leader'] : [])].map((r) => `<option value="${r}" ${r === s.role ? 'selected' : ''}>${ROLE[r]}</option>`).join('')}</select>

@@ -153,7 +153,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   import { onPageLoad } from '@/scripts/page-load';
   import { downloadSubmissions } from '@/scripts/submissions-zip';
 
-  type Entry = { id: string; student_id: string; name: string; group_name: string; note: string; url: string; size: number; created_at: string; updated_at: string; late: boolean };
+  type Entry = { id: string; file_id: string; pathname: string; student_id: string; name: string; group_name: string; note: string; url: string; size: number; created_at: string; updated_at: string; late: boolean };
   type File_ = { id: string; title: string; due_at: string | null; accepting: boolean };
 
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);

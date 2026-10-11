@@ -129,7 +129,7 @@ const mode = storageMode();
   const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
   onPageLoad( () => {
-    const root = document.querySelector<HTMLElement>('[data-ss]');
+    const root = document.querySelector<HTMLDetailsElement>('[data-ss]');
     if (!root || root.dataset.wired) return;
     root.dataset.wired = '1';
     if (location.hash === '#settings') { root.open = true; root.scrollIntoView({ block: 'start' }); }

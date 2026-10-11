@@ -515,7 +515,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
                 : h('p', { class: 'dim' }, 'Not submitted yet.'),
               detail.submission ? note : null,
               detail.submission ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', style: 'justify-self:start', onclick: () => action({ action: 'review', reviewed: detail.submission!.reviewed, note: note.value }) }, 'Save note') : null)
-          : null,
+          : '',
 
         h('section', { class: 'd-sec' },
           h('span', { class: 'd-k' }, `Exercises · ${s.solved}/${d.structure.exercises.length} solved`),

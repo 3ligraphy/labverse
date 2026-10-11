@@ -67,7 +67,7 @@ test('onboarding profile: valid year/specialization, only allowed optional modul
   assert.deepEqual(p.ok && p.value.modules, ['mobile-development'], 'invitation-only modules cannot be self-chosen');
   assert.equal(parseProfile({ year: 'Year 9', specialization: 'Software Engineering' }, DEFAULT_SETTINGS, []).ok, false);
   assert.equal(parseSettings({ years: 'Year 1\nYear 2', specializations: 'A, B' }).ok, false, 'no commas');
-  assert.equal(isForStudent({ slug: 'm', category: 'Optional', years: [], specializations: [], semester: 'Both' }, { year: 'Year 1', specialization: GENERAL, modules: ['m'] }), true);
+  assert.equal(isForStudent({ slug: 'm', category: 'Optional', kind: 'elective', open: true, years: [], specializations: [], semester: 'Both' }, { year: 'Year 1', specialization: GENERAL, modules: ['m'] }), true);
 });
 
 test('specializations start in Year 3 · Semester 2 and continue through Year 4', () => {

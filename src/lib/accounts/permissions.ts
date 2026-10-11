@@ -71,7 +71,7 @@ export function permitted(m: StoredMatrix, who: Who, perm: Permission, module?: 
   if (who.master || who.platformRole === 'super_admin') return true;
   if ('fixed' in PERMISSIONS[perm]) return false;
   const role = who.platformRole;
-  if (role && role !== 'super_admin' && m.platform[role]?.includes(perm)) return true;
+  if (role && m.platform[role]?.includes(perm)) return true; // super_admin already returned above
   if (PERMISSIONS[perm].scope !== 'module') return false;
   if (module) {
     const mr = who.modules[module];

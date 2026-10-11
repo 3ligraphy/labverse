@@ -261,7 +261,7 @@ export default function App() {
         if (containsCall(p, click.node, hook.setter)) return true;
         let assigns = false;
         walk(click.node, (n) => {
-          if ((n.type === 'AssignmentExpression' || n.type === 'UpdateExpression') && /count/.test(p.code.slice(n.start, n.end))) assigns = true;
+          if ((n.type === 'AssignmentExpression' || n.type === 'UpdateExpression') && /count/.test(p.code.slice(n.start ?? 0, n.end ?? undefined))) assigns = true;
         });
         return assigns ? `You change the variable directly — React won’t notice. Call \`${hook.setter}(…)\` instead.` : false;
       },

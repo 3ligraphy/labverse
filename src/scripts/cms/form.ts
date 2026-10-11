@@ -149,7 +149,7 @@ export function renderForm(
       const input = inputFor(field, value[field.key]);
       input.className = 'input';
       if (field.required) input.required = true;
-      if (field.idField && !options.newEntry) input.disabled = true;
+      if ('idField' in field && field.idField && !options.newEntry) input.disabled = true;
       input.addEventListener('input', () => setAt(fieldPath, field.type === 'number' ? Number(input.value) : input.value));
       wrap.insertBefore(input, wrap.querySelector('.cms-help, .cms-error'));
       into.append(wrap);

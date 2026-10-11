@@ -5,8 +5,8 @@
  */
 import { z } from 'astro/zod';
 
-type ImageField = () => z.ZodTypeAny;
-const imagePath: ImageField = () => z.string();
+/** Astro's image() in the build, a plain path string in the CMS; the schema keeps whichever type it is given. */
+const imagePath = () => z.string();
 
 export const difficulty = z.enum(['Beginner', 'Intermediate', 'Advanced']);
 export const link = z.object({ label: z.string(), href: z.string() });
@@ -19,7 +19,7 @@ export const problem = z.object({
 });
 export const faq = z.object({ q: z.string(), a: z.string() });
 
-export const labSchema = (image: ImageField = imagePath) =>
+export const labSchema = <I extends z.ZodTypeAny = ReturnType<typeof imagePath>>(image: () => I = imagePath as unknown as () => I) =>
   z.object({
     number: z.number(),
     title: z.string(),
@@ -81,7 +81,7 @@ export const projectSchema = z.object({
   faq: z.array(faq).default([]),
 });
 
-export const toolSchema = (image: ImageField = imagePath) =>
+export const toolSchema = <I extends z.ZodTypeAny = ReturnType<typeof imagePath>>(image: () => I = imagePath as unknown as () => I) =>
   z.object({
     name: z.string(),
     description: z.string(),

@@ -115,10 +115,10 @@ export const LISTS: Record<ListName, { path: string; label: string; singular: st
 };
 
 /** Zod issues → { "team.1.email": "Invalid email" } for showing under the right field. */
-export function fieldErrors(result: { success: boolean; error?: { issues: { path: (string | number)[]; message: string }[] } }) {
+export function fieldErrors(result: { success: boolean; error?: { issues: readonly { path: readonly PropertyKey[]; message: string }[] } }) {
   if (result.success) return null;
   const out: Record<string, string> = {};
-  for (const i of result.error!.issues) out[i.path.join('.') || '_'] ??= i.message;
+  for (const i of result.error!.issues) out[i.path.map(String).join('.') || '_'] ??= i.message;
   return out;
 }
 

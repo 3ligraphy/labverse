@@ -138,7 +138,7 @@ test('the same device cannot check in twice and gets its first entry back', asyn
   await store.checkIn({ deviceId: DEVICE_A, name: 'Mariam Ahmed', studentId: '236541', at: 't1' });
   const r = await store.checkIn({ deviceId: DEVICE_A, name: 'Someone Else', studentId: '999999', at: 't2' });
   assert.equal(r.status, 'device');
-  if (r.status === 'device') assert.equal(r.entry.name, 'Mariam Ahmed');
+  if (r.status === 'device') assert.equal(r.entry?.name, 'Mariam Ahmed');
   assert.equal(await store.count(), 1);
 });
 

@@ -4,6 +4,9 @@
  */
 import type { Found, Frame, FromRuntime, LabErrorInfo, LogLevel, PreviewDriver, Query, ToRuntime } from '../runtime/protocol.ts';
 
+/** A runtime message without its `__lab` marker (Omit on each member of the union, not on the union). */
+type WithoutLab<T> = T extends unknown ? Omit<T, '__lab'> : never;
+
 type Handlers = {
   onLog?: (level: LogLevel, text: string) => void;
   /** errors that happen after rendering (e.g. inside an onPress handler) */
@@ -108,7 +111,7 @@ export class LabPreview implements PreviewDriver {
     }
   };
 
-  private send(message: Omit<ToRuntime, '__lab'>) {
+  private send(message: WithoutLab<ToRuntime>) {
     this.iframe.contentWindow?.postMessage({ __lab: 1, ...message }, '*');
   }
 

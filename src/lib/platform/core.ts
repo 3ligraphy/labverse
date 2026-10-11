@@ -395,7 +395,8 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
 /** Module flow → the module card data and its labs in order, with week labels. */
 export function compileModule(flow: Flow): { meta: Record<string, string>; items: ({ kind: 'lab'; slug: string } | { kind: 'week'; title: string })[] } {
   const order = orderFlow(flow, 'module');
-  const items = order.slice(1).flatMap((n) =>
+  type Item = { kind: 'lab'; slug: string } | { kind: 'week'; title: string };
+  const items = order.slice(1).flatMap((n): Item[] =>
     n.type === 'lab' && SLUG_RE.test(n.data.slug ?? '') ? [{ kind: 'lab' as const, slug: n.data.slug }]
       : n.type === 'divider' ? [{ kind: 'week' as const, title: n.data.title || 'Week' }] : []);
   return { meta: order[0]?.data ?? {}, items };

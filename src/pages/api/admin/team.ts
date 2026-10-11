@@ -40,7 +40,7 @@ async function guard(cookies: Parameters<typeof access>[0], module: string) {
 export const GET: APIRoute = async ({ cookies, url }) => {
   const module = url.searchParams.get('module') ?? '';
   const g = await guard(cookies, module);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const [staff, students, invites] = await Promise.all([g.store.listStaff(module), g.store.listEnrollments(module), g.store.listInvites(module)]);
   const users = new Map((await g.store.list()).map((u) => [u.email, u]));
   return json({
@@ -53,7 +53,7 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 export const POST: APIRoute = async ({ cookies, url, request }) => {
   const module = url.searchParams.get('module') ?? '';
   const g = await guard(cookies, module);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const action = String(body.action ?? '');
   const kind = body.kind === 'student' ? 'student' : 'staff';
@@ -109,7 +109,7 @@ export const POST: APIRoute = async ({ cookies, url, request }) => {
 export const DELETE: APIRoute = async ({ cookies, url }) => {
   const module = url.searchParams.get('module') ?? '';
   const g = await guard(cookies, module);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const kind = url.searchParams.get('kind');
   const key = url.searchParams.get('key') ?? '';
   try {

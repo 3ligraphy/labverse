@@ -29,7 +29,7 @@ const audienceOf = (meta: Record<string, string>) => ({
 
 export const GET: APIRoute = async ({ cookies }) => {
   const g = await guard(cookies);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const settings = await g.store.getSettings();
   const rows = (await g.platform?.listModules().catch(() => [])) ?? [];
   return json({
@@ -44,7 +44,7 @@ export const GET: APIRoute = async ({ cookies }) => {
 
 export const PUT: APIRoute = async ({ cookies, request }) => {
   const g = await guard(cookies);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const s = parseSettings(body);
   if (!s.ok) return json({ error: s.error }, 400);
@@ -81,7 +81,7 @@ export const PUT: APIRoute = async ({ cookies, request }) => {
 
 export const PATCH: APIRoute = async ({ cookies, request, url }) => {
   const g = await guard(cookies);
-  if ('error' in g) return g.error;
+  if (g.error) return g.error;
   const module = url.searchParams.get('module') ?? '';
   const b = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const settings = await g.store.getSettings();
