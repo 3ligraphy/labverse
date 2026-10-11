@@ -16,7 +16,7 @@ import Icon from './Icon.astro';
         autocomplete="off"
         spellcheck="false"
       />
-      <button class="kbd sp-esc" data-search-close aria-label="Close search">esc</button>
+      <button class="kbd sp-esc" data-search-close aria-label="Close search"><span class="sp-esc-key">esc</span><span class="sp-esc-x" aria-hidden="true">✕</span></button>
     </div>
     <div class="sp-filters" role="toolbar" aria-label="Filter results" data-search-filters></div>
     <div class="sp-body" id="sp-results" role="listbox" data-search-results aria-live="polite"></div>
@@ -73,9 +73,20 @@ import Icon from './Icon.astro';
   .sp-loading { padding: 16px; display: grid; gap: 10px; }
   .sp-loading div { height: 48px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
   @keyframes shimmer { to { background-position: -200% 0; } }
+  .sp-esc-x { display: none; }
+  /* touch screens: a real close button (there is no Esc key) */
+  @media (hover: none), (max-width: 719px) {
+    .sp .sp-esc { width: 44px; height: 44px; margin: -8px -10px -8px 0; border-radius: 12px; font-size: 18px; } /* beats the global .kbd size */
+    .sp-esc-key { display: none; }
+    .sp-esc-x { display: inline; }
+  }
   @media (max-width: 719px) {
     .sp { padding: 0; align-items: stretch; }
     .sp-dialog { max-height: none; height: 100dvh; border-radius: 0; border: 0; }
     .sp-foot { display: none; }
+    /* phones: the category goes under the title, which may take two lines */
+    .sp-item { grid-template-columns: 36px minmax(0, 1fr); row-gap: 2px; }
+    .sp-item .t { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .sp-item .meta { grid-column: 2; font-size: 12px; }
   }
 </style>

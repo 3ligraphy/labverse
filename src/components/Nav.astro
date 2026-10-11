@@ -57,7 +57,7 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
       <button class="search-trigger" data-search-open aria-label="Search the course (Ctrl K)">
         <Icon name="search" size={16} />
         <span class="hide-sm">Search</span>
-        <span class="keys hide-sm"><kbd class="kbd" data-mod-key>Ctrl</kbd><kbd class="kbd">K</kbd></span>
+        <span class="keys hide-sm kbd-hint"><kbd class="kbd" data-mod-key>Ctrl</kbd><kbd class="kbd">K</kbd></span>
       </button>
       <a class="nav-account" href="/login" data-nav-account>Sign in</a>
       <button class="icon-btn theme-toggle" data-theme-toggle aria-label="Toggle color theme">
