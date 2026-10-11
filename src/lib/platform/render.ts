@@ -1,11 +1,13 @@
 /**
  * Markdown for builder-made labs, rendered on the server with the site's own pipeline:
  * the same Shiki themes (light + dark) and GitHub-style callouts as the file-based labs.
- * Text comes from admins only (/admin/builder is password-protected).
+ * Module-level staff write this text and every enrolled student reads it, so raw HTML and script links are
+ * removed first (plugins/remark-safe-builder.mjs).
  */
 import { createMarkdownProcessor } from '@astrojs/markdown-remark';
 import { transformerMetaHighlight, transformerNotationDiff, transformerNotationFocus, transformerNotationHighlight } from '@shikijs/transformers';
 import rehypeCallouts from '../../plugins/rehype-callouts.mjs';
+import remarkSafeBuilder from '../../plugins/remark-safe-builder.mjs';
 import type { Block } from './core';
 
 let renderer: ReturnType<typeof createMarkdownProcessor> | null = null;
@@ -27,6 +29,7 @@ export async function markdown(source: string): Promise<string> {
         transformerMetaHighlight(), transformerNotationHighlight(), transformerNotationDiff(), transformerNotationFocus(),
       ],
     },
+    remarkPlugins: [remarkSafeBuilder],
     rehypePlugins: [rehypeCallouts],
   });
   return (await (await renderer).render(source)).code;
