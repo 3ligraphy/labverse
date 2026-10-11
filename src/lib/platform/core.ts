@@ -401,6 +401,11 @@ export function compileModule(flow: Flow): { meta: Record<string, string>; items
   return { meta: order[0]?.data ?? {}, items };
 }
 
+/** The module leader's email named on a module flow's root node (trimmed, lower case; '' when none). */
+export const flowLeader = (flow: Flow) => (compileModule(flow).meta.leader ?? '').trim().toLowerCase();
+/** Saving a module canvas changes who leads it (and so who holds the leader role) when this is true. */
+export const leaderChanged = (before: Flow, after: Flow) => flowLeader(before) !== flowLeader(after);
+
 /* -------------------------------------------------------------- assessment */
 
 export type AssessmentItem = { label: string; weight: number; detail: string };

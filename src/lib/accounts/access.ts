@@ -5,7 +5,7 @@
  */
 import type { AstroCookies } from 'astro';
 import { masterAdmin } from '@/lib/attendance/server';
-import { compileModule } from '@/lib/platform/core';
+import { flowLeader } from '@/lib/platform/core';
 import { getPlatformStore } from '@/lib/platform/server';
 import { DEFAULT_STORED, permitted, type ModuleRole, type Permission, type Who } from './permissions';
 import { getAccountStore, viewer } from './server';
@@ -41,7 +41,8 @@ async function loadAccess(cookies: AstroCookies): Promise<AccessResult> {
     : [{}, []];
   const modules: Record<string, ModuleRole> = assigned;
   if (user) {
-    for (const m of builder) if ((compileModule(m.flow).meta.leader ?? '').trim().toLowerCase() === user.email) modules[m.slug] = 'leader';
+    // only doctors and the super admin can change this field (api/admin/platform/modules.ts)
+    for (const m of builder) if (flowLeader(m.flow) === user.email) modules[m.slug] = 'leader';
   }
   const who: Who = { platformRole: user?.role ?? null, master, modules };
   return {

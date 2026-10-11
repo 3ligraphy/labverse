@@ -13,7 +13,7 @@
 import type { APIRoute } from 'astro';
 import { json } from '@/lib/progress/server';
 import { access } from '@/lib/accounts/access';
-import { normalEmail, parseAccount } from '@/lib/accounts/core';
+import { normalEmail, parseAccount, teamAccountBlock } from '@/lib/accounts/core';
 import { MODULE_ROLES, ROLE_NAMES, type ModuleRole } from '@/lib/accounts/permissions';
 import { getAccountStore, publicUser } from '@/lib/accounts/server';
 import { inviteText, mailEnabled, sendMail } from '@/lib/accounts/mail';
@@ -61,6 +61,10 @@ export const POST: APIRoute = async ({ cookies, url, request }) => {
   const platformRole = kind === 'student' ? 'student' : body.platformRole === 'doctor' ? 'doctor' : 'ta';
   if (kind === 'staff' && !(MODULE_ROLES as readonly string[]).includes(moduleRole)) return json({ error: 'Choose a module role.' }, 400);
   if (kind === 'staff' && moduleRole === 'leader' && !g.a.can('platform.roles')) return json({ error: 'Only the super admin can appoint a module leader.' }, 403);
+  if (action === 'create' || action === 'invite') {
+    const blocked = teamAccountBlock({ email: normalEmail(body.email), platformRole, canCreateStaff: g.a.can('accounts.staff'), canManageRoles: g.a.can('platform.roles') });
+    if (blocked) return json({ error: blocked }, 403);
+  }
 
   try {
     if (action === 'enroll') {

@@ -9,7 +9,7 @@ import type { APIRoute } from 'astro';
 import { access } from '@/lib/accounts/access';
 import type { Permission } from '@/lib/accounts/permissions';
 import { json } from '@/lib/progress/server';
-import { SLUG_RE, sanitizeFlow, slugify } from '@/lib/platform/core';
+import { SLUG_RE, leaderChanged, sanitizeFlow, slugify } from '@/lib/platform/core';
 import { BUILT_IN_MODULE, getPlatformStore } from '@/lib/platform/server';
 
 export const prerender = false;
@@ -65,6 +65,13 @@ export const PATCH: APIRoute = async ({ cookies, request, url }) => {
     const r = sanitizeFlow(body.flow, 'module');
     if (!r.ok) return json({ error: r.error }, 400);
     flow = r.value;
+    // The leader named on the module node holds the module-leader role (lib/accounts/access.ts), so building
+    // the module is not enough to change it: a module admin must not be able to appoint themselves.
+    const before = await g.store.getModule(url.searchParams.get('slug') ?? '').catch(() => null);
+    if (before && leaderChanged(before.flow, flow)) {
+      const a = await access(cookies);
+      if (!a.can('modules.create') && !a.can('platform.roles')) return json({ error: 'Only a doctor who creates modules, or the super admin, can change the module leader.' }, 403);
+    }
   }
   if (body.published !== undefined && typeof body.published !== 'boolean') return json({ error: 'Invalid request.' }, 400);
   try {

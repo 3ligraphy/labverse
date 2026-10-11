@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_STORED, modulesWith, parseMatrix, permitted, type Who } from '../src/lib/accounts/permissions.ts';
-import { GENERAL, SUPER_ADMINS, checkPasswordRules, fitsStudent, hasSpecialization, inSemester, isForStudent, parseAccount, parseProfile, parseSettings, signupBlock, DEFAULT_SETTINGS } from '../src/lib/accounts/core.ts';
+import { GENERAL, SUPER_ADMINS, checkPasswordRules, fitsStudent, hasSpecialization, inSemester, isForStudent, parseAccount, parseProfile, parseSettings, signupBlock, teamAccountBlock, DEFAULT_SETTINGS } from '../src/lib/accounts/core.ts';
 import { hashPassword, signToken, verifyPassword, verifyToken } from '../src/lib/accounts/tokens.ts';
 
 const who = (o: Partial<Who>): Who => ({ platformRole: null, master: false, modules: {}, ...o });
@@ -123,4 +123,14 @@ test('sign-up refuses emails that only an invitation may claim', () => {
   assert.match(signupBlock('ta.member@bue.edu.eg', { ...none, staffRole: true }) ?? '', /invitation/);
   assert.match(signupBlock('invited@bue.edu.eg', { ...none, pendingInvite: true }) ?? '', /invitation/);
   assert.notEqual(signupBlock(SUPER_ADMINS[0].toUpperCase(), none), null, 'the super admin email, in any case');
+});
+
+test('module team pages cannot create doctors or claim the super admin email without the right permission', () => {
+  const leader = { canCreateStaff: false, canManageRoles: false };
+  assert.equal(teamAccountBlock({ email: 'new.ta@bue.edu.eg', platformRole: 'ta', ...leader }), null);
+  assert.equal(teamAccountBlock({ email: 'student@bue.edu.eg', platformRole: 'student', ...leader }), null);
+  assert.match(teamAccountBlock({ email: 'new.dr@bue.edu.eg', platformRole: 'doctor', ...leader }) ?? '', /account manager/);
+  assert.equal(teamAccountBlock({ email: 'new.dr@bue.edu.eg', platformRole: 'doctor', canCreateStaff: true, canManageRoles: false }), null);
+  assert.match(teamAccountBlock({ email: SUPER_ADMINS[0], platformRole: 'ta', ...leader }) ?? '', /super admin/);
+  assert.equal(teamAccountBlock({ email: SUPER_ADMINS[0], platformRole: 'ta', canCreateStaff: true, canManageRoles: true }), null);
 });

@@ -8,7 +8,7 @@ import { getSecret } from 'astro:env/server';
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
 import { course } from '@/site.config';
-import { compileLab, compileModule, emptyFlow, labKey, type AssessmentItem, type CompiledLab, type Flow } from './core';
+import { compileLab, compileModule, emptyFlow, flowLeader, labKey, type AssessmentItem, type CompiledLab, type Flow } from './core';
 import { DEFAULT_SETTINGS, kindOf, listOf, type Audience, type Category } from '@/lib/accounts/core';
 import type { ModuleBannerInput } from './banner';
 
@@ -284,5 +284,5 @@ export async function moduleCards(builtInAudience: { category: string; years: st
 export async function leaderEmail(module: string): Promise<string> {
   if (module === BUILT_IN_MODULE.slug) return (course.contact ?? '').toLowerCase();
   const m = await getPlatformStore()?.getModule(module);
-  return m ? (compileModule(m.flow).meta.leader ?? '').trim().toLowerCase() : '';
+  return m ? flowLeader(m.flow) : '';
 }

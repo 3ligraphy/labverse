@@ -1,7 +1,7 @@
 // Run with: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { compileLab, compileModule, emptyFlow, labKey, orderFlow, parseAssessment, parseChecks, sanitizeFlow, slugify, splitLabKey, type Flow } from '../src/lib/platform/core.ts';
+import { compileLab, compileModule, emptyFlow, flowLeader, labKey, leaderChanged, orderFlow, parseAssessment, parseChecks, sanitizeFlow, slugify, splitLabKey, type Flow } from '../src/lib/platform/core.ts';
 import { labStructure } from '../src/lib/progress/core.ts';
 import { parseModuleBanner } from '../src/lib/platform/banner.ts';
 
@@ -127,4 +127,14 @@ test('module banners require safe copy and an internal optional link', () => {
   assert.equal(parseModuleBanner({ title: '', message: 'Hello' }).ok, false);
   assert.equal(parseModuleBanner({ title: 'Hello', message: 'World', ctaLabel: 'Open', ctaHref: 'https://example.com' }).ok, false);
   assert.equal(parseModuleBanner({ title: 'Hello', message: 'World', ctaLabel: 'Open', ctaHref: '' }).ok, false);
+});
+
+test('the module leader comes from the module node, and any change to it is detected', () => {
+  const before = emptyFlow('module', { title: 'Web', leader: ' Dr.Amira@BUE.edu.eg ' });
+  assert.equal(flowLeader(before), 'dr.amira@bue.edu.eg');
+  const same = emptyFlow('module', { title: 'Web renamed', leader: 'dr.amira@bue.edu.eg' });
+  assert.equal(leaderChanged(before, same), false, 'renaming the module is not a leader change');
+  const self = emptyFlow('module', { title: 'Web', leader: 'module.admin@bue.edu.eg' });
+  assert.equal(leaderChanged(before, self), true);
+  assert.equal(leaderChanged(before, emptyFlow('module', { title: 'Web' })), true, 'clearing the leader is a change too');
 });

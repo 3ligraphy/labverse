@@ -104,6 +104,17 @@ export function signupBlock(email: string, holds: { staffRole: boolean; pendingI
   return null;
 }
 
+/**
+ * What the module team page may create for another person. Module leaders invite and add people to their own
+ * module, but a platform-wide doctor account needs the account-manager permission, and the super admin's email
+ * is never handed out from a module page (an account made for it would take over the super admin's identity).
+ */
+export function teamAccountBlock(input: { email: string; platformRole: Role; canCreateStaff: boolean; canManageRoles: boolean }): string | null {
+  if (SUPER_ADMINS.includes(normalEmail(input.email)) && !input.canManageRoles) return 'This email belongs to the platform super admin.';
+  if (input.platformRole === 'doctor' && !input.canCreateStaff) return 'Only an account manager can create doctor accounts. Invite them as a TA, or ask the super admin.';
+  return null;
+}
+
 /** Comma list → clean items ("Year 3, Year 4" → ["Year 3", "Year 4"]); empty means "everyone". */
 export const listOf = (v: string | undefined) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const has = (list: string[], v: string) => !list.length || list.some((x) => x.toLowerCase() === v.toLowerCase());
