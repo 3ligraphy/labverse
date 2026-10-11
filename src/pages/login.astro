@@ -85,7 +85,7 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
 </Base>
 
 <style is:global>
-  .auth { --g1: #c8ff4d; --g2: #7cb1ff; position: relative; min-height: 100dvh; overflow: hidden; isolation: isolate; padding: calc(var(--nav-h) + 56px) 0 80px; background: var(--hero-bg); color: var(--hero-text); }
+  .auth { --g1: #c8ff4d; --g2: #7cb1ff; position: relative; min-height: 100dvh; overflow: hidden; overflow: clip; isolation: isolate; padding: calc(var(--nav-h) + 56px) 0 80px; background: var(--hero-bg); color: var(--hero-text); }
   :root[data-theme='light'] .auth { --g1: #9fd400; --g2: #3d7be0; }
   .auth-sky { position: absolute; inset: 0; z-index: -1; }
   .auth-grid { position: absolute; inset: 0; background-image: linear-gradient(var(--hero-grid) 1px, transparent 1px), linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(ellipse at 30% 40%, #000, transparent 75%); }

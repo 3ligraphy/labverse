@@ -87,7 +87,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
 </Base>
 
 <style is:global>
-  .hub { --g1: #c8ff4d; --g2: #7cb1ff; --g3: #b69cff; position: relative; min-height: 100dvh; overflow: hidden; isolation: isolate; padding: calc(var(--nav-h) + 48px) 0 96px; background: var(--hero-bg); color: var(--hero-text); }
+  .hub { --g1: #c8ff4d; --g2: #7cb1ff; --g3: #b69cff; position: relative; min-height: 100dvh; overflow: hidden; overflow: clip; isolation: isolate; padding: calc(var(--nav-h) + 48px) 0 96px; background: var(--hero-bg); color: var(--hero-text); }
   :root[data-theme='light'] .hub { --g1: #9fd400; --g2: #3d7be0; --g3: #7a5ce0; }
   .hub-sky { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
   .hub-grid { position: absolute; inset: -50% -10% 0; background-image: linear-gradient(var(--hero-grid) 1px, transparent 1px), linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px); background-size: 64px 64px;
@@ -107,7 +107,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
   .hub-in { display: grid; gap: 36px; }
   .hub-k { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--hero-accent); }
   .hub-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hero-accent); box-shadow: 0 0 12px var(--hero-accent); animation: pulse-ring 2s infinite; }
-  .hub-t { margin-top: 18px; font-size: clamp(3rem, 1.4rem + 6.4vw, 7.4rem); line-height: .9; letter-spacing: -.055em; font-weight: 700; }
+  .hub-t { margin-top: 18px; font-size: clamp(3rem, 1.4rem + 6.4vw, 7.4rem); line-height: .9; letter-spacing: -.045em; font-weight: 700; }
   .hub-t span { background: linear-gradient(100deg, var(--g1), var(--g2) 55%, var(--g3)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .hub-sub { margin-top: 20px; max-width: 56ch; font-size: var(--fs-md); color: var(--hero-lead); }
   .hub-who { margin-top: 18px; display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 8px 8px 14px; border-radius: 999px; border: 1px solid var(--hero-line); background: color-mix(in oklab, var(--hero-bg) 60%, transparent); backdrop-filter: blur(10px); font-size: 13.5px; color: var(--hero-lead); }
@@ -123,6 +123,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
   .ob-steps li.on span, .ob-steps li.done span { background: var(--hero-accent); color: var(--hero-bg); }
   .ob-step h2 { font-size: clamp(1.6rem, 1.1rem + 1.6vw, 2.4rem); letter-spacing: -.035em; }
   .ob-pills { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px; }
+  @media (max-width: 520px) { .ob-pills[data-pills='year'] { display: grid; grid-template-columns: 1fr 1fr; } }
   .ob-pill { padding: 14px 20px; border-radius: 16px; border: 1px solid var(--hero-line); background: color-mix(in oklab, var(--hero-text) 4%, transparent); color: var(--hero-text); font: 600 15px var(--font-body); cursor: pointer; transition: transform var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast); }
   .ob-pill:hover { transform: translateY(-2px); border-color: color-mix(in oklab, var(--hero-accent) 60%, var(--hero-line)); }
   .ob-pill[aria-pressed='true'] { border-color: var(--hero-accent); background: color-mix(in oklab, var(--hero-accent) 16%, transparent); box-shadow: 0 0 0 1px var(--hero-accent), 0 10px 30px -12px var(--hero-accent); }

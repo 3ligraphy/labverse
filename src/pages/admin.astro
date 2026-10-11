@@ -131,7 +131,7 @@ if (staff) {
 </Base>
 
 <style>
-  .ah-gate { position: relative; min-height: 100dvh; display: grid; place-items: center; padding: calc(var(--nav-h) + 40px) 16px 80px; background: var(--hero-bg); color: var(--hero-text); isolation: isolate; overflow: hidden; }
+  .ah-gate { position: relative; min-height: 100dvh; display: grid; place-items: center; padding: calc(var(--nav-h) + 40px) 16px 80px; background: var(--hero-bg); color: var(--hero-text); isolation: isolate; overflow: hidden; overflow: clip; }
   .ah-sky { position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 20% 0%, color-mix(in oklab, #c8ff4d 28%, transparent), transparent 45%), radial-gradient(circle at 90% 100%, color-mix(in oklab, #7cb1ff 30%, transparent), transparent 45%), linear-gradient(var(--hero-grid) 1px, transparent 1px) 0 0 / 52px 52px, linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px) 0 0 / 52px 52px; }
   .ah-login { width: min(100%, 520px); padding: clamp(26px, 5vw, 44px); display: grid; gap: 16px; }
   .ah-login h1 { font-size: clamp(2rem, 1.2rem + 3vw, 3.2rem); letter-spacing: -.05em; line-height: 1; }

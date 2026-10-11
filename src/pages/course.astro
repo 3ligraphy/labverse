@@ -37,7 +37,7 @@ const workspace = [
 const cmdGroups = [...groupBy(commands, (c) => c.data.category)].slice(0, 5);
 const resGroups = [...groupBy(resources, (r) => r.data.category)];
 ---
-<Base>
+<Base title={course.name} description={course.tagline}>
   <Hero counts={counts} />
 
   <!-- WORKSPACE ------------------------------------------------------------>

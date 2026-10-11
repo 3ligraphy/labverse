@@ -93,7 +93,7 @@ const optionalCards = cards.filter((c) => optional.includes(c.slug));
 </Base>
 
 <style>
-  .pr { position: relative; min-height: 100dvh; padding: calc(var(--nav-h) + 44px) 0 100px; background: var(--hero-bg); color: var(--hero-text); isolation: isolate; overflow: hidden; }
+  .pr { position: relative; min-height: 100dvh; padding: calc(var(--nav-h) + 44px) 0 100px; background: var(--hero-bg); color: var(--hero-text); isolation: isolate; overflow: hidden; overflow: clip; }
   .pr-sky { position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 85% 0%, color-mix(in oklab, #7cb1ff 30%, transparent), transparent 45%), radial-gradient(circle at 0% 20%, color-mix(in oklab, #c8ff4d 22%, transparent), transparent 40%); }
   .pr-in { display: grid; gap: 28px; }
   .pr-head { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }

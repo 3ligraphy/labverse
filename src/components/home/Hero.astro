@@ -123,7 +123,7 @@ const quick = [
 </section>
 
 <style>
-  .hero { position: relative; min-height: min(100svh, 1000px); padding-top: calc(var(--nav-h) + 28px); overflow: hidden; display: flex; flex-direction: column; }
+  .hero { position: relative; min-height: min(100svh, 1000px); padding-top: calc(var(--nav-h) + 28px); overflow: hidden; overflow: clip; display: flex; flex-direction: column; }
   .hero-bg { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
   .hero-grid { position: absolute; inset: 0; mask-image: radial-gradient(ellipse 70% 60% at 70% 45%, #000 20%, transparent 75%); }
   .hero-glow { position: absolute; width: 900px; height: 900px; right: -200px; top: -120px; background: radial-gradient(circle, var(--accent-glow), transparent 60%); opacity: 0.35; filter: blur(40px); }
@@ -256,6 +256,7 @@ const quick = [
     .fl-api { left: 2%; bottom: 30%; }
     .hero-quick { gap: 4px 18px; }
   }
+  @media (max-width: 480px) { .fl { display: none !important; } } /* they covered the phone mock's list */
   @media (prefers-reduced-motion: reduce) {
     .hero-in, .fl, .tl, .app-list li, .phone-wrap { opacity: 1 !important; transform: none !important; animation: none !important; }
     .rf { stroke-dashoffset: 65.4; }

@@ -274,6 +274,22 @@ function initToc() {
 function onScroll() {
   const nav = $('[data-nav]');
   if (nav) nav.toggleAttribute('data-scrolled', window.scrollY > 12);
+  const top = $('[data-top]');
+  if (top) top.hidden = window.scrollY < innerHeight * 2;
+}
+
+/* ---------- back to top: very long pages (a lab is ~50 screens on a phone) ---------- */
+function initTop() {
+  $('[data-top]')?.remove();
+  if (document.documentElement.scrollHeight < innerHeight * 5) return;
+  const b = Object.assign(document.createElement('button'), { type: 'button', className: 'to-top', textContent: '↑', hidden: true });
+  b.dataset.top = '';
+  b.setAttribute('aria-label', 'Back to top');
+  b.addEventListener('click', () => {
+    scrollTo({ top: 0, behavior: reduced() ? 'auto' : 'smooth' });
+    $<HTMLElement>('#main')?.focus({ preventScroll: true });
+  });
+  document.body.append(b);
 }
 
 /* ---------- one-time global listeners ---------- */
@@ -320,6 +336,8 @@ document.addEventListener('astro:page-load', () => {
   buildOSTabs();
   initReveal();
   initCount();
+  initTop();
+  onScroll();
   initToc();
   if (isMac) $$('[data-mod-key]').forEach((k) => (k.textContent = '⌘'));
   document.body.style.overflow = '';

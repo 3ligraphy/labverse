@@ -52,7 +52,7 @@ const builtInCourse = /^\/(course|labs|coursework|project|commands|tools|setup|r
   <body>
     <a href="#main" class="skip-link">Skip to content</a>
     <Nav module={module} />
-    <main id="main" transition:name="main">
+    <main id="main" tabindex="-1" transition:name="main">
       <slot />
     </main>
     <Footer />
