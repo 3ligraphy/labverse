@@ -1,6 +1,7 @@
 import type { Field } from '@/lib/cms/fields';
 import { renderForm, type FormErrors } from './form';
 import { reviewDialog, type DiffLine } from './diff-view';
+import { guardUnsaved } from '@/scripts/unsaved';
 
 type Status = {
   editor: string;
@@ -21,7 +22,6 @@ let dirty = false;
 let active = 'course';
 let root: HTMLElement | null = null;
 let main: HTMLElement | null = null;
-let unloadBound = false;
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = '') => {
   const node = document.createElement(tag);
@@ -271,10 +271,7 @@ function init() {
     try { await request('/api/cms/discard', { method: 'POST' }); toast('Unpublished changes discarded.'); await refreshStatus(); await navigate(active, true); }
     catch (error) { errorBanner(error); }
   });
-  if (!unloadBound) {
-    addEventListener('beforeunload', (event) => { if (dirty) event.preventDefault(); });
-    unloadBound = true;
-  }
+  guardUnsaved(() => dirty);
   refreshStatus().catch(errorBanner);
   navigate('course', true);
 }

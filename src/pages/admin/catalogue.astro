@@ -129,6 +129,7 @@ if (!(await access(Astro.cookies)).can('platform.settings')) return Astro.redire
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
+  import { guardUnsaved } from '@/scripts/unsaved';
   type Cat = { name: string; kind: 'core' | 'elective' };
   type Aud = { category: string; years: string[]; semester: string; specializations: string[]; open: boolean };
   type Mod = { slug: string; title: string; code: string; color: string; builtIn: boolean; published: boolean; audience: Aud };
@@ -296,6 +297,6 @@ if (!(await access(Astro.cookies)).can('platform.settings')) return Astro.redire
 
     const renderAll = () => { renderSem(); renderSpecFrom(); renderList('years'); renderList('specializations'); renderList('categories'); renderMods(); };
     renderAll();
-    window.addEventListener('beforeunload', (e) => { if (dirty) e.preventDefault(); });
+    guardUnsaved(() => dirty);
   });
 </script>

@@ -14,6 +14,7 @@
  * The flow is saved as JSON through the admin API and validated again on the server (lib/platform/core).
  */
 import { nodeDefs, orderFlow, parseChecks, type Field, type Flow, type FlowKind, type FlowNode, type NodeDef } from '@/lib/platform/core';
+import { guardUnsaved } from '@/scripts/unsaved';
 
 export type CanvasConfig = {
   kind: FlowKind;
@@ -856,7 +857,7 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && selected) { e.preventDefault(); duplicate(selected); }
     else if (e.key === 'Escape') { if (root.dataset.sheet) closeSheet(); else select(null); }
   });
-  window.addEventListener('beforeunload', (e) => { if (dirty) e.preventDefault(); });
+  guardUnsaved(() => dirty);
 
   const groupedLegacyLabs = groupLeadingLabs();
   if (cfg.kind === 'module') layoutModuleGroups();
