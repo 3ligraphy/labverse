@@ -353,7 +353,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
     .gp-chip { font-size: 12px; }
     .gp-ideas { grid-template-columns: 1fr; }
     .gp-seg { width: 100%; } .gp-seg button { flex: 1; padding: 8px; }
-    .gp-short .btn { flex: 2; justify-content: center; padding-inline: 10px; }
+    .gp-short .btn { flex: 2; justify-content: center; padding-inline: 10px; white-space: normal; height: auto; min-height: 36px; text-align: center; } /* long labels wrap instead of being cut */
     .gp-short .btn-ghost { flex: 1; }
     .bx-stage { min-height: 260px; }
     .bx-box { width: 180px; }

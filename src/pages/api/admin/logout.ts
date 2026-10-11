@@ -8,5 +8,5 @@ export const prerender = false;
 export const POST: APIRoute = async ({ cookies, redirect }) => {
   endAdminSession(cookies);
   endUserSession(cookies);
-  return redirect('/admin', 303);
+  return redirect('/', 303); // same place as every other sign-out
 };

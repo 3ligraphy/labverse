@@ -31,7 +31,8 @@ export const GET: APIRoute = async ({ cookies }) => {
   const g = await guard(cookies);
   if (g.error) return g.error;
   const settings = await g.store.getSettings();
-  const rows = (await g.platform?.listModules().catch(() => [])) ?? [];
+  // the built-in course also has a builder record with the same slug: list it once
+  const rows = ((await g.platform?.listModules().catch(() => [])) ?? []).filter((m) => m.slug !== BUILT_IN_MODULE.slug);
   return json({
     settings,
     modules: [

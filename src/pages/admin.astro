@@ -50,7 +50,7 @@ if (staff) {
       if (a.can('module.build', c.slug)) tools.push({ label: 'Canvas', href: `/admin/builder/${c.slug}` });
       if (c.builtIn && a.can('module.submissions', c.slug)) tools.push({ label: 'Submissions', href: '/admin/project' });
       if (c.builtIn && a.can('cms.edit')) tools.push({ label: 'Content', href: '/admin/cms' });
-      return { ...c, href: !c.builtIn && a.can('module.build', c.slug) ? `/admin/builder/${c.slug}` : c.href, myRole: mr ? ROLE_NAMES[mr] : a.who.platformRole ? ROLE_NAMES[a.who.platformRole] : 'Admin', tools };
+      return { ...c, href: !c.builtIn && a.can('module.build', c.slug) ? `/admin/builder/${c.slug}` : c.href, myRole: a.who.platformRole === 'super_admin' ? ROLE_NAMES.super_admin : mr ? ROLE_NAMES[mr] : a.who.platformRole ? ROLE_NAMES[a.who.platformRole] : 'Admin', tools };
     }),
     platformTools: [
       a.can('modules.create') && { label: 'Modules & lab builder', href: '/admin/builder', desc: 'Create modules and visually build their labs and exercises', icon: '⬡' },
@@ -145,6 +145,8 @@ if (staff) {
   .ah-hero h1 { margin-top: 10px; font-size: clamp(2.4rem, 1.4rem + 3.6vw, 4.6rem); letter-spacing: -.05em; line-height: .95; }
   .ah-hero .muted { margin-top: 12px; max-width: 60ch; }
   .ah-stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  /* phones: the numbers side by side instead of three full-width cards */
+  @media (max-width: 600px) { .ah-stats { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; } .ah-stat { padding: 12px; } }
   .ah-stat { display: grid; gap: 4px; padding: 18px; border-radius: 18px; border: 1px solid var(--line-2); background: color-mix(in oklab, var(--surface) 85%, transparent); color: var(--text); }
   .ah-stat .mono { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
   .ah-stat b { font: 650 40px/1 var(--font-display); letter-spacing: -.04em; }

@@ -137,7 +137,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .si-tag.ok { background: var(--accent-soft); color: var(--accent-text); }
   .si-tag.late { background: color-mix(in oklab, var(--warn) 18%, transparent); color: var(--warn); }
   .si-row-act { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
-  .si-del { color: var(--danger); }
+  .si-del { color: var(--danger); margin-left: auto; } /* apart from Preview / Open file: a destructive action */
+  .si-row-act { flex-wrap: wrap; }
   .si-groups { list-style: none; padding: 0; margin-top: 12px; display: grid; gap: 8px; }
   .si-groups li { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 13.5px; }
   .si-groups .bar { grid-column: 1 / -1; height: 5px; border-radius: 99px; background: var(--line); overflow: hidden; }
@@ -276,7 +277,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         entries = data.entries;
         render(data.file);
         live.classList.add('on');
-        live.textContent = `live · ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+        live.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
       } catch (error) {
         live.classList.remove('on');
         live.textContent = error instanceof Error ? error.message : 'Could not load.';

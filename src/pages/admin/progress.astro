@@ -42,7 +42,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             <div class="pa-ci" data-pa-ci></div>
             <span class="pa-live mono" data-pa-live>connecting…</span>
             <a class="btn btn-ghost btn-sm" data-pa-csv href="#" download>Export CSV</a>
-            <form method="post" action="/api/admin/logout"><button class="btn btn-ghost btn-sm" type="submit">Log out</button></form>
+            <form method="post" action="/api/admin/logout"><button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
           </div>
         </header>
 
@@ -316,7 +316,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         lab = data.structure.lab;
         if ('id' in data.session) sessionId = data.session.id;
         live.className = 'pa-live mono on';
-        live.textContent = `live · ${new Date().toLocaleTimeString('en-GB')}`;
+        live.textContent = `Updated ${new Date().toLocaleTimeString('en-GB')}`;
         render();
       } catch {
         live.className = 'pa-live mono err';

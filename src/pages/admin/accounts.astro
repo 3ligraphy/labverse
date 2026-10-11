@@ -15,7 +15,7 @@ Astro.response.headers.set('cache-control', 'no-store, max-age=0');
 const a = await access(Astro.cookies);
 const can = Object.fromEntries(PERMISSION_KEYS.map((p) => [p, a.can(p)])) as Record<string, boolean>;
 const teamModules = can['platform.roles']
-  ? [BUILT_IN_MODULE.slug, ...((await getPlatformStore()?.listModules().catch(() => [])) ?? []).map((m) => m.slug)]
+  ? [BUILT_IN_MODULE.slug, ...((await getPlatformStore()?.listModules().catch(() => [])) ?? []).map((m) => m.slug).filter((s) => s !== BUILT_IN_MODULE.slug)]
   : modulesWith(a.matrix, a.who, 'module.invite');
 if (!Object.values(can).some(Boolean) && !teamModules.length) return Astro.redirect('/login?next=/admin/accounts', 303);
 const enabled = Boolean(getAccountStore());
@@ -51,7 +51,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
           <section class="ac-card" data-matrix-card>
             <div class="ac-h"><h2>Roles &amp; permissions</h2><span class="mono ac-pill">Super admin</span></div>
             <p class="muted small">Tick what each role may do. Platform roles apply to every module; module roles apply only in the modules where someone holds them. Super admins always have everything.</p>
-            <div class="table-wrap">
+            <div class="table-wrap" tabindex="0" role="region" aria-label="Roles and permissions (scrolls sideways on small screens)">
               <table class="ac-matrix">
                 <thead><tr><th>Permission</th>{MATRIX_ROLES.map((r) => <th class={r.kind}>{r.kind === 'module' ? `Module ${r.key === 'ta' ? 'TA' : ROLE_NAMES[r.key].replace('Module ', '').toLowerCase()}` : ROLE_NAMES[r.key]}<small>{r.kind}</small></th>)}</tr></thead>
                 <tbody>
@@ -207,6 +207,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .ac-role { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font: 600 12px/1.6 var(--font-mono); text-transform: uppercase; background: color-mix(in oklab, var(--rc) 25%, transparent); }
   .ac-act { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .ac-act select { height: 32px; padding: 0 8px; font-size: 12px; width: auto; }
+  /* phones: the action buttons get their own row instead of running past the card */
+  @media (max-width: 600px) { .ac-row { grid-template-columns: auto minmax(0, 1fr); } .ac-act { grid-column: 1 / -1; justify-content: flex-start; } }
   .ac-del { color: var(--danger); }
 </style>
 
