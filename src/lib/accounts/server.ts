@@ -127,8 +127,8 @@ class AccountStore {
     await this.seed();
   }
 
-  /** First run: the Mobile Development team become staff of that module, super admins are promoted, and
-   *  everyone without an account gets an invite link (shown to super admins in Admin → Accounts). */
+  /** First run: the Mobile Development team become staff of that module, and everyone without an account
+   *  gets an invite link (the super admin's carries that role) (shown to super admins in Admin → Accounts). */
   private async seed() {
     for (const t of teamSeed()) {
       await this.run(`insert into ${this.staff} (module, email, role, added_by) values ($1, $2, $3, 'site.yaml') on conflict do nothing`, [BUILT_IN, t.email, t.module_role]);
@@ -149,7 +149,8 @@ class AccountStore {
         values ($1, $2, $3, $4, $5, $6, 'site.yaml', now() + interval '${INVITE_DAYS} days')`,
         [randomBytes(24).toString('base64url'), t.email, t.name, t.platform_role, BUILT_IN, t.module_role]);
     }
-    await this.run(`update ${this.users} set role = 'super_admin', token_version = token_version + 1 where email = any($1) and role <> 'super_admin'`, [SUPER_ADMINS]);
+    // The super admin gets the role from the seeded invitation above (or STAFF_INITIAL_PASSWORD), never by
+    // promoting whichever account happens to use that email: sign-up does not prove email ownership.
   }
   private async q(text: string, params: unknown[] = []) {
     await (this.ready ??= this.migrate().catch((e) => { this.ready = null; throw e; }));
@@ -167,13 +168,23 @@ class AccountStore {
   async list(): Promise<UserRow[]> {
     return (await this.q(`select * from ${this.users} order by role, name`)).map(toUser);
   }
+  /** Whether this email already holds a module staff role or an open invitation (see signupBlock). */
+  async emailHolds(email: string): Promise<{ staffRole: boolean; pendingInvite: boolean }> {
+    const [r] = await this.q(
+      `select exists (select 1 from ${this.staff} where email = $1) as staff,
+              exists (select 1 from ${this.invites} where email = $1 and accepted_at is null and expires_at > now()) as invite`,
+      [email.toLowerCase()],
+    );
+    return { staffRole: Boolean(r?.staff), pendingInvite: Boolean(r?.invite) };
+  }
+
   /** null when the email (or student ID) is already registered */
   async create(a: NewAccount, profile?: Profile): Promise<UserRow | null> {
     try {
       const [r] = await this.q(
         `insert into ${this.users} (id, role, name, email, password_hash, student_id, year, specialization, modules)
          values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning *`,
-        [randomUUID(), SUPER_ADMINS.includes(a.email) ? 'super_admin' : a.role, a.name, a.email, hashPassword(a.password), a.studentId, profile?.year ?? null, profile?.specialization ?? null, profile?.modules ?? []],
+        [randomUUID(), a.role, a.name, a.email, hashPassword(a.password), a.studentId, profile?.year ?? null, profile?.specialization ?? null, profile?.modules ?? []],
       );
       return toUser(r);
     } catch (error) {

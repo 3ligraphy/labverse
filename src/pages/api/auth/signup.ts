@@ -5,7 +5,7 @@
 import type { APIRoute } from 'astro';
 import { clientIp } from '@/lib/attendance/server';
 import { getProgressStore, json } from '@/lib/progress/server';
-import { parseAccount, parseProfile } from '@/lib/accounts/core';
+import { parseAccount, parseProfile, signupBlock } from '@/lib/accounts/core';
 import { getAccountStore, publicUser, startUserSession } from '@/lib/accounts/server';
 import { hubData } from '@/lib/accounts/hub';
 
@@ -23,6 +23,8 @@ export const POST: APIRoute = async ({ request, cookies, url, clientAddress }) =
     const { settings, optional } = await hubData();
     const profile = parseProfile(body, settings, optional);
     if (!profile.ok) return json({ error: profile.error }, 400);
+    const blocked = signupBlock(account.value.email, await store.emailHolds(account.value.email));
+    if (blocked) return json({ error: blocked }, 409);
     const user = await store.create(account.value, profile.value);
     if (!user) return json({ error: 'That email or student ID already has an account. Sign in instead.' }, 409);
     startUserSession(cookies, user, url.protocol === 'https:');

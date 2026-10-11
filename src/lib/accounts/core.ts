@@ -92,6 +92,18 @@ export function parseAccount(input: Record<string, unknown>, allowed: readonly R
   return { ok: true, value: { role, name, email, password: input.password as string, studentId } };
 }
 
+/**
+ * Self-sign-up never proves that the person owns the email, while staff roles, invitations and super-admin status
+ * are all keyed by email. So an email that already holds one of those can only get an account through its
+ * invitation link (or from an admin): returns why sign-up is refused, or null when it may go ahead.
+ */
+export function signupBlock(email: string, holds: { staffRole: boolean; pendingInvite: boolean }): string | null {
+  if (SUPER_ADMINS.includes(normalEmail(email)) || holds.staffRole || holds.pendingInvite) {
+    return 'This email belongs to an invited teaching-team member. Open the invitation link sent to it, or ask the module leader to resend it.';
+  }
+  return null;
+}
+
 /** Comma list → clean items ("Year 3, Year 4" → ["Year 3", "Year 4"]); empty means "everyone". */
 export const listOf = (v: string | undefined) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const has = (list: string[], v: string) => !list.length || list.some((x) => x.toLowerCase() === v.toLowerCase());

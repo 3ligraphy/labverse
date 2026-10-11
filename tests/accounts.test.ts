@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_STORED, modulesWith, parseMatrix, permitted, type Who } from '../src/lib/accounts/permissions.ts';
-import { GENERAL, checkPasswordRules, fitsStudent, hasSpecialization, inSemester, isForStudent, parseAccount, parseProfile, parseSettings, DEFAULT_SETTINGS } from '../src/lib/accounts/core.ts';
+import { GENERAL, SUPER_ADMINS, checkPasswordRules, fitsStudent, hasSpecialization, inSemester, isForStudent, parseAccount, parseProfile, parseSettings, signupBlock, DEFAULT_SETTINGS } from '../src/lib/accounts/core.ts';
 import { hashPassword, signToken, verifyPassword, verifyToken } from '../src/lib/accounts/tokens.ts';
 
 const who = (o: Partial<Who>): Who => ({ platformRole: null, master: false, modules: {}, ...o });
@@ -115,4 +115,12 @@ test('catalogue categories: admin-defined, core vs elective; only open electives
     { slug: 'web', category: 'Elective', kind: 'elective' as const, open: false, years: [], specializations: [], semester: 'Both' as const },
   ];
   assert.deepEqual(optionalFor(mods, { year: 'Year 3', specialization: GENERAL }).map((m) => m.slug), ['mobile']);
+});
+
+test('sign-up refuses emails that only an invitation may claim', () => {
+  const none = { staffRole: false, pendingInvite: false };
+  assert.equal(signupBlock('new.student@bue.edu.eg', none), null);
+  assert.match(signupBlock('ta.member@bue.edu.eg', { ...none, staffRole: true }) ?? '', /invitation/);
+  assert.match(signupBlock('invited@bue.edu.eg', { ...none, pendingInvite: true }) ?? '', /invitation/);
+  assert.notEqual(signupBlock(SUPER_ADMINS[0].toUpperCase(), none), null, 'the super admin email, in any case');
 });
