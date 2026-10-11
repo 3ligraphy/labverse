@@ -1,6 +1,6 @@
 /**
  * Invitation emails. Sent through Resend when RESEND_API_KEY and MAIL_FROM are set (e.g. MAIL_FROM =
- * "LabVerse <no-reply@your-domain>"); otherwise nothing is sent and the admin shares the link (copy / mailto).
+ * "BUENOVA <no-reply@your-domain>"); otherwise nothing is sent and the admin shares the link (copy / mailto).
  */
 import { getSecret } from 'astro:env/server';
 import { platform } from '@/site.config';

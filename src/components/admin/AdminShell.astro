@@ -8,6 +8,7 @@ import { access } from '@/lib/accounts/access';
 import { hubData } from '@/lib/accounts/hub';
 import { ROLE_NAMES } from '@/lib/accounts/permissions';
 import { platform } from '@/site.config';
+import Logo from '@/components/Logo.astro';
 
 interface Props { active?: string }
 const { active = '' } = Astro.props;
@@ -46,7 +47,7 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
 ---
 <div class="ash">
   <aside class="ash-side" aria-label="Admin">
-    <a class="ash-brand" href="/admin"><span class="ash-logo" aria-hidden="true">◆</span><span><b>{platform.name}</b><small class="mono">admin workspace</small></span></a>
+    <a class="ash-brand" href="/admin"><Logo size={34} /><span><b>{platform.name}</b><small class="mono">admin workspace</small></span></a>
     <div class="ash-me">
       <span class="ash-av" aria-hidden="true">{initials}</span>
       <span><b>{who}</b><small class="mono">{role}{modules.length ? ` · ${modules.length} module${modules.length === 1 ? '' : 's'}` : ''}</small></span>
@@ -116,7 +117,6 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
   .ash-side { display: grid; align-content: start; gap: 18px; padding: calc(var(--nav-h) + 22px) 16px 22px; border-right: 1px solid var(--line); background: color-mix(in oklab, var(--surface) 70%, transparent); backdrop-filter: blur(16px); }
   @media (min-width: 1100px) { .ash-side { position: sticky; top: 0; height: 100dvh; overflow: auto; } }
   .ash-brand { display: flex; align-items: center; gap: 10px; }
-  .ash-logo { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), #7cb1ff); color: #0b0d10; font-size: 15px; box-shadow: 0 10px 24px -12px var(--accent); }
   .ash-brand b { display: block; font-family: var(--font-display); letter-spacing: -.02em; }
   .ash-brand small, .ash-me small { display: block; font-size: 10.5px; color: var(--text-3); letter-spacing: .06em; }
   .ash-me { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--surface); }

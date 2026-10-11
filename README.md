@@ -219,9 +219,9 @@ The teaching team publishes submissions, such as the **project proposal**, and s
 - **Safety:** admin routes need the admin login. Student uploads are rate-limited per IP and confined to that item's folder. Every PDF must be `application/pdf`, start with `%PDF-` and come from this project's own store, and rejected uploads are deleted. Hand-in PDF links are unguessable but public, and are only shown to admins.
 - **Code:** rules in `src/lib/project-files/core.ts` (unit-tested: `npm test`), storage in `src/lib/project-files/server.ts`, endpoints in `src/pages/api/project/`, `src/pages/api/submissions/` and `src/pages/api/admin/project/`, the banner in `src/components/Announce.astro`, and the ZIP builder in `src/scripts/submissions-zip.ts`.
 
-## LabVerse platform (modules, builder, accounts)
+## BUENOVA platform (modules, builder, accounts)
 
-The site is **LabVerse**, an interactive courses platform. The Mobile Development course is its built-in module, and further modules are built in the browser.
+The site is **BUENOVA**, an interactive courses platform. The Mobile Development course is its built-in module, and further modules are built in the browser.
 
 - **Choose a module first:** `/` asks for your year, then your specialization (only from **Year 3 · Semester 2** on; before that students are "General"), then the optional modules you chose. It then shows your modules for the **active semester**, with the rest under "other semesters". The nav and footer show a module's sections only once you're inside it. `/modules` searches every module, grouped by year, with year, semester and specialization filters.
 - **Enrolment:** Mobile Development is an optional module anyone may add. Every builder module is **invitation-only**: its pages and labs open for staff and for students enrolled through an invitation or by the module team (`/admin/team/<module>`).

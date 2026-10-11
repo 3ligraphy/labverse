@@ -19,7 +19,7 @@ export const team = site.team;
 export const assessment = site.assessment;
 
 /** The platform that hosts every module (the course below is its built-in module). */
-export const platform = { name: 'LabVerse', tagline: 'Interactive courses platform' };
+export const platform = { name: 'BUENOVA', tagline: 'Interactive courses platform' };
 
 /** Sections of the built-in course, shown in the nav once a student is inside it. */
 export const nav = [
