@@ -48,6 +48,18 @@ if (!file) return Astro.redirect('/admin/project', 303);
     <p class="fb-msg" role="status" data-fb-msg></p>
     <div class="fb-grid" data-fb-cards><p class="muted">Loading groups…</p></div>
     <div class="fb-orphans" data-fb-orphans hidden></div>
+
+    <dialog class="fb-dlg" data-fb-dlg aria-labelledby="fb-d-title">
+      <div class="fb-d-head">
+        <div><p class="fb-label" data-d-k></p><h2 id="fb-d-title" data-d-title></h2></div>
+        <button type="button" class="fb-d-x" data-d-close aria-label="Close">✕</button>
+      </div>
+      <div class="fb-d-body" data-d-body></div>
+      <div class="fb-d-foot">
+        <a class="btn btn-ghost btn-sm" data-d-open target="_blank" rel="noopener" hidden>Open proposal ↗</a>
+        <button type="button" class="btn btn-primary btn-sm" data-d-approve>Approve this idea</button>
+      </div>
+    </dialog>
   </section>
 </AdminShell>
 </Base>
@@ -96,6 +108,54 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .fb-idea small { display: block; margin-top: 3px; font: 500 10.5px var(--font-mono); color: var(--text-3); letter-spacing: .04em; font-weight: 400; }
   .fb-idea.none { font-weight: 400; color: var(--warn); background: color-mix(in oklab, var(--warn) 10%, transparent); }
   .fb-idea.none a { text-decoration: underline; }
+
+  .fb-ideas { display: grid; gap: 8px; }
+  .fb-ideas-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .fb-ideas-head .fb-label { margin: 0; }
+  .fb-mode { font: 500 10.5px var(--font-mono); color: var(--warn); letter-spacing: .04em; }
+  .fb-mode.on { color: var(--text-3); }
+  .fb-options { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .fb-opt { display: flex; align-items: stretch; border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--surface); transition: border-color .15s, background .15s; }
+  .fb-opt:hover { border-color: var(--text-3); }
+  .fb-opt.on { border-color: var(--accent-text); background: var(--accent-soft); }
+  .fb-opt.spin { border-color: var(--accent-text); background: color-mix(in oklab, var(--accent) 22%, transparent); }
+  .fb-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; background: none; color: var(--text); font: 600 13.5px/1.35 var(--font-body); text-align: left; cursor: pointer; }
+  .fb-pick span { min-width: 0; overflow-wrap: anywhere; }
+  .fb-pick em { margin-left: auto; padding: 2px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 700 9.5px/1.5 var(--font-mono); font-style: normal; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+  .fb-radio { flex: none; width: 16px; height: 16px; border: 1.5px solid var(--text-3); border-radius: 50%; display: grid; place-items: center; }
+  .fb-opt.on .fb-radio { border-color: var(--accent-text); }
+  .fb-opt.on .fb-radio::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-text); }
+  .fb-pick:focus-visible, .fb-info:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; border-radius: var(--r-md); }
+  .fb-info { flex: none; padding: 0 12px; border: 0; border-left: 1px solid var(--line-2); background: none; color: var(--text-2); font: 500 12px var(--font-body); cursor: pointer; }
+  .fb-info:hover { color: var(--accent-text); }
+  .fb-idea-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .fb-idea-tools .btn { display: inline-flex; align-items: center; gap: 6px; }
+  .fb-clear { border: 0; background: none; padding: 0; color: var(--text-3); font-size: 12px; text-decoration: underline; cursor: pointer; }
+  .fb-idea-msg { font: 11px var(--font-mono); color: var(--accent-text); }
+  .fb-idea-msg.err { color: var(--danger); }
+  @media (prefers-reduced-motion: reduce) { .fb-opt { transition: none; } }
+
+  .fb-dlg { width: min(640px, calc(100vw - 32px)); max-height: min(82dvh, 760px); padding: 0; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); color: var(--text); box-shadow: 0 24px 80px rgb(0 0 0 / .35); }
+  .fb-dlg[open] { display: grid; grid-template-rows: auto 1fr auto; }
+  .fb-dlg::backdrop { background: rgb(8 12 20 / .55); backdrop-filter: blur(3px); }
+  .fb-d-head { display: flex; justify-content: space-between; gap: 12px; padding: 20px 22px 14px; border-bottom: 1px solid var(--line); }
+  .fb-d-head h2 { font-size: var(--fs-lg); letter-spacing: -.02em; margin-top: 2px; }
+  .fb-d-x { flex: none; width: 34px; height: 34px; border: 1px solid var(--line-2); border-radius: 50%; background: none; color: var(--text-2); cursor: pointer; }
+  .fb-d-body { overflow-y: auto; padding: 18px 22px; display: grid; gap: 18px; align-content: start; }
+  .fb-d-desc { font-size: 14.5px; line-height: 1.6; color: var(--text-2); }
+  .fb-d-sec { margin: 12px 0 6px; font: 600 12.5px var(--font-body); color: var(--text); letter-spacing: 0; }
+  .fb-d-feats { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .fb-d-feats li { display: grid; gap: 2px; padding: 9px 12px; border-radius: var(--r-md); background: var(--surface-2); font-size: 13px; line-height: 1.5; }
+  .fb-d-feats li span { color: var(--text-2); }
+  .fb-d-empty { color: var(--text-2); font-size: 14px; }
+  .fb-d-foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding: 14px 22px; border-top: 1px solid var(--line); }
+  .fb-d-loading { display: flex; align-items: center; gap: 6px; padding: 18px 0; }
+  .fb-d-loading span { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-text); animation: fb-dot 1s infinite ease-in-out; }
+  .fb-d-loading span:nth-child(2) { animation-delay: .15s; } .fb-d-loading span:nth-child(3) { animation-delay: .3s; }
+  .fb-d-loading p { margin-left: 8px; }
+  @keyframes fb-dot { 0%, 80%, 100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .fb-d-loading span { animation: none; opacity: .6; } }
+  @media (max-width: 640px) { .fb-dlg { width: 100vw; max-width: 100vw; max-height: 88dvh; margin: auto 0 0; border-radius: var(--r-lg) var(--r-lg) 0 0; } }
   .fb-text { width: 100%; min-height: 130px; padding: 10px 12px; font: 14px/1.55 var(--font-body); resize: vertical; }
   .fb-foot { display: flex; justify-content: space-between; gap: 10px; font: 11px var(--font-mono); color: var(--text-3); }
   .fb-foot .err { color: var(--danger); }
@@ -108,7 +168,9 @@ if (!file) return Astro.redirect('/admin/project', 303);
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
-  import { buildGroups, emptyPlan, type Group, type Plan, type Student } from '@/lib/project-files/groups';
+  import { buildGroups, emptyPlan, randomIdea, type Group, type Plan, type Student } from '@/lib/project-files/groups';
+  import type { IdeaDetails } from '@/lib/project-files/idea-details';
+  import type { DocText } from '@/scripts/doc-text';
   import { placeNotes, reportRows, reportFileName, type Feedback, type Note } from '@/lib/project-files/feedback';
   import type { Entry } from '@/lib/project-files/core';
 
@@ -171,8 +233,195 @@ if (!file) return Astro.redirect('/admin/project', 303);
       return n ? `Saved ${esc(when(n.updatedAt))}${n.by ? ` · ${esc(n.by)}` : ''}` : 'Not written yet';
     };
 
-    const card = (g: Group) => {
+    /* ------------------------------------------------------- idea choice */
+    /** The ideas to choose from: those found in the files or added on the Groups page, plus the current choice. */
+    const options = (g: Group) => {
+      const chosen = idea(g);
+      return chosen && !g.ideas.some((i) => i.toLowerCase() === chosen.toLowerCase()) ? [...g.ideas, chosen] : g.ideas;
+    };
+    const DICE = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>';
+
+    const ideaBlock = (g: Group) => {
       const choice = plan.choices[g.key];
+      const list = options(g);
+      const groupsLink = `/admin/project/${encodeURIComponent(fileId)}/groups`;
+      const mode = choice?.idea ? (choice.mode === 'auto' ? 'Drawn at random' : 'Chosen by staff') : 'Not approved yet';
+      if (!list.length) {
+        return `<p class="fb-label">Idea</p><div class="fb-idea none">No ideas were found in this group's files. <a href="${groupsLink}">Add one on the Groups page</a></div>`;
+      }
+      return `<div class="fb-ideas-head"><p class="fb-label">Idea · ${list.length} proposed</p><span class="fb-mode ${choice?.idea ? 'on' : ''}" data-mode>${mode}</span></div>
+        <ul class="fb-options" role="radiogroup" aria-label="Approved idea">${list.map((name, i) => {
+          const on = name === choice?.idea;
+          return `<li class="fb-opt ${on ? 'on' : ''}" data-opt="${i}">
+            <button type="button" class="fb-pick" role="radio" aria-checked="${on}" data-pick="${i}"><i class="fb-radio" aria-hidden="true"></i><span>${esc(name)}</span>${on ? '<em>Approved</em>' : ''}</button>
+            <button type="button" class="fb-info" data-info="${i}" aria-label="Details about ${esc(name)}">Details</button>
+          </li>`;
+        }).join('')}</ul>
+        <div class="fb-idea-tools">
+          <button type="button" class="btn btn-ghost btn-sm" data-draw ${list.length < 2 ? 'disabled title="Only one idea to choose from"' : ''}>${DICE}<span>Draw at random</span></button>
+          ${choice?.idea ? '<button type="button" class="fb-clear" data-clear>Clear choice</button>' : ''}
+          <span class="fb-idea-msg" data-idea-msg role="status"></span>
+        </div>`;
+    };
+
+    const cardOf = (key: string) => cards.querySelector<HTMLElement>(`.fb-card[data-key="${CSS.escape(key)}"]`);
+    const redrawIdeas = (g: Group) => {
+      const box = cardOf(g.key)?.querySelector<HTMLElement>('[data-ideas]');
+      if (box) box.innerHTML = ideaBlock(g);
+      renderSummary();
+    };
+
+    /** Approves `name` for the group (empty clears it). Shows it straight away, and undoes it if saving fails. */
+    const choose = async (g: Group, name: string, mode: 'manual' | 'auto') => {
+      const before = plan.choices[g.key];
+      if (name) plan.choices[g.key] = { mode, idea: name }; else delete plan.choices[g.key];
+      redrawIdeas(g);
+      const note = (text: string, err = false) => {
+        const el = cardOf(g.key)?.querySelector<HTMLElement>('[data-idea-msg]');
+        if (el) { el.className = `fb-idea-msg ${err ? 'err' : 'ok'}`; el.textContent = text; }
+      };
+      try {
+        const res = await fetch(`/api/admin/project/feedback?file=${encodeURIComponent(fileId)}`, {
+          method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'choice', key: g.key, idea: name, mode }),
+        });
+        if (res.status === 401) return location.reload();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error ?? 'Could not save.');
+        note(name ? 'Saved' : 'Cleared');
+      } catch (error) {
+        if (before) plan.choices[g.key] = before; else delete plan.choices[g.key];
+        redrawIdeas(g);
+        note(`${error instanceof Error ? error.message : 'Could not save.'} Try again.`, true);
+      }
+    };
+
+    const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let drawing = false;
+    /** Draws an idea at random: a short shuffle over the options, then it lands on the pick. */
+    const draw = async (g: Group) => {
+      const list = options(g);
+      if (drawing || list.length < 2) return;
+      drawing = true;
+      const pick = randomIdea(list) ?? list[0];
+      const el = cardOf(g.key);
+      el?.querySelectorAll<HTMLButtonElement>('[data-ideas] button').forEach((b) => { b.disabled = true; });
+      if (el && !reduceMotion()) {
+        const rows = [...el.querySelectorAll<HTMLElement>('.fb-opt')];
+        const land = list.indexOf(pick);
+        const steps = rows.length * 3 + land; // three laps, then stop on the pick
+        for (let s = 0; s <= steps; s++) {
+          rows.forEach((r, i) => r.classList.toggle('spin', i === s % rows.length));
+          await new Promise((r) => setTimeout(r, 45 + (s / steps) ** 3 * 220)); // slows down before landing
+        }
+      }
+      drawing = false;
+      await choose(g, pick, 'auto');
+    };
+
+    /* ---------------------------------------------------- idea details */
+    const dlg = $<HTMLDialogElement>('[data-fb-dlg]');
+    const dBody = dlg.querySelector<HTMLElement>('[data-d-body]')!;
+    const dOpen = dlg.querySelector<HTMLAnchorElement>('[data-d-open]')!;
+    const dApprove = dlg.querySelector<HTMLButtonElement>('[data-d-approve]')!;
+    let dFor: { g: Group; name: string } | null = null;
+    /** Each hand-in's text, read once per visit. */
+    const docs = new Map<string, Promise<DocText>>();
+    const textOf = async (e: Entry): Promise<DocText> => {
+      if (!docs.has(e.id)) docs.set(e.id, import('@/scripts/doc-text').then(({ readDocText }) => readDocText(e.url)).catch((err) => ({ error: String(err?.message ?? err) })));
+      const doc = await docs.get(e.id)!;
+      if ('error' in doc) docs.delete(e.id); // try again next time
+      return doc;
+    };
+    /** The page's code changed since it was opened (a deploy, or the dev server restarted): only a reload helps. */
+    const STALE = /dynamically imported module|importing a module script failed/i;
+    /** The group's hand-ins, the ones whose file named this idea first. */
+    const sourcesFor = (g: Group, name: string) => {
+      const mine = entries.filter((e) => g.entries.includes(e.id));
+      const named = (e: Entry) => (plan.scans[e.id]?.ideas ?? []).some((i) => i.toLowerCase() === name.toLowerCase()) || e.note.toLowerCase().includes(name.toLowerCase());
+      return [...mine.filter(named), ...mine.filter((e) => !named(e))];
+    };
+
+    const showDetails = async (g: Group, name: string) => {
+      dFor = { g, name };
+      const num = g.numbered ? g.key.replace(/^G/, 'Group ') : g.title;
+      dlg.querySelector('[data-d-k]')!.textContent = `${num} · proposed idea`;
+      dlg.querySelector('[data-d-title]')!.textContent = name;
+      const approved = idea(g) === name;
+      dApprove.disabled = approved;
+      dApprove.textContent = approved ? 'Approved' : 'Approve this idea';
+      dOpen.hidden = true;
+      dBody.innerHTML = '<div class="fb-d-loading"><span></span><span></span><span></span><p class="small faint">Reading the proposal…</p></div>';
+      if (!dlg.open) dlg.showModal();
+      let found: { details: IdeaDetails; entry: Entry } | null = null;
+      let firstError = '';
+      try {
+        const { ideaDetails } = await import('@/lib/project-files/idea-details');
+        for (const e of sourcesFor(g, name)) {
+          const doc = await textOf(e);
+          if ('error' in doc) { firstError ||= doc.error; continue; }
+          const details = ideaDetails(doc.lines, name);
+          if (details) { found = { details, entry: e }; break; }
+        }
+      } catch (error) {
+        firstError = String((error as Error)?.message ?? error);
+      }
+      if (dFor?.g !== g || dFor.name !== name) return; // another idea was opened meanwhile
+      const source = found?.entry ?? sourcesFor(g, name)[0];
+      if (source) { dOpen.href = source.url; dOpen.hidden = false; dOpen.textContent = `Open ${source.name.split(' ')[0]}'s proposal ↗`; }
+      if (!found && STALE.test(firstError)) {
+        dBody.innerHTML = '<p class="fb-d-empty">This page was updated after you opened it, so it can’t read the proposal. Reload the page and open the details again.</p><p><button type="button" class="btn btn-primary btn-sm" data-d-reload>Reload page</button></p>';
+        dBody.querySelector('[data-d-reload]')!.addEventListener('click', () => location.reload());
+        return;
+      }
+      if (!found || (!found.details.description && !found.details.features.length)) {
+        dBody.innerHTML = `<p class="fb-d-empty">${found ? 'The proposal names this idea but has no description or feature list for it.'
+          : firstError ? esc(firstError) : 'This idea isn’t described in the group’s files (it may have been added by hand on the Groups page).'}</p>`;
+        return;
+      }
+      const { description, features } = found.details;
+      const sections = new Map<string, typeof features>();
+      for (const f of features) sections.set(f.section, [...(sections.get(f.section) ?? []), f]);
+      dBody.innerHTML = `
+        ${description ? `<section><p class="fb-label">About</p><p class="fb-d-desc">${esc(description)}</p></section>` : ''}
+        ${features.length ? `<section><p class="fb-label">Features · ${features.length}</p>${[...sections].map(([sec, list]) => `
+          ${sec ? `<h3 class="fb-d-sec">${esc(sec)}</h3>` : ''}
+          <ul class="fb-d-feats">${list.map((f) => `<li><b>${esc(f.title)}</b>${f.text ? `<span>${esc(f.text)}</span>` : ''}</li>`).join('')}</ul>`).join('')}</section>` : ''}
+        <p class="small faint">Read from ${esc(found.entry.name)}'s hand-in. Long sections are shortened.</p>`;
+    };
+
+    dlg.addEventListener('click', (e) => { if (e.target === dlg || (e.target as HTMLElement).closest('[data-d-close]')) dlg.close(); });
+    dlg.addEventListener('close', () => { dFor = null; });
+    dApprove.addEventListener('click', async () => {
+      if (!dFor) return;
+      const { g, name } = dFor;
+      dlg.close();
+      await choose(g, name, 'manual');
+    });
+
+    cards.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      const el = t.closest<HTMLElement>('[data-key]');
+      const g = el && groups.find((x) => x.key === el.dataset.key);
+      if (!g || drawing) return;
+      const list = options(g);
+      const pick = t.closest<HTMLElement>('[data-pick]');
+      const info = t.closest<HTMLElement>('[data-info]');
+      if (pick && list[Number(pick.dataset.pick)] !== idea(g)) choose(g, list[Number(pick.dataset.pick)], 'manual');
+      else if (info) showDetails(g, list[Number(info.dataset.info)]);
+      else if (t.closest('[data-draw]')) draw(g);
+      else if (t.closest('[data-clear]')) choose(g, '', 'manual');
+    });
+    // Arrow keys move between a card's ideas; Enter or Space approves one.
+    cards.addEventListener('keydown', (e) => {
+      const pick = (e.target as HTMLElement).closest<HTMLElement>('[data-pick]');
+      if (!pick || !['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      const picks = [...pick.closest('.fb-options')!.querySelectorAll<HTMLElement>('[data-pick]')];
+      const next = picks[(picks.indexOf(pick) + (e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1) + picks.length) % picks.length];
+      e.preventDefault();
+      next.focus();
+    });
+
+    const card = (g: Group) => {
       const text = texts.get(g.key) ?? '';
       const num = g.numbered ? /^G(\d+)$/.exec(g.key)?.[1] ?? g.key : '—';
       return `<article class="fb-card ${has(g.key) ? 'done' : ''}" data-key="${esc(g.key)}">
@@ -185,12 +434,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
           <p class="fb-label">Members · ${g.members.length}</p>
           <ul class="fb-members">${g.members.map((m) => `<li>${esc(m.name)}<span>${esc(m.id)}</span></li>`).join('') || '<li class="muted">No members</li>'}</ul>
         </div>
-        <div>
-          <p class="fb-label">Approved idea</p>
-          ${choice?.idea
-            ? `<div class="fb-idea">${esc(choice.idea)}<small>${choice.mode === 'auto' ? 'Drawn at random' : 'Chosen by staff'}</small></div>`
-            : `<div class="fb-idea none">No idea approved yet. <a href="/admin/project/${encodeURIComponent(fileId)}/groups">Choose one</a></div>`}
-        </div>
+        <div class="fb-ideas" data-ideas>${ideaBlock(g)}</div>
         <label>
           <p class="fb-label">Written feedback</p>
           <textarea class="input fb-text" maxlength="${max}" data-text placeholder="Strengths, what to improve, next steps…">${esc(text)}</textarea>

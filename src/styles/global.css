@@ -138,6 +138,8 @@
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
 * { margin: 0; }
+/* The reset above also removes the margin that centres modal dialogs; give it back (full-screen sheets set their own). */
+dialog { margin: auto; }
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;

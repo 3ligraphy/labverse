@@ -271,6 +271,15 @@ export function extractIdeas(lines: readonly string[]): string[] {
     .slice(0, MAX_IDEAS);
 }
 
+/** The idea one labelled line names ("Idea 2: X", "Project Proposal: X", "App name: X"), or null. */
+export function labelledIdea(raw: string): string | null {
+  const line = raw.replace(/\s+/g, ' ').trim();
+  const labelled = IDEA_LINE.exec(line);
+  if (labelled) return /^(?:description|summary)$/i.test(labelled[1] ?? '') && !looksLikeName(labelled[2]) ? null : tidyIdea(labelled[2]);
+  const found = (TITLE_LINE.exec(line) ?? IDEA_IS.exec(line))?.[1];
+  return found ? tidyIdea(found) : null;
+}
+
 /* ------------------------------------------------------------------ groups */
 
 export type Group = {
@@ -493,6 +502,18 @@ export function cleanPlan(input: unknown): Plan {
   }
   for (const [k, v] of record(p.teams)) { const team = cleanTeam(v); if (keyOk(k) && team) plan.teams[k] = team; }
   return plan;
+}
+
+/** Sets (or, with an empty idea, clears) one group's chosen idea in the plan, from a request body. */
+export function setChoice(plan: Plan, input: Record<string, unknown>): { ok: true; key: string } | { ok: false; error: string } {
+  const key = String(input.key ?? '').trim();
+  const idea = String(input.idea ?? '').replace(/\s+/g, ' ').trim();
+  const mode = input.mode === 'auto' ? 'auto' : input.mode === 'manual' || !input.mode ? 'manual' : null;
+  if (!keyOk(key)) return { ok: false, error: 'Unknown group.' };
+  if (!mode) return { ok: false, error: 'Choose how the idea was picked.' };
+  if (idea.length > MAX_IDEA_LEN) return { ok: false, error: `Keep the idea under ${MAX_IDEA_LEN} characters.` };
+  if (idea) plan.choices[key] = { mode, idea }; else delete plan.choices[key];
+  return { ok: true, key };
 }
 
 /**
