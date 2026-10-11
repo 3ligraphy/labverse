@@ -7,6 +7,8 @@
  *   (optional) CMS_BASE = main, CMS_DRAFTS = cms-drafts
  * On a laptop without a token, saves are written straight into the project files (local mode).
  */
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { AstroCookies } from 'astro';
 import { getSecret } from 'astro:env/server';
 import { noStore } from '@/lib/attendance/server';
@@ -19,13 +21,25 @@ import type { ListName } from './fields';
 const env = (key: string) => getSecret(key) || undefined;
 const onVercel = () => Boolean(env('VERCEL'));
 
+/**
+ * The project folder for local mode. The dev server can be started from another folder (astro dev --root …),
+ * so the working directory is only a fallback: in dev this file sits in <project>/src/lib/cms.
+ */
+function projectRoot(): string {
+  try {
+    const root = new URL('../../../', import.meta.url);
+    if (root.protocol === 'file:' && existsSync(fileURLToPath(new URL('src/content/data/site.yaml', root)))) return fileURLToPath(root);
+  } catch { /* bundled build: no source folder next to it */ }
+  return process.cwd();
+}
+
 let repo: ContentRepo | null | undefined;
 export function getRepo(): ContentRepo | null {
   if (repo !== undefined) return repo;
   const token = env('GITHUB_TOKEN');
   const name = env('GITHUB_REPO');
   if (token && name) repo = new GitHubRepo({ token, repo: name, base: env('CMS_BASE') ?? 'main', drafts: env('CMS_DRAFTS') ?? 'cms-drafts' });
-  else repo = onVercel() ? null : new LocalRepo(process.cwd());
+  else repo = onVercel() ? null : new LocalRepo(projectRoot());
   return repo;
 }
 
