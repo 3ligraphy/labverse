@@ -249,4 +249,21 @@ test('sortGroups orders by newest hand-in by default, and by number, size or mis
   assert.deepEqual(keys('number'), ['G1', 'G2', 'G3']);
   assert.deepEqual(keys('members'), ['G1', 'G2', 'G3']);
   assert.deepEqual(keys('unchosen'), ['G3', 'G2', 'G1']);
+test('extractIdeas reads numbered app headings that have no "Idea" label', () => {
+  const kino = [
+    'Faculty of Informatics and Computer Science', 'Mobile Application Development Proposal', '26CSSE24H', 'Group Participants',
+    'Name | ID | Group', 'Khaled Waleed | 248902 | A-3', 'Aya Hassan | 242329 | A-2', 'Lamees Yasser | 246629 | A-3', 'Mohammed Essam | 209762 | A-1',
+    '1. KinoLog App (Movie Tracking and Social Networking Application)',
+    'KinoLog is a social application for film enthusiasts that allows users to track watched',
+    'movies, rate and review films, maintain watchlists, create custom movie lists, and follow',
+    'The proposed app would use The Movie Database (TMDB) API to retrieve movie',
+    '2. TripWise App (Travel Planning Application)',
+    'TripWise is a travel planning application that allows users to organize trips, create day-by-',
+    'For the proposed app, Google Maps Platform can provide interactive maps, destination',
+  ];
+  assert.deepEqual(extractIdeas(kino), ['KinoLog App (Movie Tracking and Social Networking Application)', 'TripWise App (Travel Planning Application)']);
+  // a numbered name without "App", described on the next line
+  assert.deepEqual(extractIdeas(['1. StudyBuddy', 'StudyBuddy is a planner that matches classmates for group study sessions.']), ['StudyBuddy']);
+  // ordinary numbered lists are not ideas
+  assert.deepEqual(extractIdeas(['1. Introduction', '2. The app will let users log in.', '3. Login screen', '4. Profile screen']), []);
 });
