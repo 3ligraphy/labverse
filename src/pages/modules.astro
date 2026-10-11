@@ -22,7 +22,7 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
   <section class="md" data-md data-active={settings.activeSemester}>
     <div class="md-sky" aria-hidden="true"></div>
     <div class="container">
-      <p class="md-k mono">Module directory · {settings.activeSemester} is active · {cards.length} modules</p>
+      <p class="md-k mono">Module directory · {settings.activeSemester} is active · {cards.length} module{cards.length === 1 ? '' : 's'}</p>
       <h1 class="md-t">Find a <span>module</span></h1>
       <p class="md-l">Browse by year, semester and specialization. Specializations start in {specFromLabel}. Mobile Development is open to everyone as an optional module; other modules need an invitation from their module leader.</p>
       <div class="md-search">
@@ -39,7 +39,7 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
 
       {groups.map((g) => (
         <section class="md-group" data-group>
-          <h2 class="md-gh"><span>{g.year}</span><small class="mono" data-count></small></h2>
+          <h2 class="md-gh"><span>{g.year}</span><small class="mono" data-group-count></small></h2>
           <div class="md-grid">
             {g.cards.map((m, i) => (
               <a href={m.href} class="mcard" style={`--c:${m.color}; --i:${i}`} data-card data-slug={m.slug} data-open-flag={m.open && m.kind === 'elective' ? '1' : ''} data-cat={m.category}
@@ -158,7 +158,7 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
           if (show) n++;
         });
         g.hidden = n === 0;
-        g.querySelector('[data-count]')!.textContent = `${n} module${n === 1 ? '' : 's'}`;
+        g.querySelector('[data-group-count]')!.textContent = `${n} module${n === 1 ? '' : 's'}`;
         total += n;
       });
       root.querySelector<HTMLElement>('[data-md-none]')!.hidden = total > 0;

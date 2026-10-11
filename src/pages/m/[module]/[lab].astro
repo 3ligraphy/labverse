@@ -86,7 +86,7 @@ const q = preview ? '?preview' : '';
                 <div>
                   <p class="mono dash-k">Your progress</p>
                   <p class="dash-v"><b data-done>0</b> / {taskCount} tasks</p>
-                  <p class="dash-s mono">{parts.length} parts{totalMin ? ` · ${totalMin} min` : ''}</p>
+                  <p class="dash-s mono">{parts.length} part{parts.length === 1 ? '' : 's'}{totalMin ? ` · ${totalMin} min` : ''}</p>
                   <button class="dash-reset mono" data-lab-reset type="button">reset</button>
                 </div>
               </div>

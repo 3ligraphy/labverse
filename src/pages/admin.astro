@@ -107,7 +107,7 @@ if (staff) {
                   <span class="ah-glow" aria-hidden="true"></span>
                   <div class="ah-mtop mono"><span>{m.code || 'Module'}</span><span class="ah-role">{m.myRole}</span></div>
                   <h3><a href={m.href} target="_blank" rel="noopener">{m.title}</a></h3>
-                  <p class="ah-chips mono"><span>{m.category}</span><span>{m.semester === 'Both' ? 'Both semesters' : m.semester}</span><span>{m.years.length ? m.years.join(', ') : 'All years'}</span><span>{m.labs} labs</span></p>
+                  <p class="ah-chips mono"><span>{m.category}</span><span>{m.semester === 'Both' ? 'Both semesters' : m.semester}</span><span>{m.years.length ? m.years.join(', ') : 'All years'}</span><span>{m.labs} lab{m.labs === 1 ? '' : 's'}</span></p>
                   <div class="ah-tools">{m.tools.map((t) => <a class:list={['ah-tool', { pri: t.primary }]} href={t.href}>{t.label}</a>)}</div>
                 </article>
               ))}

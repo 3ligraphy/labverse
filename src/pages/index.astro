@@ -24,7 +24,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
 
     <div class="container hub-in">
       <header class="hub-head">
-        <p class="hub-k mono"><span class="hub-dot"></span> Learning platform · {settings.activeSemester} is active · {cards.length} modules</p>
+        <p class="hub-k mono"><span class="hub-dot"></span> Learning platform · {settings.activeSemester} is active · {cards.length} module{cards.length === 1 ? '' : 's'}</p>
         <h1 class="hub-t" data-hub-title>Choose your <span>module</span></h1>
         <p class="hub-sub" data-hub-sub>Tell us where you are in your degree and we'll line up your modules.</p>
         <div class="hub-who" data-hub-who hidden></div>
