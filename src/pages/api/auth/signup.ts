@@ -5,7 +5,7 @@
 import type { APIRoute } from 'astro';
 import { clientIp } from '@/lib/attendance/server';
 import { getProgressStore, json } from '@/lib/progress/server';
-import { parseAccount, parseProfile, signupBlock } from '@/lib/accounts/core';
+import { AUTH_LIMITS, parseAccount, parseProfile, signupBlock } from '@/lib/accounts/core';
 import { getAccountStore, publicUser, startUserSession } from '@/lib/accounts/server';
 import { hubData } from '@/lib/accounts/hub';
 
@@ -15,7 +15,7 @@ export const POST: APIRoute = async ({ request, cookies, url, clientAddress }) =
   const store = getAccountStore();
   if (!store) return json({ error: 'Accounts are not set up on this site yet.' }, 503);
   const tries = (await getProgressStore()?.hit(`signup:${clientIp(request, clientAddress)}`, 3600).catch(() => 0)) ?? 0;
-  if (tries > 10) return json({ error: 'Too many sign-ups from this network. Try again later.' }, 429);
+  if (tries > AUTH_LIMITS.signupNetworkPerHour) return json({ error: 'Too many sign-ups from this network. Try again later.' }, 429);
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const account = parseAccount({ ...body, role: 'student' }, ['student']);
   if (!account.ok) return json({ error: account.error }, 400);

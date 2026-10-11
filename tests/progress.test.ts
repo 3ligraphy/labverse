@@ -360,3 +360,15 @@ test('open practice is off by default and toggles per lab', async () => {
   await store.setPractice('lab-02', false);
   assert.equal(await store.getPractice('lab-02'), false);
 });
+
+test('count() reads a rate-limit counter without adding to it, and expires with its window', async () => {
+  let t = 0;
+  const s = new MemoryStore(() => t);
+  assert.equal(await s.count('login:fail:a@b.c'), 0);
+  await s.hit('login:fail:a@b.c', 60);
+  await s.hit('login:fail:a@b.c', 60);
+  assert.equal(await s.count('login:fail:a@b.c'), 2);
+  assert.equal(await s.count('login:fail:a@b.c'), 2, 'reading does not count');
+  t = 61_000;
+  assert.equal(await s.count('login:fail:a@b.c'), 0);
+});

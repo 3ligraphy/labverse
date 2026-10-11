@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_STORED, modulesWith, parseMatrix, permitted, type Who } from '../src/lib/accounts/permissions.ts';
-import { GENERAL, SUPER_ADMINS, checkPasswordRules, fitsStudent, hasSpecialization, inSemester, isForStudent, parseAccount, parseProfile, parseSettings, signupBlock, teamAccountBlock, DEFAULT_SETTINGS } from '../src/lib/accounts/core.ts';
+import { AUTH_LIMITS, GENERAL, SUPER_ADMINS, checkPasswordRules, fitsStudent, hasSpecialization, inSemester, isForStudent, loginThrottle, parseAccount, parseProfile, parseSettings, signupBlock, teamAccountBlock, DEFAULT_SETTINGS } from '../src/lib/accounts/core.ts';
 import { hashPassword, signToken, verifyPassword, verifyToken } from '../src/lib/accounts/tokens.ts';
 
 const who = (o: Partial<Who>): Who => ({ platformRole: null, master: false, modules: {}, ...o });
@@ -133,4 +133,12 @@ test('module team pages cannot create doctors or claim the super admin email wit
   assert.equal(teamAccountBlock({ email: 'new.dr@bue.edu.eg', platformRole: 'doctor', canCreateStaff: true, canManageRoles: false }), null);
   assert.match(teamAccountBlock({ email: SUPER_ADMINS[0], platformRole: 'ta', ...leader }) ?? '', /super admin/);
   assert.equal(teamAccountBlock({ email: SUPER_ADMINS[0], platformRole: 'ta', canCreateStaff: true, canManageRoles: true }), null);
+});
+
+test('a whole class on one network can sign in; password guessing is limited per account', () => {
+  assert.equal(loginThrottle({ network: 120, failures: 0 }), null, 'a full lab signing in together');
+  assert.equal(loginThrottle({ network: 1, failures: AUTH_LIMITS.loginFailuresPerEmail - 1 }), null);
+  assert.match(loginThrottle({ network: 1, failures: AUTH_LIMITS.loginFailuresPerEmail }) ?? '', /wrong passwords/);
+  assert.match(loginThrottle({ network: AUTH_LIMITS.loginNetworkPer10Min + 1, failures: 0 }) ?? '', /network/);
+  assert.ok(AUTH_LIMITS.signupNetworkPerHour >= 100, 'a cohort can create accounts in one lab');
 });

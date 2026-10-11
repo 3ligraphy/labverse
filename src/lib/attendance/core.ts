@@ -25,6 +25,15 @@ const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}'’. -]*[\p{L}\p{M}.]$/u;
 const ID_RE = /^[A-Za-z0-9-]{3,20}$/;
 const DEVICE_RE = /^[A-Za-z0-9_-]{16,64}$/;
 
+/**
+ * The caller's IP for rate limits. Vercel's own header comes first because clients cannot set it, then the
+ * socket address; a client-supplied X-Forwarded-For is only used when nothing better exists.
+ */
+export function ipFrom(headers: Headers, clientAddress?: string): string {
+  const first = (v: string | null) => v?.split(',')[0]?.trim() || '';
+  return first(headers.get('x-vercel-forwarded-for')) || clientAddress || first(headers.get('x-real-ip')) || first(headers.get('x-forwarded-for')) || 'unknown';
+}
+
 export function validateCheckIn(input: unknown): Validation {
   const o = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
   const name = String(o.name ?? '').normalize('NFC').trim().replace(/\s+/g, ' ');

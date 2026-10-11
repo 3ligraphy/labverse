@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ipFrom,
   validateCheckIn,
   signSession,
   verifySession,
@@ -220,4 +221,12 @@ test('classifyDuplicate tells a reused device from a reused student ID', () => {
 test('classifyDuplicate ignores errors that are not duplicates', () => {
   assert.equal(classifyDuplicate({ code: '42P01', message: 'relation "attendance" does not exist' }), null);
   assert.equal(classifyDuplicate(null), null);
+});
+
+test('rate-limit IP prefers the Vercel header, then the socket, and trusts X-Forwarded-For last', () => {
+  const h = (o: Record<string, string>) => new Headers(o);
+  assert.equal(ipFrom(h({ 'x-vercel-forwarded-for': '41.1.1.1', 'x-forwarded-for': '6.6.6.6' }), '10.0.0.1'), '41.1.1.1');
+  assert.equal(ipFrom(h({ 'x-forwarded-for': '6.6.6.6, 41.1.1.1' }), '41.2.2.2'), '41.2.2.2', 'a spoofed header cannot beat the socket address');
+  assert.equal(ipFrom(h({ 'x-forwarded-for': '41.3.3.3, 10.0.0.1' })), '41.3.3.3');
+  assert.equal(ipFrom(h({})), 'unknown');
 });

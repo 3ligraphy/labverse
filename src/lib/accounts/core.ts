@@ -93,6 +93,25 @@ export function parseAccount(input: Record<string, unknown>, allowed: readonly R
 }
 
 /**
+ * Sign-in and sign-up limits. A whole class signs in from one campus network (one public IP), so the
+ * per-network ceilings are high and only stop floods; guessing a password is limited per email, counting
+ * failed attempts only, so one person's typos never lock anyone else out.
+ */
+export const AUTH_LIMITS = {
+  loginNetworkPer10Min: 300,
+  loginFailuresPerEmail: 8,
+  loginFailureWindowSec: 15 * 60,
+  signupNetworkPerHour: 150,
+} as const;
+
+/** Why a sign-in attempt is refused before checking the password, or null. */
+export function loginThrottle(counts: { network: number; failures: number }): string | null {
+  if (counts.failures >= AUTH_LIMITS.loginFailuresPerEmail) return 'Too many wrong passwords for this account. Wait 15 minutes, or ask a module leader to reset it.';
+  if (counts.network > AUTH_LIMITS.loginNetworkPer10Min) return 'Too many sign-in attempts from this network. Wait ten minutes and try again.';
+  return null;
+}
+
+/**
  * Self-sign-up never proves that the person owns the email, while staff roles, invitations and super-admin status
  * are all keyed by email. So an email that already holds one of those can only get an account through its
  * invitation link (or from an admin): returns why sign-up is refused, or null when it may go ahead.

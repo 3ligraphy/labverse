@@ -46,6 +46,8 @@ export interface ProgressStore {
   setSubmission(s: { studentKey: string; lab: string; url: string; sessionId?: string }): Promise<void>;
   /** Counts calls per key inside a time window (rate limiting). */
   hit(key: string, windowSec: number): Promise<number>;
+  /** The current count for a key without adding to it (0 once its window has passed). */
+  count(key: string): Promise<number>;
   labData(lab: string, sessionId?: string): Promise<LabData>;
   studentData(lab: string, studentKey: string, sessionId?: string): Promise<StudentData>;
   unlock(studentKey: string): Promise<void>;
@@ -129,6 +131,10 @@ export class MemoryStore implements ProgressStore {
     const next = !h || h.until < t ? { n: 1, until: t + windowSec * 1000 } : { n: h.n + 1, until: h.until };
     this.hits.set(key, next);
     return next.n;
+  }
+  async count(key: string) {
+    const h = this.hits.get(key);
+    return h && h.until >= this.now() ? h.n : 0;
   }
   async labData(lab: string, sessionId?: string): Promise<LabData> {
     const inSession = (row: { session_id?: string }) => sessionId === undefined || row.session_id === sessionId;
@@ -462,6 +468,11 @@ export class NeonStore implements ProgressStore {
        returning n`,
       [key, windowSec],
     );
+    return Number(row?.n ?? 0);
+  }
+
+  async count(key: string) {
+    const [row] = await this.q<{ n: number }>(`select n from ${this.t.hits} where key = $1 and until >= now()`, [key]);
     return Number(row?.n ?? 0);
   }
 

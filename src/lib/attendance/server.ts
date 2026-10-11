@@ -17,6 +17,7 @@ import {
   checkPassword,
   findRedisEnv,
   findSupabaseEnv,
+  ipFrom,
   sessionSecret,
   signSession,
   verifySession,
@@ -126,10 +127,9 @@ export function endAdminSession(cookies: AstroCookies) {
   cookies.delete(ADMIN_COOKIE, { path: '/' });
 }
 
-/** Best-effort client IP for login rate limiting. */
+/** Best-effort client IP for rate limiting (see ipFrom). */
 export function clientIp(request: Request, clientAddress?: string): string {
-  const fwd = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  return fwd || request.headers.get('x-real-ip') || clientAddress || 'unknown';
+  return ipFrom(request.headers, clientAddress);
 }
 
 export const noStore = { 'cache-control': 'no-store, max-age=0' };
