@@ -88,15 +88,53 @@ const pdfWorker = (url: string) => (import.meta.env.DEV ? Promise.resolve(url) :
   .then((code) => URL.createObjectURL(new Blob([`(${installStreamIterator.toString()})();\n`, code], { type: 'text/javascript' })))
   .catch(() => url));
 
-async function pdfLines(bytes: Uint8Array): Promise<string[]> {
-  // The legacy build: the standard one calls brand-new JavaScript (Promise.try, Math.sumPrecise,
-  // Map.getOrInsertComputed…) directly, which Safari on iPhone doesn't have yet, so every PDF failed there.
-  // Safari also can't `for await` over a stream, which pdf.js does on the page and in its worker.
+/**
+ * pdf.js, set up once. The legacy build: the standard one calls brand-new JavaScript (Promise.try,
+ * Math.sumPrecise, Map.getOrInsertComputed…) directly, which Safari on iPhone doesn't have yet. Safari also
+ * can't `for await` over a stream, which pdf.js does on the page and in its worker.
+ */
+async function loadPdfjs() {
   installStreamIterator();
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
     pdfjs.GlobalWorkerOptions.workerSrc = await pdfWorker((await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default);
   }
+  return pdfjs;
+}
+
+/**
+ * Draws a PDF's pages into `box` as images (works where the browser can't show PDFs inline, like iPhone).
+ * Returns how many pages the file has; at most `maxPages` are drawn.
+ */
+export async function renderPdf(url: string, box: HTMLElement, maxPages = 20): Promise<number> {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Download failed (${res.status}).`);
+  const pdfjs = await loadPdfjs();
+  const task = pdfjs.getDocument({ data: new Uint8Array(await res.arrayBuffer()) });
+  const doc = await task.promise;
+  // the box may not be laid out yet: measure it, else its parent
+  const width = Math.max(280, box.clientWidth || box.parentElement?.clientWidth || 600);
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  try {
+    for (let p = 1; p <= Math.min(doc.numPages, maxPages); p++) {
+      if (!box.isConnected) break; // the viewer moved on to another file
+      const page = await doc.getPage(p);
+      const viewport = page.getViewport({ scale: (width / page.getViewport({ scale: 1 }).width) * dpr });
+      const canvas = Object.assign(document.createElement('canvas'), { width: Math.floor(viewport.width), height: Math.floor(viewport.height) });
+      canvas.className = 'gp-v-page';
+      canvas.setAttribute('aria-label', `Page ${p}`);
+      box.append(canvas);
+      await page.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport }).promise;
+      page.cleanup();
+    }
+    return doc.numPages;
+  } finally {
+    await task.destroy();
+  }
+}
+
+async function pdfLines(bytes: Uint8Array): Promise<string[]> {
+  const pdfjs = await loadPdfjs();
   const task = pdfjs.getDocument({ data: bytes });
   const doc = await task.promise;
   const lines: string[] = [];

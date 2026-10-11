@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  assignRandom, autoNumber, buildGroups, cleanTeam, entryKeys, numberGroup, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
+  assignRandom, autoNumber, buildGroups, lastHandIn, sortGroups, cleanTeam, entryKeys, numberGroup, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
   parseRoster, randomIdea, unassigned, type Plan,
 } from '../src/lib/project-files/groups.ts';
 
@@ -231,4 +231,22 @@ test('extractIdeas reads real proposals from the course', () => {
     'Number | Name | ID | Group', '1 | Rawan Ahmed', 'Osman', '246108 | A3', '2 | Fatma Ahmed | 246613 | A3', '3 | Merna Attwa | 247689 | A3',
     'The ideas : restaurant app ,Fitness Challenge App',
   ]), ['restaurant app', 'Fitness Challenge App']);
+});
+
+test('sortGroups orders by newest hand-in by default, and by number, size or missing idea on request', () => {
+  const es = [
+    { ...entry('a', '23CS0001', 'Sara Ali', 'G2'), updated_at: '2026-10-10T09:00:00Z' },
+    { ...entry('b', '23CS0003', 'Mona Adel', 'G1'), updated_at: '2026-10-11T08:00:00Z' },
+    { ...entry('c', '23CS0004', 'Youssef Nabil', 'G3'), updated_at: '2026-10-09T12:00:00Z' },
+    { ...entry('d', '23CS0005', 'Laila Samir', 'G3'), updated_at: '2026-10-10T12:00:00Z' },
+  ];
+  const p: Plan = { ...emptyPlan(), choices: { G1: { mode: 'manual', idea: 'Gym' } } };
+  const groups = buildGroups(es, roster.students, p);
+  const keys = (sort: Parameters<typeof sortGroups>[1]) => sortGroups(groups, sort, es, p).map((g) => g.key);
+  assert.equal(lastHandIn(groups.find((g) => g.key === 'G3')!, es), '2026-10-10T12:00:00Z');
+  assert.deepEqual(keys('newest'), ['G1', 'G3', 'G2']);
+  assert.deepEqual(keys('oldest'), ['G2', 'G3', 'G1']);
+  assert.deepEqual(keys('number'), ['G1', 'G2', 'G3']);
+  assert.deepEqual(keys('members'), ['G1', 'G2', 'G3']);
+  assert.deepEqual(keys('unchosen'), ['G3', 'G2', 'G1']);
 });

@@ -8,7 +8,7 @@
 import Base from '@/layouts/Base.astro';
 import AdminShell from '@/components/admin/AdminShell.astro';
 import { canManageSubmissions } from '@/lib/accounts/labscope';
-import { TEAM_SIZE } from '@/lib/project-files/groups';
+import { SORTS, TEAM_SIZE } from '@/lib/project-files/groups';
 import { getFilesStore } from '@/lib/project-files/server';
 
 export const prerender = false;
@@ -85,6 +85,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         </div>
       </div>
       <div class="gp-tools">
+        <div class="gp-row gp-sort-row"><label class="gp-sort small">Sort <select class="input" data-gp-sort aria-label="Sort groups">{Object.entries(SORTS).map(([k, v]) => <option value={k}>{v}</option>)}</select></label><span class="small faint" data-gp-new-sum></span></div>
         <div class="gp-row">
           <button class="btn btn-ghost btn-sm" type="button" data-gp-select-under>Select all under {TEAM_SIZE}</button>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-select-none>Clear</button>
@@ -116,6 +117,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
           <p class="muted small">Pick an idea yourself, or let the system draw one at random, for each group.</p>
         </div>
         <div class="gp-row">
+          <label class="gp-sort small">Sort <select class="input" data-gp-sort aria-label="Sort groups">{Object.entries(SORTS).map(([k, v]) => <option value={k}>{v}</option>)}</select></label>
           <label class="gp-check"><input type="checkbox" data-gp-auto-all /> Choose every group's idea at random</label>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-redraw-all hidden>Draw again for all</button>
         </div>
@@ -127,6 +129,26 @@ if (!file) return Astro.redirect('/admin/project', 303);
       </div>
     </section>
     <p class="gp-msg" role="status" data-gp-msg></p>
+
+    <dialog class="gp-viewer" data-gp-viewer aria-label="Hand-in viewer">
+      <div class="gp-v-head">
+        <div><p class="gp-step mono" data-v-k></p><h3 data-v-title></h3></div>
+        <button type="button" class="gp-v-x" data-v-close aria-label="Close">✕</button>
+      </div>
+      <div class="gp-v-files" data-v-files role="tablist" aria-label="Hand-ins"></div>
+      <div class="gp-v-bar">
+        <div class="gp-seg" role="group" aria-label="View">
+          <button type="button" data-v-tab="file" aria-pressed="true">Original file</button>
+          <button type="button" data-v-tab="text" aria-pressed="false">Extracted text</button>
+        </div>
+        <a class="btn btn-ghost btn-sm" data-v-open target="_blank" rel="noopener">Open file ↗</a>
+      </div>
+      <p class="small faint gp-v-meta" data-v-meta></p>
+      <div class="gp-v-body">
+        <div class="gp-v-file" data-v-file></div>
+        <div class="gp-v-text" data-v-text hidden></div>
+      </div>
+    </dialog>
   </section>
 </AdminShell>
 </Base>
@@ -164,6 +186,52 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-chip button { border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 0 0 0 2px; font-size: 14px; line-height: 1; }
   .gp-chip button:hover { color: var(--danger); }
   .gp-nonum { color: var(--warn); }
+  .gp-sort { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); }
+  .gp-sort select { height: 34px; padding: 0 30px 0 10px; font-size: 13px; width: auto; }
+  .gp-sort-row { width: 100%; }
+  .gp-newb { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 700 9.5px/1.5 var(--font-mono); letter-spacing: .08em; vertical-align: 2px; }
+  .gp-when { display: block; margin-top: 2px; font: 11px var(--font-mono); color: var(--text-3); }
+  tr.is-new td { background: color-mix(in oklab, var(--accent) 7%, transparent); }
+  .gp-group.is-new { border-color: color-mix(in oklab, var(--accent-text) 55%, var(--line-2)); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .gp-group h3 .gp-title-side { display: grid; justify-items: end; gap: 2px; }
+  .gp-view { justify-self: start; }
+  /* the hand-in viewer */
+  .gp-viewer { width: min(980px, calc(100vw - 24px)); height: min(92dvh, 1100px); padding: 0; border: 1px solid var(--line-2); border-radius: 20px; background: var(--surface); color: var(--text); box-shadow: 0 40px 120px -30px rgb(0 0 0 / .6); overflow: hidden; }
+  .gp-viewer[open] { display: grid; grid-template-rows: auto auto auto auto minmax(0, 1fr); }
+  .gp-viewer::backdrop { background: rgb(5 8 12 / .55); backdrop-filter: blur(4px); }
+  .gp-v-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; padding: 16px 18px 10px; border-bottom: 1px solid var(--line); }
+  .gp-v-head h3 { font-size: 18px; letter-spacing: -.02em; margin-top: 2px; }
+  .gp-v-x { width: 34px; height: 34px; flex: none; border-radius: 50%; border: 0; background: var(--surface-2); color: var(--text-2); cursor: pointer; }
+  .gp-v-files { display: flex; gap: 6px; overflow-x: auto; padding: 10px 18px 0; scrollbar-width: none; }
+  .gp-v-files:empty { display: none; }
+  .gp-v-files button { flex: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: none; color: var(--text-2); font: 600 12px var(--font-body); cursor: pointer; }
+  .gp-v-files button[aria-selected='true'] { border-color: var(--accent-text); background: var(--accent-soft); color: var(--text); }
+  .gp-v-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 18px 0; }
+  .gp-v-meta { padding: 6px 18px 8px; margin: 0; }
+  .gp-v-body { min-height: 0; overflow: auto; padding: 0 18px 18px; background: var(--bg); border-top: 1px solid var(--line); overscroll-behavior: contain; }
+  .gp-v-file { display: grid; gap: 12px; justify-items: center; padding-top: 14px; }
+  .gp-v-pages { display: grid; gap: 12px; width: 100%; max-width: 860px; }
+  .gp-v-file img, .gp-v-page { display: block; width: 100%; max-width: 100%; height: auto; border-radius: 6px; background: #fff; box-shadow: 0 6px 24px -12px rgb(0 0 0 / .45); }
+  .gp-v-note { width: 100%; padding: 16px; border-radius: 12px; border: 1px dashed var(--line-2); background: var(--surface); color: var(--text-2); font-size: 13.5px; }
+  .gp-v-text { padding-top: 14px; font: 12.5px/1.6 var(--font-mono); }
+  .gp-v-text ol { list-style: none; margin: 0; padding: 0; counter-reset: ln; }
+  .gp-v-text li { display: grid; grid-template-columns: 34px 1fr; gap: 8px; padding: 1px 6px; border-radius: 6px; white-space: pre-wrap; word-break: break-word; counter-increment: ln; }
+  .gp-v-text li::before { content: counter(ln); color: var(--text-3); text-align: right; opacity: .6; }
+  .gp-v-text li.idea { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent-text); }
+  .gp-v-text mark.id { padding: 0 3px; border-radius: 4px; background: color-mix(in oklab, #7cb1ff 30%, transparent); color: inherit; }
+  .gp-v-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; font: 11px var(--font-body); color: var(--text-3); }
+  .gp-v-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .gp-v-legend i { width: 12px; height: 12px; border-radius: 3px; background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent-text); }
+  .gp-v-legend i.id { background: color-mix(in oklab, #7cb1ff 30%, transparent); box-shadow: none; }
+  .gp-v-loading { padding: 30px; color: var(--text-3); font-size: 13px; text-align: center; }
+  @media (max-width: 719px) {
+    .gp-viewer { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border: 0; border-radius: 0; }
+    .gp-v-head { padding-top: calc(env(safe-area-inset-top) + 12px); }
+    .gp-v-bar .gp-seg { flex: 1; }
+    .gp-v-body { padding-bottom: calc(env(safe-area-inset-bottom) + 18px); }
+    .gp-sort { width: 100%; justify-content: space-between; }
+    .gp-sort select { flex: 1; max-width: 70%; }
+  }
   .gp-files summary { cursor: pointer; font-size: 13.5px; color: var(--text-2); }
   .gp-files > p { margin: 8px 0; }
   .gp-files ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
@@ -296,11 +364,11 @@ if (!file) return Astro.redirect('/admin/project', 303);
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
-  import { readDocText } from '@/scripts/doc-text';
+  import { readDocText, renderPdf } from '@/scripts/doc-text';
   import { playBox } from '@/scripts/box-shuffle';
   import {
     SCAN_VERSION, TEAM_SIZE, assignRandom, autoNumber, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
-    randomIdea, unassigned, type Group, type Plan, type Student,
+    randomIdea, unassigned, lastHandIn, sortGroups, SORTS, type Group, type Plan, type Sort, type Student,
   } from '@/lib/project-files/groups';
   import { notATeamNumber, type Entry } from '@/lib/project-files/core';
 
@@ -324,6 +392,17 @@ if (!file) return Astro.redirect('/admin/project', 303);
     const selected = new Set<string>();
     const counts = new Map<string, number>();
     let scanning = false;
+
+    /* Sorting and "new since your last visit" — remembered in this browser only. */
+    const store = { get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
+    let sort: Sort = (store.get('gp:sort') as Sort) in SORTS ? (store.get('gp:sort') as Sort) : 'newest';
+    const seenKey = `gp:seen:${fileId}`;
+    /** Hand-ins after this are NEW: your last visit, or the last 24 hours the first time. */
+    const seenAt = store.get(seenKey) ?? new Date(Date.now() - 24 * 3600_000).toISOString();
+    const when = (iso: string) => iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    const isNew = (g: Group) => lastHandIn(g, entries) > seenAt;
+    const view = () => sortGroups(groups, sort, entries, plan);
+    const stamp = (g: Group) => `${isNew(g) ? '<span class="gp-newb">NEW</span>' : ''}<span class="gp-when">Submitted ${esc(when(lastHandIn(g, entries)))}</span>`;
 
     const live = $('[data-gp-live]');
     const msg = $('[data-gp-msg]');
@@ -414,12 +493,14 @@ if (!file) return Astro.redirect('/admin/project', 303);
     function renderRows() {
       const clash = clashIds();
       const rows = $('[data-gp-rows]');
-      rows.innerHTML = groups.length ? groups.map((g) => {
+      const newCount = groups.filter(isNew).length;
+      $('[data-gp-new-sum]').textContent = newCount ? `${plural(newCount, 'group')} with new hand-ins since your last visit` : '';
+      rows.innerHTML = groups.length ? view().map((g) => {
         const open = openSeats(g);
         const on = selected.has(g.key);
-        return `<tr class="${on ? 'sel' : ''} ${open ? '' : 'full'}">
+        return `<tr class="${on ? 'sel' : ''} ${open ? '' : 'full'} ${isNew(g) ? 'is-new' : ''}">
           <td class="gp-cb"><input type="checkbox" data-pick="${esc(g.key)}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'} aria-label="Select ${esc(g.title)}" /></td>
-          <td><b class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</b>${g.labels.length && g.labels.join() !== g.key ? `<br><small class="faint">typed: ${g.labels.map(esc).join(' / ')}</small>` : ''}${teamForm(g)}</td>
+          <td><b class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</b>${stamp(g)}${g.labels.length && g.labels.join() !== g.key ? `<br><small class="faint">typed: ${g.labels.map(esc).join(' / ')}</small>` : ''}${teamForm(g)}</td>
           <td><ul class="gp-chips">${g.members.map((m) => chip(m, g.key, clash)).join('')}</ul>${g.unread ? `<small class="faint">${plural(g.unread, 'file')} could not be read</small>` : ''}${plan.removed[g.key]?.length ? `<small class="faint">${plural(plan.removed[g.key].length, 'student')} taken out · <button class="btn btn-ghost btn-sm" type="button" data-restore="${esc(g.key)}">Restore</button></small>` : ''}</td>
           <td><span class="gp-size ${open ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></td>
           <td>${open ? `<input class="input mono gp-add" type="number" min="1" max="${open}" value="${wantFor(g)}" data-count-for="${esc(g.key)}" aria-label="Members to add to ${esc(g.title)}" />` : '<small class="faint">full</small>'}</td>
@@ -434,14 +515,15 @@ if (!file) return Astro.redirect('/admin/project', 303);
       $<HTMLInputElement>('[data-gp-auto-all]').checked = auto;
       $('[data-gp-redraw-all]').hidden = !auto;
       const pool = unassigned(groups, roster).length;
-      $('[data-gp-ideas]').innerHTML = groups.map((g) => {
+      $('[data-gp-ideas]').innerHTML = view().map((g) => {
         const choice = plan.choices[g.key];
         const mode = auto ? 'auto' : choice?.mode ?? 'manual';
         const extra = new Set(plan.extraIdeas[g.key] ?? []);
         const short = openSeats(g) > 0;
         const later = plan.later.includes(g.key);
-        return `<article class="gp-group" data-group="${esc(g.key)}">
-          <h3><span class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</span><span class="gp-size ${short ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></h3>
+        return `<article class="gp-group ${isNew(g) ? 'is-new' : ''}" data-group="${esc(g.key)}">
+          <h3><span><span class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</span>${stamp(g)}</span><span class="gp-size ${short ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></h3>
+          <button class="btn btn-ghost btn-sm gp-view" type="button" data-view="${esc(g.key)}">View file &amp; extracted text</button>
           <p class="members">${g.members.map((m) => `${esc(m.name)}${m.source === 'added' ? ' <b>(new)</b>' : ''}`).join(', ') || 'No members found'}</p>
           ${short ? later
             ? `<p class="small faint">Fill later · <button class="btn btn-ghost btn-sm" type="button" data-unlater="${esc(g.key)}">Show options</button></p>`
@@ -655,6 +737,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       const t = (e.target as HTMLElement).closest<HTMLElement>('button');
       if (!t) return;
       const d = t.dataset;
+      if (d.view) { openViewer(d.view); return; }
       const g = groups.find((x) => x.key === (d.for ?? d.redraw ?? d.addOne ?? d.later ?? d.unlater ?? d.dropIdea ?? d.unadd ?? d.dropMember ?? d.restore));
       if (d.gpSheet) return download(d.gpSheet as 'groups' | 'ideas');
       if (!g) return;
@@ -758,6 +841,110 @@ if (!file) return Astro.redirect('/admin/project', 303);
       say(`Sheet downloaded: ${plural(groups.length, 'group')}.${missing ? ` ${plural(missing, 'group')} still ${missing === 1 ? 'has' : 'have'} no idea selected.` : ''}${shortGroups ? ` ${plural(shortGroups, 'group')} ${shortGroups === 1 ? 'has' : 'have'} fewer than ${TEAM_SIZE} members.` : ''}`);
     }
 
-    load();
+    /* ------------------------------------------------------------ sorting */
+    const sortSelects = root.querySelectorAll<HTMLSelectElement>('[data-gp-sort]');
+    sortSelects.forEach((sel) => {
+      sel.value = sort;
+      sel.addEventListener('change', () => {
+        sort = sel.value as Sort;
+        store.set('gp:sort', sort);
+        sortSelects.forEach((other) => (other.value = sort));
+        renderRows();
+        renderIdeas();
+      });
+    });
+
+    /* ------------------------------------------------------------- viewer */
+    const viewer = $<HTMLDialogElement>('[data-gp-viewer]');
+    const vFile = $('[data-v-file]');
+    const vText = $('[data-v-text]');
+    const vFiles = $('[data-v-files]');
+    let vGroup: Group | null = null;
+    let vEntry: Entry | null = null;
+    let vTab: 'file' | 'text' = 'file';
+    const extOf = (url: string) => (/\.([a-z0-9]+)(?:$|[?#])/i.exec(new URL(url, location.href).pathname)?.[1] ?? '').toLowerCase();
+    const setTab = (tab: 'file' | 'text') => {
+      vTab = tab;
+      viewer.querySelectorAll<HTMLElement>('[data-v-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.vTab === tab)));
+      vFile.hidden = tab !== 'file';
+      vText.hidden = tab !== 'text';
+      if (tab === 'text' && !vText.dataset.for) void showText();
+    };
+
+    /** The text exactly as the page read it, with the ideas and the class-list IDs that were found highlighted. */
+    async function showText() {
+      if (!vEntry || !vGroup) return;
+      const e = vEntry;
+      vText.dataset.for = e.id;
+      vText.innerHTML = '<p class="gp-v-loading">Reading the file…</p>';
+      const doc = await readDocText(e.url);
+      if (vEntry !== e) return;
+      if ('error' in doc) { vText.innerHTML = `<p class="gp-v-note">${esc(doc.error)}</p>`; return; }
+      const scan = plan.scans[e.id];
+      const ideas = (scan?.ideas ?? []).map((i) => i.toLowerCase().replace(/…$/, '')).filter((i) => i.length >= 3);
+      const ids = new Set(scan?.ids ?? []);
+      const isIdea = (l: string) => { const t = l.toLowerCase(); return ideas.some((i) => t.includes(i) || (t.length >= 6 && i.includes(t))); };
+      const markIds = (l: string) => esc(l).replace(/[A-Za-z0-9-]{3,20}/g, (w) => (ids.has(w.toUpperCase()) ? `<mark class="id">${w}</mark>` : w));
+      vText.innerHTML = `<div class="gp-v-legend"><span><i></i>idea found (${ideas.length})</span><span><i class="id"></i>class-list ID found (${ids.size})</span><span>${plural(doc.lines.length, 'line')}</span></div>
+        <ol>${doc.lines.map((l) => `<li class="${isIdea(l) ? 'idea' : ''}"><span>${markIds(l)}</span></li>`).join('') || '<li>(no text: the file may be a scanned image)</li>'}</ol>`;
+    }
+
+    async function showEntry(e: Entry) {
+      vEntry = e;
+      delete vText.dataset.for;
+      vText.innerHTML = '';
+      vFiles.querySelectorAll<HTMLElement>('[data-v-entry]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.vEntry === e.id)));
+      $<HTMLAnchorElement>('[data-v-open]').href = e.url;
+      const ext = extOf(e.url);
+      const scan = plan.scans[e.id];
+      $('[data-v-meta]').textContent = `${e.name} (${e.student_id}) · typed group “${e.group_name}” · submitted ${when(e.updated_at)} · ${ext.toUpperCase()}${scan && !scan.error ? ` · ${plural(scan.ideas.length, 'idea')} and ${plural(scan.ids.length, 'class-list student')} found` : ''}`;
+      vFile.innerHTML = '';
+      if (ext === 'pdf') {
+        vFile.innerHTML = '<p class="gp-v-loading">Drawing the pages…</p>';
+        const box = document.createElement('div');
+        box.className = 'gp-v-pages';
+        vFile.append(box);
+        try {
+          const pages = await renderPdf(e.url, box);
+          if (vEntry !== e) return;
+          vFile.querySelector('.gp-v-loading')?.remove();
+          if (pages > 20) box.insertAdjacentHTML('beforeend', `<p class="gp-v-note">Showing the first 20 of ${pages} pages. Open the file for the rest.</p>`);
+        } catch (error) {
+          if (vEntry !== e) return;
+          vFile.innerHTML = `<p class="gp-v-note">This PDF could not be shown here (${esc(error instanceof Error ? error.message : 'unknown error')}). Use “Open file” or the extracted text.</p>`;
+        }
+      } else if (['png', 'jpg', 'jpeg'].includes(ext)) {
+        vFile.innerHTML = `<img src="${esc(e.url)}" alt="${esc(e.name)}'s hand-in" />`;
+      } else {
+        vFile.innerHTML = `<p class="gp-v-note">${ext.toUpperCase()} files can't be shown inside the browser. The <b>Extracted text</b> tab shows what was read from it, and “Open file” downloads the original.</p>`;
+        setTab('text');
+        return;
+      }
+      setTab(vTab);
+    }
+
+    function openViewer(key: string) {
+      const g = groups.find((x) => x.key === key);
+      if (!g) return;
+      vGroup = g;
+      const list = entries.filter((e) => g.entries.includes(e.id)).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+      $('[data-v-k]').textContent = `${g.title} · ${plural(list.length, 'hand-in')}`;
+      $('[data-v-title]').textContent = plan.choices[g.key]?.idea || g.ideas[0] || 'Hand-in';
+      vFiles.innerHTML = list.length > 1 ? list.map((e) => `<button type="button" role="tab" data-v-entry="${esc(e.id)}" aria-selected="false">${esc(e.name)} · ${esc(when(e.updated_at))}</button>`).join('') : '';
+      vTab = 'file';
+      if (!viewer.open) viewer.showModal();
+      if (list[0]) void showEntry(list[0]);
+    }
+    viewer.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      if (t === viewer || t.closest('[data-v-close]')) { viewer.close(); return; }
+      const tab = t.closest<HTMLElement>('[data-v-tab]');
+      if (tab) { setTab(tab.dataset.vTab as 'file' | 'text'); return; }
+      const pick = t.closest<HTMLElement>('[data-v-entry]');
+      if (pick) { const e2 = entries.find((x) => x.id === pick.dataset.vEntry); if (e2) void showEntry(e2); }
+    });
+    viewer.addEventListener('close', () => { vEntry = null; vFile.innerHTML = ''; vText.innerHTML = ''; delete vText.dataset.for; });
+
+    load().then(() => store.set(seenKey, new Date().toISOString()));
   });
 </script>

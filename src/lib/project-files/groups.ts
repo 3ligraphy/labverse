@@ -349,6 +349,35 @@ export function buildGroups(entries: readonly EntryLike[], roster: readonly Stud
   return [...groups.values()].sort((a, b) => compareGroups(a.key, b.key));
 }
 
+/** When a group last handed in: the newest of its hand-ins (ISO time, or '' when unknown). */
+export function lastHandIn(g: Pick<Group, 'entries'>, entries: readonly Pick<Entry, 'id' | 'updated_at'>[]): string {
+  const at = new Set(g.entries);
+  return entries.filter((e) => at.has(e.id)).map((e) => e.updated_at).sort().at(-1) ?? '';
+}
+
+export const SORTS = {
+  newest: 'Newest hand-in first',
+  oldest: 'Oldest hand-in first',
+  number: 'Group number',
+  members: 'Fewest members first',
+  unchosen: 'No idea chosen first',
+} as const;
+export type Sort = keyof typeof SORTS;
+
+/** The groups in the chosen order (ties: newest hand-in, then group number). */
+export function sortGroups(groups: readonly Group[], sort: Sort, entries: readonly Pick<Entry, 'id' | 'updated_at'>[], plan: Pick<Plan, 'choices'>): Group[] {
+  const at = new Map(groups.map((g) => [g.key, lastHandIn(g, entries)]));
+  const newest = (a: Group, b: Group) => (at.get(b.key)! > at.get(a.key)! ? 1 : at.get(b.key)! < at.get(a.key)! ? -1 : compareGroups(a.key, b.key));
+  const by: Record<Sort, (a: Group, b: Group) => number> = {
+    newest,
+    oldest: (a, b) => -newest(a, b) || compareGroups(a.key, b.key),
+    number: (a, b) => compareGroups(a.key, b.key),
+    members: (a, b) => a.members.length - b.members.length || newest(a, b),
+    unchosen: (a, b) => Number(Boolean(plan.choices[a.key]?.idea)) - Number(Boolean(plan.choices[b.key]?.idea)) || newest(a, b),
+  };
+  return [...groups].sort(by[sort] ?? newest);
+}
+
 /** Students listed in more than one group (each should be in exactly one). */
 export function conflicts(groups: readonly Group[]): { id: string; name: string; groups: string[] }[] {
   const where = new Map<string, { name: string; groups: string[] }>();
