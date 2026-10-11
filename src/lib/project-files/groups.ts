@@ -18,7 +18,7 @@ export type Source = 'submitted' | 'document' | 'added';
 export type Member = Student & { source: Source };
 
 /** Bump when reading files changes (e.g. better idea finding), so saved results are refreshed automatically. */
-export const SCAN_VERSION = 3;
+export const SCAN_VERSION = 4;
 
 /** What the browser read out of one hand-in's file. Kept so files are only read again when re-submitted. */
 export type Scan = {
@@ -168,6 +168,11 @@ const IDEA_HEADING = new RegExp(String.raw`^${LEAD}${KIND}s?\s*(?:#|no\.?|number
 const TITLE_HEADING = /^(?:\d+[.)]\s*)?(?:(?:project|app|application|mobile\s+app|idea)\s+(?:title|name)s?|(?:title|name)\s+of\s+(?:the\s+)?(?:project|app|application|mobile\s+app|idea))\s*:?$/i;
 /** "CookBook Project Proposal", "StudyBuddy – App Proposal": the app's name in the document title (used when nothing else is found). */
 const PROPOSAL_TITLE = /^(.{3,60}?)\s*[-–—:]?\s*(?:(?:mobile\s+)?app(?:lication)?\s+)?(?:project\s+)?proposal$/i;
+/** A numbered heading: "1. KinoLog App (Movie Tracking and Social Networking Application)". */
+const NUMBERED_TITLE = /^(?:\d{1,2}|[a-e])[.)]\s+(\p{Lu}.{2,119})$/u;
+const APP_WORD = /\b(?:app|application|platform|system)\b/i;
+/** Numbered lines that read like sentences, not names: "The app will…", "Users can…". */
+const SENTENCE_START = /^(?:the|this|our|it|we|they|users?|students?|a|an|each|every|when|if|in|for|to)\b/i;
 const GENERIC_TITLE = /^(?:the|our|my|a|an)?\s*(?:mobile|project|app|application|course|module|coursework|cw|final|group|team)\b/i;
 /** A table column that holds ideas. */
 const IDEA_COLUMN = /^(?:proposed\s+|project\s+|app\s+)?(?:ideas?|idea\s+(?:title|name)|(?:project|app|application)\s+(?:title|name)|title|name\s+of\s+(?:the\s+)?(?:app|idea|project))$/i;
@@ -228,7 +233,20 @@ export function extractIdeas(lines: readonly string[]): string[] {
     if (same) ideas.push(same[1]);
     else if (!item && (OTHER_SECTION.test(line) || line.length < 60)) state = 'none';
   }
-  // Nothing labelled as an idea: fall back to the app name in the document title ("CookBook Project Proposal").
+  // Nothing labelled as an idea: numbered app headings, each followed by its description —
+  // "1. KinoLog App (Movie Tracking …)" then "KinoLog is a social application …".
+  if (!ideas.length) {
+    const clean = lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    clean.forEach((line, i) => {
+      const m = NUMBERED_TITLE.exec(line);
+      if (!m || /[.!?;,]$/.test(m[1]) || SENTENCE_START.test(m[1])) return;
+      const name = m[1].split(/[\s(:–—-]/)[0].toLowerCase();
+      const next = (clean[i + 1] ?? '').toLowerCase();
+      const describedNext = name.length >= 3 && next.length > 30 && (next.startsWith(`${name} is `) || next.startsWith(`${name} will `) || next.startsWith(`${name} lets `) || next.startsWith(`${name} helps `));
+      if (APP_WORD.test(m[1]) || describedNext) ideas.push(m[1]);
+    });
+  }
+  // Still nothing: fall back to the app name in the document title ("CookBook Project Proposal").
   if (!ideas.length) {
     for (const raw of lines) {
       const t = PROPOSAL_TITLE.exec(raw.replace(/\s+/g, ' ').trim());
@@ -347,6 +365,35 @@ export function buildGroups(entries: readonly EntryLike[], roster: readonly Stud
     g.ideas = [...g.ideas, ...(plan.extraIdeas[g.key] ?? [])].map(tidyIdea).filter((i) => i && !seen.has(i.toLowerCase()) && seen.add(i.toLowerCase()));
   }
   return [...groups.values()].sort((a, b) => compareGroups(a.key, b.key));
+}
+
+/** When a group last handed in: the newest of its hand-ins (ISO time, or '' when unknown). */
+export function lastHandIn(g: Pick<Group, 'entries'>, entries: readonly Pick<Entry, 'id' | 'updated_at'>[]): string {
+  const at = new Set(g.entries);
+  return entries.filter((e) => at.has(e.id)).map((e) => e.updated_at).sort().at(-1) ?? '';
+}
+
+export const SORTS = {
+  newest: 'Newest hand-in first',
+  oldest: 'Oldest hand-in first',
+  number: 'Group number',
+  members: 'Fewest members first',
+  unchosen: 'No idea chosen first',
+} as const;
+export type Sort = keyof typeof SORTS;
+
+/** The groups in the chosen order (ties: newest hand-in, then group number). */
+export function sortGroups(groups: readonly Group[], sort: Sort, entries: readonly Pick<Entry, 'id' | 'updated_at'>[], plan: Pick<Plan, 'choices'>): Group[] {
+  const at = new Map(groups.map((g) => [g.key, lastHandIn(g, entries)]));
+  const newest = (a: Group, b: Group) => (at.get(b.key)! > at.get(a.key)! ? 1 : at.get(b.key)! < at.get(a.key)! ? -1 : compareGroups(a.key, b.key));
+  const by: Record<Sort, (a: Group, b: Group) => number> = {
+    newest,
+    oldest: (a, b) => -newest(a, b) || compareGroups(a.key, b.key),
+    number: (a, b) => compareGroups(a.key, b.key),
+    members: (a, b) => a.members.length - b.members.length || newest(a, b),
+    unchosen: (a, b) => Number(Boolean(plan.choices[a.key]?.idea)) - Number(Boolean(plan.choices[b.key]?.idea)) || newest(a, b),
+  };
+  return [...groups].sort(by[sort] ?? newest);
 }
 
 /** Students listed in more than one group (each should be in exactly one). */
