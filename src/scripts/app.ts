@@ -209,7 +209,10 @@ function initReveal() {
     (entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io!.unobserve(e.target); } }),
     { rootMargin: '0px 0px -8% 0px', threshold: 0.08 },
   );
-  els.forEach((e) => io!.observe(e));
+  // Blocks already on screen are revealed now: observer callbacks can wait seconds while a heavy page (a lab's
+  // exercise engine) keeps the main thread busy, and the CSS fallback is already switched off by then.
+  const vh = innerHeight;
+  els.forEach((e) => { const r = e.getBoundingClientRect(); if (r.top < vh && r.bottom > 0) e.classList.add('in'); else io!.observe(e); });
 }
 
 /* ---------- count-up numbers: <b data-count="60">60</b> ---------- */
