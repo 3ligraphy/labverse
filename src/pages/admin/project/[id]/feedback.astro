@@ -1,0 +1,308 @@
+---
+/**
+ * Feedback for one submission item's project groups: a card per group (number, members, approved idea) with a
+ * written-feedback box that saves as you type, and a BUE-branded PDF report of every group.
+ * Groups come from the Groups & ideas page (src/lib/project-files/groups.ts) · rules: src/lib/project-files/feedback.ts
+ * · PDF: src/scripts/feedback-pdf.ts.
+ */
+import Base from '@/layouts/Base.astro';
+import AdminShell from '@/components/admin/AdminShell.astro';
+import { canManageSubmissions } from '@/lib/accounts/labscope';
+import { MAX_FEEDBACK } from '@/lib/project-files/feedback';
+import { getFilesStore } from '@/lib/project-files/server';
+
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store, max-age=0');
+if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin', 303);
+
+const store = getFilesStore();
+const file = store ? await store.get(Astro.params.id ?? '').catch(() => null) : null;
+if (!file) return Astro.redirect('/admin/project', 303);
+---
+<Base title={`Feedback · ${file.title}`} noindex>
+<AdminShell active="submissions">
+  <section class="fb-shell container" data-fb data-id={file.id} data-title={file.title} data-max={MAX_FEEDBACK}>
+    <header class="fb-top">
+      <div>
+        <p class="fb-k mono"><a href="/admin/project">← Project submissions</a> · <a href={`/admin/project/${file.id}`}>{file.title}</a> · <a href={`/admin/project/${file.id}/groups`}>Groups &amp; ideas</a></p>
+        <h1>Group feedback</h1>
+        <p class="muted">Write feedback for each group. It saves as you type. When you're done, generate the PDF report with every group's members, approved idea and feedback.</p>
+      </div>
+      <div class="fb-actions">
+        <span class="live mono" data-fb-live>loading…</span>
+        <button class="btn btn-primary btn-sm" type="button" data-fb-pdf disabled>Generate PDF report</button>
+      </div>
+    </header>
+
+    <div class="fb-summary" data-fb-summary></div>
+
+    <div class="fb-tools">
+      <div class="fb-chips" role="group" aria-label="Show">
+        <button type="button" class="fb-chip" aria-pressed="true" data-filter="all">All <span data-n="all"></span></button>
+        <button type="button" class="fb-chip" aria-pressed="false" data-filter="todo">Needs feedback <span data-n="todo"></span></button>
+        <button type="button" class="fb-chip" aria-pressed="false" data-filter="done">Written <span data-n="done"></span></button>
+      </div>
+      <input class="input fb-search" type="search" placeholder="Search group, student, ID or idea" data-fb-search aria-label="Search groups" />
+    </div>
+
+    <p class="fb-msg" role="status" data-fb-msg></p>
+    <div class="fb-grid" data-fb-cards><p class="muted">Loading groups…</p></div>
+    <div class="fb-orphans" data-fb-orphans hidden></div>
+  </section>
+</AdminShell>
+</Base>
+
+<style is:global>
+  .fb-shell { min-height: 85dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 20px; align-content: start; }
+  .fb-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; }
+  .fb-k a:hover { text-decoration: underline; }
+  .fb-top { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
+  .fb-top h1 { font-size: var(--fs-xl); letter-spacing: -.04em; margin-top: 3px; }
+  .fb-top p.muted { max-width: 70ch; margin-top: 4px; }
+  .fb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .fb-summary { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); }
+  @media (min-width: 900px) { .fb-summary { grid-template-columns: repeat(4, 1fr); } }
+  .fb-kpi { padding: 16px 18px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); }
+  .fb-kpi span { font: 500 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .fb-kpi b { display: block; margin-top: 6px; font: 600 34px/1 var(--font-display); letter-spacing: -.04em; }
+  .fb-meter { margin-top: 10px; height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+  .fb-meter i { display: block; height: 100%; width: var(--w); background: var(--accent); border-radius: inherit; transition: width .3s; }
+
+  .fb-tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .fb-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fb-chip { padding: 6px 12px; border: 1px solid var(--line-2); border-radius: 999px; background: none; color: var(--text-2); font: 500 12.5px var(--font-body); cursor: pointer; }
+  .fb-chip span { color: var(--text-3); font-family: var(--font-mono); font-size: 11px; }
+  .fb-chip[aria-pressed="true"] { border-color: var(--accent-text); background: var(--accent-soft); color: var(--accent-text); }
+  .fb-search { max-width: 300px; height: 40px; padding: 0 14px; }
+  @media (max-width: 640px) { .fb-search { max-width: none; width: 100%; } }
+
+  .fb-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); align-items: start; }
+  .fb-card { position: relative; display: grid; gap: 14px; padding: 20px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); min-width: 0; transition: border-color .2s, box-shadow .2s; }
+  .fb-card::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; border-radius: var(--r-lg) 0 0 var(--r-lg); background: var(--line-2); transition: background .2s; }
+  .fb-card.done::before { background: var(--accent); }
+  .fb-card:focus-within { border-color: var(--accent-text); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .fb-card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .fb-num { display: inline-flex; align-items: baseline; gap: 6px; }
+  .fb-num b { font: 600 26px/1 var(--font-display); letter-spacing: -.04em; }
+  .fb-num small { font: 500 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+  .fb-state { padding: 3px 9px; border-radius: 999px; font: 600 10px/1.5 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; background: var(--surface-2); color: var(--text-3); white-space: nowrap; }
+  .fb-card.done .fb-state { background: var(--accent-soft); color: var(--accent-text); }
+  .fb-label { font: 500 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
+  .fb-members { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+  .fb-members li { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; }
+  .fb-members li span { color: var(--text-3); font: 12px var(--font-mono); white-space: nowrap; }
+  .fb-idea { padding: 10px 12px; border-radius: var(--r-md); background: var(--surface-2); font-size: 14px; font-weight: 600; line-height: 1.4; }
+  .fb-idea small { display: block; margin-top: 3px; font: 500 10.5px var(--font-mono); color: var(--text-3); letter-spacing: .04em; font-weight: 400; }
+  .fb-idea.none { font-weight: 400; color: var(--warn); background: color-mix(in oklab, var(--warn) 10%, transparent); }
+  .fb-idea.none a { text-decoration: underline; }
+  .fb-text { width: 100%; min-height: 130px; padding: 10px 12px; font: 14px/1.55 var(--font-body); resize: vertical; }
+  .fb-foot { display: flex; justify-content: space-between; gap: 10px; font: 11px var(--font-mono); color: var(--text-3); }
+  .fb-foot .err { color: var(--danger); }
+  .fb-foot .ok { color: var(--accent-text); }
+  .fb-msg { min-height: 20px; font-size: 13px; color: var(--accent-text); }
+  .fb-msg.err { color: var(--danger); }
+  .fb-orphans { padding: 16px 18px; border: 1px dashed var(--line-2); border-radius: var(--r-lg); font-size: 13px; color: var(--text-2); display: grid; gap: 8px; }
+  .fb-orphans blockquote { margin: 0; padding-left: 10px; border-left: 3px solid var(--line-2); white-space: pre-wrap; color: var(--text-3); }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  import { buildGroups, emptyPlan, type Group, type Plan, type Student } from '@/lib/project-files/groups';
+  import { placeNotes, reportRows, reportFileName, type Feedback, type Note } from '@/lib/project-files/feedback';
+  import type { Entry } from '@/lib/project-files/core';
+
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const when = (iso: string) => (iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+
+  onPageLoad(() => {
+    const root = document.querySelector<HTMLElement>('[data-fb]');
+    if (!root || root.dataset.wired) return;
+    root.dataset.wired = '1';
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const fileId = root.dataset.id!;
+    const title = root.dataset.title ?? 'Project';
+    const max = Number(root.dataset.max);
+    const cards = $('[data-fb-cards]');
+    const live = $('[data-fb-live]');
+    const msg = $('[data-fb-msg]');
+    const search = $<HTMLInputElement>('[data-fb-search]');
+    const pdfBtn = $<HTMLButtonElement>('[data-fb-pdf]');
+    const say = (text: string, err = false) => { msg.className = `fb-msg ${err ? 'err' : ''}`; msg.textContent = text; };
+
+    let entries: Entry[] = [];
+    let plan: Plan = emptyPlan();
+    let groups: Group[] = [];
+    /** Group key → the feedback text on screen (what is typed, saved or not). */
+    const texts = new Map<string, string>();
+    const saved = new Map<string, Note>();
+    const pending = new Map<string, ReturnType<typeof setTimeout>>();
+    let filter: 'all' | 'todo' | 'done' = 'all';
+
+    const has = (key: string) => Boolean(texts.get(key)?.trim());
+    const idea = (g: Group) => plan.choices[g.key]?.idea ?? '';
+
+    const renderSummary = () => {
+      const done = groups.filter((g) => has(g.key)).length;
+      const approved = groups.filter((g) => idea(g)).length;
+      const students = groups.reduce((n, g) => n + g.members.length, 0);
+      const pct = groups.length ? (done / groups.length) * 100 : 0;
+      $('[data-fb-summary]').innerHTML = `
+        <div class="fb-kpi"><span>Groups</span><b>${groups.length}</b></div>
+        <div class="fb-kpi"><span>Students</span><b>${students}</b></div>
+        <div class="fb-kpi"><span>Ideas approved</span><b>${approved}<small class="faint" style="font-size:16px"> / ${groups.length}</small></b></div>
+        <div class="fb-kpi"><span>Feedback written</span><b>${done}<small class="faint" style="font-size:16px"> / ${groups.length}</small></b><div class="fb-meter"><i style="--w:${pct}%"></i></div></div>`;
+      root.querySelector('[data-n="all"]')!.textContent = String(groups.length);
+      root.querySelector('[data-n="todo"]')!.textContent = String(groups.length - done);
+      root.querySelector('[data-n="done"]')!.textContent = String(done);
+      pdfBtn.disabled = !groups.length;
+    };
+
+    const matches = (g: Group) => {
+      if (filter === 'todo' && has(g.key)) return false;
+      if (filter === 'done' && !has(g.key)) return false;
+      const q = search.value.trim().toLowerCase();
+      return !q || [g.key, g.title, idea(g), ...g.members.flatMap((m) => [m.name, m.id])].join(' ').toLowerCase().includes(q);
+    };
+
+    const savedLine = (key: string) => {
+      const n = saved.get(key);
+      return n ? `Saved ${esc(when(n.updatedAt))}${n.by ? ` · ${esc(n.by)}` : ''}` : 'Not written yet';
+    };
+
+    const card = (g: Group) => {
+      const choice = plan.choices[g.key];
+      const text = texts.get(g.key) ?? '';
+      const num = g.numbered ? /^G(\d+)$/.exec(g.key)?.[1] ?? g.key : '—';
+      return `<article class="fb-card ${has(g.key) ? 'done' : ''}" data-key="${esc(g.key)}">
+        <div class="fb-card-head">
+          <span class="fb-num"><small>Group</small><b>${esc(num)}</b></span>
+          <span class="fb-state" data-state>${has(g.key) ? 'Feedback written' : 'Needs feedback'}</span>
+        </div>
+        ${g.numbered ? '' : `<p class="small faint">${esc(g.title)}: number it on the Groups page to include it in the report.</p>`}
+        <div>
+          <p class="fb-label">Members · ${g.members.length}</p>
+          <ul class="fb-members">${g.members.map((m) => `<li>${esc(m.name)}<span>${esc(m.id)}</span></li>`).join('') || '<li class="muted">No members</li>'}</ul>
+        </div>
+        <div>
+          <p class="fb-label">Approved idea</p>
+          ${choice?.idea
+            ? `<div class="fb-idea">${esc(choice.idea)}<small>${choice.mode === 'auto' ? 'Drawn at random' : 'Chosen by staff'}</small></div>`
+            : `<div class="fb-idea none">No idea approved yet. <a href="/admin/project/${encodeURIComponent(fileId)}/groups">Choose one</a></div>`}
+        </div>
+        <label>
+          <p class="fb-label">Written feedback</p>
+          <textarea class="input fb-text" maxlength="${max}" data-text placeholder="Strengths, what to improve, next steps…">${esc(text)}</textarea>
+        </label>
+        <div class="fb-foot"><span data-status>${savedLine(g.key)}</span><span data-count>${text.length} / ${max}</span></div>
+      </article>`;
+    };
+
+    const renderCards = () => {
+      const shown = groups.filter(matches);
+      cards.innerHTML = shown.length ? shown.map(card).join('')
+        : `<p class="muted">${groups.length ? 'No groups match.' : 'No groups yet. Groups appear here once students hand in; manage them on the Groups & ideas page.'}</p>`;
+    };
+
+    const save = async (g: Group, el: HTMLElement) => {
+      const status = el.querySelector<HTMLElement>('[data-status]');
+      const text = texts.get(g.key) ?? '';
+      try {
+        const res = await fetch(`/api/admin/project/feedback?file=${encodeURIComponent(fileId)}`, {
+          method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: g.key, text, entries: g.entries }),
+        });
+        if (res.status === 401) return location.reload();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error ?? 'Could not save.');
+        if (data.note) saved.set(g.key, data.note); else saved.delete(g.key);
+        if (status && !pending.has(g.key)) { status.className = 'ok'; status.innerHTML = savedLine(g.key); }
+      } catch (error) {
+        if (status) { status.className = 'err'; status.textContent = `${error instanceof Error ? error.message : 'Could not save.'} Keep this tab open and try again.`; }
+      }
+    };
+
+    cards.addEventListener('input', (e) => {
+      const area = (e.target as HTMLElement).closest<HTMLTextAreaElement>('[data-text]');
+      const el = area?.closest<HTMLElement>('[data-key]');
+      const g = el && groups.find((x) => x.key === el.dataset.key);
+      if (!area || !el || !g) return;
+      texts.set(g.key, area.value);
+      el.classList.toggle('done', has(g.key));
+      el.querySelector('[data-state]')!.textContent = has(g.key) ? 'Feedback written' : 'Needs feedback';
+      el.querySelector('[data-count]')!.textContent = `${area.value.length} / ${max}`;
+      const status = el.querySelector<HTMLElement>('[data-status]')!;
+      status.className = ''; status.textContent = 'Saving…';
+      clearTimeout(pending.get(g.key));
+      pending.set(g.key, setTimeout(() => { pending.delete(g.key); save(g, el); }, 700));
+      renderSummary();
+    });
+    // Leaving a box saves straight away.
+    cards.addEventListener('focusout', (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>('[data-key]');
+      const key = el?.dataset.key;
+      if (!el || !key || !pending.has(key)) return;
+      clearTimeout(pending.get(key)); pending.delete(key);
+      const g = groups.find((x) => x.key === key);
+      if (g) save(g, el);
+    });
+    window.addEventListener('beforeunload', (e) => { if (pending.size) e.preventDefault(); });
+
+    search.addEventListener('input', renderCards);
+    root.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach((chip) => chip.addEventListener('click', () => {
+      filter = chip.dataset.filter as typeof filter;
+      root.querySelectorAll('[data-filter]').forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+      renderCards();
+    }));
+
+    pdfBtn.addEventListener('click', async () => {
+      pdfBtn.disabled = true;
+      const label = pdfBtn.textContent;
+      pdfBtn.textContent = 'Generating…';
+      try {
+        const unnumbered = groups.filter((g) => !g.numbered).length;
+        const rows = reportRows(groups, plan, new Map(groups.map((g) => [g.key, { text: texts.get(g.key) ?? '' } as Note])));
+        const { feedbackPdf } = await import('@/scripts/feedback-pdf');
+        const bytes = await feedbackPdf({ title, rows, generatedAt: new Date() });
+        const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
+        const a = Object.assign(document.createElement('a'), { href: url, download: reportFileName(title) });
+        document.body.append(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        const missing = rows.filter((r) => !r.feedback).length;
+        say(`PDF saved: ${plural(rows.length, 'group')}.${missing ? ` ${plural(missing, 'group')} without feedback yet.` : ''}${unnumbered ? ` ${plural(unnumbered, 'group')} without a number left out.` : ''}`);
+      } catch (error) {
+        console.error(error);
+        say(`Could not generate the PDF: ${error instanceof Error ? error.message : 'unknown error'}.`, true);
+      } finally {
+        pdfBtn.disabled = !groups.length;
+        pdfBtn.textContent = label;
+      }
+    });
+
+    async function load() {
+      try {
+        const res = await fetch(`/api/admin/project/feedback?file=${encodeURIComponent(fileId)}`, { cache: 'no-store' });
+        if (res.status === 401) return location.reload();
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Could not load.');
+        entries = data.entries;
+        plan = data.plan;
+        const roster: Student[] = data.roster;
+        groups = buildGroups(entries, roster, plan);
+        const { notes, orphans } = placeNotes(groups, data.feedback as Feedback);
+        for (const [key, note] of notes) { saved.set(key, note); texts.set(key, note.text); }
+        const box = $('[data-fb-orphans]');
+        box.hidden = !orphans.length;
+        box.innerHTML = orphans.length ? `<b>Feedback for groups that no longer exist</b><p class="small faint">Their hand-ins were deleted. Copy anything you still need.</p>${orphans.map(([k, n]) => `<div><span class="mono small">${esc(k)}</span><blockquote>${esc(n.text)}</blockquote></div>`).join('')}` : '';
+        renderSummary();
+        renderCards();
+        live.textContent = `${plural(groups.length, 'group')} · loaded ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      } catch (error) {
+        live.textContent = error instanceof Error ? error.message : 'Could not load.';
+        cards.innerHTML = `<p class="muted">${esc(live.textContent)}</p>`;
+      }
+    }
+
+    load();
+  });
+</script>

@@ -28,7 +28,10 @@ if (!file) return Astro.redirect('/admin/project', 303);
         <h1>Groups &amp; ideas</h1>
         <p class="muted">Each group is built from the students who handed in and everyone named in their file's contribution table. Teams have up to {TEAM_SIZE} members.</p>
       </div>
-      <span class="live mono" data-gp-live>loading…</span>
+      <div class="gp-row">
+        <span class="live mono" data-gp-live>loading…</span>
+        <a class="btn btn-ghost btn-sm" href={`/admin/project/${file.id}/feedback`}>Write feedback →</a>
+      </div>
     </header>
 
     <!-- 1 · class list -->
