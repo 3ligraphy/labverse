@@ -7,6 +7,7 @@
 import Base from '@/layouts/Base.astro';
 import { isAdmin, setupStatus, isDoctor } from '@/lib/attendance/server';
 import { progressSetup } from '@/lib/progress/server';
+import { tokenSecret } from '@/lib/accounts/server';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'no-store, max-age=0');
@@ -14,7 +15,9 @@ Astro.response.headers.set('cache-control', 'no-store, max-age=0');
 // This dashboard, including attendance, is backed by the progress/session
 // PostgreSQL store. The old standalone attendance store (Supabase/Redis) is no
 // longer used by this page, so do not block it on those legacy credentials.
-const status = { ...setupStatus(), database: progressSetup().database };
+// Staff sign in with their accounts, which only need a signing secret (SESSION_SECRET, or ADMIN_PASSWORD when
+// that is the only one). The shared ADMIN_PASSWORD login itself is optional, so it must not block this page.
+const status = { ...setupStatus(), database: progressSetup().database, password: Boolean(tokenSecret()) };
 const ready = status.database && status.password;
 const admin = ready && isAdmin(Astro.cookies);
 const error = Astro.url.searchParams.get('e');
@@ -43,8 +46,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
           <li class:list={[{ ok: status.password }]}>
             <span class="st" aria-hidden="true">{status.password ? '✓' : '2'}</span>
             <div>
-              <b>Admin password {status.password ? 'set' : 'not set'}</b>
-              {!status.password && <p>Vercel → project → <b>Settings</b> → <b>Environment Variables</b> → add <code>ADMIN_PASSWORD</code> with the password you want → <b>Save</b>.</p>}
+              <b>Sign-in secret {status.password ? 'set' : 'not set'}</b>
+              {!status.password && <p>Vercel → project → <b>Settings</b> → <b>Environment Variables</b> → add <code>SESSION_SECRET</code> with a long random value → <b>Save</b>. Staff then sign in with their accounts.</p>}
             </div>
           </li>
         </ol>
