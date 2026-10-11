@@ -5,7 +5,10 @@
     "**/*"
   ],
   "exclude": [
-    "dist"
+    "dist",
+    ".vercel",
+    "public/runner",
+    "public/lab-runtime"
   ],
   "compilerOptions": {
     "baseUrl": ".",
