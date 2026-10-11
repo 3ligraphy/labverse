@@ -56,25 +56,25 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
             {ended && <p class="auth-note">Your session ended (the account was changed or disabled). Please sign in again.</p>}
 
             <form class="auth-form" data-form="in" method="post" action={`/api/auth/login${safeNext ? `?next=${encodeURIComponent(safeNext)}` : ''}`} data-astro-reload novalidate>
-              <label><span>BUE email or username</span><input class="input" name="email" autocomplete="username" placeholder="name.surname@bue.edu.eg" required /></label>
+              <label><span>BUE email or username</span><input class="input" name="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="name.surname@bue.edu.eg" required /></label>
               <label><span>Password</span><input class="input" type="password" name="password" autocomplete="current-password" required /></label>
-              <p class="auth-msg" data-msg role="alert"></p>
+              <p class="auth-msg" id="in-msg" data-msg role="alert"></p>
               <button class="btn btn-primary btn-lg" type="submit">Sign in →</button>
               <p class="auth-fine">Staff accounts come from an invitation or from the super admin in <b>Admin → Accounts</b>.</p>
             </form>
             <form class="auth-form" data-form="up" method="post" action="/api/auth/signup" data-astro-reload hidden novalidate>
               <div class="auth-row">
                 <label><span>Full name</span><input class="input" name="name" autocomplete="name" required maxlength="60" /></label>
-                <label><span>Student ID</span><input class="input mono" name="studentId" required maxlength="20" /></label>
+                <label><span>Student ID</span><input class="input mono" name="studentId" required maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" /></label>
               </div>
-              <label><span>University email</span><input class="input" type="email" name="email" autocomplete="email" required /></label>
+              <label><span>University email</span><input class="input" type="email" name="email" autocomplete="email" autocapitalize="none" spellcheck="false" required /></label>
               <label><span>Password <small>(10+ characters, letters and numbers)</small></span><input class="input" type="password" name="password" autocomplete="new-password" required /></label>
               <div class="auth-row">
                 <label><span>Year</span><select class="input" name="year" required><option value="">Choose…</option>{settings.years.map((y) => <option>{y}</option>)}</select></label>
                 <label><span>Specialization</span><select class="input" name="specialization" required><option value="">Choose…</option>{settings.specializations.map((s) => <option>{s}</option>)}</select></label>
               </div>
               <fieldset class="auth-opts"><legend>Optional modules you chose</legend><div data-up-opts><p class="auth-fine">Choose your year and specialization first.</p></div></fieldset>
-              <p class="auth-msg" data-msg role="alert"></p>
+              <p class="auth-msg" id="up-msg" data-msg role="alert"></p>
               <button class="btn btn-primary btn-lg" type="submit">Create account →</button>
             </form>
           </>
@@ -94,6 +94,8 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
   .auth-orb.b { width: 520px; height: 520px; right: -160px; bottom: -200px; background: radial-gradient(circle, color-mix(in oklab, var(--g2) 60%, transparent), transparent 65%); }
   .auth-in { display: grid; gap: 40px; align-items: center; }
   @media (min-width: 1000px) { .auth-in { grid-template-columns: 1fr 520px; gap: 72px; } }
+  /* phones and tablets: the form first, the explanation of roles after it */
+  @media (max-width: 999px) { .auth-card { order: -1; } .auth-in { gap: 32px; } }
   .auth-k { display: inline-flex; gap: 10px; align-items: center; font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--hero-accent); }
   .auth-k span { width: 8px; height: 8px; border-radius: 50%; background: var(--hero-accent); box-shadow: 0 0 12px var(--hero-accent); }
   .auth-copy h1 { margin-top: 18px; font-size: clamp(2.6rem, 1.4rem + 4.5vw, 5.4rem); line-height: .95; letter-spacing: -.05em; }
@@ -111,6 +113,7 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
   .auth-form small { color: var(--hero-dim); font-weight: 400; }
   .auth-form .input { height: 46px; padding: 0 14px; background: color-mix(in oklab, var(--hero-bg) 70%, transparent); border-color: var(--hero-line); color: var(--hero-text); }
   .auth-form .input:focus { border-color: var(--hero-accent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--hero-accent) 20%, transparent); }
+  .auth-form .input[aria-invalid='true'] { border-color: var(--hero-danger); }
   .auth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 520px) { .auth-row { grid-template-columns: 1fr; } }
   .auth-opts { border: 1px solid var(--hero-line); border-radius: 14px; padding: 12px 14px; }
@@ -129,6 +132,18 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
   type Opt = { slug: string; title: string; code: string; color: string; years: string[]; specializations: string[] };
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const has = (list: string[], v: string) => !list.length || list.some((x) => x.toLowerCase() === v.toLowerCase());
+
+  /** Empty required fields are marked and announced before anything is sent; true when all are filled. */
+  const filled = (form: HTMLFormElement, msg: HTMLElement): boolean => {
+    form.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+    const empty = [...form.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[required]')].filter((el) => !el.value.trim());
+    if (!empty.length) return true;
+    for (const el of empty) { el.setAttribute('aria-invalid', 'true'); el.setAttribute('aria-describedby', msg.id); }
+    const name = (el: Element) => el.closest('label')?.querySelector('span')?.firstChild?.textContent?.trim().toLowerCase() ?? 'this field';
+    msg.textContent = empty.length === 1 ? `Fill in your ${name(empty[0])}.` : `Fill in the ${empty.length} highlighted fields.`;
+    empty[0].focus();
+    return false;
+  };
 
   const init = () => {
     const root = document.querySelector<HTMLElement>('[data-auth]');
@@ -154,6 +169,7 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
       const msg = signin.querySelector<HTMLElement>('[data-msg]')!;
       const fd = new FormData(signin);
       msg.textContent = '';
+      if (!filled(signin, msg)) return;
       const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { msg.textContent = d.error ?? 'Could not sign in.'; return; }
@@ -176,6 +192,8 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
     signup.addEventListener('submit', async (e) => {
       e.preventDefault();
       const msg = signup.querySelector<HTMLElement>('[data-msg]')!;
+      msg.textContent = '';
+      if (!filled(signup, msg)) return;
       const fd = new FormData(signup);
       const body = { name: fd.get('name'), studentId: fd.get('studentId'), email: fd.get('email'), password: fd.get('password'), year: fd.get('year'), specialization: fd.get('specialization'), modules: fd.getAll('modules') };
       const r = await fetch('/api/auth/signup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
