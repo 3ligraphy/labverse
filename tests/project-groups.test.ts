@@ -269,3 +269,24 @@ test('extractIdeas reads numbered app headings that have no "Idea" label', () =>
   // ordinary numbered lists are not ideas
   assert.deepEqual(extractIdeas(['1. Introduction', '2. The app will let users log in.', '3. Login screen', '4. Profile screen']), []);
 });
+
+test('extractIdeas reads "Idea 1 Description: X" and "Project Proposal: X" titles', () => {
+  // ideas labelled "Idea n Description:", with " | " feature bullets under them
+  assert.deepEqual(extractIdeas([
+    'Mobile Application Development', 'Contribution Table:', 'Name | ID', 'Student One | 240001', 'Ideas Proposed',
+    'Idea 1 Description: Campus Lost and Found',
+    'Campus Lost and Found is a phone app for students. It is useful for locating items that were',
+    'Features:', ' | Account: Set up your account. Log on using your school/uni email.',
+    'Idea 2 Description: Fitness and Path Tracker',
+    'Take advantage of this app when away from home.', 'Features:', ' | Goals: Decide on a number of steps to do each day.',
+  ]), ['Campus Lost and Found', 'Fitness and Path Tracker']);
+  // one "Project Proposal: X" section per idea, bulleted with "• | "
+  assert.deepEqual(extractIdeas([
+    'Page | 1', 'Mobile Application Development', 'Name | ID | Group', 'Student One | 240001 | SE A3', 'Page | 2',
+    'Project Proposal: Gym Connect', '1. Project Overview & Problem Statement', '• | Equipment Bottlenecks: Crowded gym floors lead to long wait times',
+    'Page | 5', 'Project Proposal: Recycling Marketplace Platform', '2. User Features (Households and Businesses)', '• | Registration and Login: Create an account.',
+  ]), ['Gym Connect', 'Recycling Marketplace Platform']);
+  assert.deepEqual(extractIdeas(['App Proposal - StudyBuddy']), ['StudyBuddy']);
+  // a description sentence after "Idea description:" is not taken as the idea's name
+  assert.deepEqual(extractIdeas(['Idea description: This app helps students find study partners in their classes.']), []);
+});
