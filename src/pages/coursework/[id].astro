@@ -79,14 +79,14 @@ const sections = [
         <section class="block"><h2 class="block-title" id="faq">FAQ</h2><Faq items={d.faq} /></section>
       )}
     </article>
-    <aside class="doc-aside"><Toc items={sections} /></aside>
+    <div class="doc-aside"><Toc items={sections} /></div>
   </div>
 </Base>
 <style>
   .cwh-meta { margin-top: 40px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; max-width: 760px; }
   @media (min-width: 720px) { .cwh-meta { grid-template-columns: repeat(4, 1fr); } }
   .cwh-meta > div { background: var(--surface); padding: 16px; }
-  .cwh-meta dt { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+  .cwh-meta dt { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
   .cwh-meta dd { margin-top: 8px; font-weight: 550; }
   .cwh-meta .warn { color: var(--warn); }
   .tasks { list-style: none; padding: 0; display: grid; }

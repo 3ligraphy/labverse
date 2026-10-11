@@ -39,20 +39,20 @@ if (!(await access(Astro.cookies)).can('platform.settings')) return Astro.redire
         <section class="cat-card">
           <div class="cat-h"><h2>Years</h2><span class="mono cat-n" data-n="years"></span></div>
           <div class="cat-list" data-list="years"></div>
-          <form class="cat-add" data-add="years"><input class="input" placeholder="Add a year (e.g. Foundation, Year 5)" maxlength="60" /><button class="btn btn-ghost btn-sm" type="submit">Add</button></form>
+          <form class="cat-add" data-add="years"><input class="input" aria-label="New year" placeholder="Add a year (e.g. Foundation, Year 5)" maxlength="60" /><button class="btn btn-ghost btn-sm" type="submit">Add</button></form>
         </section>
 
         <section class="cat-card">
           <div class="cat-h"><h2>Specializations</h2><span class="mono cat-n" data-n="specializations"></span></div>
           <div class="cat-list" data-list="specializations"></div>
-          <form class="cat-add" data-add="specializations"><input class="input" placeholder="Add a specialization" maxlength="60" /><button class="btn btn-ghost btn-sm" type="submit">Add</button></form>
+          <form class="cat-add" data-add="specializations"><input class="input" aria-label="New specialization" placeholder="Add a specialization" maxlength="60" /><button class="btn btn-ghost btn-sm" type="submit">Add</button></form>
         </section>
 
         <section class="cat-card">
           <div class="cat-h"><h2>Categories</h2><span class="mono cat-n" data-n="categories"></span></div>
           <p class="cat-fine"><b>Core</b>: shown to every matching student. <b>Elective</b>: only to students who pick it (when it is open) or are enrolled.</p>
           <div class="cat-list" data-list="categories"></div>
-          <form class="cat-add" data-add="categories"><input class="input" placeholder="Add a category (e.g. Elective, University requirement)" maxlength="40" /><button class="btn btn-ghost btn-sm" type="submit">Add</button></form>
+          <form class="cat-add" data-add="categories"><input class="input" aria-label="New category" placeholder="Add a category (e.g. Elective, University requirement)" maxlength="40" /><button class="btn btn-ghost btn-sm" type="submit">Add</button></form>
         </section>
       </div>
 
@@ -62,7 +62,7 @@ if (!(await access(Astro.cookies)).can('platform.settings')) return Astro.redire
       </div>
 
       <section class="cat-card cat-mods">
-        <div class="cat-h"><h2>Modules</h2><input class="input cat-q" type="search" placeholder="Filter modules" data-q /></div>
+        <div class="cat-h"><h2>Modules</h2><input class="input cat-q" type="search" placeholder="Filter modules" aria-label="Filter modules" data-q /></div>
         <p class="cat-fine">Changes to a module save automatically.</p>
         <div data-mods><p class="muted">Loading…</p></div>
       </section>
@@ -72,7 +72,7 @@ if (!(await access(Astro.cookies)).can('platform.settings')) return Astro.redire
 
 <style is:global>
   .cat { padding-top: calc(var(--nav-h) + 40px); padding-bottom: 100px; display: grid; gap: 20px; }
-  .cat-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; }
+  .cat-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
   .cat-top h1 { font-size: var(--fs-2xl); letter-spacing: -.05em; margin-top: 4px; }
   .cat-top .muted { margin-top: 6px; max-width: 70ch; }
   .cat-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); align-items: start; }
@@ -97,9 +97,9 @@ if (!(await access(Astro.cookies)).can('platform.settings')) return Astro.redire
   .cat-acts button:hover { color: var(--text); border-color: var(--text-3); }
   .cat-acts .x:hover { color: var(--danger); border-color: var(--danger); }
   .cat-kind { display: flex; padding: 2px; border-radius: 9px; background: var(--surface-2); }
-  .cat-kind button { width: auto; height: 26px; padding: 0 9px; border: 0; border-radius: 7px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .cat-kind button { width: auto; height: 26px; padding: 0 9px; border: 0; border-radius: 7px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
   .cat-kind button[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); }
-  .cat-renamed { grid-column: 1 / -1; font-size: 11px; color: var(--warn); padding-bottom: 4px; }
+  .cat-renamed { grid-column: 1 / -1; font-size: 12px; color: var(--warn); padding-bottom: 4px; }
   .cat-add { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
   .cat-add .input { height: 38px; padding: 0 12px; }
   .cat-bar { position: sticky; bottom: 16px; z-index: 5; display: flex; justify-content: flex-end; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line-2); background: var(--glass); backdrop-filter: blur(16px); }
@@ -112,12 +112,12 @@ if (!(await access(Astro.cookies)).can('platform.settings')) return Astro.redire
   .cat-mh { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .cat-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: 0 0 12px var(--c); }
   .cat-mh b { font-size: 15px; }
-  .cat-mh small { font-size: 11.5px; color: var(--text-3); }
-  .cat-saved { margin-left: auto; font-size: 11.5px; color: var(--ok); }
+  .cat-mh small { font-size: 12px; color: var(--text-3); }
+  .cat-saved { margin-left: auto; font-size: 12px; color: var(--ok); }
   .cat-saved.err { color: var(--danger); }
   .cat-fields { display: grid; gap: 10px; grid-template-columns: 170px 150px 1fr; align-items: start; }
   @media (max-width: 900px) { .cat-fields { grid-template-columns: 1fr 1fr; } }
-  .cat-fields label { display: grid; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--text-2); }
+  .cat-fields label { display: grid; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-2); }
   .cat-fields .input { height: 36px; padding: 0 10px; font-size: 13px; }
   .cat-chips { display: flex; flex-wrap: wrap; gap: 5px; }
   .cat-chip { padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line-2); background: none; color: var(--text-2); font-size: 12px; cursor: pointer; }

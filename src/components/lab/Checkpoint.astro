@@ -20,7 +20,7 @@ const { title = 'Checkpoint' } = Astro.props;
   .cp.in .cp-ic { animation: cp-ring 1.4s var(--ease-out) 300ms; }
   .cp.in .cp-ic svg { transition: stroke-dashoffset 500ms var(--ease-out) 250ms; stroke-dashoffset: 0; }
   @keyframes cp-ring { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 55%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
-  .cp-title { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ok); margin-bottom: 4px; font-weight: 600; }
+  .cp-title { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ok); margin-bottom: 4px; font-weight: 600; }
   .cp-body { color: var(--text); min-width: 0; }
   .cp-body > :global(* + *) { margin-top: 12px !important; }
   @media (prefers-reduced-motion: reduce) { .cp-ic svg { stroke-dashoffset: 0; } }

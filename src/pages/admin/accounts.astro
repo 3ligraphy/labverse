@@ -118,7 +118,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
                     <button type="button" aria-pressed="false" data-f="staff">Staff</button>
                     <button type="button" aria-pressed="false" data-f="student">Students</button>
                   </div>
-                  <input class="input ac-q" type="search" placeholder="Search name, email, ID" data-ac-q />
+                  <input class="input ac-q" type="search" placeholder="Search name, email, ID" aria-label="Search accounts" data-ac-q />
                 </div>
                 <div class="ac-rows" data-ac-rows><p class="muted">Loading…</p></div>
               </div>
@@ -134,7 +134,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 
 <style is:global>
   .ac { min-height: 85dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 20px; align-content: start; }
-  .ac-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; }
+  .ac-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
   .ac-top { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
   .ac-top h1 { font-size: var(--fs-xl); letter-spacing: -.04em; margin-top: 3px; }
   .ac-top .muted { max-width: 72ch; margin-top: 6px; }
@@ -150,15 +150,15 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   }
   .ac-card h2 { font-size: var(--fs-lg); }
   .ac-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  .ac-pill { padding: 3px 10px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 10.5px; }
+  .ac-pill { padding: 3px 10px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 12px; }
   .ac-teams { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
   .ac-team { display: grid; gap: 2px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg); }
   .ac-team:hover { border-color: var(--accent-text); }
-  .ac-team small { color: var(--text-3); font-size: 11px; }
+  .ac-team small { color: var(--text-3); font-size: 12px; }
   .ac-matrix { width: 100%; border-collapse: collapse; font-size: 13px; }
   .ac-matrix th, .ac-matrix td { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
   .ac-matrix th { font-size: 12px; white-space: nowrap; }
-  .ac-matrix th small, .ac-matrix td small { display: block; font-size: 10.5px; color: var(--text-3); font-weight: 400; }
+  .ac-matrix th small, .ac-matrix td small { display: block; font-size: 12px; color: var(--text-3); font-weight: 400; }
   .ac-matrix th.module { color: var(--info); }
   .ac-matrix td.c { text-align: center; }
   .ac-matrix input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
@@ -204,7 +204,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .ac-av { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; font: 700 12px var(--font-mono); background: var(--rc); color: #0b0d10; }
   .ac-row b { display: block; }
   .ac-meta { font-size: 12px; color: var(--text-3); }
-  .ac-role { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font: 600 10px/1.6 var(--font-mono); text-transform: uppercase; background: color-mix(in oklab, var(--rc) 25%, transparent); }
+  .ac-role { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font: 600 12px/1.6 var(--font-mono); text-transform: uppercase; background: color-mix(in oklab, var(--rc) 25%, transparent); }
   .ac-act { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .ac-act select { height: 32px; padding: 0 8px; font-size: 12px; width: auto; }
   .ac-del { color: var(--danger); }

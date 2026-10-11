@@ -34,14 +34,14 @@ const people = [
   .pf { margin: 24px 0 32px; display: grid; gap: 16px; align-items: center; padding: clamp(16px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
   @media (min-width: 860px) { .pf { grid-template-columns: 1.2fr auto 1fr; } .pf figcaption { grid-column: 1 / -1; } }
   .pf-col { display: grid; gap: 8px; min-width: 0; }
-  .pf-k { font-size: 10.5px; letter-spacing: 0.12em; color: var(--text-3); margin: 0 !important; }
+  .pf-k { font-size: 12px; letter-spacing: 0.12em; color: var(--text-3); margin: 0 !important; }
   .pf-call, .pf-fn { display: block; padding: 8px 10px; border-radius: 10px; background: var(--code-bg); border: 1px solid var(--line); font-size: 12px; white-space: normal; overflow-wrap: anywhere; color: var(--text-2); }
   .pf-call { border-left: 3px solid var(--c); opacity: 0; transform: translateX(-8px); }
   .pf-call b { color: var(--c); font-weight: 700; }
   :global(:root[data-theme='light']) .pf-call b { filter: brightness(0.55); }
   .pf-fn b { color: var(--accent-text); }
   .pf-arrow { position: relative; display: grid; justify-items: center; gap: 2px; color: var(--accent-text); }
-  .pf-arrow span { font-size: 11px; letter-spacing: 0.1em; }
+  .pf-arrow span { font-size: 12px; letter-spacing: 0.1em; }
   .pf-arrow svg { width: 120px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
   .pf-arrow i { position: absolute; top: 25px; left: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--accent-text); opacity: 0; }
   .pf.in .pf-arrow i { animation: pf-dot 2.4s linear infinite; }

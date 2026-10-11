@@ -77,15 +77,18 @@ const sections = [
         {next ? <a href={`/setup/${next.id}`} class="pn-a next"><span class="mono faint">Step {pad(next.data.step)} →</span><span>{next.data.title}</span></a> : <a href="/labs" class="pn-a next"><span class="mono faint">All set →</span><span>Start the labs</span></a>}
       </nav>
     </article>
-    <aside class="doc-aside"><Toc items={sections} /></aside>
+    <div class="doc-aside"><Toc items={sections} /></div>
   </div>
 </Base>
 <style>
   .sg-dots { list-style: none; padding: 0; display: flex; gap: 6px; }
-  .sg-dots a { display: block; width: 28px; height: 6px; border-radius: 6px; background: var(--line-2); transition: all var(--t-med) var(--ease-out); }
-  .sg-dots a.on { background: color-mix(in oklab, var(--accent) 60%, var(--line-2)); }
-  .sg-dots a.cur { background: var(--accent); width: 48px; }
-  .sg-dots a:hover { background: var(--text-3); }
+  /* a 6px bar, drawn inside a 24px-tall link so it is easy to tap */
+  .sg-dots a { position: relative; display: block; width: 28px; height: 24px; transition: width var(--t-med) var(--ease-out); }
+  .sg-dots a::before { content: ''; position: absolute; inset: 9px 0; border-radius: 6px; background: var(--line-2); transition: background var(--t-med) var(--ease-out); }
+  .sg-dots a.on::before { background: color-mix(in oklab, var(--accent) 60%, var(--line-2)); }
+  .sg-dots a.cur { width: 48px; }
+  .sg-dots a.cur::before { background: var(--accent); }
+  .sg-dots a:hover::before { background: var(--text-3); }
   .sg-title { max-width: 18ch; font-size: clamp(2.2rem, 1.4rem + 3vw, 4rem); }
   .vf { display: grid; gap: 14px; }
   .vf-row { display: grid; gap: 6px; }

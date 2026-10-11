@@ -50,11 +50,11 @@ const branches = members.slice(0, 4).map((m, i) => {
   .bpm-merge { fill: var(--c); opacity: 0; }
   .bpm-who rect { fill: color-mix(in oklab, var(--c) 18%, var(--code-bg)); stroke: color-mix(in oklab, var(--c) 55%, transparent); }
   .bpm-who circle { fill: var(--c); }
-  .bpm-who text { font: 600 11.5px var(--font-body); fill: var(--text); }
+  .bpm-who text { font: 600 12px var(--font-body); fill: var(--text); }
   .bpm-who { opacity: 0; }
   .bpm-rules { list-style: none; padding: 0 !important; margin: 14px 0 0 !important; display: flex; flex-wrap: wrap; gap: 8px; }
   .bpm-rules li { display: inline-flex; align-items: center; gap: 8px; margin: 0 !important; padding: 6px 12px 6px 6px !important; border-radius: 999px; border: 1px solid var(--line-2); font-size: 13.5px; color: var(--text); }
-  .bpm-rules b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font: 700 11px var(--font-mono); }
+  .bpm-rules b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font: 700 12px var(--font-mono); }
   /* motion: main → each branch draws, commits pop, merges land */
   .bpm.in .bpm-main { transition: stroke-dashoffset 1s var(--ease-out); stroke-dashoffset: 0; }
   .bpm.in .bpm-br path { transition: stroke-dashoffset 1.4s var(--ease-out); transition-delay: calc(500ms + var(--i) * 450ms); stroke-dashoffset: 0; }

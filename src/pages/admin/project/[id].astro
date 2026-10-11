@@ -57,7 +57,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         <div class="si-zip" data-si-zip hidden><progress max="1" value="0"></progress><span class="mono" data-si-zip-text></span></div>
         <div class="table-wrap">
           <table class="table si-table">
-            <thead><tr><th class="si-cb"><input type="checkbox" data-si-all aria-label="Select all shown" /></th><th>Name</th><th>Student ID</th><th>Group</th><th>Submitted</th><th>Status</th><th>Size</th><th></th></tr></thead>
+            <thead><tr><th class="si-cb"><input type="checkbox" data-si-all aria-label="Select all shown" /></th><th>Name</th><th>Student ID</th><th>Group</th><th>Submitted</th><th>Status</th><th>Size</th><th><span class="sr-only">Actions</span></th></tr></thead>
             <tbody data-si-rows><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
           </table>
         </div>
@@ -76,7 +76,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 
 <style is:global>
   .si-shell { min-height: 85dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 20px; align-content: start; }
-  .si-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; }
+  .si-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
   .si-k a:hover { text-decoration: underline; }
   .si-top { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
   .si-top h1 { font-size: var(--fs-xl); letter-spacing: -.04em; margin-top: 3px; }
@@ -84,7 +84,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .si-kpis { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); }
   @media (min-width: 900px) { .si-kpis { grid-template-columns: repeat(4, 1fr); } }
   .si-kpi { padding: 18px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); }
-  .si-kpi span { font: 500 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .si-kpi span { font: 500 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
   .si-kpi b { display: block; margin-top: 6px; font: 600 40px/1 var(--font-display); letter-spacing: -.04em; }
   .si-kpi small { display: block; margin-top: 6px; color: var(--text-3); font-size: 12px; }
   .si-kpi.late b { color: var(--warn); }
@@ -99,7 +99,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .si-tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
   .si-chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .si-chip { padding: 6px 12px; border: 1px solid var(--line-2); border-radius: 999px; background: none; color: var(--text-2); font: 500 12.5px var(--font-body); cursor: pointer; }
-  .si-chip span { color: var(--text-3); font-family: var(--font-mono); font-size: 11px; }
+  .si-chip span { color: var(--text-3); font-family: var(--font-mono); font-size: 12px; }
   .si-chip[aria-pressed="true"] { border-color: var(--accent-text); background: var(--accent-soft); color: var(--accent-text); }
   .si-batch { display: flex; align-items: center; gap: 10px; font-size: 12px; }
   .si-zip { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 12px; color: var(--text-2); }
@@ -118,7 +118,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     .si-table td { padding: 0; border: 0; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
     .si-table td.si-cb { position: absolute; left: 14px; top: 14px; }
     .si-table td:nth-child(2) { grid-column: 1 / -1; font-size: 15px; }
-    .si-table td:nth-child(n+3):not(:last-child)::before { display: block; margin-bottom: 2px; font: 600 9.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+    .si-table td:nth-child(n+3):not(:last-child)::before { display: block; margin-bottom: 2px; font: 600 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
     .si-table td:nth-child(3)::before { content: 'Student ID'; }
     .si-table td:nth-child(4)::before { content: 'Group'; }
     .si-table td:nth-child(5)::before { content: 'Submitted'; }
@@ -133,7 +133,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     .si-search { max-width: none; width: 100%; }
   }
   .si-table .note { display: block; margin-top: 4px; max-width: 38ch; font-size: 12.5px; color: var(--text-3); }
-  .si-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font: 600 10.5px/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; }
+  .si-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font: 600 12px/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; }
   .si-tag.ok { background: var(--accent-soft); color: var(--accent-text); }
   .si-tag.late { background: color-mix(in oklab, var(--warn) 18%, transparent); color: var(--warn); }
   .si-row-act { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }

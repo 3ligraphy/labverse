@@ -86,7 +86,7 @@ async function refreshStatus() {
 function pageHead(kicker: string, title: string, description: string) {
   const head = el('header', 'cms-view-head');
   const copy = el('div');
-  copy.append(el('p', 'cms-k mono', kicker), el('h1', '', title), el('p', 'muted', description));
+  copy.append(el('p', 'cms-k mono', kicker), el('h2', '', title), el('p', 'muted', description));
   head.append(copy);
   return head;
 }

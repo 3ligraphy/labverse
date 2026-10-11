@@ -66,8 +66,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       <div class="tm-col">
         <section class="tm-card"><div class="tm-h"><h2>Teaching staff</h2><span class="mono" data-n="staff"></span></div><div data-list="staff"></div></section>
         <section class="tm-card"><div class="tm-h"><h2>Students</h2><span class="mono" data-n="students"></span></div>
-          <form class="tm-bulk" data-tm-bulk><textarea class="input" name="emails" rows="2" placeholder="Enrol several students: paste emails separated by spaces, commas or new lines"></textarea><button class="btn btn-ghost btn-sm" type="submit">Enrol</button></form>
-          <input class="input tm-q" type="search" placeholder="Search students" data-tm-q />
+          <form class="tm-bulk" data-tm-bulk><textarea class="input" name="emails" rows="2" aria-label="Student emails to enrol" placeholder="Enrol several students: paste emails separated by spaces, commas or new lines"></textarea><button class="btn btn-ghost btn-sm" type="submit">Enrol</button></form>
+          <input class="input tm-q" type="search" placeholder="Search students" aria-label="Search students" data-tm-q />
           <div data-list="students"></div></section>
         <section class="tm-card"><div class="tm-h"><h2>Pending invitations</h2><span class="mono" data-n="invites"></span></div><div data-list="invites"></div></section>
       </div>
@@ -78,7 +78,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 
 <style is:global>
   .tm { min-height: 85dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 22px; align-content: start; }
-  .tm-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; }
+  .tm-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
   .tm-top { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; border-left: 4px solid var(--mc); padding-left: 16px; }
   .tm-top h1 { font-size: var(--fs-xl); letter-spacing: -.04em; margin-top: 3px; }
   .tm-top .muted { margin-top: 6px; max-width: 72ch; }
@@ -115,10 +115,10 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .tm-bulk textarea { min-height: 42px; padding: 10px 12px; resize: vertical; }
   .tm-row { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 10px 2px; border-top: 1px solid var(--line); }
   .tm-row:first-child { border-top: 0; }
-  .tm-av { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; font: 700 11px var(--font-mono); background: color-mix(in oklab, var(--mc) 25%, transparent); }
+  .tm-av { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; font: 700 12px var(--font-mono); background: color-mix(in oklab, var(--mc) 25%, transparent); }
   .tm-row b { display: block; font-size: 14px; }
   .tm-row small { font-size: 12px; color: var(--text-3); }
-  .tm-role { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font: 600 10px/1.6 var(--font-mono); text-transform: uppercase; background: var(--surface-2); }
+  .tm-role { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font: 600 12px/1.6 var(--font-mono); text-transform: uppercase; background: var(--surface-2); }
   .tm-ra { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .tm-ra select { height: 30px; padding: 0 8px; font-size: 12px; width: auto; }
   .tm-x { color: var(--danger); }

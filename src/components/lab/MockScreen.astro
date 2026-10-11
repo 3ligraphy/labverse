@@ -45,26 +45,26 @@ const [heroEmoji, ...heroTitle] = (rows[0] ?? '').split(' ');
 <style>
   .ms { margin: 0; display: grid; justify-items: center; gap: 10px; }
   .ms :global(.device) { --w: var(--ms-w); }
-  .ms-app { position: absolute; inset: 0; display: flex; flex-direction: column; color: #11181c; font-size: 11px; }
+  .ms-app { position: absolute; inset: 0; display: flex; flex-direction: column; color: #11181c; font-size: 12px; }
   .ms-head { position: relative; flex: none; height: 34px; display: grid; place-items: center; border-bottom: 1px solid #e5e7eb; font-size: 12px; }
-  .ms-back { position: absolute; left: 8px; top: 50%; translate: 0 -50%; color: #7c3aed; font-size: 11px; }
+  .ms-back { position: absolute; left: 8px; top: 50%; translate: 0 -50%; color: #7c3aed; font-size: 12px; }
   .ms-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px; overflow: hidden; }
   .ms-body.v-detail { align-items: center; text-align: center; }
   .ms-body.v-empty { justify-content: center; }
   .ms-card { padding: 8px 9px; border-radius: 9px; background: #f5f3ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ms-input { display: block; height: 22px; padding: 4px 8px; border: 1px solid #ddd6fe; border-radius: 8px; color: #94a3b8; font-size: 10.5px; }
+  .ms-input { display: block; height: 22px; padding: 4px 8px; border: 1px solid #ddd6fe; border-radius: 8px; color: #94a3b8; font-size: 12px; }
   .ms-hero { font-size: 40px; line-height: 1.1; margin-top: 6px; }
   .ms-title { font-size: 15px; }
   .ms-line { color: #475569; }
   .ms-field { display: grid; gap: 3px; }
-  .ms-field small { font-weight: 700; font-size: 10.5px; }
+  .ms-field small { font-weight: 700; font-size: 12px; }
   .ms-empty { color: #94a3b8; text-align: center; padding: 0 12px; }
   .ms-btn { align-self: stretch; margin-top: 6px; padding: 8px; border-radius: 9px; background: #7c3aed; color: #fff; font-weight: 700; text-align: center; }
   .ms-body.v-detail .ms-btn { align-self: center; padding: 6px 14px; border-radius: 999px; }
   .ms-tabs { flex: none; display: flex; border-top: 1px solid #e5e7eb; padding: 5px 0 14px; }
-  .ms-tab { flex: 1; display: grid; justify-items: center; gap: 1px; font-size: 9px; color: #8e8e93; }
+  .ms-tab { flex: 1; display: grid; justify-items: center; gap: 1px; font-size: 12px; color: #8e8e93; }
   .ms-tab i { font-style: normal; font-size: 13px; filter: grayscale(1); opacity: 0.7; }
   .ms-tab.on { color: #7c3aed; font-weight: 700; }
   .ms-tab.on i { filter: none; opacity: 1; }
-  .ms-cap { font-size: 11.5px; color: var(--text-3); text-align: center; }
+  .ms-cap { font-size: 12px; color: var(--text-3); text-align: center; }
 </style>

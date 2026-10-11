@@ -27,7 +27,7 @@ const list = classes.split(/\s+/).filter(Boolean).map((c) => {
   .cm li { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; align-items: center; margin: 0 !important; opacity: 0; transform: translateY(6px); }
   .cm-cls { color: var(--accent-text) !important; font-size: 12px; }
   .cm-arrow { color: var(--text-3); }
-  .cm-style { font-size: 11.5px; color: var(--cm-prop) !important; white-space: normal; overflow-wrap: anywhere; }
+  .cm-style { font-size: 12px; color: var(--cm-prop) !important; white-space: normal; overflow-wrap: anywhere; }
   .cm.in li { animation: cm-in 450ms var(--ease-out) forwards; animation-delay: calc(var(--i) * 120ms); }
   @keyframes cm-in { to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { .cm li { opacity: 1; transform: none; } .cm.in li { animation: none; } }

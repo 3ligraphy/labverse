@@ -112,9 +112,9 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 <style is:global>
   .cms-shell { min-height: 85dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; }
   .cms-card { border: 1px solid var(--line-2); background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
-  .cms-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; }
+  .cms-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
   .cms-gate { width: min(100%, 650px); margin: 30px auto; padding: clamp(24px, 5vw, 42px); display: grid; gap: 16px; }
-  .cms-gate h1, .cms-top h1, .cms-view-head h1 { letter-spacing: -.04em; }
+  .cms-gate h1, .cms-top h1, .cms-view-head :is(h1, h2) { letter-spacing: -.04em; }
   .cms-gate h1 { font-size: var(--fs-2xl); }
   .cms-gate ol { display: grid; gap: 12px; padding-left: 22px; color: var(--text-2); line-height: 1.65; }
   .cms-gate > .btn { justify-self: start; }
@@ -124,14 +124,14 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .cms-pick .input { height: 42px; padding: 0 12px; }
   .cms-cols { display: grid; gap: 16px; }
   @media (min-width: 640px) { .cms-cols { grid-template-columns: 1fr 1fr; } }
-  .cms-colh { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
+  .cms-colh { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
   .cms-empty { font-size: 12.5px; color: var(--text-3); padding: 10px 0; }
   .cms-person { width: 100%; border: 1px solid var(--line); border-radius: 14px; padding: 13px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 13px; text-align: left; color: var(--text); background: var(--bg); cursor: pointer; transition: border-color var(--t-fast), transform var(--t-fast); }
   .cms-person:hover { border-color: var(--accent-text); transform: translateY(-1px); }
   .cms-person span:nth-child(2) { display: grid; gap: 3px; }
   .cms-person small, .cms-status-who small { color: var(--text-3); }
   .cms-avatar { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: var(--accent-soft); color: var(--accent-text); font: 700 12px var(--font-mono); }
-  .cms-avatar.small { width: 34px; height: 34px; border-radius: 10px; font-size: 10px; }
+  .cms-avatar.small { width: 34px; height: 34px; border-radius: 10px; font-size: 12px; }
   .cms-pick-error { min-height: 20px; color: var(--danger); font-size: 13px; }
   .cms-back { color: var(--text-3); font-size: 13px; }
 
@@ -143,10 +143,10 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .cms-status-who { display: flex; align-items: center; gap: 10px; }
   .cms-status-who > span:nth-child(2) { display: grid; }
   .cms-status-who b { font-size: 13px; }
-  .cms-switch { border: 0; color: var(--accent-text); background: none; cursor: pointer; font: 600 11px var(--font-mono); }
+  .cms-switch { border: 0; color: var(--accent-text); background: none; cursor: pointer; font: 600 12px var(--font-mono); }
   .cms-status-copy { justify-self: center; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-2); }
   .cms-status-copy summary { cursor: pointer; }
-  .cms-badge { padding: 5px 8px; border-radius: 999px; color: var(--info); background: var(--info-soft); font: 600 10px var(--font-mono); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+  .cms-badge { padding: 5px 8px; border-radius: 999px; color: var(--info); background: var(--info-soft); font: 600 12px var(--font-mono); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
   .cms-files { position: absolute; top: calc(100% - 4px); padding: 12px 16px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-md); list-style: none; line-height: 1.8; }
   .cms-workspace { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 18px; align-items: start; }
   .cms-sidebar { padding: 9px; display: grid; gap: 3px; position: sticky; top: calc(var(--nav-h) + 92px); }
@@ -156,11 +156,11 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .cms-sidebar button[aria-current="true"] { color: var(--accent-text); background: var(--accent-soft); }
   .cms-sidebar button:disabled { opacity: .42; cursor: not-allowed; }
   .cms-sidebar button small, .cms-side-link small { font: 9px var(--font-mono); text-transform: uppercase; }
-  .cms-side-label { margin: 13px 10px 3px; font-size: 9px; color: var(--text-3); text-transform: uppercase; letter-spacing: .12em; }
+  .cms-side-label { margin: 13px 10px 3px; font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: .12em; }
   .cms-side-rule { height: 1px; background: var(--line); margin: 8px; }
   .cms-main { min-width: 0; display: grid; gap: 16px; }
   .cms-view-head { display: flex; justify-content: space-between; align-items: end; gap: 18px; padding: 8px 2px; }
-  .cms-view-head h1 { font-size: clamp(1.65rem, 2vw, 2.25rem); margin: 3px 0 6px; }
+  .cms-view-head :is(h1, h2) { font-size: clamp(1.65rem, 2vw, 2.25rem); margin: 3px 0 6px; }
   .cms-view-head .muted { max-width: 650px; font-size: 14px; }
   .cms-loading, .cms-empty { padding: 32px; color: var(--text-3); text-align: center; }
 
@@ -178,7 +178,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .cms-form { display: grid; gap: 18px; }
   .cms-field { display: grid; gap: 7px; min-width: 0; }
   .cms-field-label { font-size: 12px; font-weight: 650; }
-  .cms-help { color: var(--text-3); font-size: 11.5px; line-height: 1.5; }
+  .cms-help { color: var(--text-3); font-size: 12px; line-height: 1.5; }
   .cms-error { color: var(--danger); font-size: 12px; }
   .cms-form textarea.input { height: auto; min-height: 96px; padding: 12px 14px; resize: vertical; line-height: 1.5; }
   .cms-form select.input { appearance: auto; }
@@ -190,7 +190,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .cms-row-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .cms-row-head > div { display: flex; gap: 5px; }
   .cms-row-head b { font-size: 12px; text-transform: capitalize; }
-  .cms-mini { min-height: 30px; border: 1px solid var(--line-2); border-radius: 8px; padding: 0 10px; color: var(--text-2); background: transparent; cursor: pointer; font: 600 11px var(--font-body); }
+  .cms-mini { min-height: 30px; border: 1px solid var(--line-2); border-radius: 8px; padding: 0 10px; color: var(--text-2); background: transparent; cursor: pointer; font: 600 12px var(--font-body); }
   .cms-mini:hover { color: var(--text); background: var(--surface-2); }
   .cms-mini.danger:hover { color: var(--danger); }
   .cms-mini:disabled { opacity: .3; cursor: default; }
@@ -208,7 +208,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .cms-entry.active { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent-text); }
   .cms-entry > span { display: grid; gap: 3px; }
   .cms-entry b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-  .cms-entry small { color: var(--text-3); font-size: 9px; }
+  .cms-entry small { color: var(--text-3); font-size: 12px; }
   .cms-entry-head { display: flex; align-items: end; justify-content: space-between; gap: 14px; padding-bottom: 17px; border-bottom: 1px solid var(--line); }
   .cms-entry-head h2 { font-size: 20px; margin-top: 4px; }
   .cms-danger { color: var(--danger) !important; }
@@ -219,7 +219,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .cms-history-row { padding: 14px 17px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 14px; color: var(--text); }
   .cms-history-row:last-child { border: 0; }
   .cms-history-row > span { display: grid; gap: 5px; }
-  .cms-history-row b { font-size: 13px; } .cms-history-row small, .cms-history-row code { color: var(--text-3); font-size: 10px; }
+  .cms-history-row b { font-size: 13px; } .cms-history-row small, .cms-history-row code { color: var(--text-3); font-size: 12px; }
 
   .cms-dialog { width: min(920px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid var(--line-2); border-radius: var(--r-lg); color: var(--text); background: var(--surface); box-shadow: var(--shadow-lg); }
   .cms-dialog::backdrop { background: rgb(0 0 0 / .68); backdrop-filter: blur(4px); }

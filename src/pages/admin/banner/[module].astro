@@ -51,7 +51,7 @@ const view = slug === BUILT_IN_MODULE.slug ? '/course' : `/m/${slug}`;
 <style is:global>
   .bn { min-height: 85dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 24px; align-content: start; max-width: 980px; }
   .bn-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
-  .bn-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; }
+  .bn-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
   .bn-head h1 { margin-top: 4px; font-size: var(--fs-xl); letter-spacing: -.04em; }
   .bn-head .muted { margin-top: 7px; }
   .bn-form { display: grid; gap: 13px; padding: 20px; border: 1px solid var(--line-2); border-radius: 20px; background: var(--surface); }
@@ -69,7 +69,7 @@ const view = slug === BUILT_IN_MODULE.slug ? '/course' : `/m/${slug}`;
   .bn-card { display: grid; grid-template-columns: 1fr auto; gap: 10px 18px; padding: 18px; border: 1px solid var(--line-2); border-radius: 16px; background: var(--surface); }
   .bn-card.live { border-color: color-mix(in oklab, var(--mc) 60%, var(--line-2)); box-shadow: inset 4px 0 var(--mc); }
   .bn-card h3 { font-size: 1.05rem; } .bn-card p { color: var(--text-2); font-size: 13.5px; }
-  .bn-state { align-self: start; padding: 3px 8px; border-radius: 999px; color: var(--text-3); background: var(--surface-2); font: 600 10px var(--font-mono); text-transform: uppercase; }
+  .bn-state { align-self: start; padding: 3px 8px; border-radius: 999px; color: var(--text-3); background: var(--surface-2); font: 600 12px var(--font-mono); text-transform: uppercase; }
   .bn-card.live .bn-state { color: #0b0d10; background: var(--mc); }
   .bn-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
   .bn-delete { color: var(--danger); }

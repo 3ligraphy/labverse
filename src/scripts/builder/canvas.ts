@@ -311,7 +311,7 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     const n = selected ? nodeById(selected) : null;
     if (!n) {
       const order = orderFlow(flow, cfg.kind);
-      inspector.innerHTML = `${sheetHead('Inspector')}<p class="cv-k mono">Inspector</p><h3>Nothing selected</h3>
+      inspector.innerHTML = `${sheetHead('Inspector')}<p class="cv-k mono">Inspector</p><h2>Nothing selected</h2>
         <p class="muted">Click a node to edit it. Drag from a node's right-hand port to another node to connect them.</p>
         <dl class="cv-stats"><div><dt>Nodes</dt><dd>${flow.nodes.length}</dd></div><div><dt>In order</dt><dd>${order.length}</dd></div><div><dt>Drafts</dt><dd>${flow.nodes.length - order.length}</dd></div></dl>`;
       return;
@@ -320,7 +320,7 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
     const fields = n.type === 'lab' ? [] : def.fields;
     const labInfo = n.type === 'lab' ? labs.get(n.data.slug) : null;
     inspector.innerHTML = `${sheetHead(`Edit ${def.label.toLowerCase()}`)}<p class="cv-k mono" style="--nc:${def.color}"><span class="cv-glyph">${esc(def.glyph)}</span> ${esc(def.label)} node</p>
-      <h3>${esc(title(n))}</h3>
+      <h2>${esc(title(n))}</h2>
       ${n.type === 'lab' ? (labInfo
         ? `<p class="muted">/${esc(cfg.module ?? '')}/${esc(n.data.slug)} · ${labInfo.published ? 'published' : 'draft'}</p>
            <a class="btn btn-primary btn-sm" href="/admin/builder/${encodeURIComponent(cfg.module ?? '')}/${encodeURIComponent(n.data.slug)}" data-open-lab>Open lab canvas →</a>`
@@ -344,7 +344,7 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
         ? [...inspector.querySelectorAll<HTMLInputElement>(`input[data-field="${t.dataset.field}"]:checked`)].map((input) => input.value).join(', ')
         : t.value;
       if (t.type === 'color') t.nextElementSibling!.textContent = t.value;
-      inspector.querySelector('h3')!.textContent = title(n);
+      inspector.querySelector('h2')!.textContent = title(n);
       validateChecks();
       renderNodes();
       setDirty();

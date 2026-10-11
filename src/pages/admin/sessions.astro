@@ -165,7 +165,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 <style>
   .adm { padding-top: calc(var(--nav-h) + 56px); padding-bottom: 96px; min-height: 80dvh; }
   .adm-card { width: min(100%, 520px); margin-inline: auto; display: grid; gap: 16px; padding: clamp(24px, 5vw, 36px); border-radius: var(--r-xl); border: 1px solid var(--line-2); background: var(--surface); box-shadow: var(--shadow-md); }
-  .adm-k { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-text); }
+  .adm-k { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-text); }
   .adm-h { font-size: var(--fs-2xl); letter-spacing: -0.04em; }
   .fld { display: grid; gap: 8px; }
   .fld-l { font-size: 13px; font-weight: 600; }
@@ -214,7 +214,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     .board-table :global(tbody tr) { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-bottom: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
     .board-table :global(td) { padding: 0; border: 0; white-space: normal !important; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
     .board-table :global(td:first-child) { grid-column: 1 / -1; font-size: 15px; }
-    .board-table :global(td:not(:first-child)::before) { display: block; margin-bottom: 2px; font: 600 9.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+    .board-table :global(td:not(:first-child)::before) { display: block; margin-bottom: 2px; font: 600 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
     .board-table :global(td:nth-child(2)::before) { content: 'Student ID'; }
     .board-table :global(td:nth-child(3)::before) { content: 'Group'; }
     .board-table :global(td:nth-child(4)::before) { content: 'Started'; }
@@ -240,7 +240,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .adm-tabs button { padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 14px; color: var(--text-3); }
   .adm-tabs button[aria-selected='true'] { background: var(--accent); color: var(--accent-ink); }
   .adm-tabs select { height: 34px; padding: 0 10px; border-radius: 10px; max-width: min(280px, 40vw); }
-  .tab-filter { display: flex; align-items: center; gap: 7px; padding-left: 8px; font-size: 11px; font-weight: 700; color: var(--text-3); }
+  .tab-filter { display: flex; align-items: center; gap: 7px; padding-left: 8px; font-size: 12px; font-weight: 700; color: var(--text-3); }
   .tab-filter span { white-space: nowrap; }
 
   /* session CRUD */
@@ -296,7 +296,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .labp :global(.cell) { display: inline-block; width: 14px; height: 14px; border-radius: 4px; background: var(--line); vertical-align: middle; }
   .labp :global(.cell.trying) { background: var(--warn); }
   .labp :global(.cell.solved) { background: var(--ok); }
-  .labp :global(.st-table th.c), .labp :global(.st-table td.c) { padding-left: 2px; padding-right: 2px; text-align: center; font-size: 10.5px; }
+  .labp :global(.st-table th.c), .labp :global(.st-table td.c) { padding-left: 2px; padding-right: 2px; text-align: center; font-size: 12px; }
   .labp :global(.dot-on) { color: var(--ok); }
 </style>
 

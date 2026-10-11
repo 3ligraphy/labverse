@@ -143,7 +143,7 @@ const q = preview ? '?preview' : '';
           </nav>
         </article>
 
-        <aside class="doc-aside">
+        <div class="doc-aside">
           {isMission && (
             <nav class="toc tracker" aria-label="Lab tracker">
               <p class="toc-title">{label} tracker</p>
@@ -158,7 +158,7 @@ const q = preview ? '?preview' : '';
               </ol>
             </nav>
           )}
-        </aside>
+        </div>
       </div>
       <LabRuntime />
     </>
@@ -167,7 +167,7 @@ const q = preview ? '?preview' : '';
 
 <style>
   .bl-head { padding-bottom: 40px; }
-  .bl-prev { margin-top: 16px; display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-size: 11px; }
+  .bl-prev { margin-top: 16px; display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-size: 12px; }
   .bl-grid { display: grid; gap: 32px; align-items: end; margin-top: 20px; }
   @media (min-width: 1024px) { .bl-grid { grid-template-columns: 1fr 340px; gap: 64px; } }
   .bl-no { font-size: 12px; letter-spacing: 0.14em; color: var(--text-3); display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -184,21 +184,21 @@ const q = preview ? '?preview' : '';
   .ring-c { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); }
   .ring-c b { font-size: 28px; font-weight: 700; letter-spacing: -0.04em; }
   .ring-c small { font-size: 13px; color: var(--text-3); margin-top: 8px; }
-  .dash-k { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+  .dash-k { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
   .dash-v { font-size: 1.15rem; font-weight: 600; margin-top: 2px; }
   .dash-v b { font-family: var(--font-display); font-size: 1.6rem; color: var(--accent-text); }
   .dash-s { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-  .dash-reset { margin-top: 8px; font-size: 11px; color: var(--text-3); text-decoration: underline; text-underline-offset: 3px; }
+  .dash-reset { margin-top: 8px; font-size: 12px; color: var(--text-3); text-decoration: underline; text-underline-offset: 3px; }
   .plan { margin-top: 36px; }
   .plan-bar { list-style: none; padding: 0; display: flex; gap: 6px; }
   @media (max-width: 760px) { .plan-bar { flex-direction: column; } }
   .plan-bar a { position: relative; display: grid; gap: 2px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; min-width: 0; height: 100%; }
   .pb-fill { position: absolute; inset: auto 0 0 0; height: 3px; background: var(--pc); transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform 600ms var(--ease-out); }
-  .pb-n { font-size: 10px; letter-spacing: .1em; color: var(--text-3); }
+  .pb-n { font-size: 12px; letter-spacing: .1em; color: var(--text-3); }
   .pb-t { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pb-m { font-size: 11px; color: var(--text-3); }
+  .pb-m { font-size: 12px; color: var(--text-3); }
   .bl-brief { margin-block: 28px; padding: 20px 22px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
-  .bl-brief-k { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-text); }
+  .bl-brief-k { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-text); }
   .bl-brief ul { list-style: none; padding: 0; margin-top: 10px; display: grid; gap: 6px; }
   .bl-brief li { display: flex; gap: 10px; }
   .bl-brief li span { color: var(--ok); }
@@ -210,10 +210,10 @@ const q = preview ? '?preview' : '';
   .tr-bar i { display: block; height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform 700ms var(--ease-out); }
   .tr-part > ol { list-style: none; padding: 0; margin-top: 4px; border-left: 1px solid var(--line); }
   .tracker a.tr-p { display: flex; gap: 8px; align-items: baseline; font-weight: 600; color: var(--text-2); padding: 4px 0; border: 0; margin: 0; }
-  .tracker a.tr-p .mono { font-size: 11px; color: var(--accent-text); }
+  .tracker a.tr-p .mono { font-size: 12px; color: var(--accent-text); }
   .tracker .tr-part > ol a { display: grid; grid-template-columns: 12px auto 1fr; gap: 8px; align-items: center; font-size: 13px; padding: 4px 0 4px 12px; }
   .tr-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--line-2); transition: all 300ms var(--ease-out); }
-  .tr-n { font-size: 10.5px; color: var(--text-3); }
+  .tr-n { font-size: 12px; color: var(--text-3); }
   .tracker a.done { color: var(--text-3); }
   .tracker a.done .tr-dot { background: var(--ok); border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
   .bl-done .muted { font-size: 14px; }

@@ -22,7 +22,7 @@
 .mock-bar { display: flex; align-items: center; gap: 12px; height: 38px; padding: 0 12px; background: var(--gh-bg2); border-bottom: 1px solid var(--gh-bd); }
 .mock-bar .dots { display: inline-flex; gap: 6px; flex: none; }
 .mock-bar .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--gh-bd); }
-.mock-url { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 24px; padding: 0 10px; border-radius: 999px; background: var(--gh-bg); border: 1px solid var(--gh-bd); font-family: var(--font-mono); font-size: 11.5px; color: var(--gh-mu); white-space: nowrap; overflow: hidden; }
+.mock-url { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 24px; padding: 0 10px; border-radius: 999px; background: var(--gh-bg); border: 1px solid var(--gh-bd); font-family: var(--font-mono); font-size: 12px; color: var(--gh-mu); white-space: nowrap; overflow: hidden; }
 .mock-url svg { width: 11px; height: 11px; flex: none; }
 .mock-body { position: relative; padding: clamp(16px, 3.5vw, 28px); }
 .mock-cap { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--gh-bd); background: var(--gh-bg2); font-size: 12px; color: var(--gh-mu); font-family: var(--font-mono); }
@@ -43,7 +43,7 @@
 }
 .gh-input.ph { color: var(--gh-mu); }
 .gh-input.focus { border-color: var(--gh-blue); box-shadow: 0 0 0 2px color-mix(in oklab, var(--gh-blue) 35%, transparent); }
-.gh-select::after { content: '▾'; margin-left: auto; color: var(--gh-mu); font-size: 11px; }
+.gh-select::after { content: '▾'; margin-left: auto; color: var(--gh-mu); font-size: 12px; }
 .gh-textarea { min-height: 64px; align-items: flex-start; }
 .gh-hint { font-size: 12px; color: var(--gh-mu); }
 .gh-ok { font-size: 12px; color: #3fb950; font-weight: 500; }
@@ -80,7 +80,7 @@
   --n: 0;
   position: absolute; z-index: 2; top: -9px; right: -9px; width: 22px; height: 22px; border-radius: 50%;
   display: grid; place-items: center; background: var(--accent); color: var(--accent-ink);
-  font: 700 11px/1 var(--font-mono); font-style: normal; box-shadow: 0 0 0 3px var(--gh-bg, var(--bg)), 0 4px 12px -2px var(--accent-glow);
+  font: 700 12px/1 var(--font-mono); font-style: normal; box-shadow: 0 0 0 3px var(--gh-bg, var(--bg)), 0 4px 12px -2px var(--accent-glow);
   transition: transform var(--t-med) var(--ease-out);
 }
 .mk.left { right: auto; left: -9px; }
@@ -102,7 +102,7 @@
 }
 .mock-fig + ol > li::before, .legend-host + ol > li::before, ol.legend > li::before {
   content: counter(lg); position: absolute; left: 12px; top: 11px; width: 22px; height: 22px; border-radius: 50%;
-  display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font: 700 11px/1 var(--font-mono);
+  display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font: 700 12px/1 var(--font-mono);
 }
 .mock-fig + ol > li:hover, .legend-host + ol > li:hover, .mock-fig + ol > li.hl, .legend-host + ol > li.hl { border-color: var(--accent-text); background: var(--accent-soft); }
 .mock-fig + ol > li strong, .legend-host + ol > li strong { color: var(--text); }

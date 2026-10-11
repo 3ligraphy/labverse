@@ -43,7 +43,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       </div>
       <div class="gp-roster" data-gp-roster-edit hidden>
         <p class="muted small">One student per line: name and ID in either order, separated by a tab, comma or semicolon. Pasting two columns from Excel or Google Sheets works. Saving replaces the whole list.</p>
-        <textarea class="input gp-textarea mono" rows="10" placeholder={'Sara Ali, 23CS0001\nOmar Hassan, 23CS0002'} data-gp-roster-text spellcheck="false"></textarea>
+        <textarea class="input gp-textarea mono" rows="10" aria-label="Class list: one student per line, name and ID" placeholder={'Sara Ali, 23CS0001\nOmar Hassan, 23CS0002'} data-gp-roster-text spellcheck="false"></textarea>
         <div class="gp-row">
           <label class="btn btn-ghost btn-sm gp-file">Load CSV file<input type="file" accept=".csv,.txt,.tsv" data-gp-roster-file hidden /></label>
           <button class="btn btn-primary btn-sm" type="button" data-gp-roster-save>Save class list</button>
@@ -102,7 +102,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       <p class="gp-msg" role="status" data-gp-assign-msg></p>
       <div class="table-wrap">
         <table class="table gp-table">
-          <thead><tr><th class="gp-cb"></th><th>Group</th><th>Members</th><th>Size</th><th>Add</th></tr></thead>
+          <thead><tr><th class="gp-cb"><span class="sr-only">Select</span></th><th>Group</th><th>Members</th><th>Size</th><th>Add</th></tr></thead>
           <tbody data-gp-rows><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
         </table>
       </div>
@@ -155,13 +155,13 @@ if (!file) return Astro.redirect('/admin/project', 303);
 
 <style is:global>
   .gp-shell { min-height: 85dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 20px; align-content: start; }
-  .gp-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; }
+  .gp-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
   .gp-k a:hover { text-decoration: underline; }
   .gp-top { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
   .gp-top h1 { font-size: var(--fs-xl); letter-spacing: -.04em; margin-top: 3px; }
   .gp-card { border: 1px solid var(--line-2); background: var(--surface); border-radius: var(--r-lg); padding: clamp(16px, 3vw, 24px); min-width: 0; display: grid; gap: 14px; }
   .gp-card h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
-  .gp-step { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+  .gp-step { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
   .gp-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; flex-wrap: wrap; }
   .gp-head p.small { margin-top: 4px; max-width: 70ch; }
   .gp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -179,7 +179,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-table tr.full td { opacity: .75; }
   .gp-chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
   .gp-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 12.5px; background: var(--surface-2); }
-  .gp-chip small { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3); }
+  .gp-chip small { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); }
   .gp-chip.document { border-style: dashed; }
   .gp-chip.added { border-color: var(--accent-text); background: var(--accent-soft); }
   .gp-chip.clash { border-color: var(--warn); }
@@ -189,7 +189,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-sort { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); }
   .gp-sort select { height: 34px; padding: 0 30px 0 10px; font-size: 13px; width: auto; }
   .gp-sort-row { width: 100%; }
-  .gp-newb { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 700 9.5px/1.5 var(--font-mono); letter-spacing: .08em; vertical-align: 2px; }
+  .gp-newb { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 700 12px/1.5 var(--font-mono); letter-spacing: .08em; vertical-align: 2px; }
   .gp-when { display: block; margin-top: 2px; font: 11px var(--font-mono); color: var(--text-3); }
   tr.is-new td { background: color-mix(in oklab, var(--accent) 7%, transparent); }
   .gp-group.is-new { border-color: color-mix(in oklab, var(--accent-text) 55%, var(--line-2)); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -241,7 +241,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-team { display: flex; gap: 6px; margin-top: 6px; }
   .gp-team input { width: 96px; height: 32px; padding: 0 8px; }
   .gp-team.need input { border-color: var(--warn); }
-  .gp-link { border: 0; background: none; padding: 2px 0; margin-top: 2px; display: block; color: var(--text-3); font-size: 11.5px; cursor: pointer; text-decoration: underline; }
+  .gp-link { border: 0; background: none; padding: 2px 0; margin-top: 2px; display: block; color: var(--text-3); font-size: 12px; cursor: pointer; text-decoration: underline; }
   .gp-link:hover { color: var(--text); }
   .gp-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-3); }
   .gp-size { font-family: var(--font-mono); white-space: nowrap; }
@@ -279,7 +279,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .bx::backdrop { background: rgb(5 8 12 / .55); backdrop-filter: blur(6px); }
   .bx-wrap { display: grid; gap: 16px; padding: clamp(16px, 4vw, 26px); }
   .bx-top { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
-  .bx-k { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-text); }
+  .bx-k { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-text); }
   .bx-top h2 { font-size: var(--fs-lg); letter-spacing: -.02em; margin-top: 2px; }
   .bx-stage { display: grid; gap: 18px; justify-items: center; min-height: 300px; }
   .bx-stage.done { min-height: 0; }
@@ -311,7 +311,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .bx-results li.on { border-color: var(--accent-text); background: var(--accent-soft); }
   .bx-slots { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }
   .bx-slot { padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--line-2); color: transparent; font-size: 12.5px; transition: color .25s, background .25s, border-color .25s; }
-  .bx-slot small { color: inherit; font-size: 10.5px; }
+  .bx-slot small { color: inherit; font-size: 12px; }
   .bx-slot.in { color: var(--text); background: var(--accent-soft); border: 1px solid var(--accent-text); animation: bx-pop .35s cubic-bezier(.3,1.6,.5,1); }
   .bx-slot.in small { color: var(--text-3); }
   .bx-none { font-size: 12.5px; color: var(--warn); }
