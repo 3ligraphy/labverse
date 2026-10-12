@@ -150,9 +150,9 @@ export function playBox({ draws, pool, short, onSheet }: Options): Promise<void>
   ];
   for (const [side, origin] of FLAPS) Object.assign(flap(side).style, { transformBox: 'fill-box', transformOrigin: origin });
   const closeFlaps = () => Promise.all(FLAPS.map(([side, , shut], i) =>
-    play(flap(side), [{ transform: 'none' }, { transform: shut }], { duration: 260, delay: i * 130, easing: 'cubic-bezier(.5,0,.4,1.3)' })));
+    play(flap(side), [{ transform: 'none' }, { transform: shut }], { duration: 260, delay: i * 130, easing: 'cubic-bezier(.65,0,.35,1)' })));
   const openFlaps = () => Promise.all([...FLAPS].reverse().map(([side, , shut], i) =>
-    play(flap(side), [{ transform: shut }, { transform: 'none' }], { duration: 300, delay: i * 70, easing: 'cubic-bezier(.3,1.5,.5,1)' })));
+    play(flap(side), [{ transform: shut }, { transform: 'none' }], { duration: 300, delay: i * 70, easing: 'cubic-bezier(.16,1,.3,1)' })));
 
   /** Offset from an element to the middle of the box's opening. */
   const toOpening = (el: Element) => {

@@ -18,8 +18,8 @@
 <style is:global>
   .ann { position: fixed; z-index: 90; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); width: min(calc(100% - 32px), 860px); translate: -50% 0;
     border-radius: 18px; overflow: hidden; color: #0b0d10; background: linear-gradient(100deg, #c8ff4d 0%, #e6ff9a 45%, #9cf05a 100%);
-    box-shadow: 0 18px 50px -12px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(0 0 0 / 0.08) inset; animation: ann-in .5s cubic-bezier(.2,.9,.3,1.2) both; }
-  .ann-shine { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.55) 50%, transparent 70%); translate: -100% 0; animation: ann-shine 3.6s ease-in-out 0.8s infinite; pointer-events: none; }
+    box-shadow: 0 18px 50px -12px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(0 0 0 / 0.08) inset; animation: ann-in .5s var(--ease-out) both; }
+  .ann-shine { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.55) 50%, transparent 70%); translate: -100% 0; animation: ann-shine 3.6s ease-in-out 0.8s 2; pointer-events: none; }
   .ann-inner { position: relative; display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 14px; padding: 12px 12px 12px 14px; }
   .ann-new { padding: 6px 9px; border-radius: 8px; background: #0b0d10; color: #c8ff4d; font-size: 12px; font-weight: 700; letter-spacing: .12em; animation: ann-pop 1.6s ease-in-out infinite; }
   .ann-text { font-size: 14.5px; line-height: 1.35; min-width: 0; }
