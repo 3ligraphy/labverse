@@ -67,9 +67,8 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
 <style is:global>
   .md { --g1: #c8ff4d; --g2: #7cb1ff; position: relative; min-height: 100dvh; padding: calc(var(--nav-h) + 48px) 0 100px; background: var(--hero-bg); color: var(--hero-text); isolation: isolate; overflow: hidden; }
   :root[data-theme='light'] .md { --g1: #9fd400; --g2: #3d7be0; }
-  .md-sky { position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 90% -10%, color-mix(in oklab, var(--g2) 35%, transparent), transparent 45%), radial-gradient(circle at 0% 30%, color-mix(in oklab, var(--g1) 25%, transparent), transparent 40%),
-    linear-gradient(var(--hero-grid) 1px, transparent 1px) 0 0 / 56px 56px, linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px) 0 0 / 56px 56px; }
-  .md-k { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--hero-accent); }
+  .md-sky { position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 90% -10%, color-mix(in oklab, var(--g2) 35%, transparent), transparent 45%), radial-gradient(circle at 0% 30%, color-mix(in oklab, var(--g1) 25%, transparent), transparent 40%); }
+  .md-k { font-size: 12px; color: var(--hero-accent); }
   .md-t { margin-top: 14px; font-size: clamp(2.6rem, 1.4rem + 5vw, 6rem); letter-spacing: -.055em; line-height: .92; }
   .md-t span { color: var(--hero-accent); }
   .md-l { margin-top: 18px; max-width: 66ch; color: var(--hero-lead); font-size: var(--fs-md); }

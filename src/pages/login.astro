@@ -39,7 +39,7 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
 <Base title="Sign in" noindex>
   <section class="auth" data-auth>
     <script type="application/json" data-auth-data set:html={json} />
-    <div class="auth-sky" aria-hidden="true"><div class="auth-grid"></div><div class="auth-orb a"></div><div class="auth-orb b"></div></div>
+    <div class="auth-sky" aria-hidden="true"><div class="auth-orb a"></div><div class="auth-orb b"></div></div>
     <div class="container auth-in">
       <div class="auth-copy">
         <p class="auth-k mono"><span></span> Secure access</p>
@@ -106,8 +106,7 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
   .auth { --g1: #c8ff4d; --g2: #7cb1ff; position: relative; min-height: 100dvh; overflow: hidden; overflow: clip; isolation: isolate; padding: calc(var(--nav-h) + 56px) 0 80px; background: var(--hero-bg); color: var(--hero-text); }
   :root[data-theme='light'] .auth { --g1: #9fd400; --g2: #3d7be0; }
   .auth-sky { position: absolute; inset: 0; z-index: -1; }
-  .auth-grid { position: absolute; inset: 0; background-image: linear-gradient(var(--hero-grid) 1px, transparent 1px), linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(ellipse at 30% 40%, #000, transparent 75%); }
-  .auth-orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; }
+    .auth-orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; }
   .auth-orb.a { width: 520px; height: 520px; left: -160px; top: -120px; background: radial-gradient(circle, color-mix(in oklab, var(--g1) 60%, transparent), transparent 65%); }
   .auth-orb.b { width: 520px; height: 520px; right: -160px; bottom: -200px; background: radial-gradient(circle, color-mix(in oklab, var(--g2) 60%, transparent), transparent 65%); }
   .auth-in { display: grid; gap: 40px; align-items: center; }

@@ -120,8 +120,8 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
   .sbh { position: relative; overflow: hidden; overflow: clip; isolation: isolate; background: var(--hero-bg); color: var(--hero-text); padding-top: calc(var(--nav-h) + 56px); padding-bottom: 56px; }
   .sbh .crumbs { color: var(--hero-dim); }
   .sbh .crumbs a:hover { color: var(--hero-text); }
-  .sbh-bg { position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 85% -10%, var(--hero-glow), transparent 45%), linear-gradient(var(--hero-grid) 1px, transparent 1px) 0 0 / 48px 48px, linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px) 0 0 / 48px 48px; }
-  .sbh-k { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--hero-muted); }
+  .sbh-bg { position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 85% -10%, var(--hero-glow), transparent 45%); }
+  .sbh-k { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 12px; color: var(--hero-muted); }
   .sbh-state { display: inline-flex; align-items: center; gap: 8px; color: var(--hero-danger); }
   .sbh-state .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
   .sbh-state.open { color: var(--hero-accent); }

@@ -32,7 +32,7 @@ const nav = d ? [
   ) : (
     <>
       <header class="pjh">
-        <div class="pjh-bg" aria-hidden="true"><div class="pjh-grid"></div><div class="pjh-orb"></div></div>
+        <div class="pjh-bg" aria-hidden="true"><div class="pjh-orb"></div></div>
         <div class="container pjh-inner">
           <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><span aria-current="page">project</span></nav>
           <div class="pjh-top" data-reveal>
@@ -164,8 +164,7 @@ const nav = d ? [
   .pjh { position: relative; overflow: hidden; isolation: isolate; background: var(--hero-bg); color: var(--hero-text); padding-top: calc(var(--nav-h) + 64px); padding-bottom: 72px; }
   .pjh .crumbs { color: var(--hero-dim); }
   .pjh-bg { position: absolute; inset: 0; z-index: -1; }
-  .pjh-grid { position: absolute; inset: 0; background-image: linear-gradient(var(--hero-grid) 1px, transparent 1px), linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px); background-size: 56px 56px; mask-image: radial-gradient(ellipse 80% 70% at 70% 30%, #000, transparent 75%); }
-  .pjh-orb { position: absolute; width: 720px; height: 720px; right: -160px; top: -260px; border-radius: 50%; background: radial-gradient(circle, var(--hero-glow), transparent 62%); filter: blur(20px); }
+    .pjh-orb { position: absolute; width: 720px; height: 720px; right: -160px; top: -260px; border-radius: 50%; background: radial-gradient(circle, var(--hero-glow), transparent 62%); filter: blur(20px); }
   .pjh-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
   .pjh-badge { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: 0.12em; color: var(--hero-accent); }
   .pjh-badge .live { width: 8px; height: 8px; border-radius: 50%; background: var(--hero-accent); animation: pulse-ring 2s infinite; }
