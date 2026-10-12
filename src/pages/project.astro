@@ -226,6 +226,7 @@ const nav = d ? [
   @media (min-width: 720px) { :global(.pjf) { grid-template-columns: 1fr auto; align-items: center; } }
   :global(.pjf.is-new) { border-color: color-mix(in oklab, var(--accent-text) 55%, var(--line-2)); box-shadow: 0 0 0 4px var(--accent-soft); }
   :global(.pjf-t) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; }
+  :global(.pjf-t a) { display: inline-block; padding-block: 3px; }
   :global(.pjf-t a:hover) { color: var(--accent-text); }
   :global(.pjf-new) { padding: 2px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 700 12px/1.5 var(--font-mono); letter-spacing: .08em; }
   :global(.pjf-closed) { padding: 2px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text-3); font: 600 12px/1.5 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }

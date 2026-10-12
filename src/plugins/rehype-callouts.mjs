@@ -43,7 +43,7 @@ export default function rehypeCallouts() {
       if (!m) return;
       const kind = m[1].toUpperCase();
       first.value = first.value.slice(m[0].length);
-      node.tagName = 'aside';
+      node.tagName = 'div'; // role=note: an <aside> inside <main> would be a nested complementary landmark
       node.properties = { ...(node.properties || {}), className: ['callout', `callout-${kind.toLowerCase()}`], role: 'note' };
       node.children.unshift({
         type: 'element',

@@ -27,6 +27,7 @@ let lastWeek = '';
     <Locked title={data.meta.title || data.module.title} code={data.meta.code} color={color} description={data.meta.description} signedIn={gate.signedIn} next={Astro.url.pathname} />
   ) : !data ? (
     <div class="container" style="padding-block: 160px 120px">
+      <h1 class="sr-only">Module not found</h1>
       <EmptyState title="This module isn't available." body="It may not be published yet." path="modules/" />
     </div>
   ) : (

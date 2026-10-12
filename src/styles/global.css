@@ -524,6 +524,7 @@ a.row:hover .go { background: var(--accent); color: var(--accent-ink); border-co
 }
 .dash-list { list-style: none; padding: 0; display: grid; gap: 10px; }
 .dash-list li { position: relative; padding-left: 22px; color: var(--text-2); }
+.dash-list li > a { display: inline-block; padding-block: 2px; } /* ≥ 24px tap target */
 .dash-list li::before { content: '→'; position: absolute; left: 0; color: var(--accent-text); font-family: var(--font-mono); }
 
 /* prev / next pager */
