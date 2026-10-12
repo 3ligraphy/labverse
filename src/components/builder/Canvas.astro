@@ -99,7 +99,7 @@ const json = JSON.stringify(config).replace(/</g, '\\u003c');
     position: fixed; inset: var(--nav-h) 0 0 0; z-index: 40; display: grid; grid-template-rows: auto 1fr; background: var(--bg); }
   :root[data-theme='light'] .cv { --cv-bg: #f1f0ea; --cv-dot: rgb(0 0 0 / 0.09); --cv-node: #ffffff; --cv-edge: #a3a8b0; }
   .cv-bar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface); flex-wrap: wrap; }
-  .cv-back { font-size: 13px; color: var(--text-3); white-space: nowrap; }
+  .cv-back { display: inline-flex; align-items: center; min-height: 28px; font-size: 13px; color: var(--text-3); white-space: nowrap; }
   .cv-back:hover { color: var(--text); }
   .cv-title p { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-text); }
   .cv-title h1 { font-size: 18px; letter-spacing: -.02em; line-height: 1.2; }

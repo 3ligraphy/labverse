@@ -143,7 +143,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             {doctor && <a class="btn btn-ghost btn-sm" href="/admin/accounts">Accounts →</a>}
             <a class="btn btn-ghost btn-sm" href="/admin/assessment/mobile-development">Assessment →</a>
             <a class="btn btn-ghost btn-sm" href="/admin/project">Submissions →</a>
-            <form method="post" action="/api/admin/logout"><button class="btn btn-ghost btn-sm" type="submit">Log out</button></form>
+            <form method="post" action="/api/admin/logout"><button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
           </div>
         </header>
         <p class="muted small">This attendance list belongs only to the teaching session selected above. Students, check-ins and progress from parallel sessions remain separate.</p>
@@ -184,7 +184,9 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .board-count { font-size: clamp(2.2rem, 1.6rem + 3vw, 3.4rem); letter-spacing: -0.04em; margin-top: 6px; }
   .board-count b { color: var(--accent-text); font-variant-numeric: tabular-nums; }
   .board-count span { font-size: 0.45em; color: var(--text-2); font-weight: 500; letter-spacing: -0.01em; }
-  .board-actions { display: flex; align-items: center; gap: 10px; }
+  /* up to eight tools: wrap instead of running past the screen edge beside the sidebar */
+  .board-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px 10px; }
+  .board-head > * { min-width: 0; max-width: 100%; }
   @media (max-width: 719px) {
     .board-actions { flex-wrap: wrap; gap: 8px; }
     .board-actions :global(.btn), .board-actions :global(form) { flex: 1 1 auto; }
@@ -494,7 +496,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       renderSessionManager(stats);
       render(root, stats);
       live.classList.add('on');
-      live.textContent = `live · ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+      live.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
       attendanceLive?.classList.add('on');
       if (attendanceLive) attendanceLive.textContent = live.textContent;
     } catch (error) {

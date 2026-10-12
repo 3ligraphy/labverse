@@ -129,6 +129,7 @@ export function renderForm(
             input.className = 'input';
             input.value = item;
             input.placeholder = field.placeholder ?? 'Item';
+            input.setAttribute('aria-label', `${field.label} ${index + 1}`);
             input.oninput = () => { items[index] = input.value; emit(); };
             const remove = smallButton('\u00d7', 'Remove item');
             remove.onclick = () => { items.splice(index, 1); redraw(); emit(); };
