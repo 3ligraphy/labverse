@@ -7,6 +7,7 @@ function run(args) {
 }
 
 run(['node_modules/astro/bin/astro.mjs', 'build']);
+if (process.env.PSYCHOLOGY_STUDENT_HASH) run(['scripts/seed-psychology-student.mjs']);
 // Explicit one-time deployment opt-in; normal builds never mutate course data.
 if (process.env.SEED_PSYCHOLOGY === '1') {
   if (process.env.VERCEL_ENV !== 'production') throw new Error('Seeding requires a production deployment.');
