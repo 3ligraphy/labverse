@@ -12,7 +12,7 @@ const groups = inCourse
       { title: 'Build', links: nav.slice(4, 7) },
       { title: 'Help', links: [nav[7], ...secondaryNav] },
     ]
-  : [{ title: 'Platform', links: [{ label: 'Choose a module', href: '/' }, { label: 'All modules', href: '/modules' }, { label: 'Sign in', href: '/login' }] }];
+  : [{ title: 'Platform', links: [{ label: 'Your modules', href: '/' }, { label: 'All modules', href: '/modules' }, ...(path === '/login' ? [] : [{ label: 'Sign in', href: '/login' }])] }];
 ---
 <footer class="footer">
   <div class="container">
