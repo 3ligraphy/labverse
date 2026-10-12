@@ -72,7 +72,7 @@ if (!(await access(Astro.cookies)).can('platform.settings')) return Astro.redire
 
 <style is:global>
   .cat { padding-top: calc(var(--nav-h) + 40px); padding-bottom: 100px; display: grid; gap: 20px; }
-  .cat-k { color: var(--accent-text); text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
+  .cat-k { color: var(--accent-text); font-size: 12px; }
   .cat-top h1 { font-size: var(--fs-2xl); letter-spacing: -.05em; margin-top: 4px; }
   .cat-top .muted { margin-top: 6px; max-width: 70ch; }
   .cat-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); align-items: start; }

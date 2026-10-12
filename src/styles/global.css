@@ -193,8 +193,7 @@ main:focus { outline: none; } /* focused by the skip link and back-to-top, not a
 /* ---------- 4. TYPOGRAPHY ------------------------------------------------ */
 .eyebrow {
   display: inline-flex; align-items: center; gap: 10px;
-  font-family: var(--font-mono); font-size: var(--fs-xs); font-weight: 500;
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3);
+  font-family: var(--font-mono); font-size: var(--fs-xs); font-weight: 500; color: var(--text-3);
 }
 .eyebrow::before { content: '//'; color: var(--accent-text); letter-spacing: 0; }
 .eyebrow.no-slash::before { content: none; }
@@ -225,14 +224,15 @@ main:focus { outline: none; } /* focused by the skip link and back-to-top, not a
 .btn:active { transform: scale(0.97); }
 .btn svg { width: 16px; height: 16px; transition: transform var(--t-med) var(--ease-out); }
 .btn:hover svg.arrow { transform: translateX(3px); }
-.btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08) inset, 0 8px 28px -10px var(--accent-glow); }
+/* the glow is feedback: it appears on hover and focus, not at rest */
+.btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08) inset; }
 .btn-primary::after {
   content: ''; position: absolute; inset: 0; z-index: -1;
   background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.55) 50%, transparent 70%);
   transform: translateX(-120%); transition: transform 700ms var(--ease-out);
 }
 .btn-primary:hover::after { transform: translateX(120%); }
-.btn-primary:hover { box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08) inset, 0 12px 36px -10px var(--accent-glow); }
+.btn-primary:is(:hover, :focus-visible) { box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08) inset, 0 10px 30px -10px var(--accent-glow); }
 .btn-ghost { background: transparent; border: 1px solid var(--line-2); color: var(--text); }
 .btn-ghost:hover { background: var(--surface-2); border-color: var(--text-3); }
 .btn-sm { --h: 36px; padding: 0 14px; font-size: var(--fs-xs); }

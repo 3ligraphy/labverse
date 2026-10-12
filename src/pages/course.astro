@@ -83,36 +83,28 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
         <p class="lead" data-reveal>{course.overview.what}</p>
       </div>
 
-      <dl class="ov-stats" data-reveal>
-        <div><dt>Labs</dt><dd class="num">{pad(labs.length)}</dd></div>
-        <div><dt>Coursework</dt><dd class="num">{pad(coursework.length)}</dd></div>
-        <div><dt>Course project</dt><dd class="num">{pad(project ? 1 : 0)}</dd></div>
-        <div><dt>Tools</dt><dd class="num">{pad(tools.length)}</dd></div>
-        <div><dt>Commands</dt><dd class="num">{pad(commands.length)}</dd></div>
-      </dl>
-
       <div class="ov-spec">
         <div class="ov-row" data-reveal>
-          <h3 class="mono ov-k">01 — You'll learn</h3>
+          <h3 class="mono ov-k">You'll learn</h3>
           <ul class="dash-list">{course.overview.learn.map((l) => <li>{l}</li>)}</ul>
         </div>
         <div class="ov-row" data-reveal>
-          <h3 class="mono ov-k">02 — You'll build</h3>
+          <h3 class="mono ov-k">You'll build</h3>
           <p>{course.overview.build}</p>
         </div>
         <div class="ov-row" data-reveal>
-          <h3 class="mono ov-k">03 — You'll use</h3>
+          <h3 class="mono ov-k">You'll use</h3>
           <p>{course.overview.tools} <a href="/tools" class="inline-link">See the toolkit →</a></p>
         </div>
         <div class="ov-row" data-reveal id="assessment">
-          <h3 class="mono ov-k">04 — Assessment</h3>
+          <h3 class="mono ov-k">Assessment</h3>
           <div class="asm">
             <SplitBar items={assessment.map((a) => ({ label: a.label, value: a.weight, sub: a.detail }))} size="md" />
             <a href="/coursework" class="inline-link">Coursework breakdown →</a>
           </div>
         </div>
         <div class="ov-row" data-reveal id="team">
-          <h3 class="mono ov-k">05 — Teaching team</h3>
+          <h3 class="mono ov-k">Teaching team</h3>
           <ul class="team">
             {team.map((m) => (
               <li>
@@ -124,7 +116,7 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
           </ul>
         </div>
         <div class="ov-row ov-outcome" data-reveal>
-          <h3 class="mono ov-k">06 — By the end</h3>
+          <h3 class="mono ov-k">By the end</h3>
           <p class="ov-big">{course.overview.outcome}</p>
         </div>
       </div>
@@ -400,14 +392,6 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
   @media (max-width: 560px) { .ws-desc { display: none; } .ws-row { gap: 12px; } }
 
   /* overview */
-  .ov-stats { display: grid; grid-template-columns: repeat(2, 1fr); border-block: 1px solid var(--line); margin-bottom: 64px; }
-  @media (min-width: 720px) { .ov-stats { grid-template-columns: repeat(5, 1fr); } }
-  .ov-stats > div { padding: 24px 20px 24px 0; border-right: 1px solid var(--line); }
-  .ov-stats > div + div { padding-left: 20px; }
-  .ov-stats > div:last-child { border-right: 0; }
-  @media (max-width: 719px) { .ov-stats > div:nth-child(2n) { border-right: 0; } .ov-stats > div:nth-child(2n+1) { padding-left: 0; } .ov-stats > div { border-bottom: 1px solid var(--line); } }
-  .ov-stats dt { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
-  .ov-stats dd { font-family: var(--font-display); font-size: clamp(40px, 5vw, 64px); font-weight: 600; letter-spacing: -0.04em; line-height: 1; margin-top: 12px; }
   .ov-spec { display: grid; gap: 0; }
   .ov-row { display: grid; gap: 12px; padding-block: 28px; border-top: 1px solid var(--line); color: var(--text-2); }
   @media (min-width: 900px) { .ov-row { grid-template-columns: 280px 1fr; gap: 48px; } }

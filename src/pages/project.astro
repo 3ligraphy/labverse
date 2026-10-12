@@ -57,8 +57,7 @@ const nav = d ? [
       <div class="container pj-body">
         <section id="overview" class="pj-sec pj-split">
           <div>
-            <p class="eyebrow">What you're building</p>
-            <h2 class="h-2 mt-4">Overview</h2>
+            <h2 class="h-2">Overview</h2>
           </div>
           <div class="stack" style="--stack:20px">
             <p class="lead">{d.description}</p>
@@ -71,13 +70,12 @@ const nav = d ? [
         </section>
 
         <section id="files" class="pj-sec pj-split" data-pj-files hidden>
-          <div><p class="eyebrow">Download &amp; submit</p><h2 class="h-2 mt-4">Submissions</h2></div>
+          <div><h2 class="h-2">Submissions</h2></div>
           <div class="pjf-list" data-pj-file-list></div>
         </section>
 
         <section id="journey" class="pj-sec">
-          <p class="eyebrow">Project journey</p>
-          <h2 class="h-2 mt-4">Milestones</h2>
+          <h2 class="h-2">Milestones</h2>
           <ol class="mj">
             {d.milestones.map((m, i) => (
               <li class="mj-item" data-reveal style={`--d:${i * 70}ms`}>
@@ -91,13 +89,12 @@ const nav = d ? [
         </section>
 
         <section id="requirements" class="pj-sec pj-split">
-          <div><p class="eyebrow">Must have</p><h2 class="h-2 mt-4">Requirements</h2></div>
+          <div><h2 class="h-2">Requirements</h2></div>
           <ul class="check-list big">{d.requirements.map((r) => <li set:html={inline(r)} />)}</ul>
         </section>
 
         <section id="features" class="pj-sec">
-          <p class="eyebrow">Functionality</p>
-          <h2 class="h-2 mt-4">Features</h2>
+          <h2 class="h-2">Features</h2>
           <div class="feat">
             <div class="feat-col">
               <p class="feat-k mono"><span class="badge badge-accent"><span class="dot"></span>Required</span></p>
@@ -126,32 +123,32 @@ const nav = d ? [
         </section>
 
         <section id="deliverables" class="pj-sec pj-split">
-          <div><p class="eyebrow">Hand in</p><h2 class="h-2 mt-4">Deliverables</h2></div>
+          <div><h2 class="h-2">Deliverables</h2></div>
           <ol class="dlv">{d.deliverables.map((x, i) => <li><span class="mono">{pad(i + 1)}</span><span set:html={inline(x)} /></li>)}</ol>
         </section>
 
         <section id="evaluation" class="pj-sec pj-split">
-          <div><p class="eyebrow">Assessment</p><h2 class="h-2 mt-4">Evaluation</h2></div>
+          <div><h2 class="h-2">Evaluation</h2></div>
           <Rubric items={d.evaluation} />
         </section>
 
         {Content && (
           <section class="pj-sec pj-split">
-            <div><p class="eyebrow">Advice</p><h2 class="h-2 mt-4">Notes</h2></div>
+            <div><h2 class="h-2">Notes</h2></div>
             <div class="prose"><Content /></div>
           </section>
         )}
 
         {d.resources.length > 0 && (
           <section id="resources" class="pj-sec pj-split">
-            <div><p class="eyebrow">Help</p><h2 class="h-2 mt-4">Resources</h2></div>
+            <div><h2 class="h-2">Resources</h2></div>
             <div class="row-list">{d.resources.map((r) => <a href={r.href} class="row" style="grid-template-columns:1fr 36px"><span>{r.label}</span><span class="go"><Icon name="arrow-up-right" /></span></a>)}</div>
           </section>
         )}
 
         {d.faq.length > 0 && (
           <section id="faq" class="pj-sec pj-split">
-            <div><p class="eyebrow">Questions</p><h2 class="h-2 mt-4">FAQ</h2></div>
+            <div><h2 class="h-2">FAQ</h2></div>
             <Faq items={d.faq} />
           </section>
         )}
@@ -216,7 +213,7 @@ const nav = d ? [
   .feat-col.stretch { border-top-style: dashed; border-top-color: color-mix(in oklab, var(--info) 50%, var(--line)); }
   .tu { display: grid; gap: 16px; }
   @media (min-width: 900px) { .tu { grid-template-columns: 1fr 1fr; } }
-  .tu-k { display: flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-text); }
+  .tu-k { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--accent-text); }
   .dlv { list-style: none; padding: 0; counter-reset: d; border-top: 1px solid var(--line); }
   .dlv li { display: grid; grid-template-columns: 48px 1fr; gap: 12px; padding: 18px 0; border-bottom: 1px solid var(--line); font-size: 1.05rem; }
   .dlv .mono { color: var(--accent-text); font-size: 13px; padding-top: 3px; }
