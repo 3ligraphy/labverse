@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { compileLab, compileModule } from '../src/lib/platform/core.ts';
+import { psychologyTechnologyLab03 } from '../src/lib/platform/seeds/psychology-technology-lab-03.ts';
+import { psychologyTechnologyModule } from '../src/lib/platform/seeds/psychology-technology-lab-01.ts';
+import { moduleSearchItems } from '../src/lib/platform/search.ts';
+test('deployment session is reachable, tracked and searchable with real CMS verification', () => {
+  const lab = compileLab(psychologyTechnologyLab03(), 'technology-for-psychology--lab-03');
+  assert.deepEqual(lab.warnings, []);
+  assert.equal(lab.hasCheckin, true);
+  const tasks = lab.blocks.filter((b) => b.kind === 'task');
+  assert.equal(tasks.length, 10);
+  assert.equal(tasks.reduce((sum, task) => sum + parseInt(task.time), 0), 120);
+  assert.ok(tasks.some((t) => /Prove.*CMS/.test(t.title)));
+  assert.ok(tasks.some((t) => /signed-out/.test(t.body)));
+  assert.ok(compileModule(psychologyTechnologyModule()).items.some((i) => i.kind === 'lab' && i.slug === 'lab-03'));
+  const results = moduleSearchItems('technology-for-psychology', 'Technology for Psychology', [{ slug: 'lab-03', compiled: lab }]);
+  assert.ok(results.some((r) => r.u.endsWith('?tab=deployment')));
+  assert.ok(results.some((r) => r.u.includes('/lab-03#task-')));
+});

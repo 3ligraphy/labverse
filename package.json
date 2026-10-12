@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "vercel-build": "node scripts/vercel-build.mjs",
     "preview": "astro preview",
     "check": "astro check",
     "test": "node --test tests/*.test.ts"

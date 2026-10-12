@@ -1,0 +1,27 @@
+---
+/**
+ * "Website preview" block: a staff-written page (HTML + CSS) in a browser window, with Desktop / Tablet / Phone
+ * sizes and full screen. Shows students what they are about to build before they build it.
+ *   <WebPreview title="Clinic home page" url="mindcare-clinic.com" html="…" height="Tall" caption="…" />
+ */
+import WebFrame from './WebFrame.astro';
+
+interface Props { title: string; url: string; html: string; height: 'Short' | 'Medium' | 'Tall'; caption: string }
+const { title, url, html, height, caption } = Astro.props;
+const label = title || (url ? `Preview of ${url}` : 'Website preview');
+---
+<figure class="wp" data-reveal>
+  {title && (
+    <p class="wp-head"><span class="wp-kind mono">Website preview</span><span class="wp-title">{title}</span></p>
+  )}
+  <WebFrame html={html} url={url} height={height} title={label} />
+  {caption && <figcaption class="wp-cap">{caption}</figcaption>}
+</figure>
+
+<style>
+  .wp { margin-inline: 0; margin-bottom: 0; display: grid; gap: 10px; }
+  .wp-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 !important; }
+  .wp-kind { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--info); font-weight: 600; }
+  .wp-title { font-family: var(--font-display); font-size: 1.15rem; letter-spacing: -0.02em; color: var(--text); font-weight: 600; }
+  .wp-cap { font-size: 14px; color: var(--text-3); text-align: center; text-wrap: balance; }
+</style>

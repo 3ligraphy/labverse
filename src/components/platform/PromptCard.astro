@@ -1,0 +1,140 @@
+---
+/**
+ * AI prompt card: a prompt to copy into ChatGPT (or another assistant), shown like a message waiting to be sent.
+ * [Placeholders] are highlighted so students replace them; "Copy prompt" copies the text, "Open in ChatGPT/Claude"
+ * starts a chat with it filled in; "What a good answer looks like" holds the staff's expected answer.
+ *   <PromptCard id="m--lab-01--n4" title="Ask for a homepage" tool="ChatGPT" prompt="Write … [clinic name]" expectHtml="<p>…</p>" />
+ */
+import { assistantLink, promptParts } from '@/lib/platform/web';
+
+interface Props { id: string; title: string; tool: string; prompt: string; expectHtml?: string }
+const { id, title, tool, prompt, expectHtml } = Astro.props;
+const parts = promptParts(prompt);
+const slots = parts.filter((p) => p.slot).length;
+const open = assistantLink(tool, prompt);
+const TOOL_COLORS: Record<string, string> = { chatgpt: '#10a37f', claude: '#d97757', gemini: '#4c8df6', copilot: '#8b6cf6' };
+const toolColor = TOOL_COLORS[tool.trim().toLowerCase()] ?? 'var(--accent-text)';
+const headId = `pc-${id.replace(/[^\w-]/g, '-')}`;
+---
+<section class="pc" data-pc data-pc-slots={slots ? String(slots) : undefined} data-reveal aria-labelledby={headId} style={`--tool:${toolColor}`}>
+  <header class="pc-head">
+    <span class="pc-tool mono">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.1 6.1 6.1 2.1-6.1 2.1L12 19l-2.1-6.2L3.8 10.7l6.1-2.1Z" /><path d="M19 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8Z" opacity=".7" /></svg>
+      {tool === 'Any AI assistant' ? 'AI prompt' : `${tool} prompt`}
+    </span>
+    <h4 class="pc-title" id={headId}>{title}</h4>
+  </header>
+
+  <div class="pc-msg">
+    <span class="pc-you mono" aria-hidden="true">You</span>
+    <p class="pc-text" data-pc-text>{parts.map((p) => (p.slot ? <mark class="pc-slot">{p.text}</mark> : p.text))}</p>
+  </div>
+  {slots > 0 && (
+    <p class="pc-note">
+      <mark class="pc-slot pc-slot-sm" aria-hidden="true">[ ]</mark>
+      Replace the {slots === 1 ? 'highlighted part' : `${slots} highlighted parts`} with your own details before you send it.
+    </p>
+  )}
+
+  <div class="pc-actions">
+    <button type="button" class="btn btn-primary pc-copy" data-pc-copy>
+      <svg class="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></svg>
+      <svg class="i-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+      <span data-pc-label>Copy prompt</span>
+    </button>
+    {open && (
+      <a class="btn btn-ghost pc-open" href={open.href} target="_blank" rel="noopener noreferrer" data-pc-open>
+        {open.label}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+        <span class="sr-only">(opens in a new tab)</span>
+      </a>
+    )}
+    <p class="pc-status" data-pc-status role="status" aria-live="polite"></p>
+  </div>
+
+  {expectHtml && (
+    <details class="pc-expect">
+      <summary>
+        <span class="pc-ai" aria-hidden="true"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 2.5l2.1 6.1 6.1 2.1-6.1 2.1L12 19l-2.1-6.2L3.8 10.7l6.1-2.1Z" /></svg></span>
+        What a good answer looks like
+        <svg class="pc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </summary>
+      <div class="pc-answer" set:html={expectHtml} />
+    </details>
+  )}
+</section>
+
+<style>
+  .pc {
+    --tool-soft: color-mix(in oklab, var(--tool) 12%, transparent);
+    position: relative; margin-block: 8px !important; padding: 18px 18px 16px;
+    border-radius: var(--r-lg); border: 1px solid color-mix(in oklab, var(--tool) 32%, var(--line));
+    background:
+      radial-gradient(120% 90% at 100% 0%, color-mix(in oklab, var(--tool) 9%, transparent), transparent 60%),
+      var(--surface);
+    display: grid; gap: 14px;
+  }
+  .pc-head { display: grid; gap: 4px; }
+  .pc-tool {
+    justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--text); background: var(--tool-soft);
+    border: 1px solid color-mix(in oklab, var(--tool) 40%, transparent);
+  }
+  .pc-tool svg { color: var(--tool); }
+  .pc-title { font-family: var(--font-display); font-size: 1.2rem; letter-spacing: -0.02em; color: var(--text); margin: 4px 0 0 !important; line-height: 1.25; }
+
+  /* the prompt, drawn as the message you are about to send */
+  .pc-msg {
+    position: relative; margin: 0 !important; padding: 14px 16px 16px; border-radius: 16px 16px 4px 16px;
+    background: var(--bg); border: 1px solid var(--line-2);
+  }
+  .pc-you { display: block; margin-bottom: 6px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
+  .pc-text { margin: 0 !important; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1rem; line-height: 1.7; color: var(--text); }
+  .pc-slot {
+    padding: 0.05em 0.3em; border-radius: 5px; color: var(--text); font-weight: 600;
+    background: color-mix(in oklab, var(--warn) 18%, transparent); outline: 1px dashed color-mix(in oklab, var(--warn) 70%, transparent); outline-offset: -1px;
+    box-decoration-break: clone; -webkit-box-decoration-break: clone;
+  }
+  .pc-note { display: flex; align-items: baseline; gap: 8px; margin: -4px 0 0 !important; font-size: 14px; color: var(--text-2); }
+  .pc-slot-sm { flex: none; font-family: var(--font-mono); font-size: 11px; padding: 0 4px; }
+
+  .pc-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 !important; }
+  .pc-copy { --h: 48px; padding: 0 22px; font-size: 15px; }
+  .pc-copy svg { width: 18px; height: 18px; }
+  .pc-copy .i-ok { display: none; }
+  .pc-copy.copied { background: var(--ok); color: #06210f; }
+  :global(:root[data-theme='light']) .pc-copy.copied { color: #fff; }
+  .pc-copy.copied .i-copy { display: none; }
+  .pc-copy.copied .i-ok { display: block; animation: pop 420ms var(--ease-out); }
+  .pc .pc-open { text-decoration: none; color: var(--text); }
+  .pc-open { --h: 48px; font-size: 14px; border-color: color-mix(in oklab, var(--tool) 45%, var(--line-2)); }
+  .pc-open:hover { border-color: var(--tool); background: var(--tool-soft); }
+  .pc-status { flex: 1 1 200px; margin: 0 !important; font-size: 13.5px; color: var(--ok); min-height: 1em; }
+  .pc-status:empty { flex-basis: 0; }
+  :global(.no-js) .pc-copy { display: none; }
+  @media (max-width: 520px) { .pc-copy, .pc-open { flex: 1 1 100%; } }
+
+  /* expected answer: the assistant's reply bubble */
+  .pc-expect { margin: 0 !important; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface-2); padding: 0 !important; }
+  .pc-expect summary {
+    list-style: none; display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 14px !important; cursor: pointer;
+    font-size: 14.5px; font-weight: 600; color: var(--text); border-radius: var(--r-md);
+  }
+  .pc-expect summary::-webkit-details-marker { display: none; }
+  .pc-expect summary:hover { background: var(--surface-3); }
+  .pc-ai { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--tool-soft); color: var(--tool); flex: none; }
+  .pc-chev { margin-left: auto; color: var(--text-3); transition: transform var(--t-med) var(--ease-out); }
+  .pc-expect[open] .pc-chev { transform: rotate(180deg); }
+  .pc-answer { padding: 4px 16px 14px 48px; font-size: 15px; color: var(--text-2); }
+  .pc-answer > :global(* + *) { margin-top: 0.8em; }
+  .pc-expect[open] .pc-answer { animation: pc-in 320ms var(--ease-out); }
+  @keyframes pc-in { from { opacity: 0; transform: translateY(-4px); } }
+  @media (max-width: 520px) { .pc { padding: 16px 14px 14px; } .pc-answer { padding-left: 16px; } }
+  @media (prefers-reduced-motion: reduce) { .pc-expect[open] .pc-answer, .pc-copy.copied .i-ok { animation: none; } .pc-chev { transition: none; } }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  import { initPrompts } from '@/scripts/web-lab';
+  onPageLoad(() => initPrompts());
+</script>

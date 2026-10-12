@@ -1,8 +1,9 @@
 ---
 /**
  * The platform's front door: students choose their module first.
- * First visit: onboarding (year → specialization → optional modules). Then "Your modules": core modules
- * for their year and specialization plus the optional ones they chose. Answers are saved to the student's
+ * First visit: onboarding (faculty → year → specialization → optional modules; the faculty step only when the
+ * catalogue has more than one). Then "Your modules": core modules for their faculty, year and specialization
+ * plus the optional ones they chose (matched with fitsStudent, the same rule as the server). Answers are saved to the student's
  * account when signed in, otherwise in this browser (signing in is optional).
  */
 import Base from '@/layouts/Base.astro';
@@ -11,7 +12,15 @@ import { hubData } from '@/lib/accounts/hub';
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=120');
 const { settings, cards } = await hubData();
-const json = JSON.stringify({ years: settings.years, specializations: settings.specializations, categories: settings.categories, activeSemester: settings.activeSemester, specFrom: settings.specFrom, cards }).replace(/</g, '\\u003c');
+const json = JSON.stringify({ years: settings.years, specializations: settings.specializations, faculties: settings.faculties, categories: settings.categories, activeSemester: settings.activeSemester, specFrom: settings.specFrom, cards }).replace(/</g, '\\u003c');
+const multi = settings.faculties.length > 1;
+// onboarding steps (the faculty is asked only when there is a choice)
+const steps = [
+  ...(multi ? [{ id: 'faculty', dot: 'Faculty', q: 'Which faculty are you in?' }] : []),
+  { id: 'year', dot: 'Year', q: 'Which year are you in?' },
+  { id: 'specialization', dot: 'Specialization', q: "What's your specialization?" },
+  { id: 'optional', dot: 'Optional modules', q: 'Which optional modules did you choose?' },
+];
 ---
 <Base title="Choose your module" description="Pick your module to open its labs, sessions and progress.">
   <section class="hub" data-hub>
@@ -32,24 +41,17 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
       <!-- onboarding -->
       <div class="ob glass" data-ob hidden>
         <ol class="ob-steps mono" aria-hidden="true">
-          <li data-step-dot="1"><span>01</span> Year</li>
-          <li data-step-dot="2"><span>02</span> Specialization</li>
-          <li data-step-dot="3"><span>03</span> Optional modules</li>
+          {steps.map((st, i) => <li data-step-dot={st.id}><span>{String(i + 1).padStart(2, '0')}</span> {st.dot}</li>)}
         </ol>
-        <div class="ob-step" data-step="1">
-          <h2 tabindex="-1"><span class="sr-only">Step 1 of 3: </span>Which year are you in?</h2>
-          <div class="ob-pills" data-pills="year"></div>
-        </div>
-        <div class="ob-step" data-step="2" hidden>
-          <h2 tabindex="-1"><span class="sr-only">Step 2 of 3: </span>What's your specialization?</h2>
-          <div class="ob-pills" data-pills="specialization"></div>
-          <p class="ob-empty" data-spec-general hidden></p>
-        </div>
-        <div class="ob-step" data-step="3" hidden>
-          <h2 tabindex="-1"><span class="sr-only">Step 3 of 3: </span>Which optional modules did you choose?</h2>
-          <p class="ob-note" data-opt-note>Tick the optional modules you registered for. Modules you're invited to appear on their own.</p>
-          <div class="ob-opts" data-opts></div>
-        </div>
+        {steps.map((st, i) => (
+          <div class="ob-step" data-step={st.id} hidden={i > 0}>
+            <h2 tabindex="-1"><span class="sr-only">Step {i + 1} of {steps.length}: </span>{st.q}</h2>
+            {st.id === 'optional'
+              ? <><p class="ob-note" data-opt-note>Tick the optional modules you registered for. Modules you're invited to appear on their own.</p><div class="ob-opts" data-opts></div></>
+              : <div class="ob-pills" data-pills={st.id}></div>}
+            {st.id === 'specialization' && <p class="ob-empty" data-spec-general hidden></p>}
+          </div>
+        ))}
         <div class="ob-foot">
           <button type="button" class="ob-back" data-ob-back hidden>← Back</button>
           <span class="ob-msg" data-ob-msg role="status"></span>
@@ -72,6 +74,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
             <input class="find-q" type="search" placeholder="Search by name, code or description" data-find-q aria-label="Search modules" />
           </div>
           <div class="find-filters">
+            {multi && <select class="find-sel" data-find-fac aria-label="Faculty"><option value="">All faculties</option>{settings.faculties.map((f) => <option value={f.slug}>{f.name}</option>)}</select>}
             <select class="find-sel" data-find-year aria-label="Year"><option value="">All years</option>{settings.years.map((y) => <option>{y}</option>)}</select>
             <select class="find-sel" data-find-sem aria-label="Semester"><option value="">Both semesters</option><option>Semester 1</option><option>Semester 2</option></select>
             <select class="find-sel" data-find-spec aria-label="Specialization"><option value="">Any specialization</option>{settings.specializations.map((s) => <option>{s}</option>)}</select>
@@ -199,45 +202,50 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
 </style>
 
 <script>
-  import { GENERAL, hasSpecialization, inSemester, type Semester } from '@/lib/accounts/core';
+  import { ANY_FACULTY, GENERAL, facultyOfProfile, fitsStudent, hasSpecialization, inSemester, type Faculty, type Semester } from '@/lib/accounts/core';
   import { getMe } from '@/scripts/me';
-  type Card = { slug: string; code: string; title: string; term: string; description: string; color: string; href: string; labs: number; builtIn: boolean; category: string; kind: 'core' | 'elective'; open: boolean; years: string[]; specializations: string[]; semester: 'Both' | Semester };
-  type Profile = { year: string; specialization: string; modules: string[] };
+  type Card = { slug: string; code: string; title: string; term: string; description: string; color: string; href: string; labs: number; builtIn: boolean; category: string; kind: 'core' | 'elective'; open: boolean; years: string[]; specializations: string[]; semester: 'Both' | Semester; faculty: string };
+  /** faculty: '' on answers saved before faculties existed (= the default faculty) */
+  type Profile = { year: string; specialization: string; modules: string[]; faculty: string };
   type Me = { user: { name: string; role: string; studentId: string | null; profile: Profile } | null; staff: boolean; doctor: boolean; accounts: boolean; enrolled: string[]; staffModules: Record<string, string>; builderModules: string[] };
 
   const KEY = 'mdx:profile';
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const has = (list: string[], v: string) => !list.length || list.some((x) => x.toLowerCase() === v.toLowerCase());
-  /** Students choose only the built-in course (an optional module for every specialization); everything else is by invitation. */
+  // fitsStudent (shared with the server): the module's faculty (or every faculty), year and specialization;
   // "General" students (before their specialization starts) match only modules open to every specialization
-  const fitsSpec = (m: Card, spec: string) => !m.specializations.length || (spec !== GENERAL && has(m.specializations, spec));
-  /** an open elective a student may add for their year and specialization (Mobile Development by default) */
-  const selfEnrol = (m: Card, p: Pick<Profile, 'year' | 'specialization'>) => m.open && m.kind === 'elective' && has(m.years, p.year) && fitsSpec(m, p.specialization);
+  /** an open elective a student may add for their faculty, year and specialization (Mobile Development by default) */
+  const selfEnrol = (m: Card, p: Pick<Profile, 'year' | 'specialization' | 'faculty'>) => m.open && m.kind === 'elective' && fitsStudent(m, p);
   const optionalFor = (cards: Card[], p: Profile) => cards.filter((m) => selfEnrol(m, p));
   let membership = { enrolled: [] as string[], staff: {} as Record<string, string> };
   let builderModules = new Set<string>();
-  const forMe = (m: Card, p: Profile) => p.modules.includes(m.slug) || membership.enrolled.includes(m.slug) || Boolean(membership.staff[m.slug]) || (m.open && m.kind === 'core' && has(m.years, p.year) && fitsSpec(m, p.specialization));
+  const forMe = (m: Card, p: Profile) => p.modules.includes(m.slug) || membership.enrolled.includes(m.slug) || Boolean(membership.staff[m.slug]) || (m.open && m.kind === 'core' && fitsStudent(m, p));
   const local = {
     get(): Profile | null { try { const p = JSON.parse(localStorage.getItem(KEY) ?? 'null'); return p && p.year ? p : null; } catch { return null; } },
     set(p: Profile) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* private mode */ } },
   };
 
   function card(m: Card, i: number) {
-    const href = builderModules.has(m.slug) ? `/admin/builder/${encodeURIComponent(m.slug)}` : m.href;
-    return `<a class="mcard" href="${esc(href)}" style="--c:${esc(m.color)};--i:${i}" data-module="${esc(m.slug)}">
+    return `<article class="mcard" style="--c:${esc(m.color)};--i:${i}" data-module="${esc(m.slug)}">
       <span class="mcard-top"><span>${esc(m.code || 'Module')}</span><span class="mcard-tag">${esc(m.category)}${m.open ? ' · open' : ' · by invitation'}</span></span>
-      <h3>${esc(m.title)}</h3>
+      <h3><a class="module-card-link" href="${esc(m.href)}">${esc(m.title)}</a></h3>
       ${m.description ? `<p>${esc(m.description)}</p>` : ''}
       <span class="mcard-foot"><span>${m.labs} lab${m.labs === 1 ? '' : 's'}${m.term ? ` · ${esc(m.term)}` : ''}</span><span class="mcard-go" aria-hidden="true">→</span></span>
-    </a>`;
+      ${builderModules.has(m.slug) ? `<a class="module-canvas-link" href="/admin/builder/${encodeURIComponent(m.slug)}" aria-label="Open canvas for ${esc(m.title)}">Open canvas ↗</a>` : ''}
+    </article>`;
   }
 
   async function init() {
     const root = document.querySelector<HTMLElement>('[data-hub]');
     if (!root || root.dataset.wired) return;
     root.dataset.wired = '1';
-    const data = JSON.parse(root.querySelector('[data-hub-data]')!.textContent!) as { years: string[]; specializations: string[]; activeSemester: Semester; specFrom: { year: string; semester: Semester }; cards: Card[] };
+    const data = JSON.parse(root.querySelector('[data-hub-data]')!.textContent!) as { years: string[]; specializations: string[]; faculties: Faculty[]; activeSemester: Semester; specFrom: { year: string; semester: Semester }; cards: Card[] };
     const specialized = (year: string) => hasSpecialization(data, year, data.activeSemester);
+    const multi = data.faculties.length > 1;
+    const facultyNamed = (slug: string) => data.faculties.find((f) => f.slug === slug);
+    const specsOf = (slug: string) => facultyNamed(slug)?.specializations ?? [];
+    /** onboarding steps in order (the faculty step exists only with more than one faculty) */
+    const STEPS = [...root.querySelectorAll<HTMLElement>('[data-step]')].map((el) => el.dataset.step!);
     const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
     const ob = $('[data-ob]'), mine = $('[data-mine]'), who = $('[data-hub-who]');
     const me: Me = (await getMe<Me>()) ?? { user: null, staff: false, doctor: false, accounts: false, enrolled: [], staffModules: {}, builderModules: [] };
@@ -245,12 +253,15 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
     builderModules = new Set(me.builderModules ?? []);
     const student = me.user?.role === 'student' ? me.user : null;
     let profile: Profile | null = student?.profile?.year ? student.profile : local.get();
-    // a year the catalogue no longer lists (the old "Year 4") asks the questions again; a year that now has a
-    // specialization but was saved as "General" (specializations used to start later) asks for it, from step 2
-    let resumeAt = 1;
+    // answers from before faculties belong to the default faculty (one faculty: always that one)
+    if (profile) profile = { ...profile, faculty: multi ? facultyOfProfile(profile) : data.faculties[0]?.slug ?? facultyOfProfile(profile) };
+    // a year or faculty the catalogue no longer lists (the old "Year 4") asks the questions again; a year that now
+    // has a specialization but was saved as "General" (specializations used to start later), or a specialization
+    // no longer in the student's faculty, asks for it, from the specialization step
+    let resumeAt = STEPS[0];
     let carry: Profile | null = null;
-    if (profile && !data.years.includes(profile.year)) profile = null;
-    else if (profile && specialized(profile.year) && !data.specializations.includes(profile.specialization)) { carry = { ...profile, specialization: '' }; profile = null; resumeAt = 2; }
+    if (profile && (!data.years.includes(profile.year) || !facultyNamed(profile.faculty))) profile = null;
+    else if (profile && specialized(profile.year) && !specsOf(profile.faculty).includes(profile.specialization)) { carry = { ...profile, specialization: '' }; profile = null; resumeAt = 'specialization'; }
     // a choice saved in this browser can only hold modules students may pick themselves
     if (profile) profile = { ...profile, modules: profile.modules.filter((slug) => data.cards.some((c) => c.slug === slug && selfEnrol(c, profile!))) };
 
@@ -278,7 +289,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
       mode(true);
       $('[data-hub-title]').innerHTML = 'Your <span>modules</span>';
       $('[data-hub-sub]').textContent = 'Open a module to see its labs. Your TA starts each lab session.';
-      $('[data-mine-chips]').innerHTML = [p.year, data.activeSemester, p.specialization === GENERAL ? 'General' : p.specialization, `${p.modules.length} optional`].map((t) => `<span>${esc(t)}</span>`).join('')
+      $('[data-mine-chips]').innerHTML = [...(multi ? [facultyNamed(p.faculty)?.name ?? ''] : []), p.year, data.activeSemester, p.specialization === GENERAL ? 'General' : p.specialization, `${p.modules.length} optional`].map((t) => `<span>${esc(t)}</span>`).join('')
         // without an account these answers live only in this browser: say so, so a shared computer doesn't look like "mine"
         + (me.user ? '' : '<span class="warn">saved in this browser only</span>');
       const all = data.cards.filter((m) => forMe(m, p));
@@ -294,9 +305,11 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
     const findQ = $<HTMLInputElement>('[data-find-q]');
     const fYear = $<HTMLSelectElement>('[data-find-year]'), fSem = $<HTMLSelectElement>('[data-find-sem]');
     const fSpec = $<HTMLSelectElement>('[data-find-spec]'), fCat = $<HTMLSelectElement>('[data-find-cat]');
+    const fFac = root.querySelector<HTMLSelectElement>('[data-find-fac]');
     const renderFind = (p: Profile) => {
       const q = findQ.value.trim().toLowerCase();
       const list = data.cards.filter((m) => (!q || `${m.title} ${m.code} ${m.description} ${m.term} ${m.category}`.toLowerCase().includes(q))
+        && (!fFac?.value || m.faculty === fFac.value || m.faculty === ANY_FACULTY)
         && (!fYear.value || has(m.years, fYear.value))
         && (!fSem.value || inSemester(m, fSem.value as Semester))
         && (!fSpec.value || has(m.specializations, fSpec.value))
@@ -310,7 +323,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
             : '<span class="mstate locked">Invitation only · ask the module leader</span>'}`)).join('')}</div></section>`).join('');
       $('[data-find-none]').hidden = groups.length > 0;
     };
-    [findQ, fYear, fSem, fSpec, fCat].forEach((el) => el.addEventListener('input', () => profile && renderFind(profile)));
+    [findQ, fYear, fSem, fSpec, fCat, fFac].forEach((el) => el?.addEventListener('input', () => profile && renderFind(profile)));
     $('[data-others-grid]').addEventListener('click', async (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-add]');
       if (!b || !profile) return;
@@ -327,27 +340,36 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
 
     // onboarding
     const start = profile ?? carry;
-    const draft: Profile = { year: start?.year ?? '', specialization: start?.specialization ?? '', modules: [...(start?.modules ?? [])] };
-    let step = resumeAt;
+    const draft: Profile = { faculty: start?.faculty ?? (multi ? '' : data.faculties[0]?.slug ?? ''), year: start?.year ?? '', specialization: start?.specialization ?? '', modules: [...(start?.modules ?? [])] };
+    let step = Math.max(0, STEPS.indexOf(resumeAt));
+    const at = () => STEPS[step];
+    const last = () => step === STEPS.length - 1;
     // first run: the built-in course is the optional module almost every student takes, so it starts ticked
     let pretick = !profile && !carry;
     let confirmNone = false;
     const next = $<HTMLButtonElement>('[data-ob-next]'), back = $<HTMLButtonElement>('[data-ob-back]'), msg = $('[data-ob-msg]');
     const say = (text: string, error = false) => { msg.textContent = text; msg.classList.toggle('is-err', error); };
     const finishLabel = () => {
-      if (step !== 3) return;
+      if (!last()) return;
       const n = draft.modules.length;
       next.textContent = n ? `Finish · ${n} module${n === 1 ? '' : 's'}` : confirmNone ? 'Finish anyway' : 'Finish';
     };
-    const pills = (key: 'year' | 'specialization', items: string[]) => {
-      const box = $(`[data-pills="${key}"]`);
-      box.innerHTML = items.map((v) => `<button type="button" class="ob-pill" aria-pressed="${draft[key] === v}" data-v="${esc(v)}">${esc(v)}</button>`).join('');
+    /** items: values, or [value, label] pairs (faculties are chosen by name, saved by slug) */
+    const pills = (key: 'faculty' | 'year' | 'specialization', items: (string | [string, string])[]) => {
+      const box = root.querySelector<HTMLElement>(`[data-pills="${key}"]`);
+      if (!box) return;
+      box.innerHTML = items.map((it) => { const [v, label] = typeof it === 'string' ? [it, it] : it; return `<button type="button" class="ob-pill" aria-pressed="${draft[key] === v}" data-v="${esc(v)}">${esc(label)}</button>`; }).join('');
       box.onclick = (e) => {
         const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-v]');
         if (!b) return;
         if (key === 'specialization' && !specialized(draft.year)) return;
         draft[key] = b.dataset.v!;
         box.querySelectorAll('[data-v]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        // another faculty: its own specializations
+        if (key === 'faculty') {
+          if (draft.specialization !== GENERAL && !specsOf(draft.faculty).includes(draft.specialization)) draft.specialization = specialized(draft.year) ? '' : draft.specialization;
+          pills('specialization', specsOf(draft.faculty));
+        }
         render();
         // pick → next; before the specialization starts (Year 3 · Semester 2) there is nothing to pick
         if (key === 'year') draft.specialization = specialized(draft.year) ? (draft.specialization === GENERAL ? '' : draft.specialization) : GENERAL;
@@ -363,7 +385,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
       }
       $('[data-opts]').innerHTML = list.length
         ? list.map((m) => `<button type="button" class="ob-opt" style="--c:${esc(m.color)}" aria-pressed="${draft.modules.includes(m.slug)}" data-m="${esc(m.slug)}"><b>${esc(m.title)}</b><small>${esc(m.code || 'Optional')}${m.term ? ` · ${esc(m.term)}` : ''}</small></button>`).join('')
-        : '<p class="ob-empty">There are no optional modules for your year and specialization yet. Press Finish.</p>';
+        : `<p class="ob-empty">There are no optional modules for your ${multi ? 'faculty, ' : ''}year and specialization yet. Press Finish.</p>`;
       $('[data-opts]').onclick = (e) => {
         const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-m]');
         if (!b) return;
@@ -376,33 +398,33 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
       };
     };
     const render = () => {
-      root.querySelectorAll<HTMLElement>('[data-step]').forEach((s) => (s.hidden = Number(s.dataset.step) !== step));
+      root.querySelectorAll<HTMLElement>('[data-step]').forEach((s) => (s.hidden = s.dataset.step !== at()));
       root.querySelectorAll<HTMLElement>('[data-step-dot]').forEach((d) => {
-        const n = Number(d.dataset.stepDot);
+        const n = STEPS.indexOf(d.dataset.stepDot!);
         d.classList.toggle('on', n === step);
         d.classList.toggle('done', n < step);
       });
-      back.hidden = step === 1;
+      back.hidden = step === 0;
       next.textContent = 'Next →';
-      next.disabled = (step === 1 && !draft.year) || (step === 2 && !draft.specialization);
+      next.disabled = (at() === 'faculty' && !draft.faculty) || (at() === 'year' && !draft.year) || (at() === 'specialization' && !draft.specialization);
       const hasSpecialization = specialized(draft.year);
       $('[data-pills="specialization"]').hidden = !hasSpecialization;
       const general = $('[data-spec-general]');
       general.hidden = hasSpecialization;
       general.textContent = draft.year ? `General — specialization starts in ${data.specFrom.year}, ${data.specFrom.semester}.` : 'Choose your year first.';
       confirmNone = false;
-      if (step === 3) opts();
+      if (last()) opts();
       finishLabel();
       say('');
     };
     const go = (d: number) => {
-      step = Math.max(1, Math.min(3, step + d));
+      step = Math.max(0, Math.min(STEPS.length - 1, step + d));
       render();
       // keyboard and screen-reader users land on the new question
-      root.querySelector<HTMLElement>(`[data-step="${step}"] h2`)?.focus({ preventScroll: true });
+      root.querySelector<HTMLElement>(`[data-step="${at()}"] h2`)?.focus({ preventScroll: true });
     };
     next.addEventListener('click', async () => {
-      if (step < 3) return go(1);
+      if (!last()) return go(1);
       // finishing with no module leads to an empty page: ask once
       if (!draft.modules.length && optionalFor(data.cards, draft).length && !confirmNone) {
         confirmNone = true;
@@ -422,17 +444,19 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
     });
     back.addEventListener('click', () => go(-1));
     $('[data-edit]').addEventListener('click', () => {
-      mine.hidden = true; ob.hidden = false; step = 1; mode(false);
+      mine.hidden = true; ob.hidden = false; step = 0; mode(false);
       $('[data-hub-title]').innerHTML = 'Choose your <span>module</span>';
       render();
-      root.querySelector<HTMLElement>('[data-step="1"] h2')?.focus();
+      root.querySelector<HTMLElement>(`[data-step="${at()}"] h2`)?.focus();
     });
+    pills('faculty', data.faculties.map((f) => [f.slug, f.name]));
     pills('year', data.years);
-    pills('specialization', data.specializations);
+    pills('specialization', specsOf(draft.faculty));
     render();
     if (carry) say(`Specializations start in ${data.specFrom.year} now. Choose yours to see the right modules.`);
 
     if (profile && [...fYear.options].some((o) => o.value === profile!.year)) fYear.value = profile.year;
+    if (profile && fFac) fFac.value = profile.faculty;
     if (profile) showMine(profile);
     else ob.hidden = false;
   }

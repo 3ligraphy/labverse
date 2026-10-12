@@ -1,6 +1,7 @@
 /**
  * POST /api/auth/signup — a student creates an account (optional: students can still just type their
- * name and ID in each lab). { name, email, password, studentId, year, specialization, modules[] }
+ * name and ID in each lab). { name, email, password, studentId, faculty, year, specialization, modules[] }
+ * (faculty: a faculty slug, needed only when the catalogue has more than one)
  */
 import type { APIRoute } from 'astro';
 import { clientIp } from '@/lib/attendance/server';

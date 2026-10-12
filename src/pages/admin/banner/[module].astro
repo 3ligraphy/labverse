@@ -22,7 +22,7 @@ const data = JSON.stringify({ banners }).replace(/</g, '\\u003c');
 const view = slug === BUILT_IN_MODULE.slug ? '/course' : `/m/${slug}`;
 ---
 <Base title={`Banners · ${meta.title}`} noindex>
-  <AdminShell active="home">
+  <AdminShell active="banner">
     <section class="bn container" data-bn data-module={slug} style={`--mc:${meta.color || BUILT_IN_MODULE.color}`}>
       <script type="application/json" data-bn-data set:html={data} />
       <header class="bn-head">

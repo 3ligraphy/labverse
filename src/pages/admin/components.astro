@@ -1,0 +1,239 @@
+---
+/**
+ * Canvas components (permission `platform.settings`): for each module, which lab components its builders see in
+ * the lab canvas palette — the core kit (always), the mobile development kit and the no-code web & AI kit.
+ * Modules are grouped by their faculty. Nodes already in a lab keep working when their component is switched off.
+ * API: /api/admin/platform/components
+ */
+import Base from '@/layouts/Base.astro';
+import AdminShell from '@/components/admin/AdminShell.astro';
+import { access } from '@/lib/accounts/access';
+
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store, max-age=0');
+if (!(await access(Astro.cookies)).can('platform.settings')) return Astro.redirect('/admin', 303);
+---
+<Base title="Canvas components" noindex>
+  <AdminShell active="components">
+    <section class="cmp" data-cmp>
+      <header class="cmp-top">
+        <p class="cmp-k mono">Platform · canvas components</p>
+        <h1>Canvas components</h1>
+        <p class="muted">Choose which components each module's builders can add to its labs. A psychology bootcamp does not need a React Native emulator; a mobile course does not need AI prompt cards. Nodes already in a lab keep working when you switch their component off.</p>
+      </header>
+
+      <div class="cmp-tools">
+        <input class="input cmp-q" type="search" placeholder="Filter modules" aria-label="Filter modules" data-q />
+        <p class="cmp-fine">Part and Task are always on: every lab is built from them.</p>
+      </div>
+
+      <div class="cmp-groups" data-groups><p class="muted">Loading…</p></div>
+    </section>
+  </AdminShell>
+</Base>
+
+<style is:global>
+  .cmp { padding-top: calc(var(--nav-h) + 40px); padding-bottom: 100px; display: grid; gap: 20px; }
+  .cmp-k { color: var(--accent-text); font-size: 12px; }
+  .cmp-top h1 { font-size: var(--fs-2xl); letter-spacing: -.05em; margin-top: 4px; }
+  .cmp-top .muted { margin-top: 6px; max-width: 72ch; }
+  .cmp-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .cmp-q { max-width: 280px; height: 40px; padding: 0 12px; }
+  .cmp-fine { font-size: 12.5px; color: var(--text-3); }
+  .cmp-groups { display: grid; gap: 28px; }
+  .cmp-group { display: grid; gap: 12px; }
+  .cmp-group > h2 { display: flex; align-items: baseline; gap: 10px; font-size: var(--fs-lg); letter-spacing: -.02em; }
+  .cmp-group > h2 small { font: 500 12px var(--font-mono); color: var(--text-3); letter-spacing: 0; }
+  .cmp-mod { border: 1px solid var(--line-2); border-radius: 20px; padding: 18px 20px; display: grid; gap: 14px; background: var(--surface); scroll-margin-top: calc(var(--nav-h) + 20px); }
+  .cmp-mod.is-target { border-color: var(--accent-text); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .cmp-mh { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .cmp-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: 0 0 12px var(--c); }
+  .cmp-mh b { font-size: 15px; }
+  .cmp-mh small { font-size: 12px; color: var(--text-3); }
+  .cmp-mh a { font-size: 12.5px; color: var(--text-2); }
+  .cmp-mh a:hover { color: var(--accent-text); }
+  .cmp-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .cmp-presets > span { font-size: 12px; font-weight: 600; color: var(--text-2); margin-right: 4px; }
+  .cmp-preset { min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-2); background: none; color: var(--text-2); font: 600 12.5px var(--font-body); cursor: pointer; transition: all var(--t-fast); }
+  .cmp-preset:hover { color: var(--text); border-color: var(--text-3); }
+  .cmp-preset[aria-pressed='true'] { border-color: var(--accent-text); background: var(--accent-soft); color: var(--text); }
+  .cmp-kits { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); align-items: start; }
+  .cmp-kit { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 6px; background: var(--bg); min-width: 0; }
+  .cmp-kit legend { padding: 0 6px; font: 600 12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+  .cmp-kit > p { font-size: 12px; color: var(--text-3); margin-bottom: 2px; }
+  .cmp-node { display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: center; min-height: 44px; padding: 6px 8px; border-radius: 10px; cursor: pointer; }
+  .cmp-node:hover { background: var(--surface-2); }
+  .cmp-node input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .cmp-node.is-fixed { cursor: default; }
+  .cmp-node.is-fixed:hover { background: none; }
+  .cmp-glyph { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: color-mix(in oklab, var(--nc) 22%, transparent); color: var(--nc); font: 700 13px var(--font-mono); }
+  :root[data-theme='light'] .cmp-glyph { color: color-mix(in oklab, var(--nc) 55%, #000); }
+  .cmp-node b { display: block; font-size: 13.5px; }
+  .cmp-node small { display: block; font-size: 12px; color: var(--text-3); line-height: 1.35; }
+  .cmp-node .cmp-always { display: inline; margin-left: 6px; font: 500 12px var(--font-mono); color: var(--text-3); }
+  .cmp-node input:not(:checked) ~ .cmp-glyph, .cmp-node input:not(:checked) ~ span b { opacity: .55; }
+  .cmp-bar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cmp-msg { flex: 1; font-size: 13px; color: var(--text-3); min-width: 200px; }
+  .cmp-msg.dirty { color: var(--warn); }
+  .cmp-msg.ok { color: var(--ok); }
+  .cmp-msg.err { color: var(--danger); }
+  .cmp-err { padding: 16px; border-radius: 14px; border: 1px solid var(--danger); color: var(--danger); }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  import { guardUnsaved } from '@/scripts/unsaved';
+  type Kit = 'core' | 'mobile' | 'web';
+  type NodeInfo = { type: string; kit: Kit; label: string; hint: string; glyph: string; color: string };
+  type Mod = { slug: string; title: string; code: string; color: string; faculty: string; published: boolean; builtIn: boolean; nodes: string[] | null };
+  type Data = {
+    kits: Record<Kit, { label: string; hint: string }>;
+    nodes: NodeInfo[];
+    presets: Record<string, { label: string; nodes: string[] }>;
+    faculties: { slug: string; name: string }[];
+    modules: Mod[];
+  };
+  const ALWAYS = ['part', 'task'];
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+  onPageLoad(async () => {
+    const root = document.querySelector<HTMLElement>('[data-cmp]');
+    if (!root || root.dataset.wired) return;
+    root.dataset.wired = '1';
+    const box = root.querySelector<HTMLElement>('[data-groups]')!;
+    const q = root.querySelector<HTMLInputElement>('[data-q]')!;
+
+    const res = await fetch('/api/admin/platform/components', { cache: 'no-store' });
+    const data = (await res.json().catch(() => ({}))) as Data & { error?: string };
+    if (!res.ok) { box.innerHTML = `<p class="cmp-err" role="alert">${esc(data.error ?? 'Could not load the modules.')}</p>`; return; }
+
+    const all = data.nodes.map((n) => n.type);
+    /** working copy: the checked components per module (null in storage = everything) */
+    const working = new Map(data.modules.map((m) => [m.slug, new Set(m.nodes ?? all)]));
+    const saved = new Map(data.modules.map((m) => [m.slug, m.nodes]));
+    const dirty = new Set<string>();
+    const msgs = new Map<string, { text: string; cls: string }>();
+
+    const sameSet = (a: Set<string>, b: string[]) => a.size === b.length && b.every((t) => a.has(t));
+    /** what a module's checklist will store: null when every component is on (so new components appear too) */
+    const toStore = (set: Set<string>): string[] | null => (sameSet(set, all) ? null : all.filter((t) => set.has(t)));
+    const countText = (m: Mod) => {
+      const set = working.get(m.slug)!;
+      return set.size === all.length ? 'every component' : `${set.size} of ${all.length} components`;
+    };
+
+    const facultyName = (slug: string) => slug === 'all' ? 'All faculties' : data.faculties.find((f) => f.slug === slug)?.name ?? `${slug} (not in the catalogue)`;
+    const order = [...data.faculties.map((f) => f.slug), 'all'];
+
+    const nodeRow = (m: Mod, n: NodeInfo) => {
+      const fixed = ALWAYS.includes(n.type);
+      const on = fixed || working.get(m.slug)!.has(n.type);
+      return `<label class="cmp-node${fixed ? ' is-fixed' : ''}" style="--nc:${esc(n.color)}">
+        <input type="checkbox" data-node="${esc(n.type)}" ${on ? 'checked' : ''} ${fixed ? 'disabled' : ''} />
+        <span class="cmp-glyph" aria-hidden="true">${esc(n.glyph)}</span>
+        <span><b>${esc(n.label)}${fixed ? '<span class="cmp-always">always on</span>' : ''}</b><small>${esc(n.hint)}</small></span>
+      </label>`;
+    };
+    const modCard = (m: Mod) => {
+      const set = working.get(m.slug)!;
+      const msg = msgs.get(m.slug) ?? (dirty.has(m.slug) ? { text: 'Unsaved changes', cls: 'dirty' } : { text: countText(m), cls: '' });
+      return `<article class="cmp-mod" id="m-${esc(m.slug)}" data-slug="${esc(m.slug)}" style="--c:${esc(m.color)}">
+        <div class="cmp-mh"><span class="cmp-dot" aria-hidden="true"></span><b>${esc(m.title)}</b>
+          <small class="mono">${esc(m.code || m.slug)}${m.builtIn ? ' · course site' : m.published ? ' · published' : ' · draft'}</small>
+          <a href="/admin/builder/${encodeURIComponent(m.slug)}">Open canvas →</a></div>
+        <div class="cmp-presets" role="group" aria-label="Presets for ${esc(m.title)}"><span>Presets</span>
+          ${Object.entries(data.presets).map(([key, p]) => `<button type="button" class="cmp-preset" data-preset="${esc(key)}" aria-pressed="${sameSet(set, p.nodes)}">${esc(p.label)}</button>`).join('')}
+        </div>
+        <div class="cmp-kits">
+          ${(Object.keys(data.kits) as Kit[]).map((kit) => {
+            const nodes = data.nodes.filter((n) => n.kit === kit);
+            return nodes.length ? `<fieldset class="cmp-kit"><legend>${esc(data.kits[kit].label)}</legend><p>${esc(data.kits[kit].hint)}</p>${nodes.map((n) => nodeRow(m, n)).join('')}</fieldset>` : '';
+          }).join('')}
+        </div>
+        <div class="cmp-bar">
+          <p class="cmp-msg ${msg.cls}" data-msg role="status">${esc(msg.text)}</p>
+          <button type="button" class="btn btn-ghost btn-sm" data-reset ${dirty.has(m.slug) ? '' : 'disabled'}>Undo changes</button>
+          <button type="button" class="btn btn-primary btn-sm" data-save ${dirty.has(m.slug) ? '' : 'disabled'}>Save components</button>
+        </div>
+      </article>`;
+    };
+
+    const render = () => {
+      const t = q.value.trim().toLowerCase();
+      const shown = data.modules.filter((m) => !t || `${m.title} ${m.code} ${m.slug}`.toLowerCase().includes(t));
+      const facs = [...new Set([...order, ...shown.map((m) => m.faculty)])];
+      box.innerHTML = facs.map((f) => {
+        const mods = shown.filter((m) => m.faculty === f);
+        return mods.length ? `<section class="cmp-group"><h2>${esc(facultyName(f))}<small>${mods.length} module${mods.length === 1 ? '' : 's'}</small></h2>${mods.map(modCard).join('')}</section>` : '';
+      }).join('') || `<p class="muted">${data.modules.length ? 'No modules match.' : 'No modules yet. Create one in Modules & lab builder.'}</p>`;
+    };
+    const rerender = (slug: string) => {
+      const m = data.modules.find((x) => x.slug === slug)!;
+      const el = box.querySelector<HTMLElement>(`[data-slug="${CSS.escape(slug)}"]`);
+      if (!el) return;
+      const focused = (document.activeElement as HTMLElement | null)?.dataset;
+      const key = focused?.node ? `[data-node="${CSS.escape(focused.node)}"]` : focused?.preset ? `[data-preset="${CSS.escape(focused.preset)}"]` : null;
+      el.outerHTML = modCard(m);
+      if (key) box.querySelector<HTMLElement>(`[data-slug="${CSS.escape(slug)}"] ${key}`)?.focus();
+    };
+    const touch = (slug: string) => {
+      const stored = saved.get(slug) ?? null;
+      const now = toStore(working.get(slug)!);
+      if (JSON.stringify(stored) === JSON.stringify(now)) dirty.delete(slug); else dirty.add(slug);
+      msgs.delete(slug);
+      rerender(slug);
+    };
+
+    box.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      const slug = t.closest<HTMLElement>('[data-slug]')?.dataset.slug;
+      if (!slug || !t.dataset.node || ALWAYS.includes(t.dataset.node)) return;
+      const set = working.get(slug)!;
+      if (t.checked) set.add(t.dataset.node); else set.delete(t.dataset.node);
+      touch(slug);
+    });
+    box.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement;
+      const slug = target.closest<HTMLElement>('[data-slug]')?.dataset.slug;
+      if (!slug) return;
+      const preset = target.closest<HTMLButtonElement>('[data-preset]');
+      if (preset) {
+        working.set(slug, new Set([...data.presets[preset.dataset.preset!].nodes, ...ALWAYS]));
+        touch(slug);
+        return;
+      }
+      if (target.closest('[data-reset]')) {
+        working.set(slug, new Set(saved.get(slug) ?? all));
+        touch(slug);
+        return;
+      }
+      const btn = target.closest<HTMLButtonElement>('[data-save]');
+      if (!btn) return;
+      btn.disabled = true;
+      const msg = btn.closest('.cmp-bar')!.querySelector<HTMLElement>('[data-msg]')!;
+      msg.textContent = 'Saving…'; msg.className = 'cmp-msg';
+      const nodes = toStore(working.get(slug)!);
+      try {
+        const r = await fetch(`/api/admin/platform/components?module=${encodeURIComponent(slug)}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nodes }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { msgs.set(slug, { text: d.error ?? `Could not save (error ${r.status}). Your choices are still here; try again.`, cls: 'err' }); rerender(slug); return; }
+        saved.set(slug, d.module.nodes);
+        working.set(slug, new Set(d.module.nodes ?? all));
+        dirty.delete(slug);
+        const m = data.modules.find((x) => x.slug === slug)!;
+        msgs.set(slug, { text: `Saved ✓ · builders of this module now see ${countText(m)}. Existing lab nodes are untouched.`, cls: 'ok' });
+        rerender(slug);
+      } catch {
+        msgs.set(slug, { text: 'Could not reach the server. Your choices are still here; try again.', cls: 'err' });
+        rerender(slug);
+      }
+    });
+    q.addEventListener('input', render);
+
+    render();
+    const hash = decodeURIComponent(location.hash.slice(1));
+    const target = hash ? document.getElementById(hash) : null;
+    if (target) { target.classList.add('is-target'); target.scrollIntoView({ block: 'start' }); }
+    guardUnsaved(() => dirty.size > 0);
+  });
+</script>

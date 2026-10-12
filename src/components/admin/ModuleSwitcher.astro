@@ -1,0 +1,24 @@
+---
+/** The sidebar's "Managing" box: Faculty → Module. Behaviour (switching, following the page) lives in AdminShell's script. */
+type Mod = { slug: string; title: string; code: string; color: string; faculty: string; role: string };
+interface Props { ctx: Mod; modules: Mod[]; faculties: [string, string][]; where: string }
+const { ctx, modules, faculties, where } = Astro.props;
+---
+<div class="ash-ctx" data-ash-ctx style={`--mc:${ctx.color}`}>
+  <p class="ash-ctx-k mono"><span class="ash-module-dot" aria-hidden="true"></span>Managing</p>
+  {faculties.length > 1 && (
+    <label class="ash-ctx-f">
+      <span>Faculty</span>
+      <select class="input" data-ash-faculty aria-label={`Switch faculty (${where})`}>
+        {faculties.map(([slug, name]) => <option value={slug} selected={slug === ctx.faculty}>{name}</option>)}
+      </select>
+    </label>
+  )}
+  <label class="ash-ctx-f">
+    <span>Module</span>
+    <select class="input" data-ash-module aria-label={`Choose the module to manage (${where})`}>
+      {modules.filter((m) => m.faculty === ctx.faculty).map((m) => <option value={m.slug} selected={m.slug === ctx.slug}>{m.title}</option>)}
+    </select>
+  </label>
+  <p class="ash-ctx-role mono" data-ash-role>{ctx.code || 'Module'} · {ctx.role}</p>
+</div>

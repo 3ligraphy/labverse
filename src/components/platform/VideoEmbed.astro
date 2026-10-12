@@ -1,0 +1,48 @@
+---
+/**
+ * A YouTube (privacy-enhanced) or Vimeo video, 16:9, loaded only when scrolled near. `embed` is already a safe
+ * embed URL (videoEmbed in lib/platform/core). A plain link to the video sits below, for networks that block embeds.
+ *   <VideoEmbed embed="https://www.youtube-nocookie.com/embed/abc123" title="WordPress in 10 minutes" />
+ */
+import { watchUrl } from '@/lib/platform/web';
+
+interface Props { embed: string; title: string }
+const { embed, title } = Astro.props;
+const watch = watchUrl(embed);
+const site = embed.includes('vimeo') ? 'Vimeo' : 'YouTube';
+---
+<figure class="ve" data-reveal>
+  <div class="ve-frame">
+    <iframe
+      src={embed}
+      title={title}
+      loading="lazy"
+      allow="encrypted-media; picture-in-picture; fullscreen"
+      allowfullscreen
+      referrerpolicy="strict-origin-when-cross-origin"
+    ></iframe>
+  </div>
+  <figcaption class="ve-cap">
+    <span class="ve-play" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M7 4v16l13-8Z" /></svg></span>
+    <span class="ve-title">{title}</span>
+    {watch && (
+      <a class="ve-link mono" href={watch} target="_blank" rel="noopener noreferrer">
+        Watch on {site}<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg><span class="sr-only"> (opens in a new tab)</span>
+      </a>
+    )}
+  </figcaption>
+</figure>
+
+<style>
+  .ve { margin-inline: 0; margin-bottom: 0; display: grid; gap: 10px; }
+  .ve-frame {
+    position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line-2);
+    background: radial-gradient(circle at 50% 45%, var(--surface-3), #050608 70%); box-shadow: var(--shadow-md);
+  }
+  .ve-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .ve-cap { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 14.5px; color: var(--text-2); }
+  .ve-play { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-text); flex: none; }
+  .ve-title { flex: 1 1 auto; font-weight: 550; color: var(--text); }
+  .ve-link { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 12px; color: var(--text-2) !important; text-decoration: none !important; transition: color var(--t-fast), border-color var(--t-fast); }
+  .ve-link:hover { color: var(--text) !important; border-color: var(--text-3); }
+</style>

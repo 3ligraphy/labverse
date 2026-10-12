@@ -1,7 +1,6 @@
 /**
- * Command-palette search. Index is generated at build time by
- * src/pages/search-index.json.ts from every content collection, and fetched
- * lazily the first time the palette opens.
+ * Command-palette search. The layout selects the current workspace's index;
+ * switching modules resets results and ignores stale in-flight responses.
  */
 type Item = { k: string; t: string; d: string; u: string; s?: string; m?: string };
 
@@ -22,6 +21,8 @@ const LABEL: Record<string, string> = { Page: 'Pages', Lab: 'Labs', Coursework: 
 
 let index: Item[] | null = null;
 let loading: Promise<Item[]> | null = null;
+let indexUrl = '';
+let loadError = false;
 let active = 0;
 let current: Item[] = [];
 let filter = 'All';
@@ -30,9 +31,35 @@ let returnFocus: HTMLElement | null = null;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '');
 
+function syncContext() {
+  const next = document.querySelector<HTMLElement>('[data-search]')?.dataset.searchIndex ?? '/api/search';
+  if (next !== indexUrl) {
+    indexUrl = next;
+    index = null;
+    loading = null;
+    current = [];
+    active = 0;
+    filter = 'All';
+    loadError = false;
+    document.querySelector('[data-search-filters]')?.replaceChildren();
+    document.querySelector('[data-search-input]')?.removeAttribute('aria-activedescendant');
+  }
+}
 function load() {
+  syncContext();
   if (index) return Promise.resolve(index);
-  loading ??= fetch('/search-index.json').then((r) => r.json()).then((d: Item[]) => (index = d));
+  const requested = indexUrl;
+  loading ??= fetch(requested, { cache: 'no-store' }).then((r) => {
+    if (!r.ok) throw new Error('Search unavailable');
+    return r.json();
+  }).then((d: Item[]) => {
+    if (!Array.isArray(d)) throw new Error('Invalid search index');
+    if (indexUrl === requested) { index = d; loadError = false; }
+    return d;
+  }).catch((error) => {
+    if (indexUrl === requested) { loading = null; loadError = true; }
+    throw error;
+  });
   return loading;
 }
 
@@ -82,6 +109,11 @@ function run(q: string) {
 function render(q: string) {
   const box = document.querySelector<HTMLElement>('[data-search-results]');
   if (!box) return;
+  document.querySelector('[data-search-input]')?.removeAttribute('aria-activedescendant');
+  if (loadError) {
+    box.innerHTML = '<div class="sp-empty"><strong>Search is unavailable.</strong><span>Close and reopen search to try again.</span></div>';
+    return;
+  }
   if (!index) {
     box.innerHTML = '<div class="sp-loading" aria-label="Loading"><div></div><div></div><div></div></div>';
     return;
@@ -89,7 +121,7 @@ function render(q: string) {
   const { results, terms } = run(q);
   active = 0;
   if (!results.length) {
-    box.innerHTML = `<div class="sp-empty"><div class="glyph">$ grep "<b>${esc(q)}</b>" course/ <br/>→ 0 matches</div><strong>No results found.</strong><span class="faint">Try a broader term like “git”, “emulator” or “lab”.</span></div>`;
+    box.innerHTML = `<div class="sp-empty"><strong>No results found in this workspace.</strong><span class="faint">Try a section title or a shorter search term.</span></div>`;
     return;
   }
   // group preserving rank order of first appearance when searching; kind order when browsing
@@ -147,10 +179,13 @@ export function openSearch(prefill = '') {
   root.hidden = false;
   document.body.style.overflow = 'hidden';
   const input = root.querySelector<HTMLInputElement>('[data-search-input]')!;
+  syncContext();
+  loadError = false;
   input.value = prefill;
   input.focus();
   render(prefill);
-  load().then(() => { renderFilters(); render(input.value); });
+  load().then(() => { if (root === document.querySelector('[data-search]')) { renderFilters(); render(input.value); } })
+    .catch(() => { if (root === document.querySelector('[data-search]')) render(input.value); });
 }
 function closeSearch() {
   const root = document.querySelector<HTMLElement>('[data-search]');
@@ -161,6 +196,8 @@ function closeSearch() {
 }
 
 export function initSearch() {
+  document.addEventListener('astro:before-swap', closeSearch);
+  document.addEventListener('astro:page-load', syncContext);
   document.addEventListener('keydown', (e) => {
     const root = document.querySelector<HTMLElement>('[data-search]');
     const open = root && !root.hidden;

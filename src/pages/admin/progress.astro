@@ -35,10 +35,20 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             <h1 class="pa-h">Lab progress</h1>
           </div>
           <div class="pa-tools">
-            <label class="pa-select">
+            <div class="pa-select pa-pick">
+            <label hidden>
+              <span class="sr-only">Faculty</span>
+              <select class="input" data-pa-faculty></select>
+            </label>
+            <label hidden>
+              <span class="sr-only">Module</span>
+              <select class="input" data-pa-module></select>
+            </label>
+            <label>
               <span class="sr-only">Lab</span>
               <select class="input" data-pa-lab></select>
             </label>
+            </div>
             <div class="pa-ci" data-pa-ci></div>
             <span class="pa-live mono" data-pa-live>connecting…</span>
             <a class="btn btn-ghost btn-sm" data-pa-csv href="#" download>Export CSV</a>
@@ -107,6 +117,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .pa-head { display: grid; gap: 18px; }
   .pa-tools { display: grid; grid-template-columns: minmax(260px, 380px) minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px; }
   .pa-select { grid-column: 1; min-width: 0; }
+  .pa-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pa-pick label[hidden] { display: none; }
   .pa-select select { height: 38px; padding: 0 12px; border-radius: 10px; max-width: min(380px, 80vw); }
   .pa-ci { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; border-radius: var(--r-lg); border: 1px solid var(--line-2); background: var(--surface); }
   .pa-tools > .pa-live { grid-column: 3; grid-row: 1; }
@@ -238,11 +250,12 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
+  import { renderLabPicker, startModule, wireLabPicker, type LabChoice } from '@/scripts/lab-picker';
   type Cell = { passed: number; total: number; attempts: number };
   type Student = { key: string; id: string; name: string; group: string; lastSeen: string; locked: boolean; percent: number; solved: number; tasksDone: number; submission: { url: string; reviewed: boolean; note: string } | null; cells: Record<string, Cell>; attended: string | null; seen: number; activeSec: number };
   type Session = { id: string; lab: string; ta_name: string; time_slot: string; opens_at: string; closes_at: string | null; open: boolean; closesAt: string | null };
   type Data = {
-    labs: { id: string; title: string }[];
+    labs: LabChoice[];
     structure: { lab: string; title: string; tasks: { n: string; title: string }[]; exercises: { id: string; task: string; title: string; checks: number }[]; hasSubmission: boolean };
     students: Student[];
     exercises: { id: string; solvedPct: number; avgAttempts: number; medianSolveMs: number | null }[];
@@ -309,7 +322,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     const live = $('[data-pa-live]');
     async function load() {
       try {
-        const res = await fetch(`/api/admin/progress?lab=${encodeURIComponent(lab)}${sessionId ? `&session=${encodeURIComponent(sessionId)}` : ''}`, { cache: 'no-store' });
+        const module = lab ? '' : startModule();
+        const res = await fetch(`/api/admin/progress?lab=${encodeURIComponent(lab)}${module ? `&module=${encodeURIComponent(module)}` : ''}${sessionId ? `&session=${encodeURIComponent(sessionId)}` : ''}`, { cache: 'no-store' });
         if (res.status === 401) return void location.assign('/admin');
         if (!res.ok) throw new Error(String(res.status));
         data = (await res.json()) as Data;
@@ -332,13 +346,12 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       }, 5000);
     }
 
+    const picker = () => ({ faculty: $<HTMLSelectElement>('[data-pa-faculty]'), module: $<HTMLSelectElement>('[data-pa-module]'), lab: $<HTMLSelectElement>('[data-pa-lab]') });
     function render() {
       if (!data) return;
       const d = data;
       // lab picker + csv
-      const sel = $<HTMLSelectElement>('[data-pa-lab]');
-      if (sel.options.length !== d.labs.length) sel.replaceChildren(...d.labs.map((l) => h('option', { value: l.id }, l.title)));
-      sel.value = d.structure.lab;
+      renderLabPicker(picker(), d.labs, d.structure.lab);
       $<HTMLAnchorElement>('[data-pa-csv]').href = `/api/admin/progress/export?lab=${encodeURIComponent(d.structure.lab)}${sessionId ? `&session=${encodeURIComponent(sessionId)}` : ''}`;
       // stats
       for (const k of ['active', 'avgPercent', 'solved', 'checkedIn', 'submitted'] as const) countTo($(`[data-pa-stat="${k}"]`), d.totals[k]);
@@ -564,6 +577,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     }
 
     /* ------- controls ------- */
+    wireLabPicker(picker(), () => data?.labs ?? []);
     $<HTMLSelectElement>('[data-pa-lab]').addEventListener('change', (e) => {
       lab = (e.target as HTMLSelectElement).value;
       sessionId = '';

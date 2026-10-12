@@ -3,7 +3,10 @@ dist
 .astro
 .claude
 .vercel
-*.log
-.env
-.env.*
 .uploads/
+alicli
+*.token
+*.pem
+output/
+.env*
+*.log

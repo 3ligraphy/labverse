@@ -7,11 +7,23 @@
  * Pure functions only, so they are unit-tested (tests/platform.test.ts) and shared with the builder UI.
  */
 import type { Check, Step } from '../../runner/protocol';
+import { DEFAULT_FACULTY } from '../accounts/core.ts';
 
 /* --------------------------------------------------------------- node types */
 
 export type FieldKind = 'text' | 'textarea' | 'markdown' | 'code' | 'number' | 'select' | 'lines' | 'checks' | 'color';
 export type Field = { key: string; label: string; kind: FieldKind; options?: string[]; placeholder?: string; help?: string; max?: number };
+/**
+ * Canvas component kits. Every module can use the core kit; the admin chooses per module which other lab
+ * components its builders see in the palette (mobile: live React Native editor + terminal; web: AI prompts,
+ * website previews, a live HTML/CSS sandbox and click paths for no-code website labs).
+ */
+export type Kit = 'core' | 'mobile' | 'web';
+export const KITS: Record<Kit, { label: string; hint: string }> = {
+  core: { label: 'Core', hint: 'Parts, tasks, text, media, quizzes and check-in — every module' },
+  mobile: { label: 'Mobile development', hint: 'Live React Native editor with phone emulator, terminal, repo link' },
+  web: { label: 'No-code web & AI', hint: 'AI prompt cards, website previews, live HTML/CSS sandbox, click paths' },
+};
 export type NodeDef = {
   label: string;
   /** one-line description in the palette */
@@ -26,6 +38,8 @@ export type NodeDef = {
   root?: boolean;
   /** cannot be followed by anything (e.g. the module node is only a root) */
   terminal?: boolean;
+  /** lab nodes: the kit it belongs to (missing = core) */
+  kit?: Kit;
 };
 
 export const LAB_NODES = {
@@ -82,12 +96,12 @@ export const LAB_NODES = {
     defaults: { title: '', lang: 'tsx', code: "export default function App() {\n  return null;\n}" },
   },
   terminal: {
-    label: 'Terminal', hint: 'Commands and their output', color: '#8a93a1', glyph: '$',
+    label: 'Terminal', hint: 'Commands and their output', color: '#8a93a1', glyph: '$', kit: 'mobile',
     fields: [{ key: 'lines', label: 'Lines', kind: 'lines', help: '$ command · # comment · > highlight · other lines are output', max: 4000 }],
     defaults: { lines: '$ npx create-expo-app@latest my-app\n# creates the project folder\n> ✔ Your project is ready!' },
   },
   exercise: {
-    label: 'Exercise', hint: 'Live React Native editor, auto-graded', color: '#b69cff', glyph: '⚡',
+    label: 'Exercise', hint: 'Live React Native editor, auto-graded', color: '#b69cff', glyph: '⚡', kit: 'mobile',
     fields: [
       { key: 'title', label: 'Title', kind: 'text', max: 120 },
       { key: 'goal', label: 'Goal', kind: 'markdown', max: 2000 },
@@ -107,8 +121,83 @@ export const LAB_NODES = {
     },
   },
   repo: {
-    label: 'Repo link', hint: 'Students submit their GitHub link (tracked)', color: '#ff7a6b', glyph: '⎇',
+    label: 'Repo link', hint: 'Students submit their GitHub link (tracked)', color: '#ff7a6b', glyph: '⎇', kit: 'mobile',
     fields: [], defaults: {},
+  },
+  image: {
+    label: 'Image', hint: 'Screenshot or picture with a caption', color: '#9fd3ff', glyph: '▣',
+    fields: [
+      { key: 'src', label: 'Image URL (https)', kind: 'text', placeholder: 'https://…/screenshot.png', max: 2000 },
+      { key: 'alt', label: 'Alt text', kind: 'text', help: 'What the image shows, for screen readers', max: 300 },
+      { key: 'caption', label: 'Caption', kind: 'text', max: 300 },
+    ],
+    defaults: { src: '', alt: '', caption: '' },
+  },
+  video: {
+    label: 'Video', hint: 'YouTube or Vimeo video', color: '#ff6b8b', glyph: '▷',
+    fields: [
+      { key: 'url', label: 'Video link', kind: 'text', placeholder: 'https://www.youtube.com/watch?v=…', max: 500 },
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+    ],
+    defaults: { url: '', title: '' },
+  },
+  link: {
+    label: 'Link card', hint: 'A tool or resource to open in a new tab', color: '#7ce0a3', glyph: '↗',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'url', label: 'Link (https)', kind: 'text', placeholder: 'https://', max: 2000 },
+      { key: 'description', label: 'Description', kind: 'textarea', max: 400 },
+      { key: 'cta', label: 'Button label', kind: 'text', placeholder: 'Open', max: 40 },
+    ],
+    defaults: { title: 'Open the tool', url: 'https://', description: '', cta: 'Open' },
+  },
+  quiz: {
+    label: 'Quick check', hint: 'Multiple-choice question with instant feedback', color: '#ffd166', glyph: '?',
+    fields: [
+      { key: 'question', label: 'Question', kind: 'textarea', max: 600 },
+      { key: 'options', label: 'Options', kind: 'lines', help: 'One per line; start the correct one(s) with *', max: 2000 },
+      { key: 'explain', label: 'Explanation (shown after answering)', kind: 'markdown', max: 2000 },
+    ],
+    defaults: { question: 'Which one is right?', options: '*The right answer\nA wrong answer\nAnother wrong answer', explain: '' },
+  },
+  prompt: {
+    label: 'AI prompt', hint: 'A prompt to copy into ChatGPT (or open it there)', color: '#10a37f', glyph: '✦', kit: 'web',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'tool', label: 'Assistant', kind: 'select', options: ['ChatGPT', 'Claude', 'Gemini', 'Copilot', 'Any AI assistant'] },
+      { key: 'prompt', label: 'Prompt', kind: 'textarea', help: 'Write [square brackets] around parts students should replace', max: 8000 },
+      { key: 'expect', label: 'What a good answer looks like', kind: 'markdown', max: 3000 },
+    ],
+    defaults: { title: 'Ask the AI', tool: 'ChatGPT', prompt: 'Write a short welcome paragraph for [my website topic].', expect: '' },
+  },
+  browser: {
+    label: 'Website preview', hint: 'A live web page in a browser frame (desktop / tablet / phone)', color: '#5aa9ff', glyph: '◫', kit: 'web',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'url', label: 'Address bar text', kind: 'text', placeholder: 'mindcare-clinic.com', max: 200 },
+      { key: 'html', label: 'Page HTML (with <style>)', kind: 'code', help: 'Runs in a sandbox. CSS animations welcome.', max: 60000 },
+      { key: 'height', label: 'Height', kind: 'select', options: ['Short', 'Medium', 'Tall'] },
+      { key: 'caption', label: 'Caption', kind: 'text', max: 300 },
+    ],
+    defaults: { title: '', url: 'my-site.com', html: '<style>body{font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0}</style>\n<h1>Hello!</h1>', height: 'Medium', caption: '' },
+  },
+  websandbox: {
+    label: 'Web sandbox', hint: 'Live HTML/CSS editor with preview — test AI-written code', color: '#ff9f43', glyph: '</>', kit: 'web',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'goal', label: 'Goal', kind: 'markdown', max: 2000 },
+      { key: 'hint', label: 'Hint', kind: 'textarea', max: 1000 },
+      { key: 'starter', label: 'Starter HTML', kind: 'code', max: 60000 },
+    ],
+    defaults: { title: 'Try it', goal: 'Paste the code from ChatGPT and press **Run**.', hint: '', starter: '<style>\n  h1 { color: teal; }\n</style>\n<h1>Paste your code here</h1>' },
+  },
+  clickpath: {
+    label: 'Click path', hint: 'Where to click: Dashboard › Appearance › Editor', color: '#c3a6ff', glyph: '›', kit: 'web',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'steps', label: 'Steps', kind: 'lines', help: 'One click per line', max: 2000 },
+    ],
+    defaults: { title: '', steps: 'Dashboard\nAppearance\nEditor' },
   },
   checkin: {
     label: 'Check-in', hint: 'End-of-lab attendance card', color: '#c8ff4d', glyph: '⌖', terminal: true,
@@ -125,6 +214,7 @@ export const MODULE_NODES = {
       { key: 'term', label: 'Term', kind: 'text', placeholder: '2026–2027 · Semester One', max: 60 },
       { key: 'description', label: 'Description', kind: 'textarea', max: 600 },
       { key: 'color', label: 'Accent colour', kind: 'color' },
+      { key: 'faculty', label: 'Faculty', kind: 'text', max: 60, help: 'The faculty whose students this module is for (“all” = every faculty). Choices come from Admin → Catalogue.' },
       { key: 'leader', label: 'Module leader (doctor email)', kind: 'text', placeholder: 'name@bue.edu.eg', max: 200, help: 'Only this doctor sets the assessment (weights, components). Their doctor account must use this email.' },
       { key: 'open', label: 'Students may add it themselves', kind: 'select', options: ['No', 'Yes'], help: 'No: students join only by invitation or enrolment.' },
       { key: 'category', label: 'Category', kind: 'text', max: 40, placeholder: 'Core', help: 'A category from Admin → Catalogue (core: shown to matching students; elective: only to those who choose or are enrolled).' },
@@ -132,7 +222,7 @@ export const MODULE_NODES = {
       { key: 'semester', label: 'Semester', kind: 'select', options: ['Semester 1', 'Semester 2', 'Both'], help: 'Students see the active semester’s modules first (the admin switches the active semester).' },
       { key: 'specializations', label: 'Specializations', kind: 'text', placeholder: 'Software Engineering, Artificial Intelligence', help: 'Comma-separated; empty = every specialization', max: 600 },
     ],
-    defaults: { code: '', title: 'New module', term: '', description: '', color: '#7cb1ff', leader: '', category: 'Core', open: 'No', years: '', semester: 'Semester 1', specializations: '' },
+    defaults: { code: '', title: 'New module', term: '', description: '', color: '#7cb1ff', faculty: DEFAULT_FACULTY, leader: '', category: 'Core', open: 'No', years: '', semester: 'Semester 1', specializations: '' },
   },
   lab: {
     label: 'Lab', hint: 'A lab of this module (double-click to build it)', color: '#7cb1ff', glyph: '⚗',
@@ -150,6 +240,76 @@ export type LabNodeType = keyof typeof LAB_NODES;
 export type ModuleNodeType = keyof typeof MODULE_NODES;
 export type FlowKind = 'lab' | 'module';
 export const nodeDefs = (kind: FlowKind): Record<string, NodeDef> => (kind === 'lab' ? LAB_NODES : MODULE_NODES);
+
+/** Every lab node a builder can add (the Lab root is always there). */
+export const LAB_NODE_TYPES = (Object.keys(LAB_NODES) as LabNodeType[]).filter((t) => !(LAB_NODES[t] as NodeDef).root);
+export const kitOf = (type: string): Kit => ((LAB_NODES as Record<string, NodeDef>)[type]?.kit ?? 'core');
+/** Lab node types of these kits (core is always included). */
+export const nodesOfKits = (kits: Kit[]): LabNodeType[] => LAB_NODE_TYPES.filter((t) => kitOf(t) === 'core' || kits.includes(kitOf(t)));
+/** Quick choices for the admin's per-module component picker. */
+export const NODE_PRESETS: Record<string, { label: string; nodes: LabNodeType[] }> = {
+  all: { label: 'Everything', nodes: LAB_NODE_TYPES },
+  mobile: { label: 'Mobile development', nodes: nodesOfKits(['mobile']) },
+  web: { label: 'No-code web & AI', nodes: nodesOfKits(['web']) },
+};
+/**
+ * A module's allowed lab components, as stored by the admin: known, non-root lab node types in palette order.
+ * null / not an array = no restriction (every component). The structural nodes Part and Task are always kept.
+ */
+export function parseNodeList(input: unknown): LabNodeType[] | null {
+  if (!Array.isArray(input)) return null;
+  const want = new Set(input.map(String));
+  want.add('part');
+  want.add('task');
+  return LAB_NODE_TYPES.filter((t) => want.has(t));
+}
+/** The palette for a module: its allowed list, or everything when the admin set none. */
+export const allowedLabNodes = (stored: LabNodeType[] | null | undefined): LabNodeType[] => stored ?? LAB_NODE_TYPES;
+/**
+ * Node types a lab save would ADD although the module no longer allows them: nodes in `after` whose id (with that type) is not in
+ * `before` and whose type is not allowed. Nodes that were already in the lab keep working (just not addable).
+ * Root and unknown types are ignored (sanitizeFlow deals with those). Returns the distinct offending types.
+ */
+export function addedDisallowed(before: Flow | null | undefined, after: Flow, allowed: readonly string[] | null | undefined): LabNodeType[] {
+  if (!allowed) return [];
+  const ok = new Set(allowed);
+  const had = new Set((before?.nodes ?? []).map((n) => `${n.id}|${n.type}`)); // same id with a new type counts as added
+  const bad = new Set<string>();
+  for (const n of after.nodes) if (!had.has(`${n.id}|${n.type}`) && LAB_NODE_TYPES.includes(n.type as LabNodeType) && !ok.has(n.type)) bad.add(n.type);
+  return LAB_NODE_TYPES.filter((t) => bad.has(t));
+}
+
+/** https only, so staff-written links can't run script (javascript:) or load mixed content. */
+export const safeUrl = (v: string | undefined): string | null => {
+  try {
+    const u = new URL((v ?? '').trim());
+    return u.protocol === 'https:' ? u.href : null;
+  } catch { return null; }
+};
+/** A YouTube or Vimeo link → its privacy-friendly embed URL, or null. */
+export function videoEmbed(v: string | undefined): string | null {
+  const href = safeUrl(v);
+  if (!href) return null;
+  const u = new URL(href);
+  const host = u.hostname.replace(/^www\.|^m\./, '');
+  let id: string | null = null;
+  if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
+  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    id = u.searchParams.get('v') ?? u.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)/)?.[1] ?? null;
+  }
+  if (id && /^[A-Za-z0-9_-]{6,20}$/.test(id)) return `https://www.youtube-nocookie.com/embed/${id}`;
+  if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+    const vid = u.pathname.match(/(\d{5,12})/)?.[1];
+    if (vid) return `https://player.vimeo.com/video/${vid}`;
+  }
+  return null;
+}
+/** Quiz options: one per line, a leading * marks a correct one. */
+export const parseQuizOptions = (text: string) =>
+  text.split(/\r?\n/).map((l) => l.trim())
+    .map((l) => (l.startsWith('*') ? { text: l.slice(1).trim(), correct: true } : { text: l, correct: false }))
+    .filter((o) => o.text) // a lone "*" is not an option
+    .slice(0, 8);
 
 /* --------------------------------------------------------------------- flows */
 
@@ -296,7 +456,15 @@ export type Block =
   | { kind: 'terminal'; lines: string[] }
   | { kind: 'exercise'; id: string; def: Exercise }
   | { kind: 'repo' }
-  | { kind: 'checkin' };
+  | { kind: 'checkin' }
+  | { kind: 'image'; src: string; alt: string; caption: string }
+  | { kind: 'video'; embed: string; title: string }
+  | { kind: 'link'; title: string; url: string; description: string; cta: string }
+  | { kind: 'quiz'; id: string; question: string; options: { text: string; correct: boolean }[]; explain: string }
+  | { kind: 'prompt'; id: string; title: string; tool: string; prompt: string; expect: string }
+  | { kind: 'browser'; id: string; title: string; url: string; html: string; height: 'Short' | 'Medium' | 'Tall'; caption: string }
+  | { kind: 'websandbox'; id: string; title: string; goal: string; hint: string; starter: string }
+  | { kind: 'clickpath'; title: string; steps: string[] };
 
 export type CompiledLab = {
   meta: { title: string; description: string; difficulty: string; estimatedTime: string; objectives: string[] };
@@ -316,6 +484,7 @@ export const splitLabKey = (key: string) => {
   return m ? { module: m[1], lab: m[2] } : null;
 };
 const attrSafe = (s: string) => s.replace(/"/g, '”').replace(/[<>]/g, '');
+const excerptOf = (s: string | undefined) => { const t = (s ?? '').replace(/\s+/g, ' ').trim(); return t.length > 40 ? `${t.slice(0, 39)}…` : t; };
 
 export function compileLab(flow: Flow, key: string): CompiledLab {
   const order = orderFlow(flow, 'lab');
@@ -383,6 +552,48 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
         hasCheckin = true;
         blocks.push({ kind: 'checkin' });
         break;
+      case 'image': {
+        // Bundled teaching assets are served locally; keep other image URLs HTTPS-only.
+        const local = /^\/guides\/(?:[a-z0-9_-]+\/)*[a-z0-9_-]+\.(?:png|jpe?g|webp|svg)$/i.test(d.src ?? '');
+        const src = local ? d.src : safeUrl(d.src);
+        if (!src) { warnings.push('An Image node needs an https:// image URL or a bundled /guides/ image path.'); break; }
+        if (!(d.alt ?? '').trim()) warnings.push(`Image “${d.caption || src}” has no alt text.`);
+        push({ kind: 'image', src, alt: d.alt ?? '', caption: d.caption ?? '' });
+        break;
+      }
+      case 'video': {
+        const embed = videoEmbed(d.url);
+        if (!embed) { warnings.push(`Video “${d.title || d.url}”: use a YouTube or Vimeo https link.`); break; }
+        push({ kind: 'video', embed, title: d.title || 'Video' });
+        break;
+      }
+      case 'link': {
+        const url = safeUrl(d.url);
+        if (!url) { warnings.push(`Link card “${d.title}” needs an https:// link.`); break; }
+        push({ kind: 'link', title: d.title || url, url, description: d.description ?? '', cta: d.cta || 'Open' });
+        break;
+      }
+      case 'quiz': {
+        const options = parseQuizOptions(d.options ?? '');
+        if (options.length < 2 || !options.some((o) => o.correct)) { warnings.push(`Quick check “${excerptOf(d.question)}” needs 2+ options and one starting with *.`); break; }
+        push({ kind: 'quiz', id: `${key}--${node.id}`, question: d.question ?? '', options, explain: d.explain ?? '' });
+        break;
+      }
+      case 'prompt':
+        if (!(d.prompt ?? '').trim()) { warnings.push(`AI prompt “${d.title}” is empty.`); break; }
+        push({ kind: 'prompt', id: `${key}--${node.id}`, title: d.title || 'Ask the AI', tool: d.tool || 'ChatGPT', prompt: d.prompt ?? '', expect: d.expect ?? '' });
+        break;
+      case 'browser':
+        push({ kind: 'browser', id: `${key}--${node.id}`, title: d.title ?? '', url: d.url ?? '', html: d.html ?? '', height: (['Short', 'Medium', 'Tall'].includes(d.height) ? d.height : 'Medium') as 'Short' | 'Medium' | 'Tall', caption: d.caption ?? '' });
+        break;
+      case 'websandbox':
+        push({ kind: 'websandbox', id: `${key}--${node.id}`, title: d.title || 'Web sandbox', goal: d.goal ?? '', hint: d.hint ?? '', starter: d.starter ?? '' });
+        break;
+      case 'clickpath': {
+        const steps = (d.steps ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        if (steps.length) push({ kind: 'clickpath', title: d.title ?? '', steps });
+        break;
+      }
     }
   }
   const objectives = (start.objectives ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);

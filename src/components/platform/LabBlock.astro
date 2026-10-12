@@ -7,6 +7,14 @@ import Terminal from '@/components/lab/Terminal.astro';
 import Playground from '@/components/lab/Playground.astro';
 import RepoSubmit from '@/components/lab/RepoSubmit.astro';
 import CheckinCard from '@/components/lab/CheckinCard.astro';
+import ClickPath from '@/components/lab/ClickPath.astro';
+import MediaImage from './MediaImage.astro';
+import VideoEmbed from './VideoEmbed.astro';
+import LinkCard from './LinkCard.astro';
+import QuickCheck from './QuickCheck.astro';
+import PromptCard from './PromptCard.astro';
+import WebPreview from './WebPreview.astro';
+import WebSandbox from './WebSandbox.astro';
 import type { RenderedBlock } from '@/lib/platform/render';
 
 interface Props { block: RenderedBlock; lab: string; label: string }
@@ -25,3 +33,11 @@ const { block: b, lab, label } = Astro.props;
 {b.kind === 'exercise' && <Playground ex={b.id} def={b.def} demo={b.def.checks.length === 0} />}
 {b.kind === 'repo' && <RepoSubmit lab={lab} />}
 {b.kind === 'checkin' && <CheckinCard lab={lab} label={label} />}
+{b.kind === 'image' && <MediaImage src={b.src} alt={b.alt} caption={b.caption} />}
+{b.kind === 'video' && <VideoEmbed embed={b.embed} title={b.title} />}
+{b.kind === 'link' && <LinkCard title={b.title} url={b.url} description={b.description} cta={b.cta} />}
+{b.kind === 'quiz' && <QuickCheck id={b.id} question={b.question} questionHtml={b.htmlQuestion} options={b.options} explainHtml={b.htmlExplain} />}
+{b.kind === 'prompt' && <PromptCard id={b.id} title={b.title} tool={b.tool} prompt={b.prompt} expectHtml={b.htmlExpect} />}
+{b.kind === 'browser' && <WebPreview title={b.title} url={b.url} html={b.html} height={b.height} caption={b.caption} />}
+{b.kind === 'websandbox' && <WebSandbox id={b.id} title={b.title} goalHtml={b.htmlGoal} hint={b.hint} starter={b.starter} />}
+{b.kind === 'clickpath' && <ClickPath steps={b.steps} label={b.title || 'Click'} />}

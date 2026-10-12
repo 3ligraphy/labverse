@@ -22,7 +22,7 @@ const when = current.updated_at ? new Date(current.updated_at).toLocaleString('e
 import AdminShell from '@/components/admin/AdminShell.astro';
 ---
 <Base title={`Assessment · ${meta.title}`} noindex>
-<AdminShell active="home">
+<AdminShell active="assessment">
   <section class="as container" data-as data-module={slug} data-edit={perm.ok ? '1' : ''} style={`--mc:${meta.color || '#7cb1ff'}`}>
     <script type="application/json" data-as-data set:html={json} />
     <header class="as-top">

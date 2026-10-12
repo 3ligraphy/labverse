@@ -1,7 +1,8 @@
 /**
  * Admin: builder modules.
  *   GET                         every module with its labs (slug, title, published)
- *   POST   { title, slug? }     create a module (the slug is derived from the title when omitted)
+ *   POST   { title, slug?, faculty? }   create a module (the slug is derived from the title when omitted;
+ *                               faculty: a catalogue faculty slug or 'all', default the default faculty)
  *   PATCH  ?slug=… { flow?, published? }   save the module canvas and/or publish it
  *   DELETE ?slug=…              delete the module and its labs (progress records are kept)
  */
@@ -11,6 +12,8 @@ import type { Permission } from '@/lib/accounts/permissions';
 import { json } from '@/lib/progress/server';
 import { SLUG_RE, leaderChanged, sanitizeFlow, slugify } from '@/lib/platform/core';
 import { BUILT_IN_MODULE, getPlatformStore } from '@/lib/platform/server';
+import { ANY_FACULTY, DEFAULT_FACULTY, DEFAULT_SETTINGS } from '@/lib/accounts/core';
+import { getAccountStore } from '@/lib/accounts/server';
 
 export const prerender = false;
 
@@ -41,15 +44,27 @@ export const GET: APIRoute = async ({ cookies }) => {
 export const POST: APIRoute = async ({ cookies, request }) => {
   const g = await guard(cookies, 'modules.create');
   if (g.error) return g.error;
-  const body = (await request.json().catch(() => ({}))) as { title?: unknown; slug?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { title?: unknown; slug?: unknown; faculty?: unknown };
   const title = String(body.title ?? '').trim().replace(/\s+/g, ' ');
   if (!title || title.length > 120) return json({ error: 'Give the module a title (up to 120 characters).' }, 400);
   const slug = body.slug ? String(body.slug).trim() : slugify(title);
   if (!SLUG_RE.test(slug)) return json({ error: 'The address may only use lowercase letters, numbers and dashes.' }, 400);
   if (slug === BUILT_IN_MODULE.slug) return json({ error: 'That address belongs to the built-in course.' }, 409);
+  const faculty = String(body.faculty ?? '').trim() || DEFAULT_FACULTY;
   try {
-    const mod = await g.store.createModule(slug, title);
-    return mod ? json({ module: mod }, 201) : json({ error: `A module at /m/${slug} already exists.` }, 409);
+    if (faculty !== ANY_FACULTY) {
+      const { faculties } = (await getAccountStore()?.getSettings().catch(() => null)) ?? DEFAULT_SETTINGS;
+      if (!faculties.some((f) => f.slug === faculty)) return json({ error: 'Choose one of the catalogue’s faculties.' }, 400);
+    }
+    let mod = await g.store.createModule(slug, title);
+    if (!mod) return json({ error: `A module at /m/${slug} already exists.` }, 409);
+    // the module node starts in the default faculty
+    const root = mod.flow.nodes.find((n) => n.type === 'module');
+    if (root && faculty !== root.data.faculty) {
+      root.data.faculty = faculty;
+      mod = (await g.store.saveModule(slug, { flow: mod.flow })) ?? mod;
+    }
+    return json({ module: mod }, 201);
   } catch (error) {
     console.error('[platform] create module failed', error);
     return json({ error: 'Could not create the module.' }, 500);

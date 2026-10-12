@@ -1,36 +1,82 @@
 ---
 /**
  * The admin workspace frame: a role-aware sidebar (each item appears only with its permission; the super admin
- * and the master password see everything) around the page. Generic across modules — module-specific tools are
- * reached from the workspace home.
+ * and the master password see everything) around the page.
+ * Teaching: a Faculty → Module switcher picks the module being managed, and every Teaching tool (sessions,
+ * progress, lab canvas, assessment, team, banners, submissions) opens for that module. The page's own module
+ * (/admin/team/<m>, ?module=, ?lab=<m>--<lab>) wins; then the last choice (cookie); then the first module.
  */
 import { access } from '@/lib/accounts/access';
 import { hubData } from '@/lib/accounts/hub';
 import { ROLE_NAMES } from '@/lib/accounts/permissions';
+import { splitLabKey } from '@/lib/platform/core';
+import { ADMIN_MODULE_COOKIE } from '@/scripts/admin-module';
 import { platform } from '@/site.config';
 import Logo from '@/components/Logo.astro';
+import ModuleSwitcher from './ModuleSwitcher.astro';
 
 interface Props { active?: string }
 const { active = '' } = Astro.props;
 const a = await access(Astro.cookies);
 const modules = Object.keys(a.who.modules);
-const teachingModules = (await hubData()).cards
-  .filter((module) => modules.includes(module.slug))
-  .map((module) => ({ slug: module.slug, title: module.title, code: module.code, color: module.color, role: ROLE_NAMES[a.who.modules[module.slug]] }));
+const { cards, settings } = await hubData();
 const any = (p: Parameters<typeof a.can>[0]) => a.can(p) || modules.some((m) => a.can(p, m));
-const groups = [
+
+// super admins, the master password and module-creating doctors manage every module; others their own teams
+const seeAll = a.can('platform.roles') || a.can('modules.create');
+const facultyIndex = (slug: string) => { const i = settings.faculties.findIndex((f) => f.slug === slug); return i < 0 ? settings.faculties.length : i; };
+const facultyName = (slug: string) => (slug === 'all' ? 'All faculties' : settings.faculties.find((f) => f.slug === slug)?.name ?? slug);
+const manageable = cards
+  .filter((c) => seeAll || modules.includes(c.slug))
+  .sort((x, y) => facultyIndex(x.faculty) - facultyIndex(y.faculty))
+  .map((c) => ({ slug: c.slug, title: c.title, code: c.code, color: c.color, faculty: c.faculty, facultyName: facultyName(c.faculty), builtIn: c.builtIn,
+    role: a.who.platformRole === 'super_admin' ? ROLE_NAMES.super_admin : a.who.modules[c.slug] ? ROLE_NAMES[a.who.modules[c.slug]] : 'Admin' }));
+const labParam = Astro.url.searchParams.get('lab');
+const fromPage = Astro.params.module ?? Astro.url.searchParams.get('module') ?? (labParam ? splitLabKey(labParam)?.module ?? 'mobile-development' : null);
+const saved = Astro.cookies.get(ADMIN_MODULE_COOKIE)?.value;
+const ctx = manageable.find((m) => m.slug === fromPage) ?? manageable.find((m) => m.slug === saved) ?? manageable[0];
+const ctxFaculties = [...new Map(manageable.map((m) => [m.faculty, m.facultyName])).entries()];
+
+type Item = { key: string; label: string; href: string; icon: string; show: boolean; tpl?: string; off?: boolean };
+/** Teaching tools for the selected module; `tpl` keeps "__M__" so the script can repoint them when it changes. */
+const M = '__M__';
+const tool = (key: string, label: string, tpl: string, icon: string, show: boolean): Item =>
+  ({ key, label, icon, show, tpl, href: ctx ? tpl.replaceAll(M, encodeURIComponent(ctx.slug)) : tpl });
+/** Which Teaching tools this person has in one module (the links show and hide as the module changes). */
+const toolsFor = (m: { slug: string; builtIn: boolean }) => [
+  (a.can('module.sessions', m.slug) || a.can('module.progress', m.slug)) && 'sessions',
+  a.can('module.progress', m.slug) && 'progress',
+  a.can('module.build', m.slug) && 'canvas',
+  'assessment',
+  a.can('module.invite', m.slug) && 'team',
+  (a.can('module.build', m.slug) || a.can('module.submissions', m.slug)) && 'banner',
+  // project hand-ins belong to the built-in course
+  m.builtIn && a.can('module.submissions', m.slug) && 'submissions',
+].filter(Boolean) as string[];
+const ctxTools = ctx ? toolsFor(ctx) : [];
+const anyTools = new Set(manageable.flatMap(toolsFor));
+const teaching: Item[] = ctx ? [
+  tool('sessions', 'Sessions & attendance', `/admin/sessions?module=${M}`, '◷', true),
+  tool('progress', 'Lab progress', `/admin/progress?module=${M}`, '▤', true),
+  tool('canvas', 'Lab canvas', `/admin/builder/${M}`, '⬡', true),
+  tool('assessment', 'Assessment', `/admin/assessment/${M}`, '％', true),
+  tool('team', 'Team & invites', `/admin/team/${M}`, '✉', true),
+  tool('banner', 'Banners', `/admin/banner/${M}`, '⚑', true),
+  { key: 'submissions', label: 'Project submissions', href: '/admin/project', icon: '⇪', show: true },
+].filter((i) => anyTools.has(i.key)).map((i) => ({ ...i, off: !ctxTools.includes(i.key) })) : [
+  { key: 'sessions', label: 'Sessions & attendance', href: '/admin/sessions', icon: '◷', show: any('module.sessions') || any('module.progress') },
+  { key: 'progress', label: 'Lab progress', href: '/admin/progress', icon: '▤', show: any('module.progress') },
+];
+const groups: { title: string; items: Item[] }[] = [
   { title: 'Workspace', items: [{ key: 'home', label: 'Home', href: '/admin', icon: '◎', show: true }] },
-  { title: 'Teaching', items: [
-    { key: 'sessions', label: 'Sessions & attendance', href: '/admin/sessions', icon: '◷', show: any('module.sessions') || any('module.progress') },
-    { key: 'progress', label: 'Lab progress', href: '/admin/progress', icon: '▤', show: any('module.progress') },
-    { key: 'submissions', label: 'Project submissions', href: '/admin/project', icon: '⇪', show: a.can('module.submissions', 'mobile-development') },
-  ] },
+  { title: 'Teaching', items: teaching },
   { title: 'Modules', items: [
-    { key: 'builder', label: 'Modules & lab builder', href: '/admin/builder', icon: '⬡', show: a.can('modules.create') || any('module.build') },
-    { key: 'teams', label: 'Teams & invitations', href: '/admin/teams', icon: '✉', show: any('module.invite') },
+    { key: 'builder', label: 'All modules & builder', href: '/admin/builder', icon: '⬡', show: a.can('modules.create') || any('module.build') },
+    { key: 'teams', label: 'All teams', href: '/admin/teams', icon: '✉', show: any('module.invite') },
   ] },
   { title: 'Platform', items: [
     { key: 'catalogue', label: 'Catalogue', href: '/admin/catalogue', icon: '▦', show: a.can('platform.settings') },
+    { key: 'components', label: 'Canvas components', href: '/admin/components', icon: '▧', show: a.can('platform.settings') },
     { key: 'accounts', label: 'Accounts & roles', href: '/admin/accounts', icon: '⚿', show: a.can('accounts.manage') || a.can('accounts.staff') || a.can('platform.roles') },
     { key: 'cms', label: 'Course content (CMS)', href: '/admin/cms', icon: '✎', show: a.can('cms.edit') },
   ] },
@@ -41,11 +87,12 @@ const initials = who.split(/\s+/).map((p) => p[0]).slice(0, 2).join('');
 /** Phones: the first four tools in a bottom tab bar (always including the current one), the rest under More. */
 const allItems = groups.flatMap((g) => g.items);
 const current = allItems.find((i) => i.key === active);
-const tabItems = allItems.slice(0, 4);
+const tabItems = allItems.filter((i) => !i.off).slice(0, 4);
 if (current && !tabItems.includes(current)) tabItems[3] = current;
-const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', progress: 'Progress', submissions: 'Projects', builder: 'Builder', teams: 'Teams', catalogue: 'Catalogue', accounts: 'Accounts', cms: 'CMS' };
+const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', progress: 'Progress', submissions: 'Projects', canvas: 'Canvas', assessment: 'Assessment', team: 'Team', banner: 'Banners', builder: 'Builder', teams: 'Teams', catalogue: 'Catalogue', components: 'Components', accounts: 'Accounts', cms: 'CMS' };
 ---
-<div class="ash">
+<div class="ash" data-ash-active={active}>
+  <script type="application/json" data-ash-modules set:html={JSON.stringify(manageable.map((m) => ({ slug: m.slug, title: m.title, code: m.code, role: m.role, faculty: m.faculty, color: m.color, tools: toolsFor(m) })))} />
   <aside class="ash-side" aria-label="Admin">
     <a class="ash-brand" href="/admin"><Logo size={34} /><span><b>{platform.name}</b><small class="mono">admin workspace</small></span></a>
     <div class="ash-me">
@@ -55,22 +102,9 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
     <nav class="ash-nav">
       {groups.map((g) => (
         <div class="ash-group">
-          {g.title === 'Teaching' && teachingModules.length ? (
-            <>
-              <button class="ash-gt ash-toggle mono" type="button" data-ash-teaching aria-expanded="false" aria-controls="ash-teaching-modules">
-                <span>Teaching</span><span class="ash-chevron" aria-hidden="true">⌄</span>
-              </button>
-              <div class="ash-module-menu" id="ash-teaching-modules" data-ash-teaching-modules hidden>
-                {teachingModules.map((module) => (
-                  <a href={`/admin#module-${module.slug}`} style={`--mc:${module.color}`}>
-                    <span class="ash-module-dot" aria-hidden="true"></span>
-                    <span><b>{module.title}</b><small>{module.code || 'Module'} · {module.role}</small></span>
-                  </a>
-                ))}
-              </div>
-            </>
-          ) : <p class="ash-gt mono">{g.title}</p>}
-          {g.items.map((i) => <a class:list={['ash-link', { on: i.key === active }]} href={i.href} aria-current={i.key === active ? 'page' : undefined}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}</a>)}
+          <p class="ash-gt mono">{g.title}</p>
+          {g.title === 'Teaching' && ctx && <ModuleSwitcher ctx={ctx} modules={manageable} faculties={ctxFaculties} where="sidebar" />}
+          {g.items.map((i) => <a class:list={['ash-link', { on: i.key === active }]} href={i.href} data-ctx-href={i.tpl} data-ctx-key={i.off !== undefined ? i.key : undefined} hidden={i.off} aria-current={i.key === active ? 'page' : undefined}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}</a>)}
         </div>
       ))}
     </nav>
@@ -83,7 +117,7 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
   <div class="ash-main"><slot /></div>
 
   <nav class="ash-tabbar" aria-label="Admin sections">
-    {tabItems.map((i) => <a class="ash-tab" href={i.href} aria-current={i.key === active ? 'page' : undefined}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{short[i.key] ?? i.label}</a>)}
+    {tabItems.map((i) => <a class="ash-tab" href={i.href} data-ctx-href={i.tpl} data-ctx-key={i.off !== undefined ? i.key : undefined} hidden={i.off} aria-current={i.key === active ? 'page' : undefined}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{short[i.key] ?? i.label}</a>)}
     <button type="button" class="ash-tab" data-ash-more aria-expanded="false" aria-controls="ash-more"><span class="ash-ic" aria-hidden="true">⋯</span>More</button>
   </nav>
   <div class="ash-scrim" data-ash-scrim hidden></div>
@@ -96,8 +130,9 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
     {groups.map((g) => (
       <div class="ash-sheet-group">
         <p class="ash-gt mono">{g.title}</p>
+        {g.title === 'Teaching' && ctx && <ModuleSwitcher ctx={ctx} modules={manageable} faculties={ctxFaculties} where="menu" />}
         <div class="ash-sheet-grid">
-          {g.items.map((i) => <a class:list={['ash-sheet-item', { on: i.key === active }]} href={i.href}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}</a>)}
+          {g.items.map((i) => <a class:list={['ash-sheet-item', { on: i.key === active }]} href={i.href} data-ctx-href={i.tpl} data-ctx-key={i.off !== undefined ? i.key : undefined} hidden={i.off}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}</a>)}
         </div>
       </div>
     ))}
@@ -135,6 +170,13 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
   .ash-module-menu b, .ash-module-menu small { display: block; }
   .ash-module-menu b { font-size: 12.5px; }
   .ash-module-menu small { margin-top: 2px; color: var(--text-3); font: 10px var(--font-mono); }
+  [data-ctx-key][hidden] { display: none !important; }
+  .ash-ctx { display: grid; gap: 8px; margin: 2px 0 8px; padding: 12px; border-radius: 14px; border: 1px solid color-mix(in oklab, var(--mc) 45%, var(--line-2));
+    background: linear-gradient(160deg, color-mix(in oklab, var(--mc) 14%, var(--surface)), var(--surface)); transition: border-color var(--t-fast), background var(--t-fast); }
+  .ash-ctx-k { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-3); }
+  .ash-ctx-f { display: grid; gap: 4px; min-width: 0; font-size: 11.5px; font-weight: 700; color: var(--text-3); }
+  .ash-ctx-f select { width: 100%; height: 36px; padding: 0 10px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--text); }
+  .ash-ctx-role { font-size: 11px; color: var(--text-3); }
   .ash-module-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mc); box-shadow: 0 0 9px var(--mc); }
   .ash-link { position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-size: 13.5px; color: var(--text-2); transition: background var(--t-fast), color var(--t-fast); }
   .ash-link:hover { background: var(--surface-2); color: var(--text); }
@@ -198,6 +240,10 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
     .ash-side { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "me foot" "nav nav"; align-items: center; gap: 10px;
       padding: calc(var(--nav-h) + 12px) 16px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
     .ash-brand, .ash-gt, .ash-module-menu, .ash-foot a[target] { display: none !important; }
+    /* tablets: the "Managing" box sits on its own row above the menu pills */
+    .ash-nav .ash-ctx { order: -1; flex: 1 0 100%; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); align-items: end; margin: 0 0 4px; padding: 8px 10px; }
+    .ash-nav .ash-ctx-role { display: none; }
+    .ash-nav { flex-wrap: wrap; }
     .ash-me { grid-area: me; min-width: 0; padding: 8px 10px; }
     .ash-me > span:last-child { min-width: 0; }
     .ash-me b, .ash-me small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -215,17 +261,60 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
+  import { ADMIN_MODULE_EVENT, rememberAdminModule } from '@/scripts/admin-module';
+  /** Module tools: switching module reopens the same tool for the new module. */
+  const FOLLOW: Record<string, string> = {
+    sessions: '/admin/sessions?module=__M__', progress: '/admin/progress?module=__M__', assessment: '/admin/assessment/__M__',
+    team: '/admin/team/__M__', banner: '/admin/banner/__M__',
+  };
+  type Mod = { slug: string; title: string; code: string; role: string; faculty: string; color: string; tools: string[] };
+  let followWired = false;
+
   onPageLoad( () => {
-    const teaching = document.querySelector<HTMLButtonElement>('[data-ash-teaching]');
-    const teachingModules = document.querySelector<HTMLElement>('[data-ash-teaching-modules]');
-    if (teaching && teachingModules && !teaching.dataset.wired) {
-      teaching.dataset.wired = '1';
-      teaching.addEventListener('click', () => {
-        const open = teaching.getAttribute('aria-expanded') !== 'true';
-        teaching.setAttribute('aria-expanded', String(open));
-        teachingModules.hidden = !open;
+    const shell = document.querySelector<HTMLElement>('.ash');
+    const mods: Mod[] = JSON.parse(document.querySelector('[data-ash-modules]')?.textContent || '[]');
+    /** Point every Teaching link (sidebar, tab bar, phone menu) and both switchers at this module. */
+    const show = (slug: string) => {
+      const m = mods.find((x) => x.slug === slug);
+      if (!m) return;
+      document.querySelectorAll<HTMLAnchorElement>('[data-ctx-href]').forEach((link) => (link.href = link.dataset.ctxHref!.replaceAll('__M__', encodeURIComponent(slug))));
+      // only the tools this person has in this module
+      document.querySelectorAll<HTMLElement>('[data-ctx-key]').forEach((link) => (link.hidden = !m.tools.includes(link.dataset.ctxKey!)));
+      document.querySelectorAll<HTMLElement>('[data-ash-ctx]').forEach((box) => {
+        box.style.setProperty('--mc', m.color);
+        const fac = box.querySelector<HTMLSelectElement>('[data-ash-faculty]');
+        if (fac) fac.value = m.faculty;
+        const sel = box.querySelector<HTMLSelectElement>('[data-ash-module]')!;
+        sel.replaceChildren(...mods.filter((x) => x.faculty === m.faculty).map((x) => new Option(x.title, x.slug, false, x.slug === slug)));
+        sel.value = slug;
+        const role = box.querySelector<HTMLElement>('[data-ash-role]');
+        if (role) role.textContent = `${m.code || 'Module'} · ${m.role}`;
       });
+    };
+    const choose = (slug: string) => {
+      rememberAdminModule(slug);
+      const tool = FOLLOW[shell?.dataset.ashActive ?? ''];
+      // on a module tool, open the same tool for the new module; elsewhere the links just follow
+      if (tool) location.href = tool.replaceAll('__M__', encodeURIComponent(slug));
+      else if (shell?.dataset.ashActive === 'canvas') location.href = `/admin/builder/${encodeURIComponent(slug)}`;
+    };
+    document.querySelectorAll<HTMLElement>('[data-ash-ctx]').forEach((box) => {
+      if (box.dataset.wired) return;
+      box.dataset.wired = '1';
+      box.querySelector<HTMLSelectElement>('[data-ash-faculty]')?.addEventListener('change', (e) => {
+        const first = mods.find((m) => m.faculty === (e.target as HTMLSelectElement).value);
+        if (first) choose(first.slug);
+      });
+      box.querySelector<HTMLSelectElement>('[data-ash-module]')?.addEventListener('change', (e) => choose((e.target as HTMLSelectElement).value));
+    });
+    // a module chosen anywhere (here, or the lab picker on Sessions/Progress) updates the links without a reload
+    if (!followWired) {
+      followWired = true;
+      document.addEventListener(ADMIN_MODULE_EVENT, (e) => show((e as CustomEvent<string>).detail));
     }
+    // remember the module this page is about (opened from a link, the home page, ?module= or ?lab=)
+    const current = document.querySelector<HTMLSelectElement>('[data-ash-module]')?.value;
+    if (current) rememberAdminModule(current);
     // Phones: scroll the menu row so the current page's pill is visible (without moving the page).
     const nav = document.querySelector<HTMLElement>('.ash-nav');
     const on = nav?.querySelector<HTMLElement>('.ash-link.on');

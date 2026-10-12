@@ -18,9 +18,10 @@ const staff = isAdmin(Astro.cookies);
 const error = Astro.url.searchParams.get('e');
 const status = setupStatus();
 
+let manyFaculties = false;
 let view: null | {
   greeting: string; role: string; semester: string; invites: number; accounts: number;
-  modules: { slug: string; title: string; code: string; color: string; href: string; builtIn: boolean; category: string; semester: string; years: string[]; labs: number; myRole: string; tools: { label: string; href: string; primary?: boolean }[] }[];
+  modules: { slug: string; title: string; code: string; faculty: string; facultyName: string; color: string; href: string; builtIn: boolean; category: string; semester: string; years: string[]; labs: number; myRole: string; tools: { label: string; href: string; primary?: boolean }[] }[];
   platformTools: { label: string; href: string; desc: string; icon: string }[];
 } = null;
 
@@ -28,11 +29,14 @@ if (staff) {
   const a = await access(Astro.cookies);
   const { cards, settings } = await hubData();
   const store = getAccountStore();
+  // modules listed faculty by faculty, in catalogue order ("All faculties" last)
+  const facultyOrder = (slug: string) => { const i = settings.faculties.findIndex((f) => f.slug === slug); return i < 0 ? settings.faculties.length : i; };
   const seeAll = a.can('platform.roles') || a.can('modules.create');
   // super admins, the master password and module-creating doctors see every module; others their own teams
   const mine = cards.filter((c) => seeAll || a.who.modules[c.slug]);
   const [invites, users] = store && a.can('accounts.staff') ? await Promise.all([store.listInvites().catch(() => []), store.list().catch(() => [])]) : [[], []];
   const hour = new Date().toLocaleString('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Africa/Cairo' });
+  manyFaculties = new Set(mine.map((c) => c.faculty)).size > 1;
   view = {
     greeting: `${Number(hour) < 12 ? 'Good morning' : Number(hour) < 18 ? 'Good afternoon' : 'Good evening'}${a.user ? `, ${a.user.name.split(' ')[0]}` : ''}`,
     role: a.who.platformRole ? ROLE_NAMES[a.who.platformRole] : 'Full access (admin password)',
@@ -42,16 +46,17 @@ if (staff) {
     modules: mine.map((c) => {
       const mr = a.who.modules[c.slug];
       const tools: { label: string; href: string; primary?: boolean }[] = [];
-      if (a.can('module.sessions', c.slug) || a.can('module.progress', c.slug)) tools.push({ label: 'Sessions', href: '/admin/sessions', primary: true });
-      if (a.can('module.progress', c.slug)) tools.push({ label: 'Progress', href: '/admin/progress' });
+      if (a.can('module.sessions', c.slug) || a.can('module.progress', c.slug)) tools.push({ label: 'Sessions', href: `/admin/sessions?module=${encodeURIComponent(c.slug)}`, primary: true });
+      if (a.can('module.progress', c.slug)) tools.push({ label: 'Progress', href: `/admin/progress?module=${encodeURIComponent(c.slug)}` });
       if (a.can('module.invite', c.slug)) tools.push({ label: 'Team & invites', href: `/admin/team/${c.slug}` });
       tools.push({ label: 'Assessment', href: `/admin/assessment/${c.slug}` });
       if (a.can('module.build', c.slug) || a.can('module.submissions', c.slug)) tools.push({ label: 'Banners', href: `/admin/banner/${c.slug}` });
       if (a.can('module.build', c.slug)) tools.push({ label: 'Canvas', href: `/admin/builder/${c.slug}` });
       if (c.builtIn && a.can('module.submissions', c.slug)) tools.push({ label: 'Submissions', href: '/admin/project' });
       if (c.builtIn && a.can('cms.edit')) tools.push({ label: 'Content', href: '/admin/cms' });
-      return { ...c, href: !c.builtIn && a.can('module.build', c.slug) ? `/admin/builder/${c.slug}` : c.href, myRole: a.who.platformRole === 'super_admin' ? ROLE_NAMES.super_admin : mr ? ROLE_NAMES[mr] : a.who.platformRole ? ROLE_NAMES[a.who.platformRole] : 'Admin', tools };
-    }),
+      const facultyName = c.faculty === 'all' ? 'All faculties' : settings.faculties.find((f) => f.slug === c.faculty)?.name ?? c.faculty;
+      return { ...c, facultyName, href: !c.builtIn && a.can('module.build', c.slug) ? `/admin/builder/${c.slug}` : c.href, myRole: a.who.platformRole === 'super_admin' ? ROLE_NAMES.super_admin : mr ? ROLE_NAMES[mr] : a.who.platformRole ? ROLE_NAMES[a.who.platformRole] : 'Admin', tools };
+    }).sort((x, y) => facultyOrder(x.faculty) - facultyOrder(y.faculty)),
     platformTools: [
       a.can('modules.create') && { label: 'Modules & lab builder', href: '/admin/builder', desc: 'Create modules and visually build their labs and exercises', icon: '⬡' },
       a.can('platform.settings') && { label: 'Catalogue', href: '/admin/catalogue', desc: 'Years, specializations, categories, active semester', icon: '▦' },
@@ -107,7 +112,7 @@ if (staff) {
                   <span class="ah-glow" aria-hidden="true"></span>
                   <div class="ah-mtop mono"><span>{m.code || 'Module'}</span><span class="ah-role">{m.myRole}</span></div>
                   <h3><a href={m.href} target="_blank" rel="noopener">{m.title}</a></h3>
-                  <p class="ah-chips mono"><span>{m.category}</span><span>{m.semester === 'Both' ? 'Both semesters' : m.semester}</span><span>{m.years.length ? m.years.join(', ') : 'All years'}</span><span>{m.labs} lab{m.labs === 1 ? '' : 's'}</span></p>
+                  <p class="ah-chips mono">{manyFaculties && <span>{m.facultyName}</span>}<span>{m.category}</span><span>{m.semester === 'Both' ? 'Both semesters' : m.semester}</span><span>{m.years.length ? m.years.join(', ') : 'All years'}</span><span>{m.labs} lab{m.labs === 1 ? '' : 's'}</span></p>
                   <div class="ah-tools">{m.tools.map((t) => <a class:list={['ah-tool', { pri: t.primary }]} href={t.href}>{t.label}</a>)}</div>
                 </article>
               ))}

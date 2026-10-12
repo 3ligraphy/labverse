@@ -2,13 +2,15 @@
  * Admin: labs of a builder module.
  *   POST   { module, title, slug? }                 create a lab (empty flow with just its Lab node)
  *   PATCH  ?module=…&slug=… { flow?, published? }   save the lab canvas and/or publish it; returns compile warnings
+ *          (a flow may not add components the admin switched off for this module — Admin → Canvas components;
+ *          nodes that were already in the lab are kept)
  *   DELETE ?module=…&slug=…                         delete the lab (progress records are kept)
  */
 import type { APIRoute } from 'astro';
 import { access } from '@/lib/accounts/access';
 import type { Permission } from '@/lib/accounts/permissions';
 import { json } from '@/lib/progress/server';
-import { SLUG_RE, compileLab, labKey, sanitizeFlow, slugify } from '@/lib/platform/core';
+import { LAB_NODES, SLUG_RE, addedDisallowed, compileLab, labKey, sanitizeFlow, slugify } from '@/lib/platform/core';
 import { getPlatformStore } from '@/lib/platform/server';
 
 export const prerender = false;
@@ -55,6 +57,15 @@ export const PATCH: APIRoute = async ({ cookies, request, url }) => {
   }
   if (body.published !== undefined && typeof body.published !== 'boolean') return json({ error: 'Invalid request.' }, 400);
   try {
+    if (flow) {
+      const [mod, before] = await Promise.all([g.store.getModule(module), g.store.getLab(module, slug)]);
+      if (!mod || !before) return json({ error: 'Not found.' }, 404);
+      const bad = addedDisallowed(before.flow, flow, mod.labNodes);
+      if (bad.length) {
+        const names = bad.map((t) => `“${LAB_NODES[t].label}”`).join(', ');
+        return json({ error: `This module does not use ${names} — the admin switched ${bad.length === 1 ? 'it' : 'them'} off in Canvas components. Remove the new node${bad.length === 1 ? '' : 's'} and save again.` }, 400);
+      }
+    }
     const lab = await g.store.saveLab(module, slug, { flow, published: body.published as boolean | undefined });
     if (!lab) return json({ error: 'Not found.' }, 404);
     const c = compileLab(lab.flow, labKey(module, slug));

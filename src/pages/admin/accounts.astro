@@ -214,7 +214,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
-  type U = { id: string; role: string; name: string; email: string; studentId: string | null; profile: { year: string; specialization: string; modules: string[] }; active: boolean; last_login: string | null };
+  type U = { id: string; role: string; name: string; email: string; studentId: string | null; profile: { year: string; specialization: string; modules: string[]; faculty: string }; active: boolean; last_login: string | null };
+  type Faculty = { slug: string; name: string; specializations: string[] };
   type Inv = { token: string; email: string; name: string; platform_role: string; module: string | null; module_role: string | null; invited_by: string; expires_at: string };
   const RC: Record<string, string> = { super_admin: '#ff8ad8', doctor: '#c8ff4d', ta: '#7cb1ff', student: '#ffb547' };
   const NAME: Record<string, string> = { super_admin: 'Super admin', doctor: 'Doctor', ta: 'TA', student: 'Student', leader: 'Leader', admin: 'Module admin' };
@@ -230,6 +231,9 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     const rows = root.querySelector<HTMLElement>('[data-ac-rows]');
     const q = root.querySelector<HTMLInputElement>('[data-ac-q]');
     let users: U[] = [];
+    // faculties are shown (and a student can be moved) only when the catalogue has more than one
+    let faculties: Faculty[] = [];
+    const facultyOf = (u: U) => u.profile.faculty || 'informatics-computer-science'; // before faculties: the default one
     let me: string | null = null;
     let filter = 'all';
 
@@ -241,9 +245,10 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         <div class="ac-row ${u.active ? '' : 'off'}" style="--rc:${RC[u.role] ?? '#888'}" data-id="${esc(u.id)}">
           <span class="ac-av">${esc(u.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join(''))}</span>
           <div><b>${esc(u.name)}<span class="ac-role">${NAME[u.role] ?? u.role}</span>${u.id === me ? ' <small class="mono">(you)</small>' : ''}${u.active ? '' : ' <small class="mono">disabled</small>'}</b>
-            <span class="ac-meta mono">${esc(u.email)}${u.studentId ? ` · ${esc(u.studentId)}` : ''}${u.profile.year ? ` · ${esc(u.profile.year)} · ${esc(u.profile.specialization)}` : ''} · last sign-in ${when(u.last_login)}</span></div>
+            <span class="ac-meta mono">${esc(u.email)}${u.studentId ? ` · ${esc(u.studentId)}` : ''}${u.role === 'student' && faculties.length > 1 ? ` · ${esc(faculties.find((f) => f.slug === facultyOf(u))?.name ?? facultyOf(u))}` : ''}${u.profile.year ? ` · ${esc(u.profile.year)} · ${esc(u.profile.specialization || 'no specialization yet')}` : ''} · last sign-in ${when(u.last_login)}</span></div>
           ${perms['accounts.manage'] && u.id !== me ? `<div class="ac-act">
             <select class="input" data-role aria-label="Role">${['super_admin', 'doctor', 'ta', 'student'].filter((r) => perms['platform.roles'] || (r !== 'super_admin' && u.role !== 'super_admin')).map((r) => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${NAME[r]}</option>`).join('')}</select>
+            ${u.role === 'student' && faculties.length > 1 ? `<select class="input" data-faculty aria-label="Faculty of ${esc(u.name)}">${faculties.map((f) => `<option value="${esc(f.slug)}" ${f.slug === facultyOf(u) ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select>` : ''}
             <button class="btn btn-ghost btn-sm" type="button" data-reset>Reset password</button>
             <button class="btn btn-ghost btn-sm" type="button" data-toggle>${u.active ? 'Disable' : 'Enable'}</button>
             <button class="btn btn-ghost btn-sm ac-del" type="button" data-delete>Delete</button></div>` : '<span></span>'}
@@ -261,7 +266,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       const r = await fetch('/api/admin/accounts', { cache: 'no-store' });
       if (!r.ok) return;
       const d = await r.json();
-      users = d.users; me = d.me;
+      users = d.users; me = d.me; faculties = d.settings?.faculties ?? [];
       const note = root.querySelector<HTMLElement>('[data-mail-note]');
       if (note) note.textContent = d.mail ? 'Invitations are emailed automatically, and you also get the link.' : 'Email sending is not set up (RESEND_API_KEY + MAIL_FROM), so share the link: copy it, or open your email app with a ready message.';
       const f = root.querySelector<HTMLFormElement>('[data-ac-settings]');
@@ -289,9 +294,10 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     root.querySelectorAll<HTMLButtonElement>('[data-f]').forEach((b) => b.addEventListener('click', () => { filter = b.dataset.f!; root.querySelectorAll('[data-f]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); render(); }));
     q?.addEventListener('input', render);
     root.addEventListener('change', async (e) => {
-      const sel = (e.target as HTMLElement).closest<HTMLSelectElement>('[data-role]');
+      const fac = (e.target as HTMLElement).closest<HTMLSelectElement>('[data-faculty]');
+      const sel = fac ?? (e.target as HTMLElement).closest<HTMLSelectElement>('[data-role]');
       if (!sel) return;
-      const err = await patch(sel.closest<HTMLElement>('[data-id]')!.dataset.id!, { role: sel.value });
+      const err = await patch(sel.closest<HTMLElement>('[data-id]')!.dataset.id!, fac ? { faculty: fac.value } : { role: sel.value });
       if (err) note(sel, err);
       load();
     });

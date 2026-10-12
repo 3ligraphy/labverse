@@ -1,9 +1,14 @@
 ---
-/** Builder home: every module (built-in + builder) and a form to create one. */
+/**
+ * Builder home: every module (built-in + builder) and a form to create one (with its faculty when the catalogue
+ * has more than one). With modules in more than one faculty the list is grouped under faculty headings.
+ */
 import Base from '@/layouts/Base.astro';
 import { access } from '@/lib/accounts/access';
 import { compileModule } from '@/lib/platform/core';
 import { BUILT_IN_MODULE, ensureBuiltInBuilder, getPlatformStore } from '@/lib/platform/server';
+import { ANY_FACULTY, BUILT_IN_AUDIENCE, DEFAULT_SETTINGS, moduleFaculty } from '@/lib/accounts/core';
+import { getAccountStore } from '@/lib/accounts/server';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'no-store, max-age=0');
@@ -17,6 +22,19 @@ const [allModules, labs] = store ? await Promise.all([store.listModules(), store
 // people who can't create modules see only the modules they may build
 const modules = allModules.filter((m) => m.slug !== BUILT_IN_MODULE.slug && me.can('module.build', m.slug));
 const builtInLabs = labs.filter((lab) => lab.module === BUILT_IN_MODULE.slug);
+const settings = (await getAccountStore()?.getSettings().catch(() => null)) ?? { ...DEFAULT_SETTINGS, builtIn: BUILT_IN_AUDIENCE };
+const multi = settings.faculties.length > 1;
+const builtInFaculty = moduleFaculty(settings.builtIn.faculty);
+// faculty headings, only when modules sit in more than one faculty (unknown/'all' go last)
+const facultyOf = (m: (typeof modules)[number]) => moduleFaculty(compileModule(m.flow).meta.faculty);
+const used = new Set([builtInFaculty, ...modules.map(facultyOf)]);
+const grouped = used.size > 1;
+const sections = grouped
+  ? [...settings.faculties.map((f) => ({ slug: f.slug, name: f.name })), { slug: ANY_FACULTY, name: 'All faculties' },
+     ...[...used].filter((s) => s !== ANY_FACULTY && !settings.faculties.some((f) => f.slug === s)).map((s) => ({ slug: s, name: `${s} (not in the catalogue)` }))]
+      .filter((f) => used.has(f.slug))
+  : [{ slug: '', name: '' }];
+const inSection = (slug: string, faculty: string) => !grouped || faculty === slug;
 const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo' });
 import AdminShell from '@/components/admin/AdminShell.astro';
 ---
@@ -43,18 +61,21 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         {canCreate ? <form class="bh-card bh-new" data-bh-new>
           <h2>New module</h2>
           <label><span>Title</span><input class="input" name="title" required maxlength="120" placeholder="e.g. Web Development" /></label>
+          {multi && <label><span>Faculty</span><select class="input" name="faculty">{settings.faculties.map((f) => <option value={f.slug}>{f.name}</option>)}<option value={ANY_FACULTY}>All faculties</option></select></label>}
           <label><span>Address <small>(optional)</small></span><span class="bh-slug mono">/m/<input class="input mono" name="slug" maxlength="50" placeholder="web-development" /></span></label>
           <p class="bh-msg" data-bh-msg role="status"></p>
           <button class="btn btn-primary" type="submit">Create and open canvas →</button>
         </form> : <div class="bh-card"><h2>Your modules</h2><p class="muted">You can build the modules you're on the teaching team for. Ask a doctor or the super admin to create a new module.</p></div>}
 
         <div class="bh-list">
-          <article class="bh-mod" style="--c:#c8ff4d">
+          {sections.map((sec) => (<>
+          {grouped && <h2 class="bh-fh">{sec.name}</h2>}
+          {inSection(sec.slug, builtInFaculty) && <article class="bh-mod" style="--c:#c8ff4d">
             <div><p class="mono bh-code">{BUILT_IN_MODULE.code} · built-in</p><h3>{BUILT_IN_MODULE.title}</h3>
               <p class="muted small">{builtInLabs.length} visual-builder lab{builtInLabs.length === 1 ? '' : 's'} · the original source labs remain available.</p></div>
             <div class="bh-act">{me.can('module.build', BUILT_IN_MODULE.slug) && <a class="btn btn-primary btn-sm" href="/admin/builder/mobile-development">Open canvas →</a>}<a class="btn btn-ghost btn-sm" href="/admin/assessment/mobile-development">Assessment</a><a class="btn btn-ghost btn-sm" href="/course" target="_blank" rel="noopener">View course ↗</a></div>
-          </article>
-          {modules.map((m) => {
+          </article>}
+          {modules.filter((m) => inSection(sec.slug, facultyOf(m))).map((m) => {
             const c = compileModule(m.flow);
             const mine = labs.filter((l) => l.module === m.slug);
             return (
@@ -73,6 +94,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
               </article>
             );
           })}
+          </>))}
         </div>
       </div>
     )}
@@ -97,6 +119,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .bh-slug { display: flex; align-items: center; gap: 4px; color: var(--text-3); font-size: 13px; }
   .bh-msg { min-height: 18px; font-size: 13px; color: var(--danger); }
   .bh-list { display: grid; gap: 10px; }
+  .bh-fh { font-size: 12px; font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin-top: 12px; }
+  .bh-fh:first-child { margin-top: 0; }
   .bh-mod { display: grid; gap: 12px; padding: 18px 20px; border: 1px solid color-mix(in oklab, var(--c) 35%, var(--line-2)); border-radius: var(--r-lg); background: var(--surface); }
   @media (min-width: 720px) { .bh-mod { grid-template-columns: 1fr auto; align-items: center; } }
   .bh-code { font-size: 12px; color: var(--text-3); }
@@ -117,7 +141,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
-      const res = await fetch('/api/admin/platform/modules', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: fd.get('title'), slug: fd.get('slug') || undefined }) });
+      const res = await fetch('/api/admin/platform/modules', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: fd.get('title'), slug: fd.get('slug') || undefined, faculty: fd.get('faculty') || undefined }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { msg.textContent = data.error ?? 'Could not create the module.'; return; }
       location.href = `/admin/builder/${data.module.slug}`;

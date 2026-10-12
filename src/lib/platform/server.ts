@@ -8,8 +8,8 @@ import { getSecret } from 'astro:env/server';
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
 import { course } from '@/site.config';
-import { compileLab, compileModule, emptyFlow, flowLeader, labKey, type AssessmentItem, type CompiledLab, type Flow } from './core';
-import { DEFAULT_SETTINGS, kindOf, listOf, type Audience, type Category } from '@/lib/accounts/core';
+import { compileLab, compileModule, emptyFlow, flowLeader, labKey, parseNodeList, type AssessmentItem, type CompiledLab, type Flow, type LabNodeType } from './core';
+import { DEFAULT_FACULTY, DEFAULT_SETTINGS, kindOf, listOf, moduleFaculty, type Audience, type Category } from '@/lib/accounts/core';
 import type { ModuleBannerInput } from './banner';
 
 const env = (key: string) => getSecret(key) || undefined;
@@ -29,13 +29,15 @@ export const BUILT_IN_MODULE = {
   href: '/course',
 };
 
-export type ModuleRow = { slug: string; title: string; published: boolean; flow: Flow; created_at: string; updated_at: string };
+/** labNodes: the lab components the admin allows in this module's lab canvas (null = every component). */
+export type ModuleRow = { slug: string; title: string; published: boolean; flow: Flow; labNodes: LabNodeType[] | null; created_at: string; updated_at: string };
 export type LabRow = { module: string; slug: string; title: string; published: boolean; flow: Flow; created_at: string; updated_at: string };
 export type ModuleBannerRow = ModuleBannerInput & { id: string; module: string; published: boolean; created_by: string; created_at: string; updated_at: string };
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : String(v));
 const json = (v: unknown): Flow => (typeof v === 'string' ? JSON.parse(v) : (v as Flow));
-const toModule = (r: any): ModuleRow => ({ slug: r.slug, title: r.title, published: Boolean(r.published), flow: json(r.flow), created_at: iso(r.created_at), updated_at: iso(r.updated_at) });
+const toModule = (r: any): ModuleRow => ({ slug: r.slug, title: r.title, published: Boolean(r.published), flow: json(r.flow),
+  labNodes: parseNodeList(typeof r.lab_nodes === 'string' ? JSON.parse(r.lab_nodes) : r.lab_nodes), created_at: iso(r.created_at), updated_at: iso(r.updated_at) });
 const toLab = (r: any): LabRow => ({ module: r.module, slug: r.slug, title: r.title, published: Boolean(r.published), flow: json(r.flow), created_at: iso(r.created_at), updated_at: iso(r.updated_at) });
 const toBanner = (r: any): ModuleBannerRow => ({ id: r.id, module: r.module, title: r.title, message: r.message, ctaLabel: r.cta_label, ctaHref: r.cta_href, published: Boolean(r.published), created_by: r.created_by, created_at: iso(r.created_at), updated_at: iso(r.updated_at) });
 
@@ -79,6 +81,8 @@ class PlatformStore {
         cta_label text not null default '', cta_href text not null default '', published boolean not null default false,
         created_by text not null default '', created_at timestamptz not null default now(), updated_at timestamptz not null default now())`,
       `create index if not exists ${this.banners}_module_idx on ${this.banners} (module, updated_at desc)`,
+      // the lab components the admin allows per module (Admin → Canvas components); null = every component
+      `alter table ${this.modules} add column if not exists lab_nodes jsonb`,
     ]) await this.run(s);
   }
 
@@ -111,6 +115,12 @@ class PlatformStore {
       `update ${this.modules} set flow = $2, title = $3, published = $4, updated_at = now() where slug = $1 returning *`,
       [slug, JSON.stringify(flow), title, patch.published ?? cur.published],
     );
+    return r ? toModule(r) : null;
+  }
+  /** Sets the module's allowed lab components (null = every component); returns null if there is no such module. */
+  async setLabNodes(slug: string, list: readonly string[] | null): Promise<ModuleRow | null> {
+    const nodes = list === null ? null : parseNodeList([...list]);
+    const [r] = await this.q(`update ${this.modules} set lab_nodes = $2, updated_at = now() where slug = $1 returning *`, [slug, nodes === null ? null : JSON.stringify(nodes)]);
     return r ? toModule(r) : null;
   }
   async deleteModule(slug: string): Promise<boolean> {
@@ -211,6 +221,7 @@ export async function ensureBuiltInBuilder(): Promise<ModuleRow | null> {
       term: BUILT_IN_MODULE.term,
       description: BUILT_IN_MODULE.description,
       color: BUILT_IN_MODULE.color,
+      faculty: DEFAULT_FACULTY,
       open: 'Yes',
       category: 'Elective',
     }),
@@ -258,14 +269,14 @@ export type ModuleCard = Audience & { code: string; title: string; term: string;
  * (category, years, specializations) for onboarding and "my modules". The built-in module's audience is set
  * in /admin/accounts → Platform settings.
  */
-export async function moduleCards(builtInAudience: { category: string; years: string; specializations: string; semester?: string; open?: boolean }, builtInLabs: number, categories: Category[] = DEFAULT_SETTINGS.categories): Promise<ModuleCard[]> {
+export async function moduleCards(builtInAudience: { category: string; years: string; specializations: string; semester?: string; open?: boolean; faculty?: string }, builtInLabs: number, categories: Category[] = DEFAULT_SETTINGS.categories): Promise<ModuleCard[]> {
   const s = getPlatformStore();
   const [rows, labs] = s ? await Promise.all([s.listModules().catch(() => []), s.listLabs().catch(() => [])]) : [[], []];
   const cat = (v: string | undefined) => (v || 'Core').trim();
   const sem = (v: string | undefined) => (v === 'Semester 2' || v === 'Both' ? v : 'Semester 1') as Audience['semester'];
   return [
     { ...BUILT_IN_MODULE, labs: builtInLabs, builtIn: true, category: cat(builtInAudience.category), kind: kindOf(categories, cat(builtInAudience.category)), open: builtInAudience.open !== false,
-      years: listOf(builtInAudience.years), specializations: listOf(builtInAudience.specializations), semester: sem(builtInAudience.semester) },
+      years: listOf(builtInAudience.years), specializations: listOf(builtInAudience.specializations), semester: sem(builtInAudience.semester), faculty: moduleFaculty(builtInAudience.faculty) },
     ...rows.filter((m) => m.slug !== BUILT_IN_MODULE.slug && m.published).map((m) => {
       const c = compileModule(m.flow);
       const published = new Set(labs.filter((l) => l.module === m.slug && l.published).map((l) => l.slug));
@@ -274,7 +285,7 @@ export async function moduleCards(builtInAudience: { category: string; years: st
         color: c.meta.color || '#7cb1ff', href: `/m/${m.slug}`, builtIn: false,
         labs: c.items.filter((i) => i.kind === 'lab' && published.has(i.slug)).length,
         category: cat(c.meta.category), kind: kindOf(categories, cat(c.meta.category)), open: c.meta.open === 'Yes',
-        years: listOf(c.meta.years), specializations: listOf(c.meta.specializations), semester: sem(c.meta.semester),
+        years: listOf(c.meta.years), specializations: listOf(c.meta.specializations), semester: sem(c.meta.semester), faculty: moduleFaculty(c.meta.faculty),
       };
     }),
   ];

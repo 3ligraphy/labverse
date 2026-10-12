@@ -63,11 +63,11 @@ test('accounts: password rules, validation, hashing and signed tokens', () => {
 
 test('onboarding profile: valid year/specialization, only allowed optional modules; no Data Science', () => {
   assert.ok(!DEFAULT_SETTINGS.specializations.includes('Data Science'));
-  const p = parseProfile({ year: 'Year 3', specialization: 'Software Engineering', modules: ['mobile-development', 'web-development'] }, DEFAULT_SETTINGS, ['mobile-development']);
+  const p = parseProfile({ faculty: 'informatics-computer-science', year: 'Year 3', specialization: 'Software Engineering', modules: ['mobile-development', 'web-development'] }, DEFAULT_SETTINGS, ['mobile-development']);
   assert.deepEqual(p.ok && p.value.modules, ['mobile-development'], 'invitation-only modules cannot be self-chosen');
-  assert.equal(parseProfile({ year: 'Year 9', specialization: 'Software Engineering' }, DEFAULT_SETTINGS, []).ok, false);
+  assert.equal(parseProfile({ faculty: 'informatics-computer-science', year: 'Year 9', specialization: 'Software Engineering' }, DEFAULT_SETTINGS, []).ok, false);
   assert.equal(parseSettings({ years: 'Year 1\nYear 2', specializations: 'A, B' }).ok, false, 'no commas');
-  assert.equal(isForStudent({ slug: 'm', category: 'Optional', kind: 'elective', open: true, years: [], specializations: [], semester: 'Both' }, { year: 'Year 1', specialization: GENERAL, modules: ['m'] }), true);
+  assert.equal(isForStudent({ slug: 'm', category: 'Optional', kind: 'elective', open: true, years: [], specializations: [], semester: 'Both', faculty: 'informatics-computer-science' }, { year: 'Year 1', specialization: GENERAL, modules: ['m'], faculty: '' }), true);
 });
 
 test('BUE years: Prep year then Years 1–3; specializations start in Year 2', () => {
@@ -78,11 +78,12 @@ test('BUE years: Prep year then Years 1–3; specializations start in Year 2', (
   assert.equal(hasSpecialization(s, 'Year 2', 'Semester 1'), true);
   assert.equal(hasSpecialization(s, 'Year 3', 'Semester 2'), true);
   // before it starts the student is "General", whatever they send
-  const y1 = parseProfile({ year: 'Year 1', specialization: 'Software Engineering' }, s, []);
+  const ics = { faculty: 'informatics-computer-science' };
+  const y1 = parseProfile({ ...ics, year: 'Year 1', specialization: 'Software Engineering' }, s, []);
   assert.deepEqual(y1.ok && y1.value.specialization, GENERAL);
-  const y2 = parseProfile({ year: 'Year 2', specialization: '' }, s, []);
+  const y2 = parseProfile({ ...ics, year: 'Year 2', specialization: '' }, s, []);
   assert.equal(y2.ok, false, 'Year 2 must choose');
-  const y3 = parseProfile({ year: 'Year 3', specialization: 'Cyber Security' }, s, []);
+  const y3 = parseProfile({ ...ics, year: 'Year 3', specialization: 'Cyber Security' }, s, []);
   assert.deepEqual(y3.ok && y3.value.specialization, 'Cyber Security');
   // a later start set by the admin still works
   const late = { ...s, specFrom: { year: 'Year 2', semester: 'Semester 2' as const } };
@@ -126,8 +127,8 @@ test('catalogue categories: admin-defined, core vs elective; only open electives
   assert.deepEqual(ok.ok && ok.value.categories, [{ name: 'Elective', kind: 'elective' }, { name: 'Core', kind: 'core' }]);
   assert.equal(parseSettings({ years: ['Year 1'], specializations: ['SE'], categories: [{ name: 'A', kind: 'core' }, { name: 'a', kind: 'core' }] }).ok, false, 'duplicates');
   const mods = [
-    { slug: 'mobile', category: 'Optional', kind: 'elective' as const, open: true, years: [], specializations: [], semester: 'Semester 1' as const },
-    { slug: 'web', category: 'Elective', kind: 'elective' as const, open: false, years: [], specializations: [], semester: 'Both' as const },
+    { slug: 'mobile', category: 'Optional', kind: 'elective' as const, open: true, years: [], specializations: [], semester: 'Semester 1' as const, faculty: 'all' },
+    { slug: 'web', category: 'Elective', kind: 'elective' as const, open: false, years: [], specializations: [], semester: 'Both' as const, faculty: 'all' },
   ];
   assert.deepEqual(optionalFor(mods, { year: 'Year 3', specialization: GENERAL }).map((m) => m.slug), ['mobile']);
 });

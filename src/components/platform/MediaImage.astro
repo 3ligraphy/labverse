@@ -1,0 +1,61 @@
+---
+/**
+ * A screenshot or picture with a caption. Tap to enlarge (a dialog; without scripts the link opens the image).
+ *   <MediaImage src="https://…/editor.png" alt="The block editor with the + button circled" caption="The + button adds a block" />
+ */
+interface Props { src: string; alt: string; caption: string }
+const { src, alt, caption } = Astro.props;
+---
+<figure class="mi" data-reveal>
+  <a class="mi-frame" href={src} target="_blank" rel="noopener noreferrer" data-mi-zoom>
+    <img src={src} alt={alt} loading="lazy" decoding="async" />
+    <span class="mi-zoom-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5M11 8v6M8 11h6" /></svg>
+    </span>
+    <span class="sr-only">(enlarge image)</span>
+  </a>
+  {caption && <figcaption class="mi-cap">{caption}</figcaption>}
+</figure>
+
+<style>
+  .mi { margin-inline: 0; margin-bottom: 0; display: grid; gap: 10px; justify-items: center; }
+  .mi-frame {
+    position: relative; display: block; max-width: 100%; border-radius: var(--r-lg); overflow: hidden; cursor: zoom-in;
+    border: 1px solid var(--line-2); background: var(--surface-2); box-shadow: var(--shadow-md);
+    transition: transform var(--t-med) var(--ease-out), box-shadow var(--t-med);
+  }
+  .mi-frame img { display: block; width: auto; max-width: 100%; max-height: 640px; height: auto; margin: 0 auto; border: 0 !important; border-radius: 0 !important; }
+  .mi-zoom-ico {
+    position: absolute; right: 10px; bottom: 10px; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
+    background: var(--glass); color: var(--text); border: 1px solid var(--line-2); backdrop-filter: blur(8px);
+    opacity: 0; transform: translateY(4px); transition: opacity var(--t-med), transform var(--t-med) var(--ease-out);
+  }
+  .mi-frame:is(:hover, :focus-visible) .mi-zoom-ico { opacity: 1; transform: none; }
+  .mi-frame:hover { transform: translateY(-2px); }
+  @media (hover: none) { .mi-zoom-ico { opacity: 1; transform: none; } }
+  .mi-cap { font-size: 14px; color: var(--text-3); text-align: center; text-wrap: balance; max-width: 60ch; }
+
+  /* zoom dialog (created by the script) */
+  :global(.mi-dialog) {
+    max-width: none; max-height: none; width: 100vw; height: 100dvh; padding: 0; border: 0; background: transparent; overflow: hidden;
+  }
+  :global(.mi-dialog[open]) { display: grid; place-items: center; }
+  :global(.mi-dialog::backdrop) { background: rgb(5 6 8 / 0.86); backdrop-filter: blur(6px); }
+  :global(.mi-zoom) { position: relative; display: grid; gap: 12px; justify-items: center; padding: 56px 16px 24px; max-width: 100%; max-height: 100%; }
+  :global(.mi-zoom img) { max-width: min(1600px, 100%); max-height: calc(100dvh - 140px); width: auto; height: auto; border-radius: var(--r-md); box-shadow: 0 40px 80px -20px rgb(0 0 0 / 0.7); cursor: zoom-out; background: #fff; animation: mi-in 360ms var(--ease-out); }
+  :global(.mi-close) { position: fixed; top: 14px; right: 14px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgb(255 255 255 / 0.12); color: #fff; border: 1px solid rgb(255 255 255 / 0.2); }
+  :global(.mi-close:hover) { background: rgb(255 255 255 / 0.22); }
+  :global(.mi-zcap) { color: #d4d8de; font-size: 14px; text-align: center; max-width: 70ch; }
+  @keyframes mi-in { from { opacity: 0; transform: scale(0.96); } }
+  @media (prefers-reduced-motion: reduce) {
+    .mi-frame, .mi-zoom-ico { transition: none; }
+    .mi-frame:hover { transform: none; }
+    :global(.mi-zoom img) { animation: none; }
+  }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  import { initImages } from '@/scripts/web-lab';
+  onPageLoad(() => initImages());
+</script>

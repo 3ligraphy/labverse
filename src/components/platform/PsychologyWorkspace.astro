@@ -1,0 +1,92 @@
+---
+import PsychologySetup from './PsychologySetup.astro';
+import MediaImage from './MediaImage.astro';
+interface Props { section: string }
+const { section } = Astro.props;
+const outcomes = [
+  ['Plan with purpose', 'Turn an audience and a communication goal into a sitemap, a clear visual identity and useful page content.'],
+  ['Build with a CMS', 'Create pages, navigation, posts and categories in WordPress. Understand how content, design and structure fit together.'],
+  ['Work critically with AI', 'Give clear instructions, revise weak answers and check claims before using generated text or code.'],
+  ['Design for real people', 'Use readable layouts, descriptive image text and gentle motion. Review the site on different screen sizes.'],
+];
+const tools = [
+  { name: 'WordPress Playground', kind: 'YOUR BUILDING SPACE', body: 'Use the browser-based WordPress workspace from Lab 01. Keep your site backup so you can continue in Lab 02.', href: 'https://playground.wordpress.net/', action: 'Open Playground' },
+  { name: 'AI writing assistant', kind: 'YOUR DRAFTING PARTNER', body: 'Use the prompt cards inside each lab to plan and revise your fictional clinic website. Read and check every output before using it.', href: 'https://chatgpt.com/', action: 'Open ChatGPT' },
+  { name: 'The lab code sandbox', kind: 'YOUR EXPERIMENT SPACE', body: 'Lab 02 includes editable HTML and CSS examples. Change one thing, inspect the preview, and explain the result before moving it to WordPress.' },
+  { name: 'Images & attribution', kind: 'YOUR MEDIA LIBRARY', body: 'Find an image that supports the page. Check its individual licence, record its source, and write alt text describing what matters.', href: 'https://openverse.org/', action: 'Explore Openverse' },
+];
+const resources = [
+  { name: 'WordPress documentation', body: 'Look up publishing, media, blocks and site appearance when you need a second explanation.', href: 'https://wordpress.org/documentation/', tag: 'CMS REFERENCE' },
+  { name: 'Playground documentation', body: 'The official reference for the browser-based WordPress environment used in the labs.', href: 'https://developer.wordpress.org/playground/', tag: 'WORKSPACE REFERENCE' },
+  { name: 'HTML & CSS foundations', body: 'Optional follow-on learning for understanding and adapting the code in Lab 02.', href: 'https://developer.mozilla.org/en-US/docs/Learn_web_development', tag: 'GO FURTHER' },
+];
+const fixes = [
+  ['My site disappeared between sessions', 'Look for the saved site in Playground first. If it is missing, import mindcare-session1.zip using the restore steps in Lab 02. If you cannot find your backup, ask the instructor for the Session 1 starting copy.'],
+  ['My page is missing from the menu', 'Saving a page and adding it to navigation are separate steps. Check that the page is published, then revisit the menu task in Lab 01 and add its link.'],
+  ['The homepage shows posts instead of my design', 'Revisit the static-homepage task in Lab 01. Make sure your intended Home page is selected, then view the site rather than only the editor.'],
+  ['My changes are not visible', 'Save the item you edited and check the correct page in the site preview. If you changed a template or global styles, check whether that editor also has changes waiting to be saved.'],
+  ['The AI answer does not fit my page', 'Name the page, audience, purpose and word limit. Point out what is wrong with the first answer and request one specific revision. Do not paste an answer you cannot explain.'],
+  ['The code looks wrong in WordPress', 'Return to the lab sandbox and test the smallest working version. Check that you used a Custom HTML block and copied the complete example. Remove the last change and try again.'],
+];
+---
+<div class="pw">
+  {section === 'deployment' && <>
+    <div class="pw-heading"><p class="mono">SESSION 03 · GO LIVE</p><h2>A public website.<br /><span>A CMS you can still edit.</span></h2><p>Transfer your finished MindCare site to hosted WordPress, then test it as a visitor and publish an update through the live Dashboard.</p></div>
+    <div class="pw-band"><div><p class="mono">BEFORE CLASS</p><h3>Your hosting must be ready.</h3></div><p>Your instructor must provide a dedicated, empty WordPress site with a public HTTPS address, private admin access, the required theme/plugins and a backup procedure. Bring your Session 2 ZIP, original images and design notes. A hosting account is not created by this course page.</p></div>
+    <MediaImage src="/guides/psychology/deployment.svg" alt="Move content and images from Playground to hosted WordPress, then verify the public website and live CMS." caption="Your ZIP protects the practice site. Hosted WordPress makes the website available to visitors." />
+    <div class="pw-grid" style="margin-top:24px"><article class="pw-card"><h3>Transfer & rebuild</h3><p>Export WordPress XML, import pages and posts, upload images, repair source links, and reapply the theme, styles and navigation.</p></article><article class="pw-card"><h3>Test & hand over</h3><p>Check HTTPS and every page while signed out. Make a live CMS edit, capture evidence and prepare the public URL with recovery notes.</p></article></div>
+    <p style="margin-top:24px"><a class="btn btn-primary" href="/m/technology-for-psychology/lab-03">Open Session 3 — Deployment →</a></p>
+    <p style="margin-top:16px">Content transfer uses the <a href="https://learn.wordpress.org/lesson/tools-export-and-import/" target="_blank" rel="noopener noreferrer">official WordPress export/import workflow</a>. Themes, plugins and browser-only images require separate attention.</p>
+  </>}
+  {section === 'overview' && <>
+    <div class="pw-heading"><p class="mono">DIGITAL SKILLS. HUMAN CONTEXT.</p><h2>Make technology<br /><span>part of your toolkit.</span></h2><p>Build a fictional psychology clinic website across three practical sessions. Start with the basics, use AI thoughtfully, and leave with a site you can explain, edit and restore.</p></div>
+    <div class="pw-grid">{outcomes.map(([title, body], i) => <article class="pw-card"><span class="pw-number mono">0{i + 1}</span><h3>{title}</h3><p>{body}</p></article>)}</div>
+    <div class="pw-band"><div><p class="mono">WHAT YOU WILL MAKE</p><h3>Meet MindCare.</h3></div><p>A teaching website for a fictional clinic: a homepage, useful information pages, a working menu, organised posts and a consistent visual style. No coding background is needed.</p></div>
+    <div class="pw-grid"><article class="pw-card"><p class="mono">SESSION 01 · FOUNDATIONS</p><h3>From idea to working website.</h3><p>Plan your sitemap and brand, explore the Dashboard, build your pages, connect the menu and export your first backup.</p></article><article class="pw-card"><p class="mono">SESSION 02 · CONTENT & DESIGN</p><h3>Make it useful. Make it yours.</h3><p>Restore your work, organise posts, add images, refine the design and experiment with animation before the final review and export.</p></article></div>
+<article class="pw-band"><div><p class="mono">SESSION 03 · DEPLOYMENT</p><h3>Take your CMS live.</h3></div><p>Transfer your content to hosted WordPress, check the public HTTPS website and prove you can update it through the live Dashboard. <a href="/m/technology-for-psychology?tab=deployment">Deployment guide →</a></p></article>
+  </>}
+  {section === 'project' && <>
+    <div class="pw-heading"><p class="mono">THE PRACTICAL BUILD</p><h2>A small website.<br /><span>A complete workflow.</span></h2><p>MindCare brings the three labs together. Use this brief to keep track of the site you are building; your module leader will publish any grading and submission requirements separately.</p></div>
+    <div class="pw-grid"><article class="pw-card"><h3>01 / Structure</h3><p>Create the seven pages described in Lab 01, select a static homepage and connect the navigation. Give every page a clear purpose.</p></article><article class="pw-card"><h3>02 / Content</h3><p>Add the posts, categories, service information and FAQ from Lab 02. Keep the writing clear, consistent and appropriate for a fictional teaching site.</p></article><article class="pw-card"><h3>03 / Design</h3><p>Apply a consistent palette and type style. Add relevant images with alt text, test the mobile layout and keep animation subtle.</p></article><article class="pw-card"><h3>04 / Deploy & verify</h3><p>Complete Session 3 on your provided WordPress host. Submit the public HTTPS URL, signed-out visitor checks, live CMS-edit evidence and recovery notes. Keep your Playground ZIP as a source backup.</p></article></div>
+    <div class="pw-band"><div><p class="mono">BE READY TO EXPLAIN</p><h3>Your choices matter.</h3></div><p>Show one AI output you improved, one design choice you made for your audience, and how you would restore the site from your backup. Keep fictional content clearly labelled and use no real patient information.</p></div>
+  </>}
+  {section === 'tools' && <>
+    <div class="pw-heading"><p class="mono">A LIGHTWEIGHT TOOLKIT</p><h2>Open a browser.<br /><span>Start making.</span></h2><p>The labs bring together a website builder, a drafting assistant and a place to experiment with code.</p></div>
+    <div class="pw-grid">{tools.map((tool) => <article class="pw-card"><p class="mono">{tool.kind}</p><h3>{tool.name}</h3><p>{tool.body}</p>{tool.href && <a href={tool.href} target="_blank" rel="noopener noreferrer">{tool.action} ↗</a>}</article>)}</div>
+  </>}
+  {section === 'setup' && <PsychologySetup />}
+  {section === 'resources' && <>
+    <div class="pw-heading"><p class="mono">KEEP LEARNING</p><h2>The right reference.<br /><span>At the right moment.</span></h2><p>Start with the lab instructions, then use these official references to explore a feature or understand a concept more deeply.</p></div>
+    <div class="pw-grid">{resources.map((resource) => <article class="pw-card"><p class="mono">{resource.tag}</p><h3>{resource.name}</h3><p>{resource.body}</p><a href={resource.href} target="_blank" rel="noopener noreferrer">Read the reference ↗</a></article>)}</div>
+    <article class="pw-band"><div><p class="mono">QUICK REFERENCE</p><h3>Words to remember.</h3></div><p><strong>Page:</strong> lasting site information. <strong>Post:</strong> a dated article. <strong>Category:</strong> a group of posts. <strong>Theme:</strong> the site’s design. <strong>Block:</strong> one piece of page content. <strong>Backup:</strong> a copy you can restore.</p></article>
+  </>}
+  {section === 'troubleshooting' && <>
+    <div class="pw-heading"><p class="mono">WHEN SOMETHING GETS STUCK</p><h2>Pause. Check.<br /><span>Try one change.</span></h2><p>Keep a backup before experimenting. If you need help, show your instructor which task you are on, what you expected and what actually happened.</p></div>
+    <div class="pw-fixes">{fixes.map(([title, body]) => <details><summary>{title}</summary><p>{body}</p></details>)}</div>
+  </>}
+</div>
+<style>
+  .pw { padding-block: 44px 72px; }
+  .pw-heading { max-width: 720px; margin-bottom: 30px; }
+  .pw .mono { font-size: 11px; letter-spacing: .12em; color: var(--text-3); }
+  .pw h2 { font-size: clamp(2rem, 4vw, 3.8rem); line-height: 1.05; letter-spacing: -.05em; margin-block: 12px 20px; }
+  .pw h2 span { color: var(--text-3); }
+  .pw p { color: var(--text-2); line-height: 1.75; }
+  .pw-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .pw-card { padding: 28px; border: 1px solid var(--line-2); border-radius: 18px; background: var(--surface); }
+  .pw-card h3 { font-size: 1.35rem; letter-spacing: -.025em; margin-block: 12px; }
+  .pw-card p { font-size: 14px; }
+  .pw-card a { display: inline-block; margin-top: 22px; font-weight: 600; text-decoration: underline; text-underline-offset: 5px; }
+  .pw-number { display: inline-grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line-2); border-radius: 50%; }
+  .pw-band { display: grid; grid-template-columns: 1fr 2fr; gap: 32px; padding: 32px; border-radius: 18px; margin-block: 24px; background: color-mix(in oklab, var(--module-color) 9%, var(--surface)); border: 1px solid color-mix(in oklab, var(--module-color) 25%, var(--line)); }
+  .pw-band h3 { font-size: 1.7rem; letter-spacing: -.04em; margin-top: 12px; }
+  .pw-steps { padding-left: 26px; max-width: 850px; }
+  .pw-steps li { padding: 18px 0 22px 14px; border-bottom: 1px solid var(--line); }
+  .pw-steps h3 { margin-bottom: 8px; }
+  .pw code { overflow-wrap: anywhere; }
+  .pw-fixes { display: grid; gap: 12px; }
+  .pw-fixes details { border: 1px solid var(--line-2); border-radius: 14px; padding: 20px 24px; background: var(--surface); }
+  .pw-fixes summary { cursor: pointer; font-weight: 600; }
+  .pw-fixes p { margin-top: 14px; max-width: 85ch; }
+  @media(max-width: 650px) { .pw-grid, .pw-band { grid-template-columns: 1fr; } .pw-card, .pw-band { padding: 22px; } }
+</style>

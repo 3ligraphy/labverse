@@ -1,0 +1,144 @@
+---
+/**
+ * A web page in a browser window: traffic lights, address bar, reload, Desktop / Tablet / Phone sizes (the page is
+ * laid out at that width and scaled down to fit the column) and full screen. The web counterpart of Device.astro.
+ * The HTML runs in a sandboxed iframe (scripts allowed, never same-origin, so it can't touch the site or its cookies).
+ * Used by WebPreview (staff-written page) and WebSandbox (the student's live code). Client logic: src/scripts/web-lab.ts.
+ *   <WebFrame html="<h1>Hi</h1>" url="my-site.com" height="Medium" title="Clinic home page" />
+ */
+import { pageDoc } from '@/lib/platform/web';
+
+interface Props { html: string; url?: string; height?: 'Short' | 'Medium' | 'Tall'; title: string; live?: boolean }
+const { html, url = '', height = 'Medium', title, live = false } = Astro.props;
+const H = { Short: 340, Medium: 520, Tall: 720 } as const;
+const devices = [
+  { id: 'desktop', label: 'Desktop', icon: '<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/>' },
+  { id: 'tablet', label: 'Tablet', icon: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/>' },
+  { id: 'phone', label: 'Phone', icon: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>' },
+];
+---
+<div class="wf" data-wf data-device="desktop" style={`--wf-h:${H[height] ?? H.Medium}px`}>
+  <div class="wf-bar">
+    <span class="wf-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <button type="button" class="wf-btn wf-reload" data-wf-reload aria-label="Reload the page" title="Reload">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 4v7h-7" /></svg>
+    </button>
+    <div class="wf-addr" title={url || undefined}>
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+      <span class="wf-url mono"><span class="sr-only">Address: </span>{url || 'preview'}</span>
+      {live && <span class="wf-live mono" data-wf-live aria-hidden="true">live</span>}
+    </div>
+    <div class="wf-tools">
+      <div class="wf-devices" role="group" aria-label="Preview size">
+        {devices.map((d) => (
+          <button type="button" class="wf-btn wf-dev" data-wf-device={d.id} aria-pressed={d.id === 'desktop' ? 'true' : 'false'} title={d.label}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={d.icon} />
+            <span class="sr-only">{d.label}</span>
+          </button>
+        ))}
+      </div>
+      <button type="button" class="wf-btn" data-wf-full aria-label="Open full screen" title="Full screen">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+      </button>
+    </div>
+  </div>
+  <div class="wf-stage" data-wf-stage>
+    <div class="wf-canvas" data-wf-canvas>
+      <iframe
+        class="wf-frame"
+        data-wf-frame
+        title={title}
+        srcdoc={pageDoc(html)}
+        sandbox="allow-scripts"
+        loading="lazy"
+        referrerpolicy="no-referrer"
+      ></iframe>
+    </div>
+    <span class="wf-size mono" data-wf-size aria-hidden="true"></span>
+  </div>
+</div>
+
+<style>
+  .wf {
+    --wf-chrome: var(--surface-2);
+    container-type: inline-size; position: relative; display: flex; flex-direction: column;
+    border-radius: var(--r-lg); border: 1px solid var(--line-2); background: var(--surface); overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+  /* ---- chrome ---- */
+  .wf-bar { display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 6px 8px 6px 14px; background: var(--wf-chrome); border-bottom: 1px solid var(--line); }
+  .wf-dots { display: inline-flex; gap: 6px; flex: none; margin-right: 4px; }
+  .wf-dots i { width: 11px; height: 11px; border-radius: 50%; background: var(--line-2); }
+  .wf-dots i:first-child { background: #ff6b5f; } .wf-dots i:nth-child(2) { background: #ffbd2e; } .wf-dots i:nth-child(3) { background: #28c940; }
+  .wf-btn {
+    flex: none; display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: var(--text-2);
+    transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast) var(--ease-out);
+  }
+  .wf-btn:hover { background: var(--surface-3); color: var(--text); }
+  .wf-btn:active { transform: scale(0.92); }
+  .wf-reload.spin svg { animation: wf-spin 520ms var(--ease-out); }
+  @keyframes wf-spin { to { transform: rotate(360deg); } }
+  .wf-addr {
+    flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px;
+    border-radius: 999px; background: var(--bg); border: 1px solid var(--line); color: var(--text-3);
+  }
+  .wf-addr svg { flex: none; color: var(--ok); }
+  .wf-url { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wf-live { flex: none; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; color: var(--accent-text); background: var(--accent-soft); }
+  .wf-live.pulse { animation: wf-pulse 700ms var(--ease-out); }
+  @keyframes wf-pulse { 0% { box-shadow: 0 0 0 0 var(--accent-glow); } 100% { box-shadow: 0 0 0 8px transparent; } }
+  .wf-tools { display: flex; align-items: center; gap: 4px; flex: none; }
+  .wf-devices { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+  .wf-dev { width: 30px; height: 28px; }
+  .wf-dev[aria-pressed='true'] { background: var(--surface-3); color: var(--accent-text); box-shadow: 0 0 0 1px var(--line-2) inset; }
+  :global(.no-js) .wf-tools, :global(.no-js) .wf-reload { display: none; }
+  @container (max-width: 460px) {
+    .wf-dots { display: none; }
+    .wf-bar { padding-left: 6px; gap: 4px; }
+    .wf-addr { padding: 0 10px; }
+    .wf-live { display: none; }
+  }
+
+  /* ---- stage: the page is laid out at the device width and scaled down to fit ---- */
+  .wf-stage {
+    position: relative; height: min(var(--wf-h), 78svh); overflow: hidden; background: #fff;
+  }
+  .wf-canvas { position: absolute; inset: 0; }
+  .wf-frame { display: block; width: 100%; height: 100%; border: 0; background: #fff; color-scheme: light; }
+  .wf.is-scaled .wf-canvas {
+    inset: auto; top: var(--wf-pad, 0px); left: 50%; width: var(--wf-w); height: var(--wf-ch);
+    transform: translateX(-50%) scale(var(--wf-s, 1)); transform-origin: top center;
+    transition: width 420ms var(--ease-out), height 420ms var(--ease-out), transform 420ms var(--ease-out), border-radius 420ms var(--ease-out), box-shadow 420ms;
+  }
+  .wf.is-scaled:not([data-device='desktop']) .wf-stage {
+    background: radial-gradient(var(--grid-dot) 1px, transparent 1px) 0 0 / 18px 18px, var(--bg-2);
+  }
+  .wf.is-scaled[data-device='tablet'] .wf-canvas { border-radius: 18px; box-shadow: 0 0 0 10px #15181d, 0 0 0 11px #2a2f38, 0 30px 60px -20px rgb(0 0 0 / 0.5); overflow: hidden; }
+  .wf.is-scaled[data-device='phone'] .wf-canvas { border-radius: 30px; box-shadow: 0 0 0 9px #15181d, 0 0 0 10px #2a2f38, 0 30px 60px -20px rgb(0 0 0 / 0.5); overflow: hidden; }
+  .wf-size { position: absolute; right: 10px; bottom: 8px; font-size: 11px; padding: 2px 7px; border-radius: 6px; background: var(--glass); color: var(--text-2); opacity: 0; transition: opacity 300ms; pointer-events: none; }
+  .wf-size.on { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .wf.is-scaled .wf-canvas { transition: none; }
+    .wf-reload.spin svg, .wf-live.pulse { animation: none; }
+  }
+
+  /* ---- full screen (the dialog is created by the script, so its rules are global) ---- */
+  :global(.wf-dialog) {
+    width: min(1400px, calc(100vw - 32px)); height: calc(100dvh - 32px); max-width: none; max-height: none; padding: 0;
+    border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); color: var(--text); overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+  :global(.wf-dialog[open]) { display: flex; flex-direction: column; animation: wf-dlg 320ms var(--ease-out); }
+  :global(.wf-dialog::backdrop) { background: rgb(5 6 8 / 0.72); backdrop-filter: blur(4px); }
+  :global(.wf-dialog .wf) { flex: 1; min-height: 0; border: 0; border-radius: 0; box-shadow: none; }
+  :global(.wf-dialog .wf-stage) { flex: 1; height: auto; }
+  @keyframes wf-dlg { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
+  @media (max-width: 640px) { :global(.wf-dialog) { width: 100vw; height: 100dvh; border-radius: 0; border: 0; } }
+  @media (prefers-reduced-motion: reduce) { :global(.wf-dialog[open]) { animation: none; } }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  import { initFrames } from '@/scripts/web-lab';
+  onPageLoad(() => initFrames());
+</script>

@@ -1,8 +1,9 @@
 ---
-/** Lab canvas: Parts, Tasks, text, code, terminals, graded exercises, repo link and check-in, in order. */
+/** Lab canvas: Parts, Tasks and the components the admin allows for this module (Admin → Canvas components), in order. */
 import Base from '@/layouts/Base.astro';
 import Canvas from '@/components/builder/Canvas.astro';
 import { access } from '@/lib/accounts/access';
+import { allowedLabNodes } from '@/lib/platform/core';
 import { getPlatformStore } from '@/lib/platform/server';
 
 export const prerender = false;
@@ -23,6 +24,8 @@ if (!mod || !lab) return Astro.redirect(`/admin/builder/${moduleSlug}`, 303);
     config={{
       kind: 'lab', flow: lab.flow, saveUrl: `/api/admin/platform/labs?module=${encodeURIComponent(mod.slug)}&slug=${encodeURIComponent(lab.slug)}`,
       published: lab.published, previewHref: `/m/${mod.slug}/${lab.slug}?preview`,
+      // the components the admin allows in this module (Admin → Canvas components); existing nodes stay editable
+      allowed: allowedLabNodes(mod.labNodes),
     }}
   />
 </Base>

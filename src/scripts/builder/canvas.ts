@@ -13,7 +13,8 @@
  *          and the palette, inspector and tools as bottom sheets.
  * The flow is saved as JSON through the admin API and validated again on the server (lib/platform/core).
  */
-import { nodeDefs, orderFlow, parseChecks, type Field, type Flow, type FlowKind, type FlowNode, type NodeDef } from '@/lib/platform/core';
+import { ANY_FACULTY, type Faculty } from '@/lib/accounts/core';
+import { nodeDefs, orderFlow, parseChecks, parseQuizOptions, safeUrl, videoEmbed, type Field, type Flow, type FlowKind, type FlowNode, type NodeDef } from '@/lib/platform/core';
 import { guardUnsaved } from '@/scripts/unsaved';
 
 export type CanvasConfig = {
@@ -25,8 +26,12 @@ export type CanvasConfig = {
   /** module canvas: the module's labs, for lab nodes */
   module?: string;
   labs?: { slug: string; title: string; published: boolean }[];
-  /** Valid catalogue choices for module audience fields. */
-  audienceOptions?: { years: string[]; specializations: string[] };
+  /** Valid catalogue choices for module audience fields (faculty: a select; specializations: that faculty's). */
+  audienceOptions?: { years: string[]; specializations: string[]; faculties?: Faculty[] };
+  /** lab canvas: the components the admin allows in this module (missing = every one). Existing nodes stay editable. */
+  allowed?: string[];
+  /** module canvas, for the catalogue admin: where the module's canvas components are chosen */
+  componentsHref?: string;
 };
 
 const GRID = 20;
@@ -47,6 +52,9 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
   let dirty = false;
   let published = cfg.published;
   const labs = new Map((cfg.labs ?? []).map((l) => [l.slug, l]));
+  const allowed = cfg.kind === 'lab' && cfg.allowed ? new Set(cfg.allowed) : null;
+  /** builders may add (and duplicate) only the components the admin allows for this module */
+  const canAdd = (type: string) => !allowed || allowed.has(type);
 
   const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
   const stage = $('[data-cv-stage]');
@@ -88,6 +96,25 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
       }
       case 'lab': { const l = labs.get(d.slug); return l ? (l.published ? 'published' : 'draft') + ` · /${d.slug}` : 'not found'; }
       case 'divider': return 'groups the labs after it';
+      case 'image': {
+        const src = safeUrl(d.src);
+        if (!src) return '⚠ needs an https:// image URL';
+        return (d.alt ?? '').trim() ? excerpt(d.caption || d.alt, 70) : `⚠ no alt text · ${new URL(src).hostname}`;
+      }
+      case 'video': {
+        const embed = videoEmbed(d.url);
+        return embed ? `${embed.includes('vimeo') ? 'Vimeo' : 'YouTube'}${d.title ? ` · ${excerpt(d.title, 60)}` : ''}` : '⚠ use a YouTube or Vimeo https link';
+      }
+      case 'link': { const url = safeUrl(d.url); return url ? `${new URL(url).hostname} · “${d.cta || 'Open'}”` : '⚠ needs an https:// link'; }
+      case 'quiz': {
+        const o = parseQuizOptions(d.options ?? '');
+        const right = o.filter((x) => x.correct).length;
+        return `${o.length < 2 || !right ? '⚠ ' : ''}${o.length} option${o.length === 1 ? '' : 's'} · ${right} correct`;
+      }
+      case 'prompt': return (d.prompt ?? '').trim() ? `${d.tool || 'ChatGPT'} · ${excerpt(d.prompt, 60)}` : '⚠ the prompt is empty';
+      case 'browser': return [d.url, d.height, d.html ? `${d.html.split('\n').length} lines` : 'empty page'].filter(Boolean).join(' · ');
+      case 'websandbox': return `live HTML/CSS · ${(d.starter ?? '').split('\n').length} starter lines`;
+      case 'clickpath': { const steps = (d.steps ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean); return steps.length ? steps.join(' › ') : 'no steps yet (hidden)'; }
       default: return defs[n.type].hint;
     }
   };
@@ -284,11 +311,23 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
 
   /* ---------------------------------------------------------- inspector */
 
-  function fieldInput(f: Field, value: string): string {
+  /** the specializations a module may target: its faculty's, or every faculty's for “All faculties” */
+  const specializationsFor = (faculty: string | undefined) => {
+    const fac = cfg.audienceOptions?.faculties?.find((x) => x.slug === faculty);
+    return fac ? fac.specializations : cfg.audienceOptions?.specializations;
+  };
+
+  function fieldInput(f: Field, value: string, data: Record<string, string> = {}): string {
     const id = `f-${f.key}`;
     const help = f.help ? `<small class="cv-help">${esc(f.help)}</small>` : '';
     const label = `<label for="${id}">${esc(f.label)}</label>`;
-    const audience = f.key === 'years' ? cfg.audienceOptions?.years : f.key === 'specializations' ? cfg.audienceOptions?.specializations : null;
+    const faculties = cfg.kind === 'module' ? cfg.audienceOptions?.faculties : undefined;
+    if (f.key === 'faculty' && faculties?.length) {
+      const opts = [...faculties.map((x) => ({ v: x.slug, t: x.name })), { v: ANY_FACULTY, t: 'All faculties' }];
+      if (value && !opts.some((o) => o.v === value)) opts.push({ v: value, t: `${value} (not in the catalogue)` });
+      return `${label}<select class="input" id="${id}" data-field="${f.key}">${opts.map((o) => `<option value="${esc(o.v)}" ${o.v === value ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}</select>${help}`;
+    }
+    const audience = f.key === 'years' ? cfg.audienceOptions?.years : f.key === 'specializations' ? specializationsFor(data.faculty) : null;
     if (audience) {
       const selected = new Set(value.split(',').map((item) => item.trim()).filter(Boolean));
       return `${label}<div class="cv-choices">${audience.map((option) => `<label><input type="checkbox" data-field="${f.key}" value="${esc(option)}" ${selected.has(option) ? 'checked' : ''} /><span>${esc(option)}</span></label>`).join('')}</div>${help}`;
@@ -325,9 +364,10 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
         ? `<p class="muted">/${esc(cfg.module ?? '')}/${esc(n.data.slug)} · ${labInfo.published ? 'published' : 'draft'}</p>
            <a class="btn btn-primary btn-sm" href="/admin/builder/${encodeURIComponent(cfg.module ?? '')}/${encodeURIComponent(n.data.slug)}" data-open-lab>Open lab canvas →</a>`
         : '<p class="muted">This node points at a lab that no longer exists. Delete it.</p>') : ''}
-      <form class="cv-form" data-cv-form>${fields.map((f) => `<div class="cv-field">${fieldInput(f, n.data[f.key] ?? '')}</div>`).join('')}</form>
+      <form class="cv-form" data-cv-form>${fields.map((f) => `<div class="cv-field">${fieldInput(f, n.data[f.key] ?? '', n.data)}</div>`).join('')}</form>
+      ${canAdd(n.type) || def.root ? '' : '<p class="cv-help">The admin switched this component off for this module: this node still works and can be edited, but new ones cannot be added.</p>'}
       ${def.root ? '<p class="cv-help">This is the starting node. It cannot be deleted.</p>' : `
-        <div class="cv-node-actions"><button type="button" class="btn btn-ghost btn-sm" data-dup>Duplicate</button>
+        <div class="cv-node-actions">${canAdd(n.type) ? '<button type="button" class="btn btn-ghost btn-sm" data-dup>Duplicate</button>' : ''}
         <button type="button" class="btn btn-ghost btn-sm cv-danger" data-del>Delete node</button></div>`}`;
     const checkMsg = inspector.querySelector<HTMLElement>('[data-check-msg]');
     const validateChecks = () => {
@@ -344,6 +384,16 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
         ? [...inspector.querySelectorAll<HTMLInputElement>(`input[data-field="${t.dataset.field}"]:checked`)].map((input) => input.value).join(', ')
         : t.value;
       if (t.type === 'color') t.nextElementSibling!.textContent = t.value;
+      if (t.dataset.field === 'faculty' && cfg.audienceOptions?.faculties?.length) {
+        // only the new faculty's specializations stay chosen; the picker then offers just those
+        const valid = new Set(specializationsFor(t.value) ?? []);
+        n.data.specializations = (n.data.specializations ?? '').split(',').map((x) => x.trim()).filter((x) => x && valid.has(x)).join(', ');
+        renderNodes();
+        setDirty();
+        renderInspector();
+        inspector.querySelector<HTMLElement>('[data-field="faculty"]')?.focus();
+        return;
+      }
       inspector.querySelector('h2')!.textContent = title(n);
       validateChecks();
       renderNodes();
@@ -370,7 +420,7 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
 
   function addNode(type: string, at?: { x: number; y: number }, data: Record<string, string> = {}) {
     const def = defs[type];
-    if (!def || def.root) return null;
+    if (!def || def.root || !canAdd(type)) return null;
     let after = !at && selected ? nodeById(selected) : null;
     // A new week selected from the palette belongs after the selected week and all of its labs.
     if (cfg.kind === 'module' && type === 'divider' && !at) {
@@ -431,6 +481,11 @@ export function mountCanvas(root: HTMLElement, cfg: CanvasConfig) {
   function duplicate(id: string) {
     const n = nodeById(id);
     if (!n || isRoot(n)) return;
+    if (!canAdd(n.type)) {
+      status.textContent = `${defs[n.type].label} is switched off for this module, so it can't be duplicated.`;
+      status.dataset.state = 'error';
+      return;
+    }
     const copy: FlowNode = { ...structuredClone(n), id: uid(), x: n.x + 40, y: n.y + 120 };
     flow.nodes.push(copy);
     renderNodes();

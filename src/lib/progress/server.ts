@@ -13,6 +13,9 @@ import { noStore } from '@/lib/attendance/server';
 import { exerciseStats, labStructure, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
 import { NeonStore, type ProgressStore } from './store';
 import { publishedLabSources } from '@/lib/platform/server';
+import { splitLabKey } from '@/lib/platform/core';
+import { ANY_FACULTY, DEFAULT_FACULTY } from '@/lib/accounts/core';
+import { hubData } from '@/lib/accounts/hub';
 
 const env = (key: string) => getSecret(key) || undefined;
 const onVercel = () => Boolean(env('VERCEL'));
@@ -150,11 +153,38 @@ export type DashboardStudent = {
   activeSec: number;
 };
 
+/**
+ * The lab picker on the admin dashboards: each lab with its module and faculty, so staff choose
+ * Faculty → Module → Lab. File-based labs belong to the built-in course; builder labs are "<module>--<lab>".
+ */
+async function labChoices(labs: LabStructure[]) {
+  const { settings, cards } = await hubData().catch(() => ({ settings: null, cards: [] as Awaited<ReturnType<typeof hubData>>['cards'] }));
+  const card = new Map(cards.map((c) => [c.slug, c]));
+  const facultyName = new Map((settings?.faculties ?? []).map((f) => [f.slug, f.name]));
+  return labs.map((l) => {
+    const key = splitLabKey(l.lab);
+    const module = key?.module ?? 'mobile-development';
+    const c = card.get(module);
+    const moduleTitle = c?.title ?? module;
+    const faculty = c?.faculty ?? DEFAULT_FACULTY;
+    return {
+      id: l.lab,
+      // builder lab titles are "<module>: <lab>"; the module has its own picker now
+      title: key && l.title.startsWith(`${moduleTitle}: `) ? l.title.slice(moduleTitle.length + 2) : l.title,
+      module, moduleTitle, faculty,
+      facultyName: faculty === ANY_FACULTY ? 'All faculties' : facultyName.get(faculty) ?? faculty,
+      href: key ? `/m/${key.module}/${key.lab}` : `/labs/${l.lab}`,
+    };
+  });
+}
+
 /** Everything /admin/progress shows for one lab. */
 /** `allow` limits which labs the dashboard offers (lab dashboards follow the permission matrix). */
-export async function buildDashboard(labParam: string | null, sessionParam?: string | null, allow: (lab: string) => boolean = () => true) {
+export async function buildDashboard(labParam: string | null, sessionParam?: string | null, allow: (lab: string) => boolean = () => true, moduleParam?: string | null) {
   const labs = (await getStructures()).filter((l) => allow(l.lab));
-  const structure = labs.find((l) => l.lab === labParam) ?? labs.find((l) => l.exercises.length) ?? labs[0];
+  // ?module= (from a module's Sessions / Progress button) opens that module's first lab
+  const inModule = moduleParam ? labs.find((l) => (splitLabKey(l.lab)?.module ?? 'mobile-development') === moduleParam) : undefined;
+  const structure = labs.find((l) => l.lab === labParam) ?? inModule ?? labs.find((l) => l.exercises.length) ?? labs[0];
   const s = getProgressStore();
   if (!structure || !s) return null;
   const sessions = await s.listSessions(structure.lab);
@@ -190,7 +220,7 @@ export async function buildDashboard(labParam: string | null, sessionParam?: str
   students.sort((a, b) => b.percent - a.percent || a.name.localeCompare(b.name));
   const exercises = exerciseStats(structure, data.students.map((st) => data.best.filter((b) => b.student_key === st.student_key)));
   return {
-    labs: labs.map((l) => ({ id: l.lab, title: l.title })),
+    labs: await labChoices(labs),
     structure,
     students,
     exercises,

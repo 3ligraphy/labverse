@@ -4,12 +4,17 @@
  * Phones (≤ 760px) get an app layout instead: app bar, a Steps list (or the canvas), a bottom tab bar, and the
  * palette, inspector and tools as bottom sheets. Same DOM, switched by CSS and `data-mode` / `data-sheet`.
  */
-import { nodeDefs } from '@/lib/platform/core';
+import { KITS, kitOf, nodeDefs, type Kit } from '@/lib/platform/core';
 import type { CanvasConfig } from '@/scripts/builder/canvas';
 
 interface Props { config: CanvasConfig; heading: string; kicker: string; back: { href: string; label: string } }
 const { config, heading, kicker, back } = Astro.props;
-const defs = Object.entries(nodeDefs(config.kind)).filter(([, d]) => !d.root && !(config.kind === 'module' && d.label === 'Lab'));
+const allowed = config.kind === 'lab' && config.allowed ? new Set<string>(config.allowed) : null;
+const defs = Object.entries(nodeDefs(config.kind)).filter(([type, d]) => !d.root && !(config.kind === 'module' && d.label === 'Lab') && (!allowed || allowed.has(type)));
+/** lab palette: grouped by kit (core first), with a small heading when more than one kit is shown */
+const groups = config.kind === 'lab'
+  ? (Object.keys(KITS) as Kit[]).map((kit) => ({ kit, label: KITS[kit].label, items: defs.filter(([type]) => kitOf(type) === kit) })).filter((g) => g.items.length)
+  : [{ kit: '', label: '', items: defs }];
 const json = JSON.stringify(config).replace(/</g, '\\u003c');
 ---
 <section class="cv" data-cv data-mode="outline">
@@ -35,13 +40,19 @@ const json = JSON.stringify(config).replace(/</g, '\\u003c');
       <div class="cv-sheet-head" data-cv-sheet-head><span class="cv-grab" aria-hidden="true"></span><b data-cv-palette-title>Add a step</b><button type="button" class="cv-x" data-cv-close aria-label="Close">✕</button></div>
       <p class="cv-k mono cv-desk">Nodes</p>
       <p class="cv-help cv-desk">Drag onto the canvas, or click to add after the selected node.</p>
-      <div class="cv-pals">
-        {defs.map(([type, d]) => (
-          <button type="button" class="cv-pal" draggable="true" data-palette={type} style={`--nc:${d.color}`}>
-            <span class="cv-glyph">{d.glyph}</span><span><b>{d.label}</b><small>{d.hint}</small></span>
-          </button>
-        ))}
-      </div>
+      {groups.map((g) => (
+        <>
+          {groups.length > 1 && <p class="cv-kit mono">{g.label}</p>}
+          <div class="cv-pals">
+            {g.items.map(([type, d]) => (
+              <button type="button" class="cv-pal" draggable="true" data-palette={type} style={`--nc:${d.color}`}>
+                <span class="cv-glyph">{d.glyph}</span><span><b>{d.label}</b><small>{d.hint}</small></span>
+              </button>
+            ))}
+          </div>
+        </>
+      ))}
+      {config.kind === 'lab' && allowed && <p class="cv-help">The admin chooses which components this module uses.</p>}
       {config.kind === 'module' && (
         <>
           <p class="cv-k mono cv-sp">Labs</p>
@@ -52,6 +63,7 @@ const json = JSON.stringify(config).replace(/</g, '\\u003c');
             <p class="cv-help" data-newlab-msg></p>
           </form>
           <div class="cv-pals" data-cv-unplaced></div>
+          {config.componentsHref && <a class="cv-comp-link" href={config.componentsHref}>Canvas components ↗<small>Choose which lab components this module's builders see</small></a>}
         </>
       )}
     </aside>
@@ -77,6 +89,7 @@ const json = JSON.stringify(config).replace(/</g, '\\u003c');
         <button type="button" class="cv-more-item" data-proxy="[data-cv-layout]"><span>▦</span>Auto-layout</button>
         <button type="button" class="cv-more-item" data-proxy="[data-cv-zoom-in]"><span>+</span>Zoom in</button>
         <button type="button" class="cv-more-item" data-proxy="[data-cv-zoom-out]"><span>−</span>Zoom out</button>
+        {config.componentsHref && <a class="cv-more-item" href={config.componentsHref}><span>▧</span>Canvas components</a>}
         <a class="cv-more-item" href={back.href}><span>←</span>{back.label}</a>
       </div>
       <div class="cv-warn cv-warn-m" data-cv-warnings-m hidden></div>
@@ -126,6 +139,10 @@ const json = JSON.stringify(config).replace(/</g, '\\u003c');
   .cv-pal small { display: block; font-size: 12px; color: var(--text-3); line-height: 1.35; }
   .cv-glyph { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: color-mix(in oklab, var(--nc, var(--accent)) 22%, transparent); color: var(--nc, var(--accent)); font: 700 13px var(--font-mono); }
   :root[data-theme='light'] .cv-glyph { color: color-mix(in oklab, var(--nc) 55%, #000); }
+  .cv-kit { margin-top: 14px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+  .cv-comp-link { display: grid; gap: 2px; margin-top: 22px; padding: 10px 12px; border-radius: 10px; border: 1px dashed var(--line-2); font-size: 13px; font-weight: 600; color: var(--accent-text); }
+  .cv-comp-link:hover { border-color: var(--accent-text); }
+  .cv-comp-link small { font-size: 12px; font-weight: 400; color: var(--text-3); }
   .cv-newlab { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-top: 10px; }
   .cv-newlab .input { height: 34px; padding: 0 10px; font-size: 13px; }
   .cv-newlab select { grid-column: 1 / -1; }

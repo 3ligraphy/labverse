@@ -1,0 +1,54 @@
+---
+import MediaImage from './MediaImage.astro';
+import { psychologySetup, psychologyVisuals } from '@/lib/platform/psychology-guide';
+import { PLAYGROUND_URL } from '@/lib/platform/seeds/psychology-technology-lab-01';
+import { PLAYGROUND_FALLBACK } from '@/lib/platform/playground';
+---
+<div class="psg">
+  <header><p class="mono">SET UP ONCE · KEEP YOUR WORK SAFE</p><h2>Your first steps,<br /><span>with a picture at every turn.</span></h2><p>Allow about 20 minutes. You need a laptop, an internet connection and somewhere to store your backups. The screenshots are official WordPress reference images; labels and layout can vary by version. Select any image to enlarge it.</p></header>
+  <nav aria-label="Setup steps">{psychologySetup.map((s, i) => <a href={`#setup-${i + 1}`}>{String(i + 1).padStart(2, '0')} · {s.title}</a>)}</nav>
+  <div class="psg-launch"><a class="btn btn-primary" href={PLAYGROUND_URL} target="_blank" rel="noopener noreferrer">Open prepared Playground ↗</a><a class="btn btn-ghost" href="/m/technology-for-psychology?tab=labs">Go to all three sessions →</a></div>
+  <details class="psg-recovery"><summary>Playground says “had a hiccup”?</summary>
+    <p><strong>If the Console says sw.js returned 403:</strong> Playground’s required startup script was refused. Open the link in a normal Chrome or Edge window outside an embedded/in-app browser. If it still fails, share the sw.js Network response with your instructor or network administrator. Switching to a temporary site will not fix a blocked script.</p>
+    <p><strong>If only OPFS / browser-storage errors remain:</strong> try a different browser profile while keeping the original saved data. A <a href="https://playground.wordpress.net/?storage=temp" target="_blank" rel="noopener noreferrer">temporary diagnostic site</a> can help test startup, but all its work is lost on reload or closing the tab.</p>
+    <p>Try plain WordPress below to check whether the prepared launch is the problem. Keep your current tab and backups; do not clear site data containing saved work.</p>
+    <a class="btn btn-ghost" href={PLAYGROUND_FALLBACK} target="_blank" rel="noopener noreferrer">Open plain WordPress ↗</a>
+    <p>If it opens, return to your saved site from Playgrounds or import your ZIP. For a fresh site, activate Twenty Twenty-Five under Appearance → Themes (install it if absent); install Blocks Animation in Session 2 through Plugins → Add New Plugin.</p>
+    <p>If the plain site also fails, try another browser. Share the first red Developer Tools → Console error with your instructor, plus the Playground URL and whether you were opening a new site or restoring one.</p>
+    <a href="https://developer.wordpress.org/playground/handbook/troubleshooting/" target="_blank" rel="noopener noreferrer">Official recovery guide ↗</a>
+  </details>
+  {psychologySetup.map((step, i) => {
+    const visual = psychologyVisuals[step.visual];
+    return <section class="psg-step" id={`setup-${i + 1}`} aria-labelledby={`setup-title-${i + 1}`}>
+      <div class="psg-step-head"><span class="psg-number mono">{String(i + 1).padStart(2, '0')}</span><div><p class="mono">{step.time}</p><h3 id={`setup-title-${i + 1}`}>{step.title}</h3></div></div>
+      <div class="psg-content"><div><ol>{step.steps.map((instruction) => <li>{instruction}</li>)}</ol><p class="psg-check"><strong>You are ready when</strong>{step.check}</p><details><summary>Need a hand?</summary><p>{step.help}</p></details></div><div><MediaImage src={visual.src} alt={visual.alt} caption={visual.caption} />{visual.source && <a class="psg-source" href={visual.source} target="_blank" rel="noopener noreferrer">Screenshot: official WordPress documentation ↗</a>}</div></div>
+    </section>;
+  })}
+  <footer><h3>Ready to begin?</h3><p>You can open the Dashboard, edit a draft, export a backup and restore it. Open Lab 01 and begin with the website plan.</p><a class="btn btn-primary" href="/m/technology-for-psychology/lab-01">Start Session 1 →</a></footer>
+</div>
+<style>
+  .psg { padding-block: 44px 70px; }
+  header { max-width: 800px; }
+  .mono { font-size: 11px; letter-spacing: .1em; color: var(--text-3); }
+  h2 { font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.08; letter-spacing: -.05em; margin-block: 12px 22px; }
+  h2 span { color: var(--text-3); }
+  p, li { color: var(--text-2); line-height: 1.75; }
+  nav { display: flex; gap: 8px; flex-wrap: wrap; margin-block: 26px; }
+  nav a { border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 12px; font-size: 12px; }
+  nav a:hover { background: var(--surface-2); }
+  .psg-launch { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 35px; }
+  .psg-recovery { padding: 20px; margin-bottom: 28px; border: 1px solid var(--line-2); border-radius: 14px; background: var(--surface); }
+  .psg-recovery .btn { margin-top: 14px; }
+  .psg-step { scroll-margin-top: calc(var(--nav-h) + 24px); padding-block: 32px; border-top: 1px solid var(--line-2); }
+  .psg-step-head { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; }
+  .psg-number { display: grid; place-items: center; flex-shrink: 0; width: 48px; height: 48px; background: color-mix(in oklab, var(--module-color) 16%, var(--surface)); border-radius: 14px; color: var(--text); font-size: 18px; }
+  h3 { font-size: clamp(1.3rem, 2vw, 1.7rem); letter-spacing: -.035em; }
+  .psg-content { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 32px; }
+  ol { padding-left: 22px; display: grid; gap: 12px; }
+  li { padding-left: 5px; font-size: 14px; }
+  .psg-check { display: grid; gap: 4px; border-left: 3px solid var(--module-color); padding: 12px 16px; margin-block: 20px; background: var(--surface); font-size: 13px; }
+  details { font-size: 13px; } summary { cursor: pointer; font-weight: 600; } details p { margin-top: 8px; }
+  .psg-source { display: block; font-size: 11px; color: var(--text-3); text-decoration: underline; text-underline-offset: 3px; margin-top: 12px; text-align: center; }
+  footer { padding: 28px; background: var(--surface); border-radius: 18px; display: grid; gap: 16px; justify-items: start; }
+  @media(max-width: 800px) { .psg-content { grid-template-columns: 1fr; } }
+</style>

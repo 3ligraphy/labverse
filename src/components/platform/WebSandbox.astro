@@ -1,0 +1,153 @@
+---
+/**
+ * Web sandbox: a live HTML/CSS editor next to a browser preview, for trying code an AI assistant wrote.
+ * Run (or Ctrl+Enter, or auto-run when typing pauses), Reset to the starter, Copy; the student's code is kept in
+ * this browser per block. Before scripts load the starter is already in the text area and the preview.
+ *   <WebSandbox id="m--lab-01--n7" title="Try your hero section" goalHtml="<p>…</p>" hint="…" starter="<h1>…</h1>" />
+ */
+import WebFrame from './WebFrame.astro';
+
+interface Props { id: string; title: string; goalHtml?: string; hint: string; starter: string }
+const { id, title, goalHtml, hint, starter } = Astro.props;
+const uid = `ws-${id.replace(/[^\w-]/g, '-')}`;
+---
+<section class="ws" data-ws data-ws-id={id} data-reveal aria-labelledby={`${uid}-t`}>
+  <header class="ws-head">
+    <span class="ws-kind mono"><span aria-hidden="true">&lt;/&gt;</span> Web sandbox</span>
+    <h4 class="ws-title" id={`${uid}-t`}>{title}</h4>
+  </header>
+  {goalHtml && <div class="ws-goal" set:html={goalHtml} />}
+  {hint && (
+    <details class="ws-hint">
+      <summary><span aria-hidden="true">💡</span> Hint</summary>
+      <p>{hint}</p>
+    </details>
+  )}
+
+  <div class="ws-body">
+    <div class="ws-code">
+      <div class="ws-tabs">
+        <span class="ws-file mono"><span class="ws-dot" aria-hidden="true"></span>index.html</span>
+        <span class="ws-kbd mono" aria-hidden="true"><kbd>Ctrl</kbd>+<kbd>↵</kbd> run · <kbd>Esc</kbd> <kbd>Tab</kbd> leave</span>
+      </div>
+      <div class="ws-editor" data-ws-editor>
+        <textarea
+          class="ws-ta mono"
+          data-ws-src
+          spellcheck="false"
+          autocapitalize="off"
+          autocomplete="off"
+          aria-label={`HTML and CSS code: ${title}`}
+        >{starter}</textarea>
+      </div>
+      <div class="ws-bar">
+        <button type="button" class="btn btn-primary btn-sm ws-run" data-ws-run>
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8Z" /></svg>Run
+        </button>
+        <label class="ws-auto">
+          <input type="checkbox" data-ws-auto checked />
+          <span class="ws-switch" aria-hidden="true"></span>
+          Auto-run
+        </label>
+        <span class="ws-sp"></span>
+        <button type="button" class="ws-link" data-ws-copy>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></svg>
+          Copy code
+        </button>
+        <button type="button" class="ws-link ws-reset" data-ws-reset>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7" /><path d="M4 4v5h5" /></svg>
+          <span data-ws-reset-label>Reset</span>
+        </button>
+      </div>
+      <p class="ws-status mono" data-ws-status role="status" aria-live="polite"></p>
+    </div>
+    <div class="ws-preview">
+      <WebFrame html={starter} url="preview · your code" height="Medium" title={`Preview: ${title}`} live />
+    </div>
+  </div>
+</section>
+
+<style>
+  .ws {
+    --ws-tag: #7ee787; --ws-attr: #79c0ff; --ws-str: #a5d6ff; --ws-com: #8b949e; --ws-prop: #79c0ff; --ws-num: #ffa657;
+    --ws-kw: #ff7b72; --ws-sel: #d2a8ff; --ws-val: #e6edf3; --ws-fn: #d2a8ff; --ws-punc: #8b949e;
+    --rule: #ff9f43;
+    container-type: inline-size; position: relative; margin-block: 8px !important;
+    border: 1px solid color-mix(in oklab, var(--rule) 30%, var(--line)); border-radius: var(--r-lg); background: var(--surface); overflow: hidden;
+  }
+  :global(:root[data-theme='light']) .ws {
+    --ws-tag: #116329; --ws-attr: #0550ae; --ws-str: #0a3069; --ws-com: #6e7781; --ws-prop: #0550ae; --ws-num: #953800;
+    --ws-kw: #cf222e; --ws-sel: #8250df; --ws-val: #24292f; --ws-fn: #8250df; --ws-punc: #57606a;
+    --rule: #a35400;
+  }
+  .ws-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 14px 18px 0; }
+  .ws-kind { display: inline-flex; gap: 6px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--rule); font-weight: 600; }
+  .ws-title { flex: 1 1 auto; font-family: var(--font-display); font-size: 1.15rem; letter-spacing: -0.02em; color: var(--text); margin: 0 !important; }
+  .ws-goal { padding: 6px 18px 0; color: var(--text-2); font-size: 15px; }
+  .ws-goal > :global(*) { margin: 0 !important; }
+  .ws-goal > :global(* + *) { margin-top: 0.6em !important; }
+  .ws-hint { margin: 10px 18px 0 !important; border: 1px solid var(--line) !important; border-radius: var(--r-md); background: var(--info-soft) !important; padding: 0 14px !important; }
+  .ws-hint summary { padding: 8px 0 !important; font-size: 14px; }
+  .ws-hint p { margin: 0 0 10px !important; font-size: 14.5px; color: var(--text); white-space: pre-line; }
+
+  .ws-body { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: 14px; border-top: 1px solid var(--line); }
+  @container (min-width: 760px) {
+    .ws-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+    .ws-preview { border-left: 1px solid var(--line); }
+    .ws-editor { height: auto; flex: 1; }
+  }
+  .ws-code { display: flex; flex-direction: column; min-width: 0; }
+  .ws-tabs { display: flex; align-items: center; gap: 8px; padding: 6px 10px 0; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+  .ws-file { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; margin-bottom: -1px; font-size: 12px; color: var(--text); background: var(--code-bg); border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; }
+  .ws-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rule); transition: background var(--t-med), box-shadow var(--t-med); }
+  .ws.is-dirty .ws-dot { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+  .ws-kbd { margin-left: auto; padding-bottom: 6px; font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ws-kbd kbd { font-family: inherit; padding: 1px 5px; border: 1px solid var(--line-2); border-radius: 4px; }
+  @container (max-width: 420px) { .ws-kbd { display: none; } }
+  .ws-editor { position: relative; height: 340px; min-height: 300px; background: var(--code-bg); }
+  .ws-editor :global(.cm-editor) { position: absolute; inset: 0; }
+  .ws-ta {
+    display: block; width: 100%; height: 100%; margin: 0; padding: 12px 14px; border: 0; resize: none; outline: none;
+    background: var(--code-bg); color: var(--text); font-size: 13.5px; line-height: 1.65; tab-size: 2; white-space: pre-wrap;
+  }
+  /* focus ring drawn above the editor (CodeMirror or the plain text area) */
+  .ws-editor::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 0 2px transparent; transition: box-shadow var(--t-fast); }
+  .ws-editor:focus-within::after { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent-text) 70%, transparent); }
+  @media (max-width: 640px) { .ws-ta { font-size: 16px; } } /* no zoom-on-focus on phones */
+
+  .ws-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 10px 12px 4px; border-top: 1px solid var(--line); }
+  .ws-run { --h: 40px; padding: 0 18px; }
+  .ws-run svg { width: 13px; height: 13px; }
+  .ws-run::before { content: ''; position: absolute; inset: 0; border-radius: inherit; opacity: 0; }
+  .ws.is-dirty:not(:has([data-ws-auto]:checked)) .ws-run::before { animation: ws-nudge 1.6s var(--ease-out) infinite; }
+  @keyframes ws-nudge { 0% { opacity: 1; box-shadow: 0 0 0 0 var(--accent-glow); } 100% { opacity: 0; box-shadow: 0 0 0 10px var(--accent-glow); } }
+  .ws-auto { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px; font-size: 13px; color: var(--text-2); cursor: pointer; user-select: none; border-radius: 8px; }
+  .ws-auto input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .ws-switch { position: relative; width: 30px; height: 18px; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--line-2); transition: background var(--t-med); }
+  .ws-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--text-3); transition: transform var(--t-med) var(--ease-out), background var(--t-med); }
+  .ws-auto input:checked + .ws-switch { background: var(--accent-soft); border-color: var(--accent-text); }
+  .ws-auto input:checked + .ws-switch::after { transform: translateX(12px); background: var(--accent-text); }
+  .ws-auto input:focus-visible + .ws-switch { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .ws-sp { flex: 1; }
+  .ws-link { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border-radius: 8px; font-size: 13px; color: var(--text-2); white-space: nowrap; transition: color var(--t-fast), background var(--t-fast); }
+  .ws-link:hover { color: var(--text); background: var(--surface-2); }
+  .ws-link.copied { color: var(--ok); }
+  .ws-reset.armed { color: var(--danger); background: var(--danger-soft); }
+  .ws-status { min-height: 1.6em; margin: 0 !important; padding: 0 14px 8px; font-size: 12px; color: var(--text-3); }
+  :global(.no-js) .ws-bar, :global(.no-js) .ws-kbd { display: none; }
+
+  .ws-preview { display: flex; flex-direction: column; min-width: 0; padding: 12px; background: var(--bg-2); border-top: 1px solid var(--line); }
+  @container (min-width: 760px) { .ws-preview { border-top: 0; } }
+  .ws-preview :global(.wf) { flex: 1; box-shadow: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ws.is-dirty .ws-run::before { animation: none !important; }
+    .ws-switch, .ws-switch::after, .ws-dot { transition: none; }
+  }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  import { initSandboxes } from '@/scripts/web-lab';
+  onPageLoad(() => initSandboxes());
+</script>

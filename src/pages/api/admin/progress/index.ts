@@ -1,4 +1,4 @@
-/** GET /api/admin/progress?lab=lab-02 — the live dashboard data (admin only). */
+/** GET /api/admin/progress?lab=lab-02 (or ?module=slug for that module's first lab) — the live dashboard data (admin only). */
 import type { APIRoute } from 'astro';
 import { isAdmin } from '@/lib/attendance/server';
 import { access } from '@/lib/accounts/access';
@@ -12,7 +12,7 @@ export const GET: APIRoute = async ({ cookies, url }) => {
   if (!progressSetup().database) return json({ error: 'no-database' }, 503);
   try {
     const a = await access(cookies);
-    const data = await buildDashboard(url.searchParams.get('lab'), url.searchParams.get('session'), (lab) => canSeeLab(a, lab));
+    const data = await buildDashboard(url.searchParams.get('lab'), url.searchParams.get('session'), (lab) => canSeeLab(a, lab), url.searchParams.get('module'));
     return data ? json(data) : json({ error: 'no-labs' }, 404);
   } catch (err) {
     console.error('[progress] dashboard failed', err);

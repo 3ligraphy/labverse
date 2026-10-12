@@ -3,7 +3,8 @@
  *   GET                                         { users?, settings, matrix, staff, invites, perms }
  *   POST   { role, name, email, password, studentId? }        create an account        (accounts.staff)
  *   POST   { action: 'invite', email, name, role }             platform invite link     (accounts.staff)
- *   PATCH  ?id=… { active?, role?, name?, password? }           manage an account        (accounts.manage)
+ *   PATCH  ?id=… { active?, role?, name?, password?, faculty? } manage an account        (accounts.manage)
+ *          faculty moves a student to another faculty (a specialization not in it is cleared: they choose again)
  *   DELETE ?id=…  |  ?invite=…                                  delete account / revoke  (accounts.manage / accounts.staff)
  *   (platform settings moved to /api/admin/catalogue)
  *   PUT    { matrix }                                           roles & permissions      (platform.roles, super admin)
@@ -12,7 +13,7 @@
  */
 import type { APIRoute } from 'astro';
 import { json } from '@/lib/progress/server';
-import { ROLES, checkPasswordRules, normalEmail, parseAccount, type Role } from '@/lib/accounts/core';
+import { GENERAL, ROLES, checkPasswordRules, normalEmail, parseAccount, type Role } from '@/lib/accounts/core';
 import { PERMISSION_KEYS, parseMatrix } from '@/lib/accounts/permissions';
 import { access } from '@/lib/accounts/access';
 import { getAccountStore, publicUser } from '@/lib/accounts/server';
@@ -85,7 +86,7 @@ export const PATCH: APIRoute = async ({ cookies, request, url }) => {
   const target = await store.byId(id);
   if (!target) return json({ error: 'Not found.' }, 404);
   if (target.role === 'super_admin' && !a.can('platform.roles')) return deny('Only the super admin can change a super admin.');
-  const body = ((await request.json().catch(() => null)) ?? {}) as { active?: unknown; role?: unknown; name?: unknown; password?: unknown };
+  const body = ((await request.json().catch(() => null)) ?? {}) as { active?: unknown; role?: unknown; name?: unknown; password?: unknown; faculty?: unknown };
   const self = a.user?.id === id;
   const patch: { active?: boolean; role?: Role; name?: string; password?: string } = {};
   if (body.active !== undefined) {
@@ -110,6 +111,13 @@ export const PATCH: APIRoute = async ({ cookies, request, url }) => {
     patch.password = String(body.password);
   }
   try {
+    if (body.faculty !== undefined) {
+      const fac = (await store.getSettings()).faculties.find((f) => f.slug === String(body.faculty));
+      if (!fac) return json({ error: 'Choose one of the catalogue’s faculties.' }, 400);
+      const p = target.profile;
+      const specialization = p.specialization === GENERAL || fac.specializations.includes(p.specialization) ? p.specialization : '';
+      await store.setProfile(id, { ...p, faculty: fac.slug, specialization });
+    }
     const user = await store.update(id, patch);
     return user ? json({ user: publicUser(user) }) : json({ error: 'Not found.' }, 404);
   } catch (error) {

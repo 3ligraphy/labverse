@@ -1,7 +1,7 @@
 ---
 /**
- * Sign in (doctors, TAs, students) and optional student sign-up with onboarding (year, specialization,
- * optional modules). Students never have to sign in: they can keep typing their name and ID in each lab.
+ * Sign in (doctors, TAs, students) and optional student sign-up with onboarding (faculty, year, specialization,
+ * optional modules; the faculty is asked only when the catalogue has more than one). Students never have to sign in: they can keep typing their name and ID in each lab.
  */
 import Base from '@/layouts/Base.astro';
 import { hubData } from '@/lib/accounts/hub';
@@ -24,8 +24,9 @@ if (Astro.url.searchParams.has('email') || Astro.url.searchParams.has('password'
 const store = getAccountStore();
 const enabled = Boolean(store);
 const { settings, cards } = await hubData();
-const optional = cards.filter((c) => c.kind === 'elective' && c.open).map((c) => ({ slug: c.slug, title: c.title, code: c.code, color: c.color, years: c.years, specializations: c.specializations, builtIn: c.builtIn }));
-const study = { years: settings.years, activeSemester: settings.activeSemester, specFrom: settings.specFrom };
+const optional = cards.filter((c) => c.kind === 'elective' && c.open).map((c) => ({ slug: c.slug, title: c.title, code: c.code, color: c.color, years: c.years, specializations: c.specializations, faculty: c.faculty, builtIn: c.builtIn }));
+const study = { years: settings.years, activeSemester: settings.activeSemester, specFrom: settings.specFrom, faculties: settings.faculties };
+const oneFaculty = settings.faculties.length <= 1;
 const next = Astro.url.searchParams.get('next');
 const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '';
 const ended = Astro.url.searchParams.has('ended');
@@ -88,9 +89,10 @@ const json = JSON.stringify({ optional, study, next: safeNext }).replace(/</g, '
               </div>
               <label><span>University email</span><input class="input" type="email" name="email" autocomplete="email" autocapitalize="none" spellcheck="false" required /></label>
               <label><span>Password <small>(10+ characters, letters and numbers)</small></span><input class="input" type="password" name="password" autocomplete="new-password" required /></label>
+              <label data-faculty-field hidden={oneFaculty}><span>Faculty</span><select class="input" name="faculty" required={!oneFaculty} disabled={oneFaculty}><option value="">Choose your faculty…</option>{settings.faculties.map((f) => <option value={f.slug}>{f.name}</option>)}</select></label>
               <div class="auth-row auth-study">
                 <label><span>Year</span><select class="input" name="year" required><option value="">Choose your year…</option>{settings.years.map((y) => <option>{y}</option>)}</select></label>
-                <label data-spec-field hidden><span>Specialization</span><select class="input" name="specialization" disabled><option value="">Choose…</option>{settings.specializations.map((s) => <option>{s}</option>)}</select></label>
+                <label data-spec-field hidden><span>Specialization</span><select class="input" name="specialization" disabled><option value="">Choose…</option>{settings.faculties.map((f) => <optgroup label={f.name}>{f.specializations.map((s) => <option>{s}</option>)}</optgroup>)}</select></label>
               </div>
               <p class="auth-fine auth-spec-note" data-spec-note hidden></p>
               <fieldset class="auth-opts"><legend>Optional modules you chose</legend><div data-up-opts><p class="auth-fine">Choose your year first.</p></div></fieldset>
@@ -156,11 +158,10 @@ const json = JSON.stringify({ optional, study, next: safeNext }).replace(/</g, '
 </style>
 
 <script>
-  import { GENERAL } from '@/lib/accounts/core';
+  import { fitsStudent } from '@/lib/accounts/core';
   import { wireStudyFields, type StudyConfig } from '@/scripts/study-fields';
-  type Opt = { slug: string; title: string; code: string; color: string; years: string[]; specializations: string[]; builtIn: boolean };
+  type Opt = { slug: string; title: string; code: string; color: string; years: string[]; specializations: string[]; faculty: string; builtIn: boolean };
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-  const has = (list: string[], v: string) => !list.length || list.some((x) => x.toLowerCase() === v.toLowerCase());
 
   /** Empty required fields are marked and announced before anything is sent; true when all are filled. */
   const filled = (form: HTMLFormElement, msg: HTMLElement): boolean => {
@@ -212,15 +213,14 @@ const json = JSON.stringify({ optional, study, next: safeNext }).replace(/</g, '
     const signup = root.querySelector<HTMLFormElement>('[data-form="up"]');
     if (!signup) return;
     const box = signup.querySelector<HTMLElement>('[data-up-opts]')!;
-    // "General" students (before the specialization year) match only modules open to every specialization
-    const fitsSpec = (o: Opt, s: string) => !o.specializations.length || (s !== GENERAL && has(o.specializations, s));
     const renderOpts = () => {
-      const y = study.year(), s = study.specialization();
-      if (!y || !s) { box.innerHTML = `<p class="auth-fine">${y ? 'Choose your specialization first.' : 'Choose your year first.'}</p>`; return; }
+      const f = study.faculty(), y = study.year(), s = study.specialization();
+      if (!f || !y || !s) { box.innerHTML = `<p class="auth-fine">${!f ? 'Choose your faculty first.' : y ? 'Choose your specialization first.' : 'Choose your year first.'}</p>`; return; }
       // keep what was ticked; the built-in course starts ticked (almost every student takes it)
       const ticked = new Set([...box.querySelectorAll<HTMLInputElement>('input:checked')].map((i) => i.value));
       const fresh = !box.querySelector('input');
-      const list = data.optional.filter((o) => has(o.years, y) && fitsSpec(o, s));
+      // same rule as the server (faculty, year; "General" students match only modules open to every specialization)
+      const list = data.optional.filter((o) => fitsStudent(o, { faculty: f, year: y, specialization: s }));
       box.innerHTML = list.length
         ? list.map((o) => `<label class="auth-opt"><input type="checkbox" name="modules" value="${esc(o.slug)}"${ticked.has(o.slug) || (fresh && o.builtIn) ? ' checked' : ''} /> <span>${esc(o.title)}${o.code ? ` <small>${esc(o.code)}</small>` : ''}</span></label>`).join('')
         : '<p class="auth-fine">No optional modules for this year yet.</p>';
@@ -233,7 +233,7 @@ const json = JSON.stringify({ optional, study, next: safeNext }).replace(/</g, '
       msg.textContent = '';
       if (!filled(signup, msg)) return;
       const fd = new FormData(signup);
-      const body = { name: fd.get('name'), studentId: fd.get('studentId'), email: fd.get('email'), password: fd.get('password'), year: fd.get('year'), specialization: fd.get('specialization'), modules: fd.getAll('modules') };
+      const body = { name: fd.get('name'), studentId: fd.get('studentId'), email: fd.get('email'), password: fd.get('password'), faculty: study.faculty(), year: fd.get('year'), specialization: fd.get('specialization'), modules: fd.getAll('modules') };
       const r = await fetch('/api/auth/signup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { msg.textContent = d.error ?? 'Could not create the account.'; return; }

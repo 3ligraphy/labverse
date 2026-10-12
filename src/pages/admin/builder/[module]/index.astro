@@ -9,7 +9,8 @@ import { BUILT_IN_MODULE, ensureBuiltInBuilder, getPlatformStore } from '@/lib/p
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'no-store, max-age=0');
 const slug0 = Astro.params.module ?? '';
-if (!(await access(Astro.cookies)).can('module.build', slug0)) return Astro.redirect('/admin/builder', 303);
+const who = await access(Astro.cookies);
+if (!who.can('module.build', slug0)) return Astro.redirect('/admin/builder', 303);
 
 const store = getPlatformStore();
 const mod = slug0 === BUILT_IN_MODULE.slug ? await ensureBuiltInBuilder() : store ? await store.getModule(slug0) : null;
@@ -25,7 +26,8 @@ const [labs, { settings }] = await Promise.all([store!.listLabs(mod.slug), hubDa
       kind: 'module', flow: mod.flow, saveUrl: `/api/admin/platform/modules?slug=${encodeURIComponent(mod.slug)}`,
       published: mod.published, previewHref: `/m/${mod.slug}?preview`, module: mod.slug,
       labs: labs.map((l) => ({ slug: l.slug, title: l.title, published: l.published })),
-      audienceOptions: { years: settings.years, specializations: settings.specializations },
+      audienceOptions: { years: settings.years, specializations: settings.specializations, faculties: settings.faculties },
+      componentsHref: who.can('platform.settings') ? `/admin/components#m-${mod.slug}` : undefined,
     }}
   />
 </Base>

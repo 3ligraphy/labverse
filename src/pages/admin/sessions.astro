@@ -72,6 +72,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         <button role="tab" type="button" aria-selected="true" data-tab="att">Attendance</button>
         <button role="tab" type="button" aria-selected="false" data-tab="lab">Lab progress</button>
         <button role="tab" type="button" aria-selected="false" data-tab="sessions">Sessions</button>
+        <label class="tab-filter" hidden><span>Faculty</span><select class="input" data-admin-faculty aria-label="Select faculty"></select></label>
+        <label class="tab-filter" hidden><span>Module</span><select class="input" data-admin-module aria-label="Select module"></select></label>
         <label class="tab-filter"><span>Lab</span><select class="input" data-admin-lab aria-label="Select lab"></select></label>
         <label class="tab-filter"><span>Attendance session</span><select class="input" data-admin-session aria-label="Select attendance session"></select></label>
       </div>
@@ -141,7 +143,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             {doctor && <a class="btn btn-ghost btn-sm" href="/admin/cms">CMS →</a>}
             {doctor && <a class="btn btn-ghost btn-sm" href="/admin/builder">Builder →</a>}
             {doctor && <a class="btn btn-ghost btn-sm" href="/admin/accounts">Accounts →</a>}
-            <a class="btn btn-ghost btn-sm" href="/admin/assessment/mobile-development">Assessment →</a>
+            <a class="btn btn-ghost btn-sm" href="/admin/assessment/mobile-development" data-assessment-link>Assessment →</a>
             <a class="btn btn-ghost btn-sm" href="/admin/project">Submissions →</a>
             <form method="post" action="/api/admin/logout"><button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
           </div>
@@ -244,6 +246,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .adm-tabs select { height: 34px; padding: 0 10px; border-radius: 10px; max-width: min(280px, 40vw); }
   .tab-filter { display: flex; align-items: center; gap: 7px; padding-left: 8px; font-size: 12px; font-weight: 700; color: var(--text-3); }
   .tab-filter span { white-space: nowrap; }
+  .tab-filter[hidden] { display: none; }
 
   /* session CRUD */
   .session-admin { display: grid; gap: 22px; }
@@ -304,10 +307,11 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
+  import { renderLabPicker, startModule, wireLabPicker, type LabChoice } from '@/scripts/lab-picker';
   /* Dynamic attendance + progress summary. Detailed controls live at /admin/progress. */
   type Session = { id: string; ta_name: string; time_slot: string; opens_at: string; closes_at: string | null; duration_minutes: number | null; open: boolean; closesAt?: string | null };
   type LabStats = {
-    labs: { id: string; title: string }[];
+    labs: LabChoice[];
     structure: { lab: string; title: string; exercises: { id: string; title: string }[]; tasks: unknown[] };
     totals: { active: number; avgPercent: number; solved: number; checkedIn: number; submitted: number };
     exercises: { id: string; solvedPct: number; avgAttempts: number; medianSolveMs: number | null }[];
@@ -318,6 +322,12 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   };
 
   let timer: number | undefined;
+  let labChoices: LabChoice[] = [];
+  const picker = () => ({
+    faculty: document.querySelector<HTMLSelectElement>('[data-admin-faculty]'),
+    module: document.querySelector<HTMLSelectElement>('[data-admin-module]'),
+    lab: document.querySelector<HTMLSelectElement>('[data-admin-lab]')!,
+  });
 
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
   const pct = (r: number | null) => (r === null ? '–' : `${Math.round(r * 100)}%`);
@@ -428,7 +438,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     const t = s.totals;
     root.dataset.lab = s.structure.lab;
     root.querySelector('[data-lab-title]')!.textContent = `${s.structure.title}${'id' in s.session ? ` · ${s.session.time_slot} · ${s.session.ta_name}` : ''}`;
-    (root.querySelector('[data-open-lab]') as HTMLAnchorElement).href = `/labs/${encodeURIComponent(s.structure.lab)}`;
+    (root.querySelector('[data-open-lab]') as HTMLAnchorElement).href = s.labs.find((l) => l.id === s.structure.lab)?.href ?? `/labs/${encodeURIComponent(s.structure.lab)}`;
     root.querySelector('[data-lp-started]')!.textContent = String(t.active);
     root.querySelector('[data-lp-kpis]')!.innerHTML = [
       ['accent', t.checkedIn, 'checked in'],
@@ -476,7 +486,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     const attendanceLive = document.querySelector<HTMLElement>('[data-att-live]');
     try {
       const selectedSession = (document.querySelector('[data-admin-session]') as HTMLSelectElement | null)?.value ?? '';
-      const res = await fetch(`/api/admin/progress?lab=${encodeURIComponent(root.dataset.lab ?? '')}${selectedSession ? `&session=${encodeURIComponent(selectedSession)}` : ''}`, { cache: 'no-store' });
+      const module = root.dataset.lab ? '' : startModule();
+      const res = await fetch(`/api/admin/progress?lab=${encodeURIComponent(root.dataset.lab ?? '')}${module ? `&module=${encodeURIComponent(module)}` : ''}${selectedSession ? `&session=${encodeURIComponent(selectedSession)}` : ''}`, { cache: 'no-store' });
       if (res.status === 401) return location.reload();
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? String(res.status));
@@ -484,8 +495,10 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       const labSelect = document.querySelector<HTMLSelectElement>('[data-admin-lab]');
       const sessionSelect = document.querySelector<HTMLSelectElement>('[data-admin-session]');
       if (labSelect) {
-        labSelect.replaceChildren(...stats.labs.map((lab) => new Option(lab.title, lab.id, false, lab.id === stats.structure.lab)));
-        labSelect.value = stats.structure.lab;
+        labChoices = stats.labs;
+        renderLabPicker(picker(), labChoices, stats.structure.lab);
+        const mod = labChoices.find((l) => l.id === stats.structure.lab)?.module;
+        document.querySelectorAll<HTMLAnchorElement>('[data-assessment-link]').forEach((a) => mod && (a.href = `/admin/assessment/${encodeURIComponent(mod)}`));
       }
       if (sessionSelect) {
         sessionSelect.replaceChildren(...(stats.sessions.length
@@ -519,6 +532,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     };
     tabs.forEach((t) => t.addEventListener('click', () => show(t.dataset.tab!)));
     document.querySelectorAll<HTMLButtonElement>('[data-open-sessions]').forEach((button) => button.addEventListener('click', () => show('sessions')));
+    if (document.querySelector('[data-admin-lab]')) wireLabPicker(picker(), () => labChoices);
     document.querySelector<HTMLSelectElement>('[data-admin-lab]')?.addEventListener('change', (event) => {
       if (!root) return;
       root.dataset.lab = (event.target as HTMLSelectElement).value;

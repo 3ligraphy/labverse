@@ -1,15 +1,17 @@
 ---
 import Icon from './Icon.astro';
+interface Props { indexUrl: string; label: string }
+const { indexUrl, label } = Astro.props;
 ---
-<div class="sp" data-search hidden>
+<div class="sp" data-search data-search-index={indexUrl} hidden>
   <div class="sp-backdrop" data-search-close></div>
-  <div class="sp-dialog" role="dialog" aria-modal="true" aria-label="Search the course">
+  <div class="sp-dialog" role="dialog" aria-modal="true" aria-label={`Search ${label}`}>
     <div class="sp-input">
       <Icon name="search" size={18} />
       <input
         type="search"
         data-search-input
-        placeholder="Search labs, commands, tools, errors…"
+        placeholder={`Search ${label}…`}
         aria-label="Search"
         aria-controls="sp-results"
         aria-autocomplete="list"

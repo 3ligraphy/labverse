@@ -20,7 +20,7 @@ const meta = mod ? compileModule(mod.flow).meta : { title: BUILT_IN_MODULE.title
 import AdminShell from '@/components/admin/AdminShell.astro';
 ---
 <Base title={`Team · ${meta.title}`} noindex>
-<AdminShell active="teams">
+<AdminShell active="team">
   <section class="tm container" data-tm data-module={slug} style={`--mc:${meta.color || '#7cb1ff'}`}>
     <header class="tm-top">
       <div>

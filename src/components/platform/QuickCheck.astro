@@ -1,0 +1,150 @@
+---
+/**
+ * Quick check: a multiple-choice question with instant feedback (not tracked). One correct option → radio buttons,
+ * several → checkboxes ("Choose all that apply"). Check marks the chosen options; Try again clears them; the
+ * explanation opens once the answer is right or the student asks to see it. Without scripts a "Show the answer"
+ * disclosure marks the correct options and shows the explanation.
+ *   <QuickCheck id="m--lab-01--q1" questionHtml="<p>…</p>" options={[{ text: 'A', correct: true }, …]} explainHtml="<p>…</p>" />
+ */
+interface Props { id: string; questionHtml?: string; question: string; options: { text: string; correct: boolean }[]; explainHtml?: string }
+const { id, questionHtml, question, options, explainHtml } = Astro.props;
+const multi = options.filter((o) => o.correct).length > 1;
+const uid = `qc-${id.replace(/[^\w-]/g, '-')}`;
+const letter = (i: number) => String.fromCharCode(65 + i);
+---
+<section class="qc" data-qc data-multi={String(multi)} data-reveal aria-labelledby={`${uid}-q`}>
+  <header class="qc-head">
+    <span class="qc-kind mono"><span class="qc-q-ico" aria-hidden="true">?</span>Quick check</span>
+    <span class="qc-mode mono">{multi ? 'Choose all that apply' : 'Choose one'}</span>
+  </header>
+  {questionHtml ? <div class="qc-q" id={`${uid}-q`} set:html={questionHtml} /> : <p class="qc-q" id={`${uid}-q`}>{question}</p>}
+
+  <div class="qc-opts" role={multi ? 'group' : 'radiogroup'} aria-labelledby={`${uid}-q`}>
+    {options.map((o, i) => (
+      <label class="qc-opt" style={`--i:${i}`} data-correct={o.correct ? '' : undefined}>
+        <input class="qc-in" type={multi ? 'checkbox' : 'radio'} name={uid} value={String(i)} data-qc-in data-correct={o.correct ? '' : undefined} />
+        <span class="qc-key mono" aria-hidden="true">{letter(i)}</span>
+        <span class="qc-t">{o.text}<span class="sr-only" data-qc-sr></span></span>
+        <span class="qc-mark" aria-hidden="true">
+          <svg class="m-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7" /></svg>
+          <svg class="m-bad" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </span>
+      </label>
+    ))}
+  </div>
+
+  <div class="qc-bar">
+    <button type="button" class="btn btn-primary btn-sm qc-btn" data-qc-check>Check answer</button>
+    <button type="button" class="btn btn-ghost btn-sm qc-btn" data-qc-retry hidden>Try again</button>
+    <button type="button" class="qc-link" data-qc-reveal hidden>Show the answer</button>
+    <p class="qc-msg" data-qc-msg role="status" aria-live="polite"></p>
+  </div>
+
+  <details class="qc-explain" data-qc-explain data-empty={explainHtml ? undefined : ''}>
+    <summary>
+      <span class="qc-nojs">Show the answer</span><span class="qc-js">Why?</span>
+      <svg class="qc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+    </summary>
+    <div class="qc-why">
+      <p class="qc-nojs qc-answers">Correct: {options.filter((o) => o.correct).map((o) => o.text).join(' · ')}</p>
+      {explainHtml && <div set:html={explainHtml} />}
+    </div>
+  </details>
+</section>
+
+<style>
+  .qc {
+    --qc: var(--warn);
+    --qc-on: var(--bg); /* text on the green / red result fills */
+    position: relative; margin-block: 8px !important; padding: 16px 18px 14px; display: grid; gap: 12px;
+    border-radius: var(--r-lg); border: 1px solid color-mix(in oklab, var(--qc) 30%, var(--line)); background: var(--surface);
+    transition: border-color var(--t-med);
+  }
+  :global(:root[data-theme='light']) .qc { --qc-on: #fff; }
+  .qc[data-result='right'] { border-color: color-mix(in oklab, var(--ok) 55%, var(--line)); }
+  .qc-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+  .qc-kind { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; color: var(--qc); }
+  .qc-q-ico { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; background: color-mix(in oklab, var(--qc) 16%, transparent); font-size: 12px; letter-spacing: 0; }
+  .qc-mode { font-size: 12px; color: var(--text-3); }
+  .qc-q { margin: 0 !important; font-size: 1.08rem; line-height: 1.55; color: var(--text); font-weight: 550; }
+  .qc-q > :global(*) { margin: 0 !important; }
+  .qc-q > :global(* + *) { margin-top: 0.6em !important; }
+
+  .qc-opts { display: grid; gap: 8px; }
+  .qc-opt {
+    position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+    min-height: 48px; padding: 8px 12px 8px 8px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg);
+    cursor: pointer; color: var(--text-2); font-size: 15.5px; line-height: 1.45;
+    transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast), transform var(--t-fast) var(--ease-out);
+  }
+  .qc-opt:hover:not(:has(input:disabled)) { border-color: var(--text-3); color: var(--text); }
+  .qc-opt:active:not(:has(input:disabled)) { transform: scale(0.99); }
+  .qc-in { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+  .qc-key {
+    display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line-2);
+    font-size: 13px; font-weight: 700; color: var(--text-2); background: var(--surface); transition: all var(--t-fast);
+  }
+  .qc[data-multi='true'] .qc-key { border-radius: 8px; }
+  .qc[data-multi='false'] .qc-key { border-radius: 50%; }
+  .qc-opt:has(input:checked) { border-color: var(--accent-text); color: var(--text); background: color-mix(in oklab, var(--accent) 7%, var(--bg)); }
+  .qc-opt:has(input:checked) .qc-key { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .qc-opt:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .qc-opt:has(input:disabled) { cursor: default; }
+  .qc-mark { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; opacity: 0; transform: scale(0.5); }
+  .qc-mark svg { width: 13px; height: 13px; display: none; }
+
+  /* results */
+  .qc-opts .qc-opt[data-state] .qc-mark { opacity: 1; transform: none; transition: opacity 240ms, transform 420ms var(--ease-out); }
+  .qc-opts .qc-opt[data-state='right'], .qc-opts .qc-opt[data-state='missed'] { border-color: var(--ok); background: var(--ok-soft); color: var(--text); }
+  .qc-opts .qc-opt[data-state='right'] .qc-key, .qc-opts .qc-opt[data-state='missed'] .qc-key { background: var(--ok); border-color: var(--ok); color: var(--qc-on); }
+  .qc-opts .qc-opt[data-state='right'] .qc-mark, .qc-opts .qc-opt[data-state='missed'] .qc-mark { background: var(--ok); color: var(--qc-on); }
+  .qc-opts .qc-opt[data-state='right'] .m-ok, .qc-opts .qc-opt[data-state='missed'] .m-ok { display: block; }
+  .qc-opts .qc-opt[data-state='missed'] { border-style: dashed; }
+  .qc-opts .qc-opt[data-state='wrong'] { border-color: var(--danger); background: var(--danger-soft); color: var(--text); }
+  .qc-opts .qc-opt[data-state='wrong'] .qc-key { background: var(--danger); border-color: var(--danger); color: var(--qc-on); }
+  .qc-opts .qc-opt[data-state='wrong'] .qc-mark { background: var(--danger); color: var(--qc-on); }
+  .qc-opts .qc-opt[data-state='wrong'] .m-bad { display: block; }
+  .qc-opts .qc-opt[data-state='wrong'] { animation: qc-shake 380ms var(--ease-out); }
+  .qc-opts .qc-opt[data-state='right'] { animation: qc-pop 420ms var(--ease-out); }
+  @keyframes qc-shake { 20% { transform: translateX(-4px); } 45% { transform: translateX(4px); } 70% { transform: translateX(-2px); } }
+  @keyframes qc-pop { 50% { transform: scale(1.015); } }
+
+  .qc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .qc-btn { --h: 42px; padding: 0 18px; font-size: 14px; }
+  .qc-link { min-height: 36px; padding: 0 8px; border-radius: 8px; font-size: 14px; color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-2); }
+  .qc-link:hover { color: var(--text); }
+  .qc-msg { flex: 1 1 200px; margin: 0 !important; font-size: 14.5px; font-weight: 600; }
+  .qc-msg:empty { display: none; }
+  .qc-msg[data-tone='ok'] { color: var(--ok); }
+  .qc-msg[data-tone='bad'] { color: var(--danger); }
+  .qc-msg[data-tone='info'] { color: var(--text-2); font-weight: 500; }
+  :global(.no-js) .qc-bar { display: none; }
+
+  .qc-explain { margin: 0 !important; border-radius: var(--r-md) !important; border: 1px solid var(--line) !important; background: var(--surface-2) !important; padding: 0 !important; }
+  .qc-explain summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 6px 14px !important; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
+  .qc-explain summary::-webkit-details-marker { display: none; }
+  .qc-chev { margin-left: auto; color: var(--text-3); transition: transform var(--t-med) var(--ease-out); }
+  .qc-explain[open] .qc-chev { transform: rotate(180deg); }
+  .qc-why { padding: 0 14px 12px; font-size: 15px; color: var(--text-2); }
+  .qc-why > :global(* + *), .qc-why :global(div > * + *) { margin-top: 0.7em; }
+  .qc-explain[open] .qc-why { animation: qc-in 320ms var(--ease-out); }
+  @keyframes qc-in { from { opacity: 0; transform: translateY(-4px); } }
+  .qc-answers { margin: 0 !important; color: var(--ok); font-weight: 600; }
+  .qc-js { display: none; }
+  .qc.is-js .qc-js { display: inline; }
+  .qc.is-js .qc-nojs { display: none; }
+  /* no scripts: opening "Show the answer" marks the right options */
+  .qc:not(.is-js):has(.qc-explain[open]) .qc-opt[data-correct] { border-color: var(--ok); background: var(--ok-soft); color: var(--text); }
+
+  @media (max-width: 520px) { .qc { padding: 14px 14px 12px; } .qc-opt { font-size: 16px; } }
+  @media (prefers-reduced-motion: reduce) {
+    .qc-opt, .qc-opts .qc-opt[data-state], .qc-explain[open] .qc-why { animation: none !important; transition: none; }
+    .qc-opts .qc-opt[data-state] .qc-mark { transition: none; }
+  }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  import { initQuizzes } from '@/scripts/web-lab';
+  onPageLoad(() => initQuizzes());
+</script>

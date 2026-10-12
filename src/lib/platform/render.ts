@@ -35,8 +35,19 @@ export async function markdown(source: string): Promise<string> {
   return (await (await renderer).render(source)).code;
 }
 
-/** A block with its markdown pre-rendered to HTML (Astro components render synchronously). */
-export type RenderedBlock = Block & { html?: string; children?: RenderedBlock[] };
+/**
+ * A block with its markdown pre-rendered to HTML (Astro components render synchronously).
+ * `html` is the block's main body; the web-lab blocks carry their extra markdown fields separately:
+ * quiz → htmlQuestion + htmlExplain, prompt → htmlExpect, websandbox → htmlGoal.
+ */
+export type RenderedBlock = Block & {
+  html?: string;
+  htmlQuestion?: string;
+  htmlExplain?: string;
+  htmlExpect?: string;
+  htmlGoal?: string;
+  children?: RenderedBlock[];
+};
 
 export async function renderBlocks(blocks: Block[]): Promise<RenderedBlock[]> {
   return Promise.all(blocks.map(async (b): Promise<RenderedBlock> => {
@@ -49,6 +60,9 @@ export async function renderBlocks(blocks: Block[]): Promise<RenderedBlock[]> {
         const meta = b.title ? ` title="${b.title.replace(/"/g, '')}"` : '';
         return { ...b, html: await markdown(`${fence}${b.lang}${meta}\n${b.code}\n${fence}`) };
       }
+      case 'quiz': return { ...b, htmlQuestion: await markdown(b.question), htmlExplain: await markdown(b.explain) };
+      case 'prompt': return { ...b, htmlExpect: await markdown(b.expect) };
+      case 'websandbox': return { ...b, htmlGoal: await markdown(b.goal) };
       default: return b;
     }
   }));

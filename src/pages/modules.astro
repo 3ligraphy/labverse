@@ -1,11 +1,14 @@
 ---
 /**
- * Module directory, categorized by year → semester → specialization, with search and filters.
+ * Module directory, categorized by year → semester → specialization, with search and filters. When modules of
+ * more than one faculty are listed, a faculty filter (preset to the student's faculty) and a faculty chip on each
+ * card appear; modules for every faculty show under any faculty.
  * Each card shows whether you're in it, whether you can add it yourself (Mobile Development, an optional
  * module) or whether it needs an invitation from its module leader. Defaults to the active semester.
  */
 import Base from '@/layouts/Base.astro';
 import { hubData } from '@/lib/accounts/hub';
+import { ANY_FACULTY } from '@/lib/accounts/core';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=120');
@@ -17,6 +20,10 @@ const groups = [...settings.years, 'All years'].map((year) => ({
   cards: cards.filter((c) => (year === 'All years' ? !c.years.length : c.years.some((y) => y.toLowerCase() === year.toLowerCase()))),
 })).filter((g) => g.cards.length);
 const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester}`;
+// faculties that have modules; the faculty filter appears only when there is more than one
+const facultiesWithModules = settings.faculties.filter((f) => cards.some((c) => c.faculty === f.slug));
+const byFaculty = facultiesWithModules.length > 1;
+const facultyName = (slug: string) => (slug === ANY_FACULTY ? 'All faculties' : settings.faculties.find((f) => f.slug === slug)?.name ?? slug);
 ---
 <Base title="Find a module" description="Search every module on the platform by year, semester and specialization.">
   <section class="md" data-md data-active={settings.activeSemester}>
@@ -27,6 +34,7 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
       <p class="md-l">Browse by year, semester and specialization. Specializations start in {specFromLabel}. Mobile Development is open to everyone as an optional module; other modules need an invitation from their module leader.</p>
       <div class="md-search">
         <input class="md-q" type="search" placeholder="Search modules…" value={q} data-md-q aria-label="Search modules" />
+        {byFaculty && <select class="md-sel" data-md-fac aria-label="Faculty"><option value="">All faculties</option>{facultiesWithModules.map((f) => <option value={f.slug}>{f.name}</option>)}</select>}
         <select class="md-sel" data-md-year aria-label="Year"><option value="">All years</option>{settings.years.map((y) => <option>{y}</option>)}</select>
         <select class="md-sel" data-md-sem aria-label="Semester"><option value="">Both semesters</option><option>Semester 1</option><option>Semester 2</option></select>
         <select class="md-sel" data-md-spec aria-label="Specialization"><option value="">Any specialization</option>{settings.specializations.map((s) => <option>{s}</option>)}</select>
@@ -42,19 +50,21 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
           <h2 class="md-gh"><span>{g.year}</span><small class="mono" data-group-count></small></h2>
           <div class="md-grid">
             {g.cards.map((m, i) => (
-              <a href={m.href} class="mcard" style={`--c:${m.color}; --i:${i}`} data-card data-slug={m.slug} data-open-flag={m.open && m.kind === 'elective' ? '1' : ''} data-cat={m.category}
-                data-sem={m.semester} data-years={m.years.join('|')} data-specs={m.specializations.join('|')}
+              <article class="mcard" style={`--c:${m.color}; --i:${i}`} data-card data-slug={m.slug} data-open-flag={m.open && m.kind === 'elective' ? '1' : ''} data-cat={m.category}
+                data-sem={m.semester} data-years={m.years.join('|')} data-specs={m.specializations.join('|')} data-faculty={m.faculty}
                 data-text={`${m.title} ${m.code} ${m.description} ${m.term} ${m.specializations.join(' ')}`.toLowerCase()}>
                 <span class="mcard-top"><span>{m.code || 'Module'}</span><span class="mcard-tag">{m.category} · {m.open ? 'open' : 'by invitation'}</span></span>
-                <h3>{m.title}</h3>
+                <h3><a class="module-card-link" href={m.href}>{m.title}</a></h3>
                 <span class="md-chips mono">
+                  {byFaculty && <span class="md-chip fac">{facultyName(m.faculty)}</span>}
                   <span class:list={['md-chip', { on: m.semester === settings.activeSemester || m.semester === 'Both' }]}>{m.semester === 'Both' ? 'Both semesters' : m.semester}</span>
                   {m.specializations.length ? m.specializations.map((s) => <span class="md-chip spec">{s}</span>) : <span class="md-chip">All specializations</span>}
                 </span>
                 {m.description && <p>{m.description}</p>}
                 <span class="md-state mono" data-state></span>
                 <span class="mcard-foot"><span>{m.labs} lab{m.labs === 1 ? '' : 's'}{m.term && ` · ${m.term}`}</span><span class="mcard-go" aria-hidden="true">→</span></span>
-              </a>
+                <a class="module-canvas-link" href={`/admin/builder/${encodeURIComponent(m.slug)}`} data-canvas hidden aria-label={`Open canvas for ${m.title}`}>Open canvas ↗</a>
+              </article>
             ))}
           </div>
         </section>
@@ -86,6 +96,7 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
   .md-grid { margin-top: 18px; display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
   .md-chips { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; }
   .md-chip { padding: 3px 9px; border-radius: 999px; border: 1px solid var(--hero-line); color: var(--hero-lead); }
+  .md-chip.fac { border-style: dashed; color: var(--hero-text); }
   .md-chip.on { border-color: var(--hero-accent); color: var(--hero-accent); }
   .md-chip.spec { border-color: color-mix(in oklab, var(--c) 55%, var(--hero-line)); color: var(--hero-text); }
   .md-state { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--hero-dim); }
@@ -114,10 +125,11 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
     const year = root.querySelector<HTMLSelectElement>('[data-md-year]')!;
     const sem = root.querySelector<HTMLSelectElement>('[data-md-sem]')!;
     const spec = root.querySelector<HTMLSelectElement>('[data-md-spec]')!;
+    const fac = root.querySelector<HTMLSelectElement>('[data-md-fac]');
     const cards = [...root.querySelectorAll<HTMLElement>('[data-card]')];
     let filter = 'all';
 
-    const me = await getMe<{ builderModules?: string[]; enrolled?: string[]; staffModules?: Record<string, string>; user?: { profile?: { modules?: string[]; year?: string } } | null }>();
+    const me = await getMe<{ builderModules?: string[]; enrolled?: string[]; staffModules?: Record<string, string>; user?: { profile?: { modules?: string[]; year?: string; faculty?: string } } | null }>();
     const builderModules = new Set<string>(me?.builderModules ?? []);
     let chosen: string[] = me?.user?.profile?.modules ?? [];
     if (!me?.user) { try { chosen = JSON.parse(localStorage.getItem('mdx:profile') ?? 'null')?.modules ?? []; } catch { /* ignore */ } }
@@ -130,16 +142,22 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
       const slug = c.dataset.slug!;
       const isMine = mine.has(slug);
       const open = openSlugs.has(slug);
-      const opensCanvas = builderModules.has(slug);
-      if (opensCanvas) c.setAttribute('href', `/admin/builder/${encodeURIComponent(slug)}`);
-      s.textContent = opensCanvas ? '✓ You teach this · opens lab canvas' : isMine ? (me?.staffModules?.[slug] ? `✓ You teach this (${me.staffModules[slug]})` : '✓ You are in this module') : open ? 'Open: add it from your modules page' : '🔒 Invitation only: ask the module leader';
+      const canBuild = builderModules.has(slug);
+      c.querySelector<HTMLElement>('[data-canvas]')!.hidden = !canBuild;
+      s.textContent = canBuild ? '✓ You teach this' : isMine ? (me?.staffModules?.[slug] ? `✓ You teach this (${me.staffModules[slug]})` : '✓ You are in this module') : open ? 'Open: add it from your modules page' : '🔒 Invitation only: ask the module leader';
       s.classList.toggle('in', isMine);
       c.dataset.mine = isMine ? '1' : '';
       c.dataset.open = open ? '1' : '';
     }
     // a student's own year preselected
-    const profileYear = me?.user?.profile?.year || (() => { try { return JSON.parse(localStorage.getItem('mdx:profile') ?? 'null')?.year ?? ''; } catch { return ''; } })();
+    const saved = (() => { try { return JSON.parse(localStorage.getItem('mdx:profile') ?? 'null') ?? {}; } catch { return {}; } })();
+    const profileYear = me?.user?.profile?.year || saved.year || '';
     if (profileYear && [...year.options].some((o) => o.value === profileYear)) year.value = profileYear;
+    // and their faculty (answers from before faculties: the default faculty, the first option)
+    if (fac && profileYear) {
+      const mineFac = (me?.user ? me.user.profile?.faculty : saved.faculty) || 'informatics-computer-science';
+      if ([...fac.options].some((o) => o.value === mineFac)) fac.value = mineFac;
+    }
 
     const has = (list: string, v: string) => !list || list.toLowerCase().split('|').includes(v.toLowerCase());
     const apply = () => {
@@ -153,6 +171,7 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
             && (!year.value || title === year.value || (title === 'All years' && !c.dataset.years))
             && (!sem.value || c.dataset.sem === 'Both' || c.dataset.sem === sem.value)
             && (!spec.value || has(c.dataset.specs!, spec.value))
+            && (!fac?.value || c.dataset.faculty === fac.value || c.dataset.faculty === 'all')
             && (filter === 'all' || (filter === 'mine' && c.dataset.mine) || (filter === 'open' && c.dataset.open));
           c.hidden = !show;
           if (show) n++;
@@ -166,7 +185,7 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
       if (t) url.searchParams.set('q', t); else url.searchParams.delete('q');
       history.replaceState(history.state, '', url);
     };
-    [q, year, sem, spec].forEach((el) => el.addEventListener('input', apply));
+    [q, year, sem, spec, fac].forEach((el) => el?.addEventListener('input', apply));
     root.querySelectorAll<HTMLButtonElement>('[data-f]').forEach((b) => b.addEventListener('click', () => {
       filter = b.dataset.f!;
       root.querySelectorAll('[data-f]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));

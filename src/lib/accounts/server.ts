@@ -13,7 +13,7 @@ import { getSecret } from 'astro:env/server';
 import { createHash, randomUUID } from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
-import { BUILT_IN_AUDIENCE, DEFAULT_SETTINGS, SUPER_ADMINS, type NewAccount, type Profile, type PublicUser, type Role, type Settings, upgradeYears } from './core';
+import { BUILT_IN_AUDIENCE, DEFAULT_SETTINGS, SUPER_ADMINS, type NewAccount, type Profile, type PublicUser, type Role, type Settings, upgradeFaculties, upgradeYears } from './core';
 import { DEFAULT_STORED, type ModuleRole, type StoredMatrix } from './permissions';
 import { course, team } from '@/site.config';
 import { hashPassword, signToken, verifyPassword, verifyToken, type TokenClaims } from './tokens';
@@ -74,7 +74,7 @@ type UserRow = PublicUser & { password_hash: string; token_version: number };
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v));
 const toUser = (r: any): UserRow => ({
   id: r.id, role: r.role, name: r.name, email: r.email, studentId: r.student_id ?? null,
-  profile: { year: r.year ?? '', specialization: r.specialization ?? '', modules: Array.isArray(r.modules) ? r.modules : [] },
+  profile: { year: r.year ?? '', specialization: r.specialization ?? '', modules: Array.isArray(r.modules) ? r.modules : [], faculty: r.faculty ?? '' },
   active: Boolean(r.active), created_at: iso(r.created_at)!, last_login: iso(r.last_login),
   password_hash: r.password_hash, token_version: Number(r.token_version ?? 0),
 });
@@ -123,6 +123,8 @@ class AccountStore {
       `create table if not exists ${this.enrollments} (
         module text not null, email text not null, source text not null, added_by text not null default '',
         created_at timestamptz not null default now(), primary key (module, email))`,
+      // faculties: accounts from before them keep null (= the default faculty, see facultyOfProfile)
+      `alter table ${this.users} add column if not exists faculty text`,
     ]) await this.run(s);
     await this.seed();
   }
@@ -182,9 +184,9 @@ class AccountStore {
   async create(a: NewAccount, profile?: Profile): Promise<UserRow | null> {
     try {
       const [r] = await this.q(
-        `insert into ${this.users} (id, role, name, email, password_hash, student_id, year, specialization, modules)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning *`,
-        [randomUUID(), a.role, a.name, a.email, hashPassword(a.password), a.studentId, profile?.year ?? null, profile?.specialization ?? null, profile?.modules ?? []],
+        `insert into ${this.users} (id, role, name, email, password_hash, student_id, year, specialization, modules, faculty)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *`,
+        [randomUUID(), a.role, a.name, a.email, hashPassword(a.password), a.studentId, profile?.year ?? null, profile?.specialization ?? null, profile?.modules ?? [], profile?.faculty || null],
       );
       return toUser(r);
     } catch (error) {
@@ -199,7 +201,7 @@ class AccountStore {
     return u;
   }
   async setProfile(id: string, p: Profile): Promise<UserRow | null> {
-    const [r] = await this.q(`update ${this.users} set year = $2, specialization = $3, modules = $4 where id = $1 returning *`, [id, p.year, p.specialization, p.modules]);
+    const [r] = await this.q(`update ${this.users} set year = $2, specialization = $3, modules = $4, faculty = $5 where id = $1 returning *`, [id, p.year, p.specialization, p.modules, p.faculty || null]);
     return r ? toUser(r) : null;
   }
   /** deactivating or changing the password bumps the token version, which signs the account out everywhere */
@@ -287,6 +289,19 @@ class AccountStore {
   async renameProfiles(field: 'year' | 'specialization', from: string, to: string) {
     await this.q(`update ${this.users} set ${field === 'year' ? 'year' : 'specialization'} = $2 where ${field === 'year' ? 'year' : 'specialization'} = $1`, [from, to]);
   }
+  /** a specialization now belongs to another faculty: its students move with it */
+  async moveSpecialization(specialization: string, faculty: string) {
+    await this.q(`update ${this.users} set faculty = $2 where specialization = $1 and coalesce(faculty, '') <> $2`, [specialization, faculty]);
+  }
+  /** a faculty was deleted: its students move to `to` ('' = the default faculty) */
+  async moveFaculty(from: string, to: string) {
+    await this.q(`update ${this.users} set faculty = $2 where faculty = $1`, [from, to || null]);
+  }
+  /** how many accounts are in each faculty (null = the default faculty) */
+  async facultyCounts(): Promise<Record<string, number>> {
+    const rows = await this.q(`select coalesce(faculty, '') as faculty, count(*)::int as n from ${this.users} where role = 'student' group by 1`);
+    return Object.fromEntries(rows.map((r) => [r.faculty, Number(r.n)]));
+  }
 
   /* ---------------------------------------------------- permissions */
 
@@ -298,18 +313,21 @@ class AccountStore {
     await this.q(`insert into ${this.settings} (key, value) values ('matrix', $1) on conflict (key) do update set value = excluded.value, updated_at = now()`, [JSON.stringify(m)]);
   }
 
-  async getSettings(): Promise<Settings & { builtIn: { category: string; years: string; specializations: string; semester: string; open: boolean } }> {
+  async getSettings(): Promise<Settings & { builtIn: { category: string; years: string; specializations: string; semester: string; open: boolean; faculty: string } }> {
     const rows = await this.q(`select key, value from ${this.settings}`);
     const get = (k: string) => rows.find((r) => r.key === k)?.value;
+    // before faculties, only the flat specialization list was stored (it becomes the default faculty's)
+    const faculties = upgradeFaculties(get('faculties'), get('specializations'));
     return {
       ...upgradeYears(get('years'), get('specFrom')),
-      specializations: get('specializations') ?? DEFAULT_SETTINGS.specializations,
+      faculties,
+      specializations: faculties.flatMap((f) => f.specializations),
       activeSemester: get('activeSemester') ?? DEFAULT_SETTINGS.activeSemester,
       categories: get('categories') ?? DEFAULT_SETTINGS.categories,
       builtIn: { ...BUILT_IN_AUDIENCE, ...(get('builtIn') ?? {}) },
     };
   }
-  async setSetting(key: 'years' | 'specializations' | 'builtIn' | 'activeSemester' | 'specFrom' | 'categories', value: unknown) {
+  async setSetting(key: 'years' | 'specializations' | 'faculties' | 'builtIn' | 'activeSemester' | 'specFrom' | 'categories', value: unknown) {
     await this.q(`insert into ${this.settings} (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value, updated_at = now()`, [key, JSON.stringify(value)]);
   }
 }
