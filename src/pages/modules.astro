@@ -75,7 +75,8 @@ const specFromLabel = `${settings.specFrom.year} · ${settings.specFrom.semester
   .md-search { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   .md-q { flex: 1 1 320px; height: 56px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--hero-line); background: color-mix(in oklab, var(--hero-bg) 60%, transparent); color: var(--hero-text); font: 17px var(--font-body); backdrop-filter: blur(12px); }
   .md-q:focus, .md-sel:focus { outline: none; border-color: var(--hero-accent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--hero-accent) 20%, transparent); }
-  .md-sel { height: 46px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--hero-line); background: color-mix(in oklab, var(--hero-bg) 70%, transparent); color: var(--hero-text); font: 13.5px var(--font-body); }
+  .md-sel { height: 46px; padding: 0 40px 0 18px; border-radius: 999px; border: 1px solid var(--hero-line); background-color: color-mix(in oklab, var(--hero-bg) 70%, transparent); color: var(--hero-text); font: 13.5px var(--font-body); }
+  .md-sel:hover { border-color: var(--hero-dim); }
   .md-filters { display: flex; gap: 6px; }
   .md-filters button { padding: 10px 16px; border-radius: 999px; border: 1px solid var(--hero-line); background: none; color: var(--hero-lead); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
   .md-filters button[aria-pressed='true'] { border-color: var(--hero-accent); color: var(--hero-text); background: color-mix(in oklab, var(--hero-accent) 14%, transparent); }

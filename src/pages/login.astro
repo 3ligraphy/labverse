@@ -128,7 +128,8 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
   .auth-form { display: grid; gap: 14px; }
   .auth-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--hero-text); }
   .auth-form small { color: var(--hero-dim); font-weight: 400; }
-  .auth-form .input { height: 46px; padding: 0 14px; background: color-mix(in oklab, var(--hero-bg) 70%, transparent); border-color: var(--hero-line); color: var(--hero-text); }
+  .auth-form .input { height: 46px; background-color: color-mix(in oklab, var(--hero-bg) 70%, transparent); border-color: var(--hero-line); color: var(--hero-text); }
+  .auth-form .input:hover:not(:focus) { border-color: var(--hero-dim); }
   .auth-form .input:focus { border-color: var(--hero-accent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--hero-accent) 20%, transparent); }
   .auth-form .input[aria-invalid='true'] { border-color: var(--hero-danger); }
   .auth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -136,8 +137,8 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
   .auth-opts { border: 1px solid var(--hero-line); border-radius: 14px; padding: 12px 14px; }
   .auth-opts legend { padding: 0 6px; font-size: 13px; font-weight: 600; }
   .auth-opts [data-up-opts] { display: grid; gap: 8px; }
-  .auth-opt { display: flex; gap: 10px; align-items: center; font-weight: 400 !important; cursor: pointer; }
-  .auth-opt input { accent-color: var(--hero-accent); width: 16px; height: 16px; }
+  .auth-form .auth-opt { display: flex; gap: 10px; align-items: center; font-weight: 400; cursor: pointer; }
+  .auth-opt input { accent-color: var(--hero-accent); }
   .auth-msg { min-height: 18px; font-size: 13px; color: var(--hero-danger); }
   .auth-note { padding: 10px 12px; border-radius: 12px; background: color-mix(in oklab, var(--hero-warn) 16%, transparent); color: var(--hero-warn); font-size: 13px; }
   .auth-fine { font-size: 12.5px; color: var(--hero-dim); }

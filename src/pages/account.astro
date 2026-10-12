@@ -109,13 +109,14 @@ const optionalCards = cards.filter((c) => optional.includes(c.slug));
   .pr-card h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
   label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
   small { color: var(--hero-dim); font-weight: 400; }
-  .input { height: 44px; padding: 0 14px; background: color-mix(in oklab, var(--hero-bg) 70%, transparent); border-color: var(--hero-line); color: var(--hero-text); }
-  .input[readonly] { opacity: .7; }
+  .input { height: 44px; background-color: color-mix(in oklab, var(--hero-bg) 70%, transparent); border-color: var(--hero-line); color: var(--hero-text); }
+  .input:hover:not(:focus):not([readonly]) { border-color: var(--hero-dim); }
+  .input[readonly] { background-color: color-mix(in oklab, var(--hero-text) 5%, transparent); color: var(--hero-lead); }
   .pr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .pr-opts { border: 1px solid var(--hero-line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
   .pr-opts legend { padding: 0 6px; font-size: 13px; font-weight: 600; }
   .pr-opt { display: flex; align-items: center; gap: 10px; font-weight: 400; }
-  .pr-opt input { width: 16px; height: 16px; accent-color: var(--hero-accent); }
+  .pr-opt input { accent-color: var(--hero-accent); }
   .pr-msg { min-height: 18px; font-size: 13px; }
   .pr-msg.err { color: var(--hero-danger); }
   .pr-msg.ok { color: var(--hero-accent); }
