@@ -6,6 +6,9 @@ import { getMe } from '@/scripts/me';
 type PublicSession = { id: string; open: boolean; ta_name?: string; time_slot?: string };
 type PublicSessionResponse = PublicSession & { sessions?: PublicSession[]; practice?: boolean };
 
+const GATED = '[data-exercise],[data-playground],[data-repo-submit],[data-checkin],[data-task-check]';
+const PASS_KEYS = /^(Tab|Escape|Shift|Control|Alt|Meta|CapsLock|Arrow\w+|Home|End|PageUp|PageDown|F\d{1,2})$/;
+
 export function mountStart(lab: string) {
   const root = document.querySelector<HTMLElement>('[data-lab-start]');
   if (!root || root.dataset.wired) return;
@@ -26,21 +29,82 @@ export function mountStart(lab: string) {
   let practice = false; // the admin's "open practice" toggle: solve without a session, nothing recorded
   const labRoot = root.closest<HTMLElement>('[data-lab]');
 
+  /** Explains a blocked control right under it (role=status), instead of a click that silently does nothing. */
+  let note: HTMLElement | null = null;
+  let noteAt = 0;
+  const explain = (target: HTMLElement) => {
+    const access = labRoot?.dataset.sessionAccess;
+    // a task's "Done" tick is a visually hidden checkbox: explain under the task header instead
+    const block = target.closest<HTMLElement>('.task-head') ?? target.closest<HTMLElement>(GATED) ?? target.closest<HTMLElement>('section, article, .card') ?? target;
+    const text = access === 'practice'
+      ? 'Hand-ins and check-in need a live lab session. Exercises and demos work now in practice mode.'
+      : sessions.length
+        ? 'Join the session first: enter your name, ID and group in Start lab. Then you can edit, run and check.'
+        : 'This opens when your TA starts the lab session. You can read everything until then.';
+    if (note && note.previousElementSibling === block && note.dataset.text === text && Date.now() - noteAt < 4000) return;
+    noteAt = Date.now();
+    if (!note) {
+      note = document.createElement('div');
+      note.className = 'lab-gate-note';
+      note.dataset.gateNote = '';
+      note.setAttribute('role', 'status');
+    }
+    note.replaceChildren();
+    block.after(note);
+    note.dataset.text = text;
+    // filled after insertion so screen readers announce it
+    setTimeout(() => {
+      if (!note) return;
+      const p = document.createElement('p');
+      p.textContent = text;
+      note.replaceChildren(p);
+      if (access !== 'practice' && sessions.length) {
+        const go = document.createElement('button');
+        go.type = 'button';
+        go.className = 'btn btn-ghost btn-sm';
+        go.textContent = 'Go to Start lab ↑';
+        go.addEventListener('click', () => {
+          root.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+          (formBox.hidden ? root : nameIn.readOnly ? groupIn : nameIn).focus({ preventScroll: true });
+        });
+        note.append(go);
+      }
+    }, 60);
+  };
+
   if (labRoot && !labRoot.dataset.sessionGuard) {
     labRoot.dataset.sessionGuard = '1';
     const guard = (event: Event) => {
       if (labRoot.dataset.sessionAccess === 'active') return;
       const target = event.target as HTMLElement | null;
-      if (!target || target.closest('[data-lab-start]') || target.closest('a')) return;
+      if (!target || target.closest('[data-lab-start]') || target.closest('[data-gate-note]') || target.closest('a')) return;
       // Practice: exercises and demos work, but attendance and submissions still need a session.
       if (labRoot.dataset.sessionAccess === 'practice' && !target.closest('[data-repo-submit],[data-checkin]')) return;
+      // moving focus, scrolling and copying stay available, so keyboard users are never trapped
+      if (event instanceof KeyboardEvent && (PASS_KEYS.test(event.key) || ((event.ctrlKey || event.metaKey) && /^[ac]$/i.test(event.key)))) return;
       if (target.closest('button,input,textarea,select,[contenteditable="true"],.cm-editor,[data-exercise],[data-playground],[data-repo-submit],[data-checkin]')) {
         event.preventDefault();
         event.stopImmediatePropagation();
+        if (event.type !== 'change' && event.type !== 'submit') explain(target);
       }
     };
     for (const event of ['click', 'beforeinput', 'keydown', 'change', 'submit']) labRoot.addEventListener(event, guard, true);
   }
+
+  /** aria-disabled on the controls the guard blocks, so assistive tech says "unavailable" before the click */
+  const markGated = () => {
+    if (!labRoot) return;
+    const access = labRoot.dataset.sessionAccess;
+    const scope = access === 'active' ? '' : access === 'practice' ? '[data-repo-submit],[data-checkin]' : GATED;
+    labRoot.querySelectorAll('[data-gate-off]').forEach((el) => { el.removeAttribute('data-gate-off'); el.removeAttribute('aria-disabled'); });
+    if (scope) labRoot.querySelectorAll<HTMLElement>(`:is(${scope}) :is(button, input, select, textarea), [data-task-check]:is(button, input)`).forEach((el) => {
+      if (access === 'practice' && el.matches('[data-task-check]')) return;
+      if (el.closest('[data-gate-note]') || el.hasAttribute('aria-disabled')) return;
+      el.setAttribute('aria-disabled', 'true');
+      el.setAttribute('data-gate-off', '');
+    });
+    if (access === 'active') note?.remove();
+  };
 
   const show = () => {
     const student = getStudent();
@@ -51,6 +115,7 @@ export function mountStart(lab: string) {
     signed.hidden = !current;
     root.classList.toggle('is-signed', current);
     submit.disabled = !session?.open;
+    markGated();
     if (current && student) {
       signed.querySelector('[data-ls-name]')!.textContent = student.name;
       signed.querySelector('[data-ls-id]')!.textContent = student.id;

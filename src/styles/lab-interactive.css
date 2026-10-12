@@ -29,10 +29,13 @@
 .ls form[hidden] { display: none; }
 @media (min-width: 720px) { .ls form { grid-template-columns: 1.4fr 1fr 0.7fr auto; align-items: end; } }
 .ls .ls-session { grid-column: 1 / -1; }
-[data-lab][data-session-access='readonly'] :is([data-exercise], [data-playground], [data-repo-submit], [data-checkin], [data-task-check]) { opacity: 0.62; }
-[data-lab][data-session-access='readonly'] :is(.cm-editor, [data-exercise] button, [data-playground] button, [data-repo-submit] input, [data-repo-submit] button, [data-checkin] button, [data-task-check]) { cursor: not-allowed !important; }
-[data-lab][data-session-access='practice'] :is([data-repo-submit], [data-checkin]) { opacity: 0.62; }
-[data-lab][data-session-access='practice'] :is([data-repo-submit] input, [data-repo-submit] button, [data-checkin] button) { cursor: not-allowed !important; }
+/* outside a session the content stays fully readable; only the blocked controls look unavailable */
+[data-lab][data-session-access='readonly'] :is([data-exercise] button, [data-playground] button, [data-repo-submit] :is(input, button), [data-checkin] button, .task-done),
+[data-lab][data-session-access='practice'] :is([data-repo-submit] :is(input, button), [data-checkin] button) { opacity: 0.55; cursor: not-allowed !important; }
+[data-lab][data-session-access='readonly'] .cm-editor { cursor: not-allowed; }
+.lab-gate-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 10px 0 0; padding: 12px 14px; border-radius: var(--r-md); border: 1px solid color-mix(in oklab, var(--warn) 45%, var(--line)); background: color-mix(in oklab, var(--warn) 9%, var(--surface)); font-size: var(--fs-sm); color: var(--text); }
+.lab-gate-note:empty { display: none; }
+.lab-gate-note p { margin: 0 !important; flex: 1 1 26ch; color: var(--text) !important; }
 .ls label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text); }
 .ls input, .ls select { height: 46px; padding: 0 14px; font-size: 16px; border-radius: 12px; }
 .ls .ls-err { color: var(--danger) !important; font-size: 14px; min-height: 1em; }
