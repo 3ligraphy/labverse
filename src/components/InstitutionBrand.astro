@@ -15,9 +15,9 @@ import bueLogo from '@/assets/branding/bue-logo.png';
 </div>
 
 <style>
-  .institution-brand { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 12px 16px; width: fit-content; max-width: 100%; }
-  /* small phones: the full lockup (~375px) is wider than the screen */
-  @media (max-width: 400px) { .institution-brand:not(.compact) .bue-mark img { width: 124px; } .institution-brand:not(.compact) { gap: 12px; } }
+  .institution-brand { display: flex; flex: none; align-items: center; gap: 12px; width: fit-content; max-width: 100%; }
+  /* small phones: the full lockup (~375px) is wider than the screen, so it may wrap and the BUE logo is smaller */
+  @media (max-width: 400px) { .institution-brand:not(.compact) { flex-wrap: wrap; } .institution-brand:not(.compact) .bue-mark img { width: 124px; } }
   .bue-mark { display: grid; flex: none; place-items: center; padding: 9px 12px; border-radius: 12px; background: #fff; box-shadow: 0 0 0 1px rgb(15 23 42 / 0.12); }
   .bue-mark img { display: block; width: 154px; height: auto; }
   .brand-rule { width: 1px; height: 52px; background: var(--line-2); }

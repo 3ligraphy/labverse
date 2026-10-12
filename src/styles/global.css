@@ -264,7 +264,7 @@ main:focus { outline: none; } /* focused by the skip link and back-to-top, not a
   input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]), select, textarea { font-size: 16px !important; }
 }
 /* links inside running text are underlined, not told apart by colour alone */
-:is(p, li, dd, td, .prose, .lead) > a:not(.btn):not(.chip):not([class*='tab']) { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+:is(p, dd, td, .prose, .prose li, .lead, .dash-list li) > a:not(.btn):not(.chip):not([class*='tab']) { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 /* back to top (app.ts adds it on very long pages) */
 .to-top { position: fixed; z-index: 85; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 20px); width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font-size: 18px; box-shadow: var(--shadow-md); cursor: pointer; }
 .to-top:hover { border-color: var(--accent-text); }
