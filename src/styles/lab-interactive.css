@@ -273,7 +273,7 @@
 .fx-stage.is-match { box-shadow: 0 0 0 3px var(--ok); }
 .fx-layer { position: absolute; inset: 14px; display: flex; }
 .fx-box { flex: none; width: 56px; height: 56px; border-radius: 12px; display: grid; place-items: center; font-style: normal; font-weight: 800; font-size: 18px; color: #fff; transition: all 450ms var(--ease-out); }
-.fx-solid.fx-0 { background: #6366f1; } .fx-solid.fx-1 { background: #ec4899; } .fx-solid.fx-2 { background: #f59e0b; }
+.fx-solid.fx-0 { background: #4f46e5; } .fx-solid.fx-1 { background: #be185d; } .fx-solid.fx-2 { background: #f59e0b; color: #1c1300; }
 .fx-dash { border: 2px dashed var(--text-3); opacity: 0.6; }
 .fx-msg { margin: 0 !important; min-height: 1.2em; font-weight: 600; color: var(--ok); }
 .fx-right { display: grid; gap: 12px; align-content: start; min-width: 0; }

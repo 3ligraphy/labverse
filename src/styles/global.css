@@ -609,7 +609,7 @@ html.reveal-ready [data-reveal]:not(.in) { animation: none; }
     --line-2: #d2cfc4;
     --text: #0e1013;
     --text-2: #464c56;
-    --text-3: #6e7480;
+    --text-3: #5f6571;
     --accent: #c2f03a;
     --accent-2: #b0e02a;
     --accent-ink: #0e1013;
@@ -635,7 +635,7 @@ html.reveal-ready [data-reveal]:not(.in) { animation: none; }
     --hero-text: #0e1013;
     --hero-lead: #464c56;
     --hero-muted: #5b616b;
-    --hero-dim: #6e7480;
+    --hero-dim: #5f6571;
     --hero-line: #d2cfc4;
     --hero-grid: rgb(14 16 19 / 0.06);
     --hero-glow: rgb(170 230 30 / 0.45);

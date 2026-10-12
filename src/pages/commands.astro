@@ -107,10 +107,10 @@ const groups = [...groupBy(commands, (c) => c.data.category)];
   .ch-side { display: none; }
   @media (min-width: 1024px) { .ch-side { display: block; position: sticky; top: calc(var(--nav-h) + 32px); align-self: start; } }
   .ch-side ul { list-style: none; padding: 0; border-left: 1px solid var(--line); }
-  .ch-side a { display: flex; justify-content: space-between; padding: 6px 0 6px 14px; margin-left: -1px; border-left: 1px solid transparent; font-size: 14px; color: var(--text-3); transition: color var(--t-fast), border-color var(--t-fast); }
+  .ch-side a { display: flex; justify-content: space-between; padding: 6px 0 6px 14px; margin-left: -1px; border-left: 1px solid transparent; font-size: 14px; color: var(--text-2); transition: color var(--t-fast), border-color var(--t-fast); }
   .ch-side a:hover { color: var(--text); }
   .ch-side a.active { color: var(--text); border-left-color: var(--accent-text); }
-  .ch-side a.dim { opacity: 0.35; }
+  .ch-side a.dim { color: var(--text-3); }
   .ch-status { font-size: 12px; margin-bottom: 16px; min-height: 18px; }
   .ch-group { scroll-margin-top: calc(var(--nav-h) + 24px); }
   .ch-group + .ch-group { margin-top: 56px; }

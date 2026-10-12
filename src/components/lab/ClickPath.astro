@@ -30,10 +30,9 @@ const { steps, label = 'Click' } = Astro.props;
   .cp-n { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--text-2); font-size: 12px; font-weight: 700; }
   .cp-chip.last { border-color: var(--accent-text); }
   /* motion: each chip "gets clicked" in order */
-  .cpath li { opacity: 0.35; }
-  .cpath.in li { animation: cp-on 450ms var(--ease-out) forwards; animation-delay: calc(200ms + var(--i) * 260ms); }
+  .cpath.in li { animation: cp-on 450ms var(--ease-out) backwards; animation-delay: calc(200ms + var(--i) * 260ms); }
   .cpath.in .cp-n { animation: cp-n 450ms var(--ease-out) forwards; animation-delay: calc(200ms + var(--i) * 260ms); }
-  @keyframes cp-on { 0% { opacity: 0.35; transform: scale(0.96); } 60% { transform: scale(1.04); } 100% { opacity: 1; transform: none; } }
+  @keyframes cp-on { 0% { opacity: 0.35; transform: scale(0.96); } 60% { transform: scale(1.02); } 100% { opacity: 1; transform: none; } }
   @keyframes cp-n { to { background: var(--accent); color: var(--accent-ink); } }
   @media (prefers-reduced-motion: reduce) { .cpath li { opacity: 1; animation: none; } }
 </style>

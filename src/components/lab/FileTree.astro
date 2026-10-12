@@ -45,15 +45,13 @@ const rows = lines.map((raw) => {
   .ft-name { color: var(--text); white-space: nowrap; font-size: 13px; }
   .ft-note { color: var(--text-3); font-size: 13px; min-width: 0; }
   .ft-note::before { content: '← '; opacity: 0.6; }
-  .ft-row.hl { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent-text); }
+  .ft-row.hl { background: var(--accent-soft); }
   .ft-row.hl .ft-name { color: var(--accent-text); font-weight: 600; }
   .ft-row.hl .ft-note { color: var(--text-2); }
-  .ft-row.dim { opacity: 0.55; }
-  .ftree .ft-row { opacity: 0; transform: translateX(-8px); }
-  .ftree.in .ft-row { animation: ft-in 450ms var(--ease-out) forwards; animation-delay: calc(150ms + var(--i) * 70ms); }
-  .ftree.in .ft-row.dim { animation-name: ft-in-dim; }
-  @keyframes ft-in { to { opacity: 1; transform: none; } }
-  @keyframes ft-in-dim { to { opacity: 0.55; transform: none; } }
+  .ft-row.dim :is(.ft-name, .ft-note) { color: var(--text-3); }
+  .ft-row.dim .ft-ic { opacity: 0.55; }
+  .ftree.in .ft-row { animation: ft-in 450ms var(--ease-out) backwards; animation-delay: calc(150ms + var(--i) * 70ms); }
+  @keyframes ft-in { from { opacity: 0; transform: translateX(-8px); } }
   @media (max-width: 560px) { .ft-row { grid-template-columns: 18px 1fr; } .ft-note { grid-column: 2; } }
-  @media (prefers-reduced-motion: reduce) { .ftree .ft-row { opacity: 1; transform: none; animation: none; } .ftree .ft-row.dim { opacity: 0.55; } }
+  @media (prefers-reduced-motion: reduce) { .ftree.in .ft-row { animation: none; } }
 </style>

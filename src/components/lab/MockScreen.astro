@@ -12,59 +12,59 @@ const { title, rows = [], variant = 'list', tab, button, back = false, search = 
 const TABS = [['🎬', 'Movies'], ['⭐', 'Watchlist'], ['＋', 'Add']];
 const [heroEmoji, ...heroTitle] = (rows[0] ?? '').split(' ');
 ---
-<figure class="ms" data-reveal style={`--ms-w:${size}px`}>
+<figure class="mks" data-reveal style={`--mks-w:${size}px`}>
   <Device light label={`Mockup of the ${title} screen`}>
-    <div class="ms-app">
-      <div class="ms-head">{back && <span class="ms-back">‹ Back</span>}<b>{title}</b></div>
-      <div class:list={['ms-body', `v-${variant}`]}>
-        {search && <span class="ms-input stg" style="--i:0">Search movies</span>}
-        {variant === 'list' && rows.map((r, i) => <span class="ms-card stg" style={`--i:${i + 1}`}>{r}</span>)}
+    <div class="mks-app">
+      <div class="mks-head">{back && <span class="mks-back">‹ Back</span>}<b>{title}</b></div>
+      <div class:list={['mks-body', `v-${variant}`]}>
+        {search && <span class="mks-input stg" style="--i:0">Search movies</span>}
+        {variant === 'list' && rows.map((r, i) => <span class="mks-card stg" style={`--i:${i + 1}`}>{r}</span>)}
         {variant === 'detail' && (
           <>
-            <span class="ms-hero stg" style="--i:0">{heroEmoji}</span>
-            <b class="ms-title stg" style="--i:1">{heroTitle.join(' ')}</b>
-            {rows.slice(1).map((r, i) => <span class="ms-line stg" style={`--i:${i + 2}`}>{r}</span>)}
+            <span class="mks-hero stg" style="--i:0">{heroEmoji}</span>
+            <b class="mks-title stg" style="--i:1">{heroTitle.join(' ')}</b>
+            {rows.slice(1).map((r, i) => <span class="mks-line stg" style={`--i:${i + 2}`}>{r}</span>)}
           </>
         )}
         {variant === 'form' && rows.map((r, i) => (
-          <span class="ms-field stg" style={`--i:${i}`}><small>{r}</small><span class="ms-input" /></span>
+          <span class="mks-field stg" style={`--i:${i}`}><small>{r}</small><span class="mks-input" /></span>
         ))}
-        {variant === 'empty' && <span class="ms-empty stg" style="--i:0">{rows[0]}</span>}
-        {button && <span class="ms-btn stg" style={`--i:${rows.length + 2}`}>{button}</span>}
+        {variant === 'empty' && <span class="mks-empty stg" style="--i:0">{rows[0]}</span>}
+        {button && <span class="mks-btn stg" style={`--i:${rows.length + 2}`}>{button}</span>}
       </div>
       {tab !== undefined && (
-        <div class="ms-tabs">
-          {TABS.map(([icon, label], i) => <span class:list={['ms-tab', { on: i === tab }]}><i>{icon}</i>{label}</span>)}
+        <div class="mks-tabs">
+          {TABS.map(([icon, label], i) => <span class:list={['mks-tab', { on: i === tab }]}><i>{icon}</i>{label}</span>)}
         </div>
       )}
     </div>
   </Device>
-  {caption && <figcaption class="ms-cap mono">{caption}</figcaption>}
+  {caption && <figcaption class="mks-cap mono">{caption}</figcaption>}
 </figure>
 
 <style>
-  .ms { margin: 0; display: grid; justify-items: center; gap: 10px; }
-  .ms :global(.device) { --w: var(--ms-w); }
-  .ms-app { position: absolute; inset: 0; display: flex; flex-direction: column; color: #11181c; font-size: 12px; }
-  .ms-head { position: relative; flex: none; height: 34px; display: grid; place-items: center; border-bottom: 1px solid #e5e7eb; font-size: 12px; }
-  .ms-back { position: absolute; left: 8px; top: 50%; translate: 0 -50%; color: #7c3aed; font-size: 12px; }
-  .ms-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px; overflow: hidden; }
-  .ms-body.v-detail { align-items: center; text-align: center; }
-  .ms-body.v-empty { justify-content: center; }
-  .ms-card { padding: 8px 9px; border-radius: 9px; background: #f5f3ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ms-input { display: block; height: 22px; padding: 4px 8px; border: 1px solid #ddd6fe; border-radius: 8px; color: #94a3b8; font-size: 12px; }
-  .ms-hero { font-size: 40px; line-height: 1.1; margin-top: 6px; }
-  .ms-title { font-size: 15px; }
-  .ms-line { color: #475569; }
-  .ms-field { display: grid; gap: 3px; }
-  .ms-field small { font-weight: 700; font-size: 12px; }
-  .ms-empty { color: #94a3b8; text-align: center; padding: 0 12px; }
-  .ms-btn { align-self: stretch; margin-top: 6px; padding: 8px; border-radius: 9px; background: #7c3aed; color: #fff; font-weight: 700; text-align: center; }
-  .ms-body.v-detail .ms-btn { align-self: center; padding: 6px 14px; border-radius: 999px; }
-  .ms-tabs { flex: none; display: flex; border-top: 1px solid #e5e7eb; padding: 5px 0 14px; }
-  .ms-tab { flex: 1; display: grid; justify-items: center; gap: 1px; font-size: 12px; color: #8e8e93; }
-  .ms-tab i { font-style: normal; font-size: 13px; filter: grayscale(1); opacity: 0.7; }
-  .ms-tab.on { color: #7c3aed; font-weight: 700; }
-  .ms-tab.on i { filter: none; opacity: 1; }
-  .ms-cap { font-size: 12px; color: var(--text-3); text-align: center; }
+  .mks { margin: 0; display: grid; justify-items: center; gap: 10px; }
+  .mks :global(.device) { --w: var(--mks-w); }
+  .mks-app { position: absolute; inset: 0; display: flex; flex-direction: column; color: #11181c; font-size: 12px; }
+  .mks-head { position: relative; flex: none; height: 34px; display: grid; place-items: center; border-bottom: 1px solid #e5e7eb; font-size: 12px; }
+  .mks-back { position: absolute; left: 8px; top: 50%; translate: 0 -50%; color: #7c3aed; font-size: 12px; }
+  .mks-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px; overflow: hidden; }
+  .mks-body.v-detail { align-items: center; text-align: center; }
+  .mks-body.v-empty { justify-content: center; }
+  .mks-card { padding: 8px 9px; border-radius: 9px; background: #f5f3ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mks-input { display: block; height: 22px; padding: 4px 8px; border: 1px solid #ddd6fe; border-radius: 8px; color: #94a3b8; font-size: 12px; }
+  .mks-hero { font-size: 40px; line-height: 1.1; margin-top: 6px; }
+  .mks-title { font-size: 15px; }
+  .mks-line { color: #475569; }
+  .mks-field { display: grid; gap: 3px; }
+  .mks-field small { font-weight: 700; font-size: 12px; }
+  .mks-empty { color: #94a3b8; text-align: center; padding: 0 12px; }
+  .mks-btn { align-self: stretch; margin-top: 6px; padding: 8px; border-radius: 9px; background: #7c3aed; color: #fff; font-weight: 700; text-align: center; }
+  .mks-body.v-detail .mks-btn { align-self: center; padding: 6px 14px; border-radius: 999px; }
+  .mks-tabs { flex: none; display: flex; border-top: 1px solid #e5e7eb; padding: 5px 0 14px; }
+  .mks-tab { flex: 1; display: grid; justify-items: center; gap: 1px; font-size: 12px; color: #6c6c70; }
+  .mks-tab i { font-style: normal; font-size: 13px; filter: grayscale(1); opacity: 0.7; }
+  .mks-tab.on { color: #7c3aed; font-weight: 700; }
+  .mks-tab.on i { filter: none; opacity: 1; }
+  .mks-cap { font-size: 12px; color: var(--text-3); text-align: center; }
 </style>
