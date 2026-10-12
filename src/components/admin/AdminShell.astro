@@ -191,7 +191,7 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
     .ash-sheet-foot a, .ash-sheet-foot button { display: grid; place-items: center; min-height: 44px; border-radius: 12px; border: 1px solid var(--line-2); background: none; color: var(--text-2); font: 600 12.5px var(--font-body); }
     .ash-sheet-foot button { color: var(--danger); }
   }
-  .ash-main :is(h1) { background: linear-gradient(100deg, var(--text) 40%, color-mix(in oklab, var(--accent-text) 80%, var(--text))); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .ash-main :is(h1) { color: var(--text); }
   /* phones and tablets: who's signed in + profile/sign out on one row, the menu as a swipeable row of pills.
      Kept after the desktop rules so it wins over them. */
   @media (max-width: 1099px) {

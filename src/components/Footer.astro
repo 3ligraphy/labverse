@@ -57,27 +57,21 @@ const groups = inCourse
   .f-col ul { list-style: none; padding: 0; margin-top: 12px; display: grid; gap: 2px; }
   .f-col a { display: inline-block; padding-block: 5px; color: var(--text-2); font-size: 14.5px; transition: color var(--t-fast); } /* ≥ 24px tap targets */
   .f-col a:hover { color: var(--accent-text); }
-  /* The brand plate: the wordmark in heavy display type, lit lime along its top edge and fading into the footer,
-     with the logo's nova star tucked against the last letter. */
+  /* The brand plate: the wordmark in heavy display type, one quiet tone fading into the footer,
+     with the logo's lime nova star tucked against the last letter. */
   .f-mark {
     position: relative; display: flex; align-items: flex-start; margin-top: 80px; user-select: none; white-space: nowrap;
     font-size: clamp(58px, 15vw, 232px); line-height: 0.8;
   }
   .f-word {
-    font-family: var(--font-display); font-weight: 800; letter-spacing: -0.05em; padding-bottom: 0.02em;
-    background: linear-gradient(180deg,
-      color-mix(in oklab, var(--accent) 34%, transparent) 0%,
-      color-mix(in oklab, var(--text) 16%, transparent) 30%,
-      color-mix(in oklab, var(--text) 7%, transparent) 62%,
-      transparent 96%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
+    font-family: var(--font-display); font-weight: 800; letter-spacing: -0.04em; padding-bottom: 0.02em;
+    color: color-mix(in oklab, var(--text) 15%, transparent);
+    -webkit-mask-image: linear-gradient(180deg, #000 18%, rgb(0 0 0 / 0.45) 62%, transparent 98%);
+    mask-image: linear-gradient(180deg, #000 18%, rgb(0 0 0 / 0.45) 62%, transparent 98%);
   }
   .f-nova { flex: none; width: 0.34em; height: 0.34em; margin: -0.07em 0 0 -0.03em; fill: var(--accent); filter: drop-shadow(0 0 0.14em var(--accent-glow)); animation: f-nova 4.5s ease-in-out infinite; }
   @keyframes f-nova { 0%, 80%, 100% { transform: scale(1) rotate(0); } 90% { transform: scale(1.16) rotate(45deg); } }
   :global(:root[data-theme='light']) .f-nova { fill: #9ad21f; filter: drop-shadow(0 0 0.08em rgb(130 180 0 / 0.45)); }
-  :global(:root[data-theme='light']) .f-word {
-    background-image: linear-gradient(180deg, rgb(110 160 0 / 0.42) 0%, rgb(14 16 19 / 0.16) 32%, rgb(14 16 19 / 0.07) 64%, transparent 96%);
-  }
   @media (prefers-reduced-motion: reduce) { .f-nova { animation: none; } }
   .f-bottom { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; padding-block: 24px; border-top: 1px solid var(--line); font-size: 12px; color: var(--text-3); }
   .f-bottom a { display: inline-block; padding-block: 5px; } /* ≥ 24px tap target */

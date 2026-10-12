@@ -60,8 +60,7 @@ const role = invite ? (invite.module_role ? ROLE_NAMES[invite.module_role] : ROL
   .iv-card { width: min(100%, 560px); padding: clamp(26px, 5vw, 44px); display: grid; gap: 14px; }
   .iv-k { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--hero-accent); }
   h1 { font-size: clamp(2rem, 1.2rem + 3vw, 3.4rem); letter-spacing: -.05em; line-height: .98; }
-  h1 span { background: linear-gradient(100deg, #c8ff4d, #7cb1ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  :global(:root[data-theme='light']) h1 span { background-image: linear-gradient(100deg, #6f9a00, #3d7be0); }
+  h1 span { color: var(--hero-accent); }
   .iv-l, .iv-note { color: var(--hero-lead); }
   .iv-l b { color: var(--hero-text); }
   .iv-l a { color: var(--hero-accent); }
