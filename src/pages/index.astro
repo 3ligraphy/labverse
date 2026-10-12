@@ -17,14 +17,13 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
   <section class="hub" data-hub>
     <script type="application/json" data-hub-data set:html={json} />
     <div class="hub-sky" aria-hidden="true">
-      <div class="hub-grid"></div>
       <div class="hub-orb a"></div><div class="hub-orb b"></div><div class="hub-orb c"></div>
       <svg class="hub-rings" viewBox="0 0 600 600"><circle cx="300" cy="300" r="180" /><circle cx="300" cy="300" r="240" /><circle cx="300" cy="300" r="295" /></svg>
     </div>
 
     <div class="container hub-in">
       <header class="hub-head">
-        <p class="hub-k mono"><span class="hub-dot"></span> Learning platform · {settings.activeSemester} is active · {cards.length} module{cards.length === 1 ? '' : 's'}</p>
+        <p class="hub-k mono"><span class="hub-dot" aria-hidden="true"></span> {settings.activeSemester} is active · {cards.length} module{cards.length === 1 ? '' : 's'}</p>
         <h1 class="hub-t" data-hub-title>Choose your <span>module</span></h1>
         <p class="hub-sub" data-hub-sub>Tell us where you are in your degree and we'll line up your modules.</p>
         <div class="hub-who" data-hub-who hidden></div>
@@ -38,17 +37,17 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
           <li data-step-dot="3"><span>03</span> Optional modules</li>
         </ol>
         <div class="ob-step" data-step="1">
-          <h2>Which year are you in?</h2>
+          <h2 tabindex="-1"><span class="sr-only">Step 1 of 3: </span>Which year are you in?</h2>
           <div class="ob-pills" data-pills="year"></div>
         </div>
         <div class="ob-step" data-step="2" hidden>
-          <h2>What's your specialization?</h2>
+          <h2 tabindex="-1"><span class="sr-only">Step 2 of 3: </span>What's your specialization?</h2>
           <div class="ob-pills" data-pills="specialization"></div>
           <p class="ob-empty" data-spec-general hidden></p>
         </div>
         <div class="ob-step" data-step="3" hidden>
-          <h2>Which optional modules did you choose?</h2>
-          <p class="ob-note" data-opt-note>Tick the optional modules you registered for. Other modules are added by your module leader's invitation.</p>
+          <h2 tabindex="-1"><span class="sr-only">Step 3 of 3: </span>Which optional modules did you choose?</h2>
+          <p class="ob-note" data-opt-note>Tick the optional modules you registered for. Modules you're invited to appear on their own.</p>
           <div class="ob-opts" data-opts></div>
         </div>
         <div class="ob-foot">
@@ -62,9 +61,10 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
       <section class="mine" data-mine hidden>
         <div class="mine-bar">
           <p class="mono mine-chips" data-mine-chips></p>
-          <button type="button" class="mine-edit mono" data-edit>change answers</button>
+          <button type="button" class="mine-edit mono" data-edit>Change answers</button>
         </div>
         <div class="mine-grid" data-mine-grid></div>
+        <div class="mine-who" data-mine-who></div>
         <div class="later" data-later hidden><h2 class="later-h mono">Your modules in other semesters</h2><div class="mine-grid small" data-later-grid></div></div>
         <div class="find">
           <div class="find-bar">
@@ -90,9 +90,6 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
   .hub { --g1: #c8ff4d; --g2: #7cb1ff; --g3: #b69cff; position: relative; min-height: 100dvh; overflow: hidden; overflow: clip; isolation: isolate; padding: calc(var(--nav-h) + 48px) 0 96px; background: var(--hero-bg); color: var(--hero-text); }
   :root[data-theme='light'] .hub { --g1: #9fd400; --g2: #3d7be0; --g3: #7a5ce0; }
   .hub-sky { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
-  .hub-grid { position: absolute; inset: -50% -10% 0; background-image: linear-gradient(var(--hero-grid) 1px, transparent 1px), linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px); background-size: 64px 64px;
-    transform: perspective(700px) rotateX(58deg) translateY(10%); transform-origin: 50% 100%; mask-image: linear-gradient(transparent 10%, #000 60%); animation: hub-grid 14s linear infinite; }
-  @keyframes hub-grid { to { background-position: 0 64px, 0 0; } }
   .hub-orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .55; animation: hub-float 16s ease-in-out infinite; }
   .hub-orb.a { width: 520px; height: 520px; right: -120px; top: -160px; background: radial-gradient(circle, color-mix(in oklab, var(--g1) 70%, transparent), transparent 65%); }
   .hub-orb.b { width: 460px; height: 460px; left: -160px; top: 30%; background: radial-gradient(circle, color-mix(in oklab, var(--g2) 60%, transparent), transparent 65%); animation-delay: -5s; }
@@ -102,13 +99,18 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
   .hub-rings { position: absolute; width: 760px; right: -220px; top: -120px; opacity: .5; animation: hub-spin 60s linear infinite; }
   .hub-rings circle { fill: none; stroke: var(--hero-line); stroke-width: 1; stroke-dasharray: 2 10; }
   @keyframes hub-spin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .hub-grid, .hub-orb, .hub-rings, .hub-dot { animation: none !important; } }
+  @media (prefers-reduced-motion: reduce) { .hub-orb, .hub-rings, .hub-dot { animation: none !important; } }
 
   .hub-in { display: grid; gap: 36px; }
-  .hub-k { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--hero-accent); }
+  .hub-k { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: var(--hero-lead); }
   .hub-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hero-accent); box-shadow: 0 0 12px var(--hero-accent); animation: pulse-ring 2s infinite; }
   .hub-t { margin-top: 18px; font-size: clamp(3rem, 1.4rem + 6.4vw, 7.4rem); line-height: .9; letter-spacing: -.045em; font-weight: 700; }
-  .hub-t span { background: linear-gradient(100deg, var(--g1), var(--g2) 55%, var(--g3)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hub-t span { color: var(--hero-accent); }
+  /* returning students: the modules are the point, so the header steps back */
+  .hub.is-mine { padding-top: calc(var(--nav-h) + clamp(20px, 4vw, 40px)); }
+  .hub.is-mine .hub-in { gap: 22px; }
+  .hub.is-mine .hub-t { margin-top: 10px; font-size: clamp(2.1rem, 1.3rem + 3.2vw, 3.8rem); line-height: 1; letter-spacing: -.04em; }
+  .hub.is-mine .hub-sub { margin-top: 10px; font-size: 1rem; }
   .hub-sub { margin-top: 20px; max-width: 56ch; font-size: var(--fs-md); color: var(--hero-lead); }
   .hub-who { margin-top: 18px; display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 8px 8px 14px; border-radius: 999px; border: 1px solid var(--hero-line); background: color-mix(in oklab, var(--hero-bg) 60%, transparent); backdrop-filter: blur(10px); font-size: 13.5px; color: var(--hero-lead); }
   .hub-who b { color: var(--hero-text); }
@@ -138,14 +140,20 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
   .ob-empty { color: var(--hero-lead); font-size: 14.5px; padding: 18px; border-radius: 14px; border: 1px dashed var(--hero-line); }
   .ob-foot { display: flex; align-items: center; gap: 14px; }
   .ob-back { border: 0; background: none; color: var(--hero-lead); cursor: pointer; font-size: 14px; }
-  .ob-msg { flex: 1; font-size: 13px; color: var(--hero-danger); }
+  .ob-msg { flex: 1; font-size: 13.5px; color: var(--hero-lead); }
+  .ob-msg.is-err { color: var(--hero-danger); }
+  .ob-step h2:focus { outline: none; }
   .ob-next { min-width: 140px; }
 
   .mine { display: grid; gap: 22px; }
   .mine-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .mine-chips { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
-  .mine-chips span { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--hero-line); color: var(--hero-lead); background: color-mix(in oklab, var(--hero-bg) 60%, transparent); }
-  .mine-edit { border: 0; background: none; color: var(--hero-accent); cursor: pointer; font-size: 12px; text-decoration: underline; text-underline-offset: 4px; }
+  .mine-bar { justify-content: flex-start; gap: 4px 14px; }
+  .mine-chips { display: flex; flex-wrap: wrap; gap: 2px 0; font-size: 13px; color: var(--hero-lead); }
+  .mine-chips span + span::before { content: '·'; margin: 0 8px; color: var(--hero-dim); }
+  .mine-chips .warn { color: var(--hero-text); }
+  .mine-edit { min-height: 32px; border: 0; padding: 0; background: none; color: var(--hero-accent); cursor: pointer; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; }
+  .mine-who:empty { display: none; }
+  .mine-who .hub-who { margin-top: 0; }
   .mine-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); }
   .mcard { --c: var(--g1); position: relative; display: grid; gap: 12px; align-content: start; min-height: 240px; padding: 26px; border-radius: 24px; overflow: hidden; color: var(--hero-text); isolation: isolate;
     border: 1px solid color-mix(in oklab, var(--c) 35%, var(--hero-line)); background: color-mix(in oklab, var(--hero-bg) 50%, transparent); backdrop-filter: blur(14px);
@@ -251,20 +259,27 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
         ${me.accounts ? '<a href="/login" class="pri">Sign in</a><a href="/login#signup">Create account</a>' : ''}`;
     }
 
+    const head = who.parentElement!;
+    /** returning view: compact header, account line under the modules so the first module card sits above the fold on phones */
+    const mode = (returning: boolean) => {
+      root.classList.toggle('is-mine', returning);
+      (returning ? $('[data-mine-who]') : head).append(who);
+    };
     const showMine = (p: Profile) => {
       ob.hidden = true;
       mine.hidden = false;
+      mode(true);
       $('[data-hub-title]').innerHTML = 'Your <span>modules</span>';
-      $('[data-hub-sub]').textContent = 'Open a module to see its labs. Your TA starts each lab session; you sign in to the lab with your name and ID.';
-      $('[data-mine-chips]').innerHTML = [p.year, data.activeSemester, p.specialization === GENERAL ? 'General (no specialization yet)' : p.specialization, `${p.modules.length} optional`,
+      $('[data-hub-sub]').textContent = 'Open a module to see its labs. Your TA starts each lab session.';
+      $('[data-mine-chips]').innerHTML = [p.year, data.activeSemester, p.specialization === GENERAL ? 'General' : p.specialization, `${p.modules.length} optional`].map((t) => `<span>${esc(t)}</span>`).join('')
         // without an account these answers live only in this browser: say so, so a shared computer doesn't look like "mine"
-        ...(me.user ? [] : ['saved in this browser · not signed in'])].map((t) => `<span>${esc(t)}</span>`).join('');
+        + (me.user ? '' : '<span class="warn">saved in this browser only</span>');
       const all = data.cards.filter((m) => forMe(m, p));
       const mineCards = all.filter((m) => inSemester(m, data.activeSemester));
       const later = all.filter((m) => !inSemester(m, data.activeSemester));
       $('[data-later]').hidden = !later.length;
       $('[data-later-grid]').innerHTML = later.map(card).join('');
-      $('[data-mine-grid]').innerHTML = mineCards.length ? mineCards.map(card).join('') : '<p class="mine-none">You aren\'t in any module yet. Choose Mobile Development as an optional module, or ask your module leader for an invitation.</p>';
+      $('[data-mine-grid]').innerHTML = mineCards.length ? mineCards.map(card).join('') : `<p class="mine-none">You aren't in any module yet. ${optionalFor(data.cards, p).length ? 'Add an optional module under Find a module, or ask' : 'Ask'} your module leader for an invitation.</p>`;
       renderFind(p);
     };
 
@@ -306,7 +321,16 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
     // onboarding
     const draft: Profile = { year: profile?.year ?? '', specialization: profile?.specialization ?? '', modules: [...(profile?.modules ?? [])] };
     let step = 1;
+    // first run: the built-in course is the optional module almost every student takes, so it starts ticked
+    let pretick = !profile;
+    let confirmNone = false;
     const next = $<HTMLButtonElement>('[data-ob-next]'), back = $<HTMLButtonElement>('[data-ob-back]'), msg = $('[data-ob-msg]');
+    const say = (text: string, error = false) => { msg.textContent = text; msg.classList.toggle('is-err', error); };
+    const finishLabel = () => {
+      if (step !== 3) return;
+      const n = draft.modules.length;
+      next.textContent = n ? `Finish · ${n} module${n === 1 ? '' : 's'}` : confirmNone ? 'Finish anyway' : 'Finish';
+    };
     const pills = (key: 'year' | 'specialization', items: string[]) => {
       const box = $(`[data-pills="${key}"]`);
       box.innerHTML = items.map((v) => `<button type="button" class="ob-pill" aria-pressed="${draft[key] === v}" data-v="${esc(v)}">${esc(v)}</button>`).join('');
@@ -325,6 +349,10 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
     const opts = () => {
       const list = optionalFor(data.cards, draft);
       draft.modules = draft.modules.filter((m) => list.some((c) => c.slug === m));
+      if (pretick) {
+        pretick = false;
+        draft.modules = [...new Set([...draft.modules, ...list.filter((m) => m.builtIn).map((m) => m.slug)])];
+      }
       $('[data-opts]').innerHTML = list.length
         ? list.map((m) => `<button type="button" class="ob-opt" style="--c:${esc(m.color)}" aria-pressed="${draft.modules.includes(m.slug)}" data-m="${esc(m.slug)}"><b>${esc(m.title)}</b><small>${esc(m.code || 'Optional')}${m.term ? ` · ${esc(m.term)}` : ''}</small></button>`).join('')
         : '<p class="ob-empty">There are no optional modules for your year and specialization yet. Press Finish.</p>';
@@ -334,6 +362,9 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
         const on = b.getAttribute('aria-pressed') !== 'true';
         b.setAttribute('aria-pressed', String(on));
         draft.modules = on ? [...draft.modules, b.dataset.m!] : draft.modules.filter((x) => x !== b.dataset.m);
+        confirmNone = false;
+        say('');
+        finishLabel();
       };
     };
     const render = () => {
@@ -344,34 +375,50 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
         d.classList.toggle('done', n < step);
       });
       back.hidden = step === 1;
-      next.textContent = step === 3 ? 'Finish ✓' : 'Next →';
+      next.textContent = 'Next →';
       next.disabled = (step === 1 && !draft.year) || (step === 2 && !draft.specialization);
       const hasSpecialization = specialized(draft.year);
       $('[data-pills="specialization"]').hidden = !hasSpecialization;
       const general = $('[data-spec-general]');
       general.hidden = hasSpecialization;
       general.textContent = draft.year ? `General — specialization starts in ${data.specFrom.year}, ${data.specFrom.semester}.` : 'Choose your year first.';
+      confirmNone = false;
       if (step === 3) opts();
-      msg.textContent = '';
+      finishLabel();
+      say('');
     };
     const go = (d: number) => {
       step = Math.max(1, Math.min(3, step + d));
       render();
+      // keyboard and screen-reader users land on the new question
+      root.querySelector<HTMLElement>(`[data-step="${step}"] h2`)?.focus({ preventScroll: true });
     };
     next.addEventListener('click', async () => {
       if (step < 3) return go(1);
+      // finishing with no module leads to an empty page: ask once
+      if (!draft.modules.length && optionalFor(data.cards, draft).length && !confirmNone) {
+        confirmNone = true;
+        finishLabel();
+        say('No module ticked: only modules you are invited to will appear. Press again to finish anyway.');
+        return;
+      }
       next.disabled = true;
       if (student) {
         const r = await fetch('/api/auth/me', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(draft) });
         const d = await r.json().catch(() => ({}));
-        if (!r.ok) { msg.textContent = d.error ?? 'Could not save.'; next.disabled = false; return; }
+        if (!r.ok) { say(d.error ?? 'Could not save your answers. Check your connection and try again.', true); next.disabled = false; return; }
       }
       local.set(draft);
       profile = { ...draft };
       showMine(profile);
     });
     back.addEventListener('click', () => go(-1));
-    $('[data-edit]').addEventListener('click', () => { mine.hidden = true; ob.hidden = false; step = 1; $('[data-hub-title]').innerHTML = 'Choose your <span>module</span>'; render(); });
+    $('[data-edit]').addEventListener('click', () => {
+      mine.hidden = true; ob.hidden = false; step = 1; mode(false);
+      $('[data-hub-title]').innerHTML = 'Choose your <span>module</span>';
+      render();
+      root.querySelector<HTMLElement>('[data-step="1"] h2')?.focus();
+    });
     pills('year', data.years);
     pills('specialization', data.specializations);
     render();
