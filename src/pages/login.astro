@@ -5,7 +5,8 @@
  */
 import Base from '@/layouts/Base.astro';
 import { hubData } from '@/lib/accounts/hub';
-import { getAccountStore } from '@/lib/accounts/server';
+import { getAccountStore, viewer } from '@/lib/accounts/server';
+import { ROLE_LABEL } from '@/lib/accounts/core';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'no-store, max-age=0');
@@ -20,12 +21,19 @@ if (Astro.url.searchParams.has('email') || Astro.url.searchParams.has('password'
   return Astro.redirect(`${clean.pathname}${clean.search}`, 303);
 }
 
-const enabled = Boolean(getAccountStore());
+const store = getAccountStore();
+const enabled = Boolean(store);
 const { settings, cards } = await hubData();
 const optional = cards.filter((c) => c.kind === 'elective' && c.open).map((c) => ({ slug: c.slug, title: c.title, code: c.code, color: c.color, years: c.years, specializations: c.specializations }));
 const next = Astro.url.searchParams.get('next');
 const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '';
 const ended = Astro.url.searchParams.has('ended');
+// Already signed in: go straight on when the page was opened on the way somewhere (?next=…); otherwise say
+// who is signed in instead of showing the sign-in form again.
+const claims = viewer(Astro.cookies);
+const found = claims && store ? await store.byId(claims.u).catch(() => null) : null;
+const me = found?.active ? found : null;
+if (me && safeNext && !ended) return Astro.redirect(safeNext, 303);
 const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c');
 ---
 <Base title="Sign in" noindex>
@@ -41,11 +49,21 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
           <li><b>Teaching assistants</b> start lab sessions, take attendance and follow progress.</li>
           <li><b>Students</b> can sign in to skip typing their details, or keep using their name and ID.</li>
         </ul>
-        <a class="auth-skip" href="/">Continue without an account →</a>
+        {!me && <a class="auth-skip" href="/">Continue without an account →</a>}
       </div>
 
       <div class="auth-card glass">
-        {!enabled ? (
+        {me ? (
+          <div class="auth-as">
+            <h2>You're signed in</h2>
+            <p>As <b>{me.name}</b> · {ROLE_LABEL[me.role]}<br /><span class="mono">{me.email}</span></p>
+            <a class="btn btn-primary btn-lg" href={me.role === 'student' ? '/' : '/admin'}>Continue →</a>
+            <div class="auth-as-more">
+              <a class="btn btn-ghost" href="/account">Your profile</a>
+              <button class="btn btn-ghost" type="button" data-auth-out>Sign out to use another account</button>
+            </div>
+          </div>
+        ) : !enabled ? (
           <div class="auth-off"><h2>Accounts aren't set up yet</h2><p>This site needs a database and an ADMIN_PASSWORD (or SESSION_SECRET). Staff can still use the <a href="/admin">admin password</a>.</p></div>
         ) : (
           <>
@@ -126,6 +144,10 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
   .auth-fine { font-size: 12.5px; color: var(--hero-dim); }
   .auth-fine a, .auth-off a { color: var(--hero-accent); }
   .auth-off p { margin-top: 8px; color: var(--hero-lead); }
+  .auth-as { display: grid; gap: 14px; }
+  .auth-as p { color: var(--hero-lead); line-height: 1.5; }
+  .auth-as p b { color: var(--hero-text); }
+  .auth-as-more { display: flex; flex-wrap: wrap; gap: 8px; }
 </style>
 
 <script>
@@ -156,6 +178,10 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
       root.querySelectorAll<HTMLElement>('[data-form]').forEach((f) => (f.hidden = f.dataset.form !== t));
     };
     tabs.forEach((b) => b.addEventListener('click', () => show(b.dataset.tab!)));
+    root.querySelector('[data-auth-out]')?.addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      location.reload();
+    });
     if (location.hash === '#signup') show('up');
 
     const done = (role: string) => {

@@ -59,7 +59,7 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
         <span class="hide-sm">Search</span>
         <span class="keys hide-sm kbd-hint"><kbd class="kbd" data-mod-key>Ctrl</kbd><kbd class="kbd">K</kbd></span>
       </button>
-      <a class="nav-account" href="/login" data-nav-account>Sign in</a>
+      <a class="nav-account" href="/login" data-nav-account data-pending>Sign in</a>
       <button class="icon-btn theme-toggle" data-theme-toggle aria-label="Toggle color theme">
         <Icon name="sun" class="i-sun" />
         <Icon name="moon" class="i-moon" />
@@ -110,6 +110,9 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
   .nav-account { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
     border: 1px solid var(--line-2); color: var(--text); white-space: nowrap; transition: border-color var(--t-fast), background var(--t-fast); }
   .nav-account:hover { border-color: var(--accent-text); }
+  /* hidden until the page knows who is signed in, so it never flashes "Sign in" (shown anyway after 1.5s) */
+  .nav-account[data-pending] { visibility: hidden; animation: nav-account-show 0s 1.5s forwards; }
+  @keyframes nav-account-show { to { visibility: visible; } }
   .nav-account.in { background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent-text) 40%, var(--line-2)); }
   @media (max-width: 640px) { .nav-account { display: none; } }
 
@@ -220,8 +223,12 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
     const signIn = location.pathname.startsWith('/login') ? '/login' : `/login?next=${encodeURIComponent(here)}`;
     a.href = signIn;
     if (tab) tab.href = signIn;
+    const footer = document.querySelectorAll<HTMLAnchorElement>('[data-account-link]');
+    footer.forEach((l) => (l.href = signIn));
     const me = await getMe<{ user: { name: string; role: string } | null }>();
+    a.removeAttribute('data-pending');
     if (!me?.user) return;
+    footer.forEach((l) => { l.textContent = 'Your profile'; l.href = '/account'; });
     const first = me.user.name.split(' ')[0];
     a.textContent = `${first} · ${({ super_admin: 'super admin', doctor: 'Dr.', ta: 'TA', student: 'student' } as Record<string, string>)[me.user.role] ?? me.user.role}`;
     a.href = '/account';

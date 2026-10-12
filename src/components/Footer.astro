@@ -29,7 +29,7 @@ const groups = inCourse
       {groups.map((g) => (
         <nav aria-label={g.title} class="f-col">
           <p class="eyebrow no-slash">{g.title}</p>
-          <ul>{g.links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}</ul>
+          <ul>{g.links.map((l) => <li><a href={l.href} data-account-link={l.href === '/login' ? '' : undefined}>{l.label}</a></li>)}</ul>
         </nav>
       ))}
     </div>
