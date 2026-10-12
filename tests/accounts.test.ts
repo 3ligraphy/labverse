@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_STORED, modulesWith, parseMatrix, permitted, type Who } from '../src/lib/accounts/permissions.ts';
-import { AUTH_LIMITS, GENERAL, SUPER_ADMINS, checkPasswordRules, fitsStudent, hasSpecialization, inSemester, isForStudent, loginThrottle, parseAccount, parseProfile, parseSettings, signupBlock, teamAccountBlock, DEFAULT_SETTINGS } from '../src/lib/accounts/core.ts';
+import { AUTH_LIMITS, GENERAL, SUPER_ADMINS, checkPasswordRules, fitsStudent, hasSpecialization, inSemester, isForStudent, loginThrottle, parseAccount, parseProfile, parseSettings, signupBlock, teamAccountBlock, upgradeYears, DEFAULT_SETTINGS } from '../src/lib/accounts/core.ts';
 import { hashPassword, signToken, verifyPassword, verifyToken } from '../src/lib/accounts/tokens.ts';
 
 const who = (o: Partial<Who>): Who => ({ platformRole: null, master: false, modules: {}, ...o });
@@ -70,19 +70,34 @@ test('onboarding profile: valid year/specialization, only allowed optional modul
   assert.equal(isForStudent({ slug: 'm', category: 'Optional', kind: 'elective', open: true, years: [], specializations: [], semester: 'Both' }, { year: 'Year 1', specialization: GENERAL, modules: ['m'] }), true);
 });
 
-test('specializations start in Year 3 · Semester 2 and continue through Year 4', () => {
+test('BUE years: Prep year then Years 1–3; specializations start in Year 2', () => {
   const s = DEFAULT_SETTINGS;
-  assert.equal(hasSpecialization(s, 'Year 2', 'Semester 2'), false);
-  assert.equal(hasSpecialization(s, 'Year 3', 'Semester 1'), false);
+  assert.deepEqual(s.years, ['Prep year', 'Year 1', 'Year 2', 'Year 3']);
+  assert.equal(hasSpecialization(s, 'Prep year', 'Semester 2'), false);
+  assert.equal(hasSpecialization(s, 'Year 1', 'Semester 2'), false);
+  assert.equal(hasSpecialization(s, 'Year 2', 'Semester 1'), true);
   assert.equal(hasSpecialization(s, 'Year 3', 'Semester 2'), true);
-  assert.equal(hasSpecialization(s, 'Year 4', 'Semester 1'), true);
   // before it starts the student is "General", whatever they send
-  const y3s1 = parseProfile({ year: 'Year 3', specialization: 'Software Engineering' }, { ...s, activeSemester: 'Semester 1' }, []);
-  assert.deepEqual(y3s1.ok && y3s1.value.specialization, GENERAL);
-  const y3s2 = parseProfile({ year: 'Year 3', specialization: '' }, { ...s, activeSemester: 'Semester 2' }, []);
-  assert.equal(y3s2.ok, false, 'Year 3 in Semester 2 must choose');
-  const y4 = parseProfile({ year: 'Year 4', specialization: 'Cyber Security' }, s, []);
-  assert.deepEqual(y4.ok && y4.value.specialization, 'Cyber Security');
+  const y1 = parseProfile({ year: 'Year 1', specialization: 'Software Engineering' }, s, []);
+  assert.deepEqual(y1.ok && y1.value.specialization, GENERAL);
+  const y2 = parseProfile({ year: 'Year 2', specialization: '' }, s, []);
+  assert.equal(y2.ok, false, 'Year 2 must choose');
+  const y3 = parseProfile({ year: 'Year 3', specialization: 'Cyber Security' }, s, []);
+  assert.deepEqual(y3.ok && y3.value.specialization, 'Cyber Security');
+  // a later start set by the admin still works
+  const late = { ...s, specFrom: { year: 'Year 2', semester: 'Semester 2' as const } };
+  assert.equal(hasSpecialization(late, 'Year 2', 'Semester 1'), false);
+  assert.equal(hasSpecialization(late, 'Year 2', 'Semester 2'), true);
+});
+
+test('an untouched old catalogue (Year 1–4) reads as the BUE years; an edited one is kept', () => {
+  assert.deepEqual(upgradeYears(undefined, undefined), { years: DEFAULT_SETTINGS.years, specFrom: DEFAULT_SETTINGS.specFrom });
+  assert.deepEqual(upgradeYears(['Year 1', 'Year 2', 'Year 3', 'Year 4'], { year: 'Year 3', semester: 'Semester 2' }),
+    { years: ['Prep year', 'Year 1', 'Year 2', 'Year 3'], specFrom: { year: 'Year 2', semester: 'Semester 1' } });
+  assert.deepEqual(upgradeYears(['Foundation', 'Level 1'], { year: 'Level 1', semester: 'Semester 2' }),
+    { years: ['Foundation', 'Level 1'], specFrom: { year: 'Level 1', semester: 'Semester 2' } });
+  // a start year that is no longer listed falls back to a listed one
+  assert.equal(upgradeYears(['A', 'B', 'C'], { year: 'Z', semester: 'Semester 1' }).specFrom.year, 'C');
 });
 
 test('modules by semester and specialization', () => {

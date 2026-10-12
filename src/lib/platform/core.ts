@@ -128,7 +128,7 @@ export const MODULE_NODES = {
       { key: 'leader', label: 'Module leader (doctor email)', kind: 'text', placeholder: 'name@bue.edu.eg', max: 200, help: 'Only this doctor sets the assessment (weights, components). Their doctor account must use this email.' },
       { key: 'open', label: 'Students may add it themselves', kind: 'select', options: ['No', 'Yes'], help: 'No: students join only by invitation or enrolment.' },
       { key: 'category', label: 'Category', kind: 'text', max: 40, placeholder: 'Core', help: 'A category from Admin → Catalogue (core: shown to matching students; elective: only to those who choose or are enrolled).' },
-      { key: 'years', label: 'Years', kind: 'text', placeholder: 'Year 3, Year 4', help: 'Comma-separated; empty = every year', max: 200 },
+      { key: 'years', label: 'Years', kind: 'text', placeholder: 'Year 2, Year 3', help: 'Comma-separated; empty = every year', max: 200 },
       { key: 'semester', label: 'Semester', kind: 'select', options: ['Semester 1', 'Semester 2', 'Both'], help: 'Students see the active semester’s modules first (the admin switches the active semester).' },
       { key: 'specializations', label: 'Specializations', kind: 'text', placeholder: 'Software Engineering, Artificial Intelligence', help: 'Comma-separated; empty = every specialization', max: 600 },
     ],

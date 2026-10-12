@@ -22,6 +22,8 @@ const mine = [
 const student = user.role === 'student';
 const initials = user.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('');
 const optionalCards = cards.filter((c) => optional.includes(c.slug));
+const study = JSON.stringify({ years: settings.years, activeSemester: settings.activeSemester, specFrom: settings.specFrom });
+const knownYear = settings.years.includes(user.profile.year);
 ---
 <Base title="Your profile" noindex>
   <section class="pr">
@@ -49,12 +51,13 @@ const optionalCards = cards.filter((c) => optional.includes(c.slug));
           </form>
 
           {student && (
-            <form class="glass pr-card" data-pr-form="study">
+            <form class="glass pr-card" data-pr-form="study" data-study={study}>
               <h2>Your studies</h2>
-              <div class="pr-row">
-                <label><span>Year</span><select class="input" name="year">{settings.years.map((y) => <option selected={y === user.profile.year}>{y}</option>)}</select></label>
-                <label><span>Specialization</span><select class="input" name="specialization">{settings.specializations.map((s) => <option selected={s === user.profile.specialization}>{s}</option>)}</select></label>
+              <div class="pr-row pr-study">
+                <label><span>Year</span><select class="input" name="year" required>{!knownYear && <option value="" selected>Choose your year…</option>}{settings.years.map((y) => <option selected={y === user.profile.year}>{y}</option>)}</select></label>
+                <label data-spec-field><span>Specialization</span><select class="input" name="specialization"><option value="" selected={!settings.specializations.includes(user.profile.specialization)}>Choose…</option>{settings.specializations.map((s) => <option selected={s === user.profile.specialization}>{s}</option>)}</select></label>
               </div>
+              <p class="pr-fine" data-spec-note hidden></p>
               <fieldset class="pr-opts"><legend>Optional modules you chose</legend>
                 {optionalCards.length ? optionalCards.map((c) => (
                   <label class="pr-opt"><input type="checkbox" name="modules" value={c.slug} checked={user.profile.modules.includes(c.slug)} /> <span>{c.title} <small>{c.code}</small></span></label>
@@ -113,6 +116,7 @@ const optionalCards = cards.filter((c) => optional.includes(c.slug));
   .input:hover:not(:focus):not([readonly]) { border-color: var(--hero-dim); }
   .input[readonly] { background-color: color-mix(in oklab, var(--hero-text) 5%, transparent); color: var(--hero-lead); }
   .pr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pr-study:has([data-spec-field][hidden]) { grid-template-columns: 1fr; }
   .pr-opts { border: 1px solid var(--hero-line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
   .pr-opts legend { padding: 0 6px; font-size: 13px; font-weight: 600; }
   .pr-opt { display: flex; align-items: center; gap: 10px; font-weight: 400; }
@@ -132,7 +136,10 @@ const optionalCards = cards.filter((c) => optional.includes(c.slug));
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
+  import { wireStudyFields } from '@/scripts/study-fields';
   onPageLoad( () => {
+    const studyForm = document.querySelector<HTMLFormElement>('[data-pr-form="study"]');
+    if (studyForm && !studyForm.dataset.wired) wireStudyFields(studyForm, JSON.parse(studyForm.dataset.study!));
     document.querySelectorAll<HTMLFormElement>('[data-pr-form]').forEach((form) => {
       if (form.dataset.wired) return;
       form.dataset.wired = '1';

@@ -24,16 +24,30 @@ export type Category = { name: string; kind: 'core' | 'elective' };
 
 export const DEFAULT_SETTINGS = {
   categories: [{ name: 'Core', kind: 'core' }, { name: 'Optional', kind: 'elective' }] as Category[],
-  years: ['Year 1', 'Year 2', 'Year 3', 'Year 4'],
+  /** BUE: a preparatory year, then Years 1–3 */
+  years: ['Prep year', 'Year 1', 'Year 2', 'Year 3'],
   /** the semester the platform is running now (the admin switches it) */
   activeSemester: 'Semester 1' as Semester,
-  /** specializations start here and continue to the final year */
-  specFrom: { year: 'Year 3', semester: 'Semester 2' as Semester },
+  /** specializations start here (the second year after prep) and continue to the final year */
+  specFrom: { year: 'Year 2', semester: 'Semester 1' as Semester },
   specializations: ['Computer Science', 'Software Engineering', 'Artificial Intelligence', 'Cyber Security', 'Information Systems'],
 };
 export type Settings = { categories: Category[]; years: string[]; specializations: string[]; activeSemester: Semester; specFrom: { year: string; semester: Semester } };
 
-/** Does a student in this year (during this semester) have a specialization? From specFrom (Year 3 · Semester 2) on. */
+/**
+ * The first catalogue listed "Year 1"–"Year 4" with specializations from Year 3 · Semester 2. A catalogue still on
+ * exactly those untouched defaults is read as the BUE years (Prep year, Year 1–3, specializations from Year 2).
+ * A list the admin edited is kept as it is.
+ */
+export const LEGACY_DEFAULTS = { years: ['Year 1', 'Year 2', 'Year 3', 'Year 4'], specFrom: { year: 'Year 3', semester: 'Semester 2' } };
+export function upgradeYears(years: string[] | undefined, specFrom: Settings['specFrom'] | undefined): Pick<Settings, 'years' | 'specFrom'> {
+  const legacy = !years || (years.length === LEGACY_DEFAULTS.years.length && years.every((y, i) => y === LEGACY_DEFAULTS.years[i]));
+  if (!legacy) return { years: years!, specFrom: specFrom && years!.includes(specFrom.year) ? specFrom : { year: years![Math.min(2, years!.length - 1)], semester: DEFAULT_SETTINGS.specFrom.semester } };
+  const oldSpec = !specFrom || (specFrom.year === LEGACY_DEFAULTS.specFrom.year && specFrom.semester === LEGACY_DEFAULTS.specFrom.semester);
+  return { years: DEFAULT_SETTINGS.years, specFrom: oldSpec || !DEFAULT_SETTINGS.years.includes(specFrom!.year) ? DEFAULT_SETTINGS.specFrom : specFrom! };
+}
+
+/** Does a student in this year (during this semester) have a specialization? From specFrom (Year 2 · Semester 1 by default) on. */
 export function hasSpecialization(s: Pick<Settings, 'years' | 'specFrom'>, year: string, semester: Semester): boolean {
   const y = s.years.indexOf(year), from = s.years.indexOf(s.specFrom.year);
   if (y < 0 || from < 0) return false;
@@ -63,7 +77,7 @@ export function checkPasswordRules(pw: unknown): string | null {
 export function parseProfile(input: Record<string, unknown>, settings: Settings, optional: string[]): Result<Profile> {
   const year = text(input.year);
   if (!settings.years.includes(year)) return { ok: false, error: 'Choose your year.' };
-  // before the specialization starts (e.g. Year 3 · Semester 2) every student is "General"
+  // before the specialization starts (Year 2 by default) every student is "General"
   let specialization = text(input.specialization);
   if (!hasSpecialization(settings, year, settings.activeSemester)) specialization = GENERAL;
   else if (!settings.specializations.includes(specialization)) return { ok: false, error: 'Choose your specialization.' };
@@ -134,7 +148,7 @@ export function teamAccountBlock(input: { email: string; platformRole: Role; can
   return null;
 }
 
-/** Comma list → clean items ("Year 3, Year 4" → ["Year 3", "Year 4"]); empty means "everyone". */
+/** Comma list → clean items ("Year 2, Year 3" → ["Year 2", "Year 3"]); empty means "everyone". */
 export const listOf = (v: string | undefined) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const has = (list: string[], v: string) => !list.length || list.some((x) => x.toLowerCase() === v.toLowerCase());
 
@@ -182,5 +196,5 @@ export function parseSettings(input: Record<string, unknown>): Result<Settings> 
   const sem = (v: unknown, fallback: Semester) => ((SEMESTERS as readonly string[]).includes(String(v)) ? (String(v) as Semester) : fallback);
   const activeSemester = sem(input.activeSemester, DEFAULT_SETTINGS.activeSemester);
   const fromYear = years.includes(String(input.specFromYear)) ? String(input.specFromYear) : years[Math.min(2, years.length - 1)];
-  return { ok: true, value: { categories, years, specializations, activeSemester, specFrom: { year: fromYear, semester: sem(input.specFromSemester, 'Semester 2') } } };
+  return { ok: true, value: { categories, years, specializations, activeSemester, specFrom: { year: fromYear, semester: sem(input.specFromSemester, DEFAULT_SETTINGS.specFrom.semester) } } };
 }

@@ -245,13 +245,19 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
     builderModules = new Set(me.builderModules ?? []);
     const student = me.user?.role === 'student' ? me.user : null;
     let profile: Profile | null = student?.profile?.year ? student.profile : local.get();
+    // a year the catalogue no longer lists (the old "Year 4") asks the questions again; a year that now has a
+    // specialization but was saved as "General" (specializations used to start later) asks for it, from step 2
+    let resumeAt = 1;
+    let carry: Profile | null = null;
+    if (profile && !data.years.includes(profile.year)) profile = null;
+    else if (profile && specialized(profile.year) && !data.specializations.includes(profile.specialization)) { carry = { ...profile, specialization: '' }; profile = null; resumeAt = 2; }
     // a choice saved in this browser can only hold modules students may pick themselves
     if (profile) profile = { ...profile, modules: profile.modules.filter((slug) => data.cards.some((c) => c.slug === slug && selfEnrol(c, profile!))) };
 
     // who am I
     who.hidden = false;
     if (me.user) {
-      who.innerHTML = `Signed in as <b>${esc(me.user.name)}</b> · ${esc(me.user.role === 'ta' ? 'TA' : me.user.role)}
+      who.innerHTML = `Signed in as <b>${esc(me.user.name)}</b> · ${esc(({ super_admin: 'super admin', ta: 'TA' } as Record<string, string>)[me.user.role] ?? me.user.role)}
         <a href="/account">Profile</a>${me.staff ? '<a href="/admin">Admin</a>' : ''}${me.doctor ? '<a href="/admin/builder">Builder</a><a href="/admin/accounts">Accounts</a>' : ''}
         <button type="button" data-logout>Sign out</button>`;
       who.querySelector('[data-logout]')!.addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST' }); location.reload(); });
@@ -320,10 +326,11 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
     });
 
     // onboarding
-    const draft: Profile = { year: profile?.year ?? '', specialization: profile?.specialization ?? '', modules: [...(profile?.modules ?? [])] };
-    let step = 1;
+    const start = profile ?? carry;
+    const draft: Profile = { year: start?.year ?? '', specialization: start?.specialization ?? '', modules: [...(start?.modules ?? [])] };
+    let step = resumeAt;
     // first run: the built-in course is the optional module almost every student takes, so it starts ticked
-    let pretick = !profile;
+    let pretick = !profile && !carry;
     let confirmNone = false;
     const next = $<HTMLButtonElement>('[data-ob-next]'), back = $<HTMLButtonElement>('[data-ob-back]'), msg = $('[data-ob-msg]');
     const say = (text: string, error = false) => { msg.textContent = text; msg.classList.toggle('is-err', error); };
@@ -423,6 +430,7 @@ const json = JSON.stringify({ years: settings.years, specializations: settings.s
     pills('year', data.years);
     pills('specialization', data.specializations);
     render();
+    if (carry) say(`Specializations start in ${data.specFrom.year} now. Choose yours to see the right modules.`);
 
     if (profile && [...fYear.options].some((o) => o.value === profile!.year)) fYear.value = profile.year;
     if (profile) showMine(profile);

@@ -13,7 +13,7 @@ import { getSecret } from 'astro:env/server';
 import { createHash, randomUUID } from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
-import { BUILT_IN_AUDIENCE, DEFAULT_SETTINGS, SUPER_ADMINS, type NewAccount, type Profile, type PublicUser, type Role, type Settings } from './core';
+import { BUILT_IN_AUDIENCE, DEFAULT_SETTINGS, SUPER_ADMINS, type NewAccount, type Profile, type PublicUser, type Role, type Settings, upgradeYears } from './core';
 import { DEFAULT_STORED, type ModuleRole, type StoredMatrix } from './permissions';
 import { course, team } from '@/site.config';
 import { hashPassword, signToken, verifyPassword, verifyToken, type TokenClaims } from './tokens';
@@ -302,11 +302,10 @@ class AccountStore {
     const rows = await this.q(`select key, value from ${this.settings}`);
     const get = (k: string) => rows.find((r) => r.key === k)?.value;
     return {
-      years: get('years') ?? DEFAULT_SETTINGS.years,
+      ...upgradeYears(get('years'), get('specFrom')),
       specializations: get('specializations') ?? DEFAULT_SETTINGS.specializations,
       activeSemester: get('activeSemester') ?? DEFAULT_SETTINGS.activeSemester,
       categories: get('categories') ?? DEFAULT_SETTINGS.categories,
-      specFrom: get('specFrom') ?? DEFAULT_SETTINGS.specFrom,
       builtIn: { ...BUILT_IN_AUDIENCE, ...(get('builtIn') ?? {}) },
     };
   }

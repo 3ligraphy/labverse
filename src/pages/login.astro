@@ -24,7 +24,8 @@ if (Astro.url.searchParams.has('email') || Astro.url.searchParams.has('password'
 const store = getAccountStore();
 const enabled = Boolean(store);
 const { settings, cards } = await hubData();
-const optional = cards.filter((c) => c.kind === 'elective' && c.open).map((c) => ({ slug: c.slug, title: c.title, code: c.code, color: c.color, years: c.years, specializations: c.specializations }));
+const optional = cards.filter((c) => c.kind === 'elective' && c.open).map((c) => ({ slug: c.slug, title: c.title, code: c.code, color: c.color, years: c.years, specializations: c.specializations, builtIn: c.builtIn }));
+const study = { years: settings.years, activeSemester: settings.activeSemester, specFrom: settings.specFrom };
 const next = Astro.url.searchParams.get('next');
 const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '';
 const ended = Astro.url.searchParams.has('ended');
@@ -34,7 +35,7 @@ const claims = viewer(Astro.cookies);
 const found = claims && store ? await store.byId(claims.u).catch(() => null) : null;
 const me = found?.active ? found : null;
 if (me && safeNext && !ended) return Astro.redirect(safeNext, 303);
-const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c');
+const json = JSON.stringify({ optional, study, next: safeNext }).replace(/</g, '\\u003c');
 ---
 <Base title="Sign in" noindex>
   <section class="auth" data-auth>
@@ -87,11 +88,12 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
               </div>
               <label><span>University email</span><input class="input" type="email" name="email" autocomplete="email" autocapitalize="none" spellcheck="false" required /></label>
               <label><span>Password <small>(10+ characters, letters and numbers)</small></span><input class="input" type="password" name="password" autocomplete="new-password" required /></label>
-              <div class="auth-row">
-                <label><span>Year</span><select class="input" name="year" required><option value="">Choose…</option>{settings.years.map((y) => <option>{y}</option>)}</select></label>
-                <label><span>Specialization</span><select class="input" name="specialization" required><option value="">Choose…</option>{settings.specializations.map((s) => <option>{s}</option>)}</select></label>
+              <div class="auth-row auth-study">
+                <label><span>Year</span><select class="input" name="year" required><option value="">Choose your year…</option>{settings.years.map((y) => <option>{y}</option>)}</select></label>
+                <label data-spec-field hidden><span>Specialization</span><select class="input" name="specialization" disabled><option value="">Choose…</option>{settings.specializations.map((s) => <option>{s}</option>)}</select></label>
               </div>
-              <fieldset class="auth-opts"><legend>Optional modules you chose</legend><div data-up-opts><p class="auth-fine">Choose your year and specialization first.</p></div></fieldset>
+              <p class="auth-fine auth-spec-note" data-spec-note hidden></p>
+              <fieldset class="auth-opts"><legend>Optional modules you chose</legend><div data-up-opts><p class="auth-fine">Choose your year first.</p></div></fieldset>
               <p class="auth-msg" id="up-msg" data-msg role="alert"></p>
               <button class="btn btn-primary btn-lg" type="submit">Create account →</button>
             </form>
@@ -133,6 +135,9 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
   .auth-form .input:focus { border-color: var(--hero-accent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--hero-accent) 20%, transparent); }
   .auth-form .input[aria-invalid='true'] { border-color: var(--hero-danger); }
   .auth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  /* before the specialization year the year takes the whole row */
+  .auth-study:has([data-spec-field][hidden]) { grid-template-columns: 1fr; }
+  .auth-spec-note { margin-top: -4px; }
   @media (max-width: 520px) { .auth-row { grid-template-columns: 1fr; } }
   .auth-opts { border: 1px solid var(--hero-line); border-radius: 14px; padding: 12px 14px; }
   .auth-opts legend { padding: 0 6px; font-size: 13px; font-weight: 600; }
@@ -151,7 +156,9 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
 </style>
 
 <script>
-  type Opt = { slug: string; title: string; code: string; color: string; years: string[]; specializations: string[] };
+  import { GENERAL } from '@/lib/accounts/core';
+  import { wireStudyFields, type StudyConfig } from '@/scripts/study-fields';
+  type Opt = { slug: string; title: string; code: string; color: string; years: string[]; specializations: string[]; builtIn: boolean };
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const has = (list: string[], v: string) => !list.length || list.some((x) => x.toLowerCase() === v.toLowerCase());
 
@@ -171,7 +178,7 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
     const root = document.querySelector<HTMLElement>('[data-auth]');
     if (!root || root.dataset.wired) return;
     root.dataset.wired = '1';
-    const data = JSON.parse(root.querySelector('[data-auth-data]')!.textContent!) as { optional: Opt[]; next: string };
+    const data = JSON.parse(root.querySelector('[data-auth-data]')!.textContent!) as { optional: Opt[]; study: StudyConfig; next: string };
     const tabs = root.querySelectorAll<HTMLButtonElement>('[data-tab]');
     const show = (t: string) => {
       tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
@@ -205,16 +212,21 @@ const json = JSON.stringify({ optional, next: safeNext }).replace(/</g, '\\u003c
     const signup = root.querySelector<HTMLFormElement>('[data-form="up"]');
     if (!signup) return;
     const box = signup.querySelector<HTMLElement>('[data-up-opts]')!;
-    const year = signup.querySelector<HTMLSelectElement>('[name=year]')!, spec = signup.querySelector<HTMLSelectElement>('[name=specialization]')!;
+    // "General" students (before the specialization year) match only modules open to every specialization
+    const fitsSpec = (o: Opt, s: string) => !o.specializations.length || (s !== GENERAL && has(o.specializations, s));
     const renderOpts = () => {
-      if (!year.value || !spec.value) return;
-      const list = data.optional.filter((o) => has(o.years, year.value) && has(o.specializations, spec.value));
+      const y = study.year(), s = study.specialization();
+      if (!y || !s) { box.innerHTML = `<p class="auth-fine">${y ? 'Choose your specialization first.' : 'Choose your year first.'}</p>`; return; }
+      // keep what was ticked; the built-in course starts ticked (almost every student takes it)
+      const ticked = new Set([...box.querySelectorAll<HTMLInputElement>('input:checked')].map((i) => i.value));
+      const fresh = !box.querySelector('input');
+      const list = data.optional.filter((o) => has(o.years, y) && fitsSpec(o, s));
       box.innerHTML = list.length
-        ? list.map((o) => `<label class="auth-opt"><input type="checkbox" name="modules" value="${esc(o.slug)}" /> <span>${esc(o.title)}${o.code ? ` <small>${esc(o.code)}</small>` : ''}</span></label>`).join('')
-        : '<p class="auth-fine">No optional modules for this year and specialization yet.</p>';
+        ? list.map((o) => `<label class="auth-opt"><input type="checkbox" name="modules" value="${esc(o.slug)}"${ticked.has(o.slug) || (fresh && o.builtIn) ? ' checked' : ''} /> <span>${esc(o.title)}${o.code ? ` <small>${esc(o.code)}</small>` : ''}</span></label>`).join('')
+        : '<p class="auth-fine">No optional modules for this year yet.</p>';
     };
-    year.addEventListener('change', renderOpts);
-    spec.addEventListener('change', renderOpts);
+    const study = wireStudyFields(signup, data.study, renderOpts);
+    renderOpts();
     signup.addEventListener('submit', async (e) => {
       e.preventDefault();
       const msg = signup.querySelector<HTMLElement>('[data-msg]')!;
