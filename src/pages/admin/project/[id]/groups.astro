@@ -220,7 +220,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-v-text ol { list-style: none; margin: 0; padding: 0; counter-reset: ln; }
   .gp-v-text li { display: grid; grid-template-columns: 34px 1fr; gap: 8px; padding: 1px 6px; border-radius: 6px; white-space: pre-wrap; word-break: break-word; counter-increment: ln; }
   .gp-v-text li::before { content: counter(ln); color: var(--text-3); text-align: right; opacity: .6; }
-  .gp-v-text li.idea { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent-text); }
+  .gp-v-text li.idea { background: var(--accent-soft); color: var(--text); }
   .gp-v-text mark.id { padding: 0 3px; border-radius: 4px; background: color-mix(in oklab, #7cb1ff 30%, transparent); color: inherit; }
   .gp-v-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; font: 11px var(--font-body); color: var(--text-3); }
   .gp-v-legend span { display: inline-flex; align-items: center; gap: 6px; }

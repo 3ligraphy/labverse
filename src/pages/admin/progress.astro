@@ -187,7 +187,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .pa-table :global(tr.st-row) { cursor: pointer; transition: background var(--t-fast); }
   .pa-table :global(tr.st-row:hover) { background: var(--surface-2); }
   .pa-table :global(tr.flash) { animation: pa-flash 1.6s var(--ease-out); }
-  @keyframes pa-flash { 0% { box-shadow: inset 3px 0 0 var(--accent-text); background: var(--accent-soft); } 100% { box-shadow: inset 3px 0 0 transparent; } }
+  @keyframes pa-flash { 0% { background: var(--accent-soft); } 100% { background: transparent; } }
   .pa-table :global(.who b) { display: block; font-weight: 600; color: var(--text); }
   .pa-table :global(.who small) { font: 12px var(--font-mono); color: var(--text-3); }
   .pa-table :global(.prog) { display: grid; grid-template-columns: 80px 38px; align-items: center; gap: 10px; }

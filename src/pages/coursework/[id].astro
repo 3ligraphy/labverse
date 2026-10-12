@@ -66,7 +66,7 @@ const sections = [
         <section class="block"><h2 class="block-title" id="deliverables">Deliverables</h2><ul class="check-list">{d.deliverables.map((o) => <li set:html={inline(o)} />)}</ul></section>
       )}
       {d.submission.length > 0 && (
-        <section class="block"><h2 class="block-title" id="submission">Submission</h2><div class="panel panel-pad" style="border-left:3px solid var(--accent)"><ul class="dash-list">{d.submission.map((o) => <li set:html={inline(o)} />)}</ul></div></section>
+        <section class="block"><h2 class="block-title" id="submission">Submission</h2><div class="panel panel-pad"><ul class="dash-list">{d.submission.map((o) => <li set:html={inline(o)} />)}</ul></div></section>
       )}
       {d.grading.length > 0 && (
         <section class="block"><h2 class="block-title" id="grading">Grading</h2><Rubric items={d.grading} /></section>

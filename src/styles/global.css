@@ -317,8 +317,7 @@ main:focus { outline: none; } /* focused by the skip link and back-to-top, not a
 .callout {
   --c: var(--info); --c-soft: var(--info-soft);
   margin-block: var(--s-6); padding: 16px 18px 16px 20px; border-radius: var(--r-md);
-  background: var(--c-soft); border: 1px solid color-mix(in oklab, var(--c) 30%, transparent);
-  border-left: 3px solid var(--c); font-size: 0.95em;
+  background: var(--c-soft); border: 1px solid color-mix(in oklab, var(--c) 40%, transparent); font-size: 0.95em;
 }
 .callout > * + * { margin-top: 8px; }
 .callout-title { font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c); }

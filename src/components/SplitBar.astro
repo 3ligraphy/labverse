@@ -34,8 +34,9 @@ const sum = items.reduce((a, i) => a + i.value, 0);
 <style>
   .split { margin-inline: 0; margin-bottom: 0; display: grid; gap: 16px; }
   .split-big { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px 24px; }
-  .big-item { display: grid; gap: 2px; padding-left: 14px; border-left: 3px solid var(--c); }
-  :global(:root[data-theme='light']) .big-item:first-child { border-left-color: var(--accent-text); }
+  .big-item { display: grid; gap: 2px; }
+  .big-l::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 3px; background: var(--c); vertical-align: 0.05em; }
+  :global(:root[data-theme='light']) .big-item:first-child .big-l::before { background: var(--accent-text); }
   .big-n { display: flex; align-items: baseline; gap: 2px; font-family: var(--font-display); font-weight: 700; letter-spacing: -0.05em; line-height: 1; color: var(--text); }
   .lg .big-n b { font-size: clamp(48px, 7vw, 76px); }
   .md .big-n b { font-size: clamp(36px, 5vw, 52px); }

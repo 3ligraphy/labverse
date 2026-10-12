@@ -190,8 +190,8 @@ const nav = d ? [
   .pj-sec:last-child { border-bottom: 0; }
   .pj-split { display: grid; gap: 32px; }
   @media (min-width: 960px) { .pj-split { grid-template-columns: 340px 1fr; gap: 64px; } }
-  .problem { padding: 24px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--warn); color: var(--text); font-size: 1.05rem; }
-  .problem-k { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--warn); margin-bottom: 8px; }
+  .problem { padding: 24px; border-radius: var(--r-lg); background: color-mix(in oklab, var(--warn) 7%, var(--surface)); border: 1px solid color-mix(in oklab, var(--warn) 40%, var(--line)); color: var(--text); font-size: 1.05rem; }
+  .problem-k { font-size: 12px; color: var(--warn); margin-bottom: 8px; }
 
   .mj { list-style: none; padding: 0; margin-top: 48px; display: grid; gap: 32px; }
   @media (min-width: 900px) { .mj { grid-template-columns: repeat(var(--n, 5), 1fr); gap: 0; } }

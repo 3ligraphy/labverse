@@ -94,12 +94,11 @@ const json = JSON.stringify({ id: ex, files: def.files, checks: def.checks }).re
     --pg-kw: #ff7b72; --pg-str: #a5d6ff; --pg-num: #79c0ff; --pg-fn: #d2a8ff; --pg-tag: #7ee787; --pg-attr: #79c0ff;
     --rule: var(--accent);
     position: relative; container-type: inline-size; margin-block: 8px !important;
-    border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--rule) 30%, var(--line)); border-radius: var(--r-lg); background: var(--surface); overflow: hidden;
     transition: border-color var(--t-med);
   }
   :global(:root[data-theme='light']) .pg { --pg-kw: #cf222e; --pg-str: #0a3069; --pg-num: #0550ae; --pg-fn: #8250df; --pg-tag: #116329; --pg-attr: #0550ae; --rule: var(--accent-text); }
   .pg.exercise { --rule: var(--info); }
-  .pg::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--rule); z-index: 1; }
   .pg.is-passed { border-color: color-mix(in oklab, var(--ok) 50%, var(--line)); }
   .pg.is-passed::before { background: var(--ok); }
 

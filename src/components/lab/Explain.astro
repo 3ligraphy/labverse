@@ -42,7 +42,7 @@ const cmd = parts.map(([t]) => t).join(' ');
   .xp .copy-btn:hover { background: #232932; color: #eceef1; }
   .xp-legend { list-style: none; padding: 12px !important; margin: 0 !important; display: grid; gap: 8px; }
   @media (min-width: 720px) { .xp-legend { grid-template-columns: 1fr 1fr; } }
-  .xp-legend li { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 10px; padding: 9px 12px !important; margin: 0 !important; border-radius: 8px; background: #13171d; border-left: 3px solid var(--c); color: #aab1bd; font-size: 14px; }
+  .xp-legend li { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 10px; padding: 9px 12px !important; margin: 0 !important; border-radius: 8px; background: #13171d; border: 1px solid color-mix(in oklab, var(--c) 38%, transparent); color: #aab1bd; font-size: 14px; }
   .xp-k { background: none !important; border: 0 !important; padding: 0 !important; color: var(--c) !important; font-size: 13px !important; white-space: nowrap; }
   .xp-m :global(code) { background: #1b2028; border-color: #262c36; color: #eceef1; }
   .xp .xp-legend li { opacity: 0; transform: translateY(8px); }

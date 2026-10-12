@@ -36,7 +36,7 @@ const people = [
   .pf-col { display: grid; gap: 8px; min-width: 0; }
   .pf-k { font-size: 12px; letter-spacing: 0.12em; color: var(--text-3); margin: 0 !important; }
   .pf-call, .pf-fn { display: block; padding: 8px 10px; border-radius: 10px; background: var(--code-bg); border: 1px solid var(--line); font-size: 12px; white-space: normal; overflow-wrap: anywhere; color: var(--text-2); }
-  .pf-call { border-left: 3px solid var(--c); opacity: 0; transform: translateX(-8px); }
+  .pf-call { border-color: color-mix(in oklab, var(--c) 55%, var(--line)); opacity: 0; transform: translateX(-8px); }
   .pf-call b { color: var(--c); font-weight: 700; }
   :global(:root[data-theme='light']) .pf-call b { filter: brightness(0.55); }
   .pf-fn b { color: var(--accent-text); }
