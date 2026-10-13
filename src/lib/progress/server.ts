@@ -10,7 +10,7 @@ import { getCollection } from 'astro:content';
 import { getPlayground } from '@/lib/playgrounds';
 import { EXERCISES as LAB02_EXERCISES } from '@/lab/exercises/lab-02/meta';
 import { noStore } from '@/lib/attendance/server';
-import { exerciseStats, labStructure, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
+import { effectiveDeviceLock, exerciseStats, labStructure, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
 import { NeonStore, type ProgressStore } from './store';
 import { publishedLabSources } from '@/lib/platform/server';
 
@@ -43,6 +43,17 @@ const BUILDER_TTL_MS = 30_000;
  * Every lab's tasks and auto-checked exercises: the file-based labs (src/content) followed by the
  * published labs of builder modules (/admin/builder), so attendance, sessions and progress cover both.
  */
+/**
+ * Whether this student ID is locked to one device (the admin's setting for all, or their own override).
+ * Off when progress storage is not set up.
+ */
+export async function isDeviceLocked(studentId: string): Promise<boolean> {
+  const store = getProgressStore();
+  if (!store) return false;
+  const [all, own] = await Promise.all([store.getDeviceLock(), store.studentDeviceLock(studentId.toLowerCase())]);
+  return effectiveDeviceLock(own, all);
+}
+
 export async function getStructures(): Promise<LabStructure[]> {
   if (!builderLabs || Date.now() - builderLabs.at > BUILDER_TTL_MS) {
     builderLabs = {
@@ -117,7 +128,7 @@ export async function studentWrite<V extends Identity>(
     }
     if ((await s.hit(`w:${v.value.deviceKey}`, WINDOW_SEC)) > WRITES_PER_WINDOW) return json({ error: 'slow-down' }, 429);
     if ((await s.touchStudent(v.value)) === 'conflict') {
-      return json({ error: 'device', message: 'This browser is linked to another student, or this student ID is linked to another device. Ask your TA to use “Allow new device”.' }, 409);
+      return json({ error: 'device', message: 'This student ID is registered under a different name, or it is locked to another device. Type your name exactly as before, or ask your TA.' }, 409);
     }
     const out = await act(s, { ...v.value, sessionId });
     return out instanceof Response ? out : json({ ok: true, ...(out ?? {}) });
@@ -136,7 +147,10 @@ export type DashboardStudent = {
   group: string;
   startedAt: string;
   lastSeen: string;
+  /** a device is recorded for this student */
   locked: boolean;
+  /** per-student override: true = one device, false = any device, null = follows the setting for all */
+  deviceLock: boolean | null;
   percent: number;
   solved: number;
   tasksDone: number;
@@ -180,6 +194,7 @@ export async function buildDashboard(labParam: string | null, sessionParam?: str
       startedAt: st.session_started_at ?? st.created_at,
       lastSeen: st.last_seen,
       locked: st.device_key !== null,
+      deviceLock: st.device_lock ?? null,
       percent: score.percent,
       solved: score.solved,
       tasksDone,
@@ -203,6 +218,7 @@ export async function buildDashboard(labParam: string | null, sessionParam?: str
     },
     session: selected ? { ...selected, ...sessionState(selected, Date.now()) } : { open: false, closesAt: null },
     practice: await s.getPractice(structure.lab),
+    deviceLock: await s.getDeviceLock(),
     sessions: sessions.map((session) => ({ ...session, ...sessionState(session, Date.now()) })),
     updatedAt: new Date().toISOString(),
   };
