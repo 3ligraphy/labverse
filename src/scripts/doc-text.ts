@@ -18,6 +18,23 @@ const extOf = (url: string) => (/\.([a-z0-9]+)(?:$|[?#])/i.exec(new URL(url, loc
 export async function readDocText(url: string): Promise<DocText> {
   const ext = extOf(url);
   if (![...READABLE, 'zip'].includes(ext)) return { error: `${ext.toUpperCase() || 'This'} files can't be read; add the members and ideas by hand.` };
+  if (ext === 'zip') {
+    // extract first: read only the documents inside, not the whole (often large) project ZIP
+    let inside: Map<string, Uint8Array> | null = null;
+    try {
+      let n = 0;
+      inside = await unzipRemote(url, (f) => readableInZip(f) && n++ < MAX_FILES_IN_ZIP);
+    } catch (error) {
+      console.warn('[doc-text] ranged ZIP read failed, downloading it whole', url, error);
+    }
+    if (inside) {
+      try {
+        return clean(await zipDocLines(inside));
+      } catch (error) {
+        return failed('ZIP', error);
+      }
+    }
+  }
   let bytes: Uint8Array;
   try {
     const res = await fetch(url, { cache: 'no-store' });
@@ -27,14 +44,18 @@ export async function readDocText(url: string): Promise<DocText> {
     return { error: 'Download failed.' };
   }
   try {
-    const lines = await linesOf(ext, bytes);
-    return { lines: lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean) };
+    return clean(await linesOf(ext, bytes));
   } catch (error) {
     console.warn('[doc-text] could not read', url, error);
-    const why = error instanceof Error && error.message ? ` (${error.message.slice(0, 120)})` : '';
-    return { error: `The ${ext.toUpperCase()} file could not be read${why}.` };
+    return failed(ext.toUpperCase(), error);
   }
 }
+
+const clean = (lines: string[]): DocText => ({ lines: lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean) });
+const failed = (kind: string, error: unknown): DocText => {
+  const why = error instanceof Error && error.message ? ` (${error.message.slice(0, 120)})` : '';
+  return { error: `The ${kind} file could not be read${why}.` };
+};
 
 async function linesOf(ext: string, bytes: Uint8Array): Promise<string[]> {
   if (ext === 'pdf') return pdfLines(bytes);
@@ -44,8 +65,13 @@ async function linesOf(ext: string, bytes: Uint8Array): Promise<string[]> {
 }
 
 /** A ZIP hand-in: reads the PDF, Word and PowerPoint files inside it (macOS "._" leftovers skipped). */
+const readableInZip = (n: string) => READABLE.includes(n.split('.').pop()!.toLowerCase()) && !/(^|\/)(__MACOSX\/|\._)/.test(n);
+
 async function zipLines(bytes: Uint8Array): Promise<string[]> {
-  const inside = await unzip(bytes, (n) => READABLE.includes(n.split('.').pop()!.toLowerCase()) && !/(^|\/)(__MACOSX\/|\._)/.test(n));
+  return zipDocLines(await unzip(bytes, readableInZip));
+}
+
+async function zipDocLines(inside: Map<string, Uint8Array>): Promise<string[]> {
   if (!inside.size) throw new Error('no PDF, Word or PowerPoint file inside');
   const lines: string[] = [];
   for (const [name, data] of [...inside].slice(0, MAX_FILES_IN_ZIP)) {
@@ -172,31 +198,70 @@ async function pdfLines(bytes: Uint8Array): Promise<string[]> {
 
 /* -------------------------------------------------------------- Word, PPTX */
 
+/** Reads bytes [start, end) of a ZIP, from memory or over the network. */
+type ZipReader = (start: number, end: number) => Promise<Uint8Array>;
+
 /** Reads the files whose names pass `name` out of a ZIP (stored or deflated). Also used by the file preview. */
 export async function unzip(bytes: Uint8Array, name: (n: string) => boolean): Promise<Map<string, Uint8Array>> {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return unzipWith(async (start, end) => bytes.subarray(start, end), bytes.length, name);
+}
+
+async function unzipWith(read: ZipReader, total: number, name: (n: string) => boolean): Promise<Map<string, Uint8Array>> {
+  const tailStart = Math.max(0, total - 65_557);
+  const tail = await read(tailStart, total);
+  const tv = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
   let eocd = -1;
-  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65_557); i--) if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  for (let i = tail.length - 22; i >= 0; i--) if (tv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
   if (eocd < 0) throw new Error('not a zip');
-  const count = view.getUint16(eocd + 10, true);
-  let at = view.getUint32(eocd + 16, true);
+  const count = tv.getUint16(eocd + 10, true);
+  const cdSize = tv.getUint32(eocd + 12, true);
+  const cdStart = tv.getUint32(eocd + 16, true);
+  const cd = cdStart >= tailStart ? tail.subarray(cdStart - tailStart, cdStart - tailStart + cdSize) : await read(cdStart, cdStart + cdSize);
+  const view = new DataView(cd.buffer, cd.byteOffset, cd.byteLength);
   const out = new Map<string, Uint8Array>();
   const dec = new TextDecoder();
-  for (let n = 0; n < count && view.getUint32(at, true) === 0x02014b50; n++) {
+  let at = 0;
+  for (let n = 0; n < count && at + 46 <= cd.length && view.getUint32(at, true) === 0x02014b50; n++) {
     const method = view.getUint16(at + 10, true);
     const size = view.getUint32(at + 20, true);
     const nameLen = view.getUint16(at + 28, true);
     const skip = nameLen + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
     const local = view.getUint32(at + 42, true);
-    const file = dec.decode(bytes.subarray(at + 46, at + 46 + nameLen));
+    const file = dec.decode(cd.subarray(at + 46, at + 46 + nameLen));
     at += 46 + skip;
     if (!name(file)) continue;
-    const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
-    const data = bytes.slice(start, start + size);
+    const head = await read(local, local + 30);
+    const hv = new DataView(head.buffer, head.byteOffset, head.byteLength);
+    const start = local + 30 + hv.getUint16(26, true) + hv.getUint16(28, true);
+    const data = (await read(start, start + size)).slice();
     if (method === 0) out.set(file, data);
     else if (method === 8) out.set(file, new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()));
   }
   return out;
+}
+
+/**
+ * Opens a ZIP on the server without downloading all of it: the index at its end, then only the files that pass
+ * `name` (HTTP range requests). Project ZIPs can be far too big to download whole in the browser.
+ * Returns null when the server ignores ranges, so the caller can fall back to a full download.
+ */
+async function unzipRemote(url: string, name: (n: string) => boolean): Promise<Map<string, Uint8Array> | null> {
+  const get = async (range: string) => {
+    const res = await fetch(url, { headers: { Range: range }, cache: 'no-store' });
+    if (res.status !== 206) { void res.body?.cancel(); return null; }
+    return { res, bytes: new Uint8Array(await res.arrayBuffer()) };
+  };
+  const first = await get('bytes=-65557');
+  const total = Number(/\/(\d+)\s*$/.exec(first?.res.headers.get('content-range') ?? '')?.[1]);
+  if (!first || !Number.isFinite(total)) return null;
+  const tailStart = total - first.bytes.length;
+  return unzipWith(async (start, end) => {
+    if (start >= tailStart) return first.bytes.subarray(start - tailStart, end - tailStart);
+    if (end <= start) return new Uint8Array();
+    const part = await get(`bytes=${start}-${end - 1}`);
+    if (!part) throw new Error('range request refused');
+    return part.bytes;
+  }, total, name);
 }
 
 const xml = (data: Uint8Array) => new DOMParser().parseFromString(new TextDecoder().decode(data), 'application/xml');
