@@ -290,3 +290,21 @@ test('extractIdeas reads "Idea 1 Description: X" and "Project Proposal: X" title
   // a description sentence after "Idea description:" is not taken as the idea's name
   assert.deepEqual(extractIdeas(['Idea description: This app helps students find study partners in their classes.']), []);
 });
+
+test('extractIdeas reads a title above "Overview" / "Brief description:" and numbered titles with a paragraph', () => {
+  assert.deepEqual(extractIdeas(['Proposal', 'Members:', 'Entertainment Review App', 'Overview', 'Our app aims to be a review platform.', 'SkillSwap', 'Overview', 'Swap skills.']), ['Entertainment Review App', 'SkillSwap']);
+  assert.deepEqual(extractIdeas(['Hear Me', 'Brief description:', 'An app for deaf users.', 'Rootine', 'Brief description:', 'Plant care.']), ['Hear Me', 'Rootine']);
+  assert.deepEqual(extractIdeas(['Name | ID', '1. Smart Expense Tracker', 'Many individuals conduct daily financial transactions that go untracked.', '2. Nabd', 'A blood donation app for people who need blood quickly nearby.']), ['Smart Expense Tracker', 'Nabd']);
+  assert.deepEqual(extractIdeas(['Ober (Open Uber)', 'Mobile Application Development | | | 26CSCI38H', 'Name: Ali | Student ID: 239719', 'Idea and purpose', 'A ride booking app.']), ['Ober (Open Uber)']);
+  // a feature list is not read as ideas
+  assert.deepEqual(extractIdeas(['Core functionality', '1. Select pickup and drop-off locations on a map.', '2. View an estimated fare.']), []);
+});
+
+test('extractIdeas cleans contents-page dots, page numbers, control characters and table bars', () => {
+  assert.deepEqual(extractIdeas(['Idea 1: RoadSense ........ 4', 'Idea 1: RoadSense']), ['RoadSense']);
+  assert.deepEqual(extractIdeas(['Idea 1: StrategyPulse:\u0001A\u0001Mobile\u0001App', 'Idea 2: | Smart Property Finder']), ['StrategyPulse: A Mobile App', 'Smart Property Finder']);
+});
+
+test('findStudents finds an ID typed against the name', () => {
+  assert.deepEqual(findStudents('Names: Hassan236184, mazeen235577', [{ id: '236184', name: 'Hassan Saif' }]), ['236184']);
+});

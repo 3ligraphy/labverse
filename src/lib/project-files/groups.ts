@@ -18,7 +18,7 @@ export type Source = 'submitted' | 'document' | 'added';
 export type Member = Student & { source: Source };
 
 /** Bump when reading files changes (e.g. better idea finding), so saved results are refreshed automatically. */
-export const SCAN_VERSION = 5;
+export const SCAN_VERSION = 6;
 
 /** What the browser read out of one hand-in's file. Kept so files are only read again when re-submitted. */
 export type Scan = {
@@ -146,6 +146,8 @@ export function cleanRoster(input: unknown): Result<Student[]> {
 /** Roster students named in a file: by student ID (as a whole word) or by full name (two words or more). */
 export function findStudents(text: string, roster: readonly Student[]): string[] {
   const tokens = new Set(text.toUpperCase().match(/[A-Z0-9-]{3,20}/g) ?? []);
+  // an ID typed against the name: "Hassan236184"
+  for (const digits of text.match(/\d{4,20}/g) ?? []) tokens.add(digits);
   const words = ` ${normName(text)} `;
   return roster
     .filter((s) => tokens.has(s.id) || (normName(s.name).includes(' ') && words.includes(` ${normName(s.name)} `)))
@@ -186,9 +188,19 @@ const BULLET = /^[•\-*▪◦●○■□➢►–✓✔]\s*(.{3,})$/;
 const OTHER_SECTION = /^(?:\d+[.)]?\s*)?(?:contribution|team|group|members?|student|names?|signature|declaration|introduction|problem|objectives?|features?|requirements?|references?|conclusion|description|overview|target|users?|scope|technolog|tools?|timeline|plan)\b/i;
 /** Lines that are the document's own title, not an idea. */
 const NOT_AN_IDEA = /^(?:mobile\s+(?:app(?:lication)?\s+)?development|(?:project\s+)?proposal|course\s*work|cw\s*\d|module|phase\s*\d|(?:group|team)\s*#?\s*\d+)\b|^[\d\s.#|-]*$/i;
+/** The heading under an idea's title: "Hear Me" then "Brief description:", "Ober (Open Uber)" then "Idea and purpose". */
+const ABOUT_HEADING = /^(?:overview|(?:(?:brief|short|app|project|idea)\s+)?description|idea\s+and\s+purpose|purpose|(?:the\s+)?problem(?:\s+statement)?|introduction|summary|about(?:\s+the\s+(?:app|project|idea))?|concept)\s*:?$/i;
+const NOT_A_TITLE = /^(?:background|abstract|motivation|solution|proposed\s+solution|methodology|architecture|screens?|design|core|main|key|technical|unit|functional|non-functional|academic)\b/i;
+/** A short name on its own line: "Entertainment Review App", "Smart Expense Tracker", "PadbolHub". */
+const looksLikeTitle = (s: string) => s.length >= 3 && s.length <= 60 && s.split(' ').length <= 6 && /^\p{Lu}/u.test(s)
+  && !/[.!?,;:|]$/.test(s) && !s.includes(' | ') && !/\d{4,}/.test(s)
+  && ![OTHER_SECTION, ABOUT_HEADING, NOT_A_TITLE, GENERIC_TITLE, NOT_AN_IDEA, SENTENCE_START].some((re) => re.test(s))
+  && s.split(' ').filter((w) => /^\p{L}{4,}/u.test(w)).every((w) => /^\p{Lu}/u.test(w));
 
 const tidyIdea = (s: string) => {
-  const t = s.replace(/\s+/g, ' ').replace(/^["“”']+|["“”']+$/g, '').replace(/\s*\|\s*$/, '').trim();
+  // control characters some PDFs use as spaces, table-of-contents dots ("RoadSense ........ 4"), stray table bars
+  const t = s.replace(/[\u0000-\u001f]+/g, ' ').replace(/\s*\.{4,}\s*\d*\s*$/, '').replace(/\s+/g, ' ').replace(/^\|\s*/, '')
+    .replace(/^["“”']+|["“”']+$/g, '').replace(/\s*\|\s*$/, '').trim();
   return t.length > MAX_IDEA_LEN ? `${t.slice(0, MAX_IDEA_LEN - 1).trimEnd()}…` : t;
 };
 
@@ -255,7 +267,17 @@ export function extractIdeas(lines: readonly string[]): string[] {
       const name = m[1].split(/[\s(:–—-]/)[0].toLowerCase();
       const next = (clean[i + 1] ?? '').toLowerCase();
       const describedNext = name.length >= 3 && next.length > 30 && (next.startsWith(`${name} is `) || next.startsWith(`${name} will `) || next.startsWith(`${name} lets `) || next.startsWith(`${name} helps `));
-      if (APP_WORD.test(m[1]) || describedNext) ideas.push(m[1]);
+      // "1. Smart Expense Tracker" then its paragraph
+      const titled = looksLikeTitle(m[1]) && next.length > 40 && !NUMBERED.test(clean[i + 1] ?? '');
+      if (APP_WORD.test(m[1]) || describedNext || titled) ideas.push(m[1]);
+    });
+  }
+  // Still nothing: a short title right above "Overview", "Brief description:", "Idea and purpose".
+  if (!ideas.length) {
+    const clean = lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    clean.forEach((line, i) => {
+      const title = line.replace(/^(?:\d{1,2}|[a-e])[.)]\s+/i, '');
+      if (ABOUT_HEADING.test(clean[i + 1] ?? '') && looksLikeTitle(title)) ideas.push(title);
     });
   }
   // Still nothing: fall back to the app name in the document title ("CookBook Project Proposal").
@@ -265,8 +287,17 @@ export function extractIdeas(lines: readonly string[]): string[] {
       if (t && !GENERIC_TITLE.test(t[1])) { ideas.push(t[1]); break; }
     }
   }
+  // Still nothing: the document's first line, when an "Idea and purpose" / "Overview" heading follows close below.
+  if (!ideas.length) {
+    const clean = lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    if (clean[0] && looksLikeTitle(clean[0]) && clean.slice(1, 6).some((l) => ABOUT_HEADING.test(l))) ideas.push(clean[0]);
+  }
   const seen = new Set<string>();
-  return ideas.map(tidyIdea)
+  const tidy = ideas.map(tidyIdea);
+  const lower = new Set(tidy.map((i) => i.toLowerCase()));
+  return tidy
+    // "FixIt 4" (a contents line with its page number) when "FixIt" is there too
+    .filter((i) => !(/\s\d{1,3}$/.test(i) && lower.has(i.replace(/\s\d{1,3}$/, '').toLowerCase())))
     .filter((i) => i.length >= 3 && /\p{L}{2}/u.test(i) && !NOT_AN_IDEA.test(i) && !seen.has(i.toLowerCase()) && seen.add(i.toLowerCase()))
     .slice(0, MAX_IDEAS);
 }
