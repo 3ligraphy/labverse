@@ -80,3 +80,16 @@ test('reportFileName makes a safe file name', () => {
   assert.equal(reportFileName('Project proposal submission'), 'project-proposal-submission-feedback.pdf');
   assert.equal(reportFileName('  ??? '), 'project-feedback.pdf');
 });
+
+test('placeNotes keeps a group its own feedback when a one-person group is merged into it', () => {
+  const plan = emptyPlan();
+  const groups = buildGroups(entries, [], plan);
+  const g1 = groups.find((g) => g.key === 'G1')!;
+  let fb = setNote({}, 'G1', 'Feedback for G1', g1.entries, 'A');
+  fb = setNote(fb, 'G2', 'Older note for the student who moved', ['e3'], 'A');
+  fb.G2.updatedAt = '2999-01-01T00:00:00.000Z'; // newer than G1's, still must not replace it
+  plan.teams.e3 = 'G1';
+  const { notes, orphans } = placeNotes(buildGroups(entries, [], plan), fb);
+  assert.equal(notes.get('G1')?.text, 'Feedback for G1');
+  assert.deepEqual(orphans.map(([k]) => k), ['G2'], 'the merged group\'s note is listed apart, not lost');
+});

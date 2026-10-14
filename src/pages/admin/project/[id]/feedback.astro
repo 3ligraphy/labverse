@@ -26,7 +26,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       <div>
         <p class="fb-k mono"><a href="/admin/project">← Project submissions</a> · <a href={`/admin/project/${file.id}`}>{file.title}</a> · <a href={`/admin/project/${file.id}/groups`}>Groups &amp; ideas</a></p>
         <h1>Group feedback</h1>
-        <p class="muted">Write feedback for each group. It saves as you type. When you're done, generate the PDF report with every group's members, approved idea and feedback.</p>
+        <p class="muted">Write feedback for each group. It saves as you type. When you're done, generate the PDF report with every group's members, approved idea and feedback. A student who is alone in a group can be dragged into another group: their ideas go with them and their own group closes.</p>
       </div>
       <div class="fb-actions">
         <span class="live mono" data-fb-live>loading…</span>
@@ -159,7 +159,8 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .fb-foot { display: flex; justify-content: space-between; gap: 10px; font: 11px var(--font-mono); color: var(--text-3); }
   .fb-foot .err { color: var(--danger); }
   .fb-foot .ok { color: var(--accent-text); }
-  .fb-msg { min-height: 20px; font-size: 13px; color: var(--accent-text); }
+  .fb-msg { min-height: 20px; font-size: 13px; color: var(--accent-text); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .fb-card.solo { border-style: dashed; }
   .fb-msg.err { color: var(--danger); }
   .fb-orphans { padding: 16px 18px; border: 1px dashed var(--line-2); border-radius: var(--r-lg); font-size: 13px; color: var(--text-2); display: grid; gap: 8px; }
   .fb-orphans blockquote { margin: 0; padding: 8px 12px; border-radius: var(--r-sm); background: var(--surface-2); white-space: pre-wrap; color: var(--text-2); }
@@ -167,7 +168,8 @@ if (!file) return Astro.redirect('/admin/project', 303);
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
-  import { buildGroups, emptyPlan, randomIdea, type Group, type Plan, type Student } from '@/lib/project-files/groups';
+  import { buildGroups, emptyPlan, isSolo, moveSolo, randomIdea, type Group, type Plan, type Student } from '@/lib/project-files/groups';
+  import { soloDrag } from '@/scripts/solo-drag';
   import type { IdeaDetails } from '@/lib/project-files/idea-details';
   import type { DocText } from '@/scripts/doc-text';
   import { placeNotes, reportRows, reportFileName, type Feedback, type Note } from '@/lib/project-files/feedback';
@@ -195,6 +197,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
     let entries: Entry[] = [];
     let plan: Plan = emptyPlan();
     let groups: Group[] = [];
+    let roster: Student[] = [];
     /** Group key → the feedback text on screen (what is typed, saved or not). */
     const texts = new Map<string, string>();
     const saved = new Map<string, Note>();
@@ -423,11 +426,19 @@ if (!file) return Astro.redirect('/admin/project', 303);
     const card = (g: Group) => {
       const text = texts.get(g.key) ?? '';
       const num = g.numbered ? /^G(\d+)$/.exec(g.key)?.[1] ?? g.key : '—';
-      return `<article class="fb-card ${has(g.key) ? 'done' : ''}" data-key="${esc(g.key)}">
+      const solo = isSolo(g);
+      const into = solo ? groups.filter((t) => !check(g.key, t.key)) : [];
+      return `<article class="fb-card ${has(g.key) ? 'done' : ''} ${solo ? 'solo' : ''}" data-key="${esc(g.key)}" data-drop-key="${esc(g.key)}">
         <div class="fb-card-head">
           <span class="fb-num"><small>Group</small><b>${esc(num)}</b></span>
           <span class="fb-state" data-state>${has(g.key) ? 'Feedback written' : 'Needs feedback'}</span>
         </div>
+        ${solo ? `<div class="solo-bar">
+          <button type="button" class="solo-handle" data-solo-drag="${esc(g.key)}" aria-label="Drag ${esc(g.members[0].name)} into another group" title="Drag onto another group">⠿ <span>Alone in this group · drag into a group</span></button>
+          <select class="input solo-move" data-solo-move="${esc(g.key)}" aria-label="Move ${esc(g.members[0].name)} to another group">
+            <option value="">Move to group…</option>${into.map((t) => `<option value="${esc(t.key)}">${esc(t.title)} · ${plural(t.members.length, 'member')}</option>`).join('')}
+          </select>
+        </div>` : ''}
         ${g.numbered ? '' : `<p class="small faint">${esc(g.title)}: number it on the Groups page to include it in the report.</p>`}
         <div>
           <p class="fb-label">Members · ${g.members.length}</p>
@@ -530,7 +541,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         if (!res.ok) throw new Error(data.error ?? 'Could not load.');
         entries = data.entries;
         plan = data.plan;
-        const roster: Student[] = data.roster;
+        roster = data.roster;
         groups = buildGroups(entries, roster, plan);
         const { notes, orphans } = placeNotes(groups, data.feedback as Feedback);
         for (const [key, note] of notes) { saved.set(key, note); texts.set(key, note.text); }
@@ -545,6 +556,63 @@ if (!file) return Astro.redirect('/admin/project', 303);
         cards.innerHTML = `<p class="muted">${esc(live.textContent)}</p>`;
       }
     }
+
+    /* ------------------------------------- a solo student into another group */
+    const groupOf = (key: string) => groups.find((g) => g.key === key);
+    /** null when the solo group `from` can join `to`, otherwise why not (the same checks the move makes). */
+    function check(from: string, to: string): string | null {
+      const a = groupOf(from), b = groupOf(to);
+      if (!a || !b) return 'Unknown group.';
+      const r = moveSolo(structuredClone(plan), a, b);
+      return r.ok ? null : r.error;
+    }
+    let undoPlan: Plan | null = null;
+    const savePlan = async (next: Plan) => {
+      const res = await fetch(`/api/admin/project/groups?file=${encodeURIComponent(fileId)}`, {
+        method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: next }),
+      });
+      if (res.status === 401) { location.reload(); return false; }
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Could not save.');
+      return true;
+    };
+    async function move(from: string, to: string) {
+      const a = groupOf(from), b = groupOf(to);
+      if (!a || !b) return;
+      const before = structuredClone(plan), next = structuredClone(plan);
+      const r = moveSolo(next, a, b);
+      if (!r.ok) return say(r.error, true);
+      if (pending.size) return say('Wait for the feedback you are typing to save, then try again.', true);
+      say(`Moving ${a.members[0].name} into ${b.title}…`);
+      try {
+        if (!(await savePlan(next))) return;
+        undoPlan = before;
+        await load();
+        msg.className = 'fb-msg';
+        msg.innerHTML = `${esc(a.members[0].name)} joined ${esc(b.title)}, with their ideas. ${esc(a.title)} is closed. <button type="button" class="btn btn-ghost btn-sm" data-solo-undo>Undo</button>`;
+        cardOf(b.key)?.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+      } catch (error) {
+        plan = before;
+        say(`${error instanceof Error ? error.message : 'Could not save.'} Nothing was moved.`, true);
+      }
+    }
+    soloDrag(cards, { label: (key) => groupOf(key)?.members[0]?.name ?? key, check, drop: (from, to) => void move(from, to) });
+    cards.addEventListener('change', (e) => {
+      const sel = (e.target as HTMLElement).closest<HTMLSelectElement>('[data-solo-move]');
+      if (sel?.value) void move(sel.dataset.soloMove!, sel.value);
+    });
+    msg.addEventListener('click', async (e) => {
+      if (!(e.target as HTMLElement).closest('[data-solo-undo]') || !undoPlan) return;
+      const back = undoPlan;
+      undoPlan = null;
+      try {
+        if (!(await savePlan(back))) return;
+        await load();
+        say('Undone: the student is back in their own group.');
+      } catch (error) {
+        undoPlan = back;
+        say(`${error instanceof Error ? error.message : 'Could not undo.'} Try again.`, true);
+      }
+    });
 
     load();
   });

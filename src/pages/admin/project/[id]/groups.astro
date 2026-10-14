@@ -84,7 +84,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         <div>
           <p class="gp-step mono">Step 3</p>
           <h2>Add random members</h2>
-          <p class="muted small">Select groups with fewer than {TEAM_SIZE} members and how many to add. Only students who are in no group can be picked, and each one goes to one group.</p>
+          <p class="muted small">Select groups with fewer than {TEAM_SIZE} members and how many to add. Only students who are in no group can be picked, and each one goes to one group. A student alone in a group can be dragged onto another group (or moved with its menu): their ideas go with them and their own group closes.</p>
         </div>
       </div>
       <div class="gp-tools">
@@ -369,8 +369,9 @@ if (!file) return Astro.redirect('/admin/project', 303);
   import { onPageLoad } from '@/scripts/page-load';
   import { readDocText, renderPdf } from '@/scripts/doc-text';
   import { playBox } from '@/scripts/box-shuffle';
+  import { soloDrag } from '@/scripts/solo-drag';
   import {
-    SCAN_VERSION, TEAM_SIZE, assignRandom, autoNumber, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
+    SCAN_VERSION, TEAM_SIZE, assignRandom, autoNumber, buildGroups, isSolo, moveSolo, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
     randomIdea, unassigned, lastHandIn, sortGroups, SORTS, type Group, type Plan, type Sort, type Student,
   } from '@/lib/project-files/groups';
   import { notATeamNumber, type Entry } from '@/lib/project-files/core';
@@ -501,10 +502,13 @@ if (!file) return Astro.redirect('/admin/project', 303);
       rows.innerHTML = groups.length ? view().map((g) => {
         const open = openSeats(g);
         const on = selected.has(g.key);
-        return `<tr class="${on ? 'sel' : ''} ${open ? '' : 'full'} ${isNew(g) ? 'is-new' : ''}">
+        const solo = isSolo(g);
+        const into = solo ? groups.filter((t) => !soloCheck(g.key, t.key)) : [];
+        const soloBar = solo ? `<div class="solo-bar"><button type="button" class="solo-handle" data-solo-drag="${esc(g.key)}" aria-label="Drag ${esc(g.members[0].name)} into another group" title="Drag onto another group">⠿ <span>Drag into a group</span></button><select class="input solo-move" data-solo-move="${esc(g.key)}" aria-label="Move ${esc(g.members[0].name)} to another group"><option value="">Move to group…</option>${into.map((t) => `<option value="${esc(t.key)}">${esc(t.title)} · ${plural(t.members.length, 'member')}</option>`).join('')}</select></div>` : '';
+        return `<tr class="${on ? 'sel' : ''} ${open ? '' : 'full'} ${isNew(g) ? 'is-new' : ''} ${solo ? 'solo' : ''}" data-drop-key="${esc(g.key)}">
           <td class="gp-cb"><input type="checkbox" data-pick="${esc(g.key)}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'} aria-label="Select ${esc(g.title)}" /></td>
           <td><b class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</b>${stamp(g)}${g.labels.length && g.labels.join() !== g.key ? `<br><small class="faint">typed: ${g.labels.map(esc).join(' / ')}</small>` : ''}${teamForm(g)}</td>
-          <td><ul class="gp-chips">${g.members.map((m) => chip(m, g.key, clash)).join('')}</ul>${g.unread ? `<small class="faint">${plural(g.unread, 'file')} could not be read</small>` : ''}${plan.removed[g.key]?.length ? `<small class="faint">${plural(plan.removed[g.key].length, 'student')} taken out · <button class="btn btn-ghost btn-sm" type="button" data-restore="${esc(g.key)}">Restore</button></small>` : ''}</td>
+          <td><ul class="gp-chips">${g.members.map((m) => chip(m, g.key, clash)).join('')}</ul>${soloBar}${g.unread ? `<small class="faint">${plural(g.unread, 'file')} could not be read</small>` : ''}${plan.removed[g.key]?.length ? `<small class="faint">${plural(plan.removed[g.key].length, 'student')} taken out · <button class="btn btn-ghost btn-sm" type="button" data-restore="${esc(g.key)}">Restore</button></small>` : ''}</td>
           <td><span class="gp-size ${open ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></td>
           <td>${open ? `<input class="input mono gp-add" type="number" min="1" max="${open}" value="${wantFor(g)}" data-count-for="${esc(g.key)}" aria-label="Members to add to ${esc(g.title)}" />` : '<small class="faint">full</small>'}</td>
         </tr>`;
@@ -711,6 +715,41 @@ if (!file) return Astro.redirect('/admin/project', 303);
       render();
       save();
     });
+    /* ------------------------------------- a solo student into another group */
+    /** null when the solo group `from` can join `to`, otherwise why not (the same checks the move makes). */
+    function soloCheck(from: string, to: string): string | null {
+      const a = groups.find((g) => g.key === from), b = groups.find((g) => g.key === to);
+      if (!a || !b) return 'Unknown group.';
+      const r = moveSolo(structuredClone(plan), a, b);
+      return r.ok ? null : r.error;
+    }
+    let soloUndo: Plan | null = null;
+    function moveInto(from: string, to: string) {
+      const a = groups.find((g) => g.key === from), b = groups.find((g) => g.key === to);
+      if (!a || !b) return;
+      const before = structuredClone(plan);
+      const r = moveSolo(plan, a, b);
+      if (!r.ok) return say(r.error, true, assignMsg);
+      soloUndo = before;
+      render();
+      save();
+      assignMsg.className = 'gp-msg';
+      assignMsg.innerHTML = `${esc(a.members[0].name)} joined ${esc(b.title)}, with their ideas. ${esc(a.title)} is closed. <button type="button" class="btn btn-ghost btn-sm" data-solo-undo>Undo</button>`;
+    }
+    soloDrag($('[data-gp-rows]'), { label: (key) => groups.find((g) => g.key === key)?.members[0]?.name ?? key, check: soloCheck, drop: moveInto });
+    $('[data-gp-rows]').addEventListener('change', (e) => {
+      const sel = (e.target as HTMLElement).closest<HTMLSelectElement>('[data-solo-move]');
+      if (sel?.value) moveInto(sel.dataset.soloMove!, sel.value);
+    });
+    assignMsg.addEventListener('click', (e) => {
+      if (!(e.target as HTMLElement).closest('[data-solo-undo]') || !soloUndo) return;
+      plan = soloUndo;
+      soloUndo = null;
+      render();
+      save();
+      say('Undone: the student is back in their own group.', false, assignMsg);
+    });
+
     $('[data-gp-select-under]').addEventListener('click', () => { for (const g of groups) if (openSeats(g)) selected.add(g.key); renderRows(); });
     $('[data-gp-select-none]').addEventListener('click', () => { selected.clear(); renderRows(); });
     $('[data-gp-count]').addEventListener('input', () => { counts.clear(); renderRows(); });
