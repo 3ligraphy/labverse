@@ -1,6 +1,7 @@
 /**
  * Admin: written feedback for each project group (/admin/project/[id]/feedback).
- *   GET ?file=…   { file, entries, roster, plan, feedback } — everything the cards and the PDF report need
+ *   GET ?file=…   { file, entries, roster, plan, feedback, release, views } — everything the cards and the PDF report
+ *                 need, plus which students have looked up their published result
  *   PUT ?file=…   { key, text, entries }  saves (or, with empty text, clears) one group's feedback
  *   PUT ?file=…   { action: 'choice', key, idea, mode }  approves one group's idea (empty idea clears it); the rest
  *                 of the group plan is left as it is
@@ -31,14 +32,15 @@ export const GET: APIRoute = async ({ url, cookies }) => {
   try {
     const file = await store.get(url.searchParams.get('file') ?? '');
     if (!file) return json({ error: 'Not found.' }, 404);
-    const [entries, roster, plan, feedback, release] = await Promise.all([
+    const [entries, roster, plan, feedback, release, views] = await Promise.all([
       store.listEntries(file.id),
       store.getGroupData<Student[]>('roster'),
       store.getGroupData<unknown>(`plan:${file.id}`),
       store.getGroupData<unknown>(`feedback:${file.id}`),
       store.getGroupData<unknown>(`release:${file.id}`),
+      store.listViews(file.id),
     ]);
-    return json({ file, entries, roster: roster ?? [], plan: plan ? cleanPlan(plan) : emptyPlan(), feedback: cleanFeedback(feedback), release: cleanRelease(release) });
+    return json({ file, entries, roster: roster ?? [], plan: plan ? cleanPlan(plan) : emptyPlan(), feedback: cleanFeedback(feedback), release: cleanRelease(release), views });
   } catch (error) {
     console.error('[project-feedback] could not load', error);
     return json({ error: 'Could not load the feedback.' }, 500);

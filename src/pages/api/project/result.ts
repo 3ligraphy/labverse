@@ -3,6 +3,7 @@
  *   GET                      { items: [{ id, title }] }  the published items (so the page knows to show the box)
  *   GET ?studentId=…         { results: [{ item, group, members, idea, feedback }] }  the student's own group only
  * Lookups are limited per network address, so nobody can try every ID; members are names only, never IDs.
+ * Each lookup that finds a group is recorded, so staff can see who has checked (admin feedback page).
  */
 import type { APIRoute } from 'astro';
 import { clientIp } from '@/lib/attendance/server';
@@ -45,7 +46,10 @@ export const GET: APIRoute = async ({ url, request, clientAddress }) => {
       const groups = buildGroups(entries, roster, p);
       const { notes } = placeNotes(groups, cleanFeedback(feedback));
       const r = resultFor(groups, p, notes, studentId);
-      if (r) results.push({ item: file.title, ...r });
+      if (!r) continue;
+      results.push({ item: file.title, ...r });
+      // never fail the student's lookup over the record
+      await store.recordView(file.id, studentId).catch((error) => console.error('[project-result] could not record the view', error));
     }
     return new Response(JSON.stringify({ results }), { headers: { 'content-type': 'application/json', 'cache-control': 'private, no-store' } });
   } catch (error) {

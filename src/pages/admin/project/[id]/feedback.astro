@@ -38,6 +38,38 @@ if (!file) return Astro.redirect('/admin/project', 303);
     <p class="fb-release" data-fb-release-note hidden></p>
     <div class="fb-summary" data-fb-summary></div>
 
+    <section class="fb-seen" data-fb-seen hidden aria-labelledby="fb-seen-title">
+      <div class="fb-seen-head">
+        <div class="fb-seen-copy">
+          <h2 id="fb-seen-title">Who checked their result</h2>
+          <p class="small muted" data-seen-sub></p>
+        </div>
+        <div class="fb-seen-count"><b data-seen-n>0</b><span data-seen-of></span><div class="fb-meter"><i data-seen-bar style="--w:0%"></i></div></div>
+        <button type="button" class="btn btn-ghost btn-sm" data-seen-toggle aria-expanded="false" aria-controls="fb-seen-body">Show the list</button>
+      </div>
+      <div class="fb-seen-body" id="fb-seen-body" data-seen-body hidden>
+        <div class="fb-tools">
+          <div class="fb-chips" role="group" aria-label="Show students">
+            <button type="button" class="fb-chip" aria-pressed="true" data-seen-filter="no">Not checked <span data-seen-c="no"></span></button>
+            <button type="button" class="fb-chip" aria-pressed="false" data-seen-filter="yes">Checked <span data-seen-c="yes"></span></button>
+            <button type="button" class="fb-chip" aria-pressed="false" data-seen-filter="all">All <span data-seen-c="all"></span></button>
+          </div>
+          <div class="fb-seen-tools">
+            <input class="input fb-search" type="search" placeholder="Search name, ID or group" data-seen-search aria-label="Search students" />
+            <button type="button" class="btn btn-ghost btn-sm" data-seen-copy>Copy list</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-seen-refresh>Refresh</button>
+          </div>
+        </div>
+        <div class="fb-seen-wrap">
+          <table class="fb-seen-table">
+            <thead><tr><th scope="col">Student</th><th scope="col">ID</th><th scope="col">Group</th><th scope="col">Checked</th></tr></thead>
+            <tbody data-seen-rows></tbody>
+          </table>
+        </div>
+        <p class="small faint">A lookup counts when someone types the student's ID on the Project page and it finds their group. Anyone who knows an ID can type it, so this shows the ID was looked up, not who typed it.</p>
+      </div>
+    </section>
+
     <div class="fb-tools">
       <div class="fb-chips" role="group" aria-label="Show">
         <button type="button" class="fb-chip" aria-pressed="true" data-filter="all">All <span data-n="all"></span></button>
@@ -165,6 +197,28 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .fb-release { padding: 12px 14px; border-radius: var(--r-md); border: 1px solid color-mix(in oklab, var(--accent-text) 40%, var(--line-2)); background: var(--accent-soft); font-size: 13.5px; color: var(--text); }
   [data-fb-release][aria-pressed="true"] { border-color: var(--accent-text); color: var(--accent-text); }
   .fb-msg.err { color: var(--danger); }
+  .fb-seen { display: grid; gap: 16px; padding: 18px 20px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); }
+  .fb-seen-head { display: flex; align-items: center; gap: 16px 24px; flex-wrap: wrap; }
+  .fb-seen-copy { flex: 1 1 260px; }
+  .fb-seen-copy h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
+  .fb-seen-copy p { margin-top: 2px; }
+  .fb-seen-count { flex: 0 1 220px; min-width: 160px; }
+  .fb-seen-count b { font: 600 28px/1 var(--font-display); letter-spacing: -.04em; }
+  .fb-seen-count span { margin-left: 4px; color: var(--text-3); font-size: 14px; }
+  .fb-seen-body { display: grid; gap: 12px; }
+  .fb-seen-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .fb-seen-tools .fb-search { width: 220px; }
+  @media (max-width: 640px) { .fb-seen-tools .fb-search { width: 100%; } }
+  .fb-seen-wrap { max-height: 460px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); }
+  .fb-seen-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .fb-seen-table th { position: sticky; top: 0; z-index: 1; background: var(--surface-2); text-align: left; font: 600 12px var(--font-body); color: var(--text-2); padding: 9px 12px; }
+  .fb-seen-table td { padding: 9px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+  .fb-seen-table td.mono { font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
+  .fb-seen-yes { color: var(--accent-text); white-space: nowrap; }
+  .fb-seen-yes small { display: block; color: var(--text-3); font: 11px var(--font-mono); }
+  .fb-seen-no { color: var(--text-3); }
+  .fb-seen-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--accent-text); vertical-align: middle; }
+  @media (max-width: 640px) { .fb-seen-table th:nth-child(2), .fb-seen-table td:nth-child(2) { display: none; } }
   .fb-orphans { padding: 16px 18px; border: 1px dashed var(--line-2); border-radius: var(--r-lg); font-size: 13px; color: var(--text-2); display: grid; gap: 8px; }
   .fb-orphans blockquote { margin: 0; padding: 8px 12px; border-radius: var(--r-sm); background: var(--surface-2); white-space: pre-wrap; color: var(--text-2); }
 </style>
@@ -176,6 +230,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   import type { DocText } from '@/scripts/doc-text';
   import { placeNotes, reportRows, reportFileName, type Feedback, type Note } from '@/lib/project-files/feedback';
   import type { Entry } from '@/lib/project-files/core';
+  import { whoChecked, type View } from '@/lib/project-files/results';
 
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
@@ -435,7 +490,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         ${g.numbered ? '' : `<p class="small faint">${esc(g.title)}: number it on the Groups page to include it in the report.</p>`}
         <div>
           <p class="fb-label">Members · ${g.members.length}</p>
-          <ul class="fb-members">${g.members.map((m) => `<li>${esc(m.name)}<span>${esc(m.id)}</span></li>`).join('') || '<li class="muted">No members</li>'}</ul>
+          <ul class="fb-members">${g.members.map((m) => `<li>${esc(m.name)}<span>${esc(m.id)}${seenDot(m.id)}</span></li>`).join('') || '<li class="muted">No members</li>'}</ul>
         </div>
         <div class="fb-ideas" data-ideas>${ideaBlock(g)}</div>
         <label>
@@ -558,10 +613,97 @@ if (!file) return Astro.redirect('/admin/project', 303);
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error ?? 'Could not save.');
         showRelease(data.release);
+        renderSeen();
         say(next ? 'Published: each student can now look up their own result on the Project page.' : 'Hidden: students no longer see the results.');
       } catch (error) {
         releaseBtn.disabled = false;
         say(`${error instanceof Error ? error.message : 'Could not save.'} Try again.`, true);
+      }
+    });
+
+    /* ------------------------------------------- who checked their result */
+    let views: View[] = [];
+    let viewOf = new Map<string, View>();
+    let seenFilter: 'no' | 'yes' | 'all' = 'no';
+    const seen = $('[data-fb-seen]');
+    const seenBody = $('[data-seen-body]');
+    const seenToggle = $<HTMLButtonElement>('[data-seen-toggle]');
+    const seenSearch = $<HTMLInputElement>('[data-seen-search]');
+    function seenDot(id: string) {
+      const v = viewOf.get(id);
+      return v ? `<i class="fb-seen-dot" role="img" aria-label="Checked their result" title="Checked their result · ${esc(when(v.lastAt))}"></i>` : '';
+    }
+    const seenRows = () => {
+      const q = seenSearch.value.trim().toLowerCase();
+      return whoChecked(groups, views).rows
+        .filter((r) => (seenFilter === 'all' || (seenFilter === 'yes') === Boolean(r.view)) && (!q || `${r.name} ${r.id} ${r.group}`.toLowerCase().includes(q)))
+        .sort((a, b) => (b.view?.lastAt ?? '').localeCompare(a.view?.lastAt ?? '') || a.group.localeCompare(b.group, undefined, { numeric: true }));
+    };
+    const renderSeen = () => {
+      const { checked, total } = whoChecked(groups, views);
+      seen.hidden = !published && !views.length;
+      $('[data-seen-n]').textContent = String(checked);
+      $('[data-seen-of]').textContent = `of ${plural(total, 'student')}`;
+      $('[data-seen-bar]').style.setProperty('--w', `${total ? (checked / total) * 100 : 0}%`);
+      const last = views.reduce((m, v) => (v.lastAt > m ? v.lastAt : m), '');
+      $('[data-seen-sub]').textContent = !published ? 'Results are hidden from students right now.'
+        : checked ? `${plural(total - checked, 'student')} haven't looked yet. Last check ${when(last)}.` : 'Nobody has looked up their result yet.';
+      root.querySelector('[data-seen-c="no"]')!.textContent = String(total - checked);
+      root.querySelector('[data-seen-c="yes"]')!.textContent = String(checked);
+      root.querySelector('[data-seen-c="all"]')!.textContent = String(total);
+      if (seenBody.hidden) return;
+      const list = seenRows();
+      $('[data-seen-rows]').innerHTML = list.length
+        ? list.map((r) => `<tr><td>${esc(r.name)}</td><td class="mono">${esc(r.id)}</td><td>${esc(r.group.startsWith('Group') ? r.group : 'No number yet')}</td><td>${r.view
+            ? `<span class="fb-seen-yes">${esc(when(r.view.lastAt))}<small>${r.view.count === 1 ? 'once' : `${r.view.count} times · first ${esc(when(r.view.firstAt))}`}</small></span>`
+            : '<span class="fb-seen-no">Not yet</span>'}</td></tr>`).join('')
+        : `<tr><td colspan="4" class="muted">${seenFilter === 'no' && !seenSearch.value ? 'Everyone has checked their result.' : 'No students match.'}</td></tr>`;
+    };
+    const setViews = (list: View[] | undefined) => {
+      views = list ?? [];
+      viewOf = new Map(views.map((v) => [v.studentId.toUpperCase(), v]));
+    };
+    seenToggle.addEventListener('click', () => {
+      seenBody.hidden = !seenBody.hidden;
+      seenToggle.setAttribute('aria-expanded', String(!seenBody.hidden));
+      seenToggle.textContent = seenBody.hidden ? 'Show the list' : 'Hide the list';
+      renderSeen();
+    });
+    seenSearch.addEventListener('input', renderSeen);
+    root.querySelectorAll<HTMLButtonElement>('[data-seen-filter]').forEach((chip) => chip.addEventListener('click', () => {
+      seenFilter = chip.dataset.seenFilter as typeof seenFilter;
+      root.querySelectorAll('[data-seen-filter]').forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+      renderSeen();
+    }));
+    $('[data-seen-copy]').addEventListener('click', async () => {
+      const list = seenRows();
+      const text = ['Name\tID\tGroup\tChecked', ...list.map((r) => [r.name, r.id, r.group, r.view ? when(r.view.lastAt) : 'Not yet'].join('\t'))].join('\n');
+      try { await navigator.clipboard.writeText(text); say(`Copied ${plural(list.length, 'student')}. Paste it into a sheet or an email.`); }
+      catch { say('Could not copy. Select the table and copy it instead.', true); }
+    });
+    const seenRefresh = $<HTMLButtonElement>('[data-seen-refresh]');
+    seenRefresh.addEventListener('click', async () => {
+      seenRefresh.disabled = true;
+      try {
+        const res = await fetch(`/api/admin/project/feedback?file=${encodeURIComponent(fileId)}`, { cache: 'no-store' });
+        if (res.status === 401) return location.reload();
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Could not load.');
+        // only the lookups are refreshed, so feedback being typed is left alone
+        setViews(data.views);
+        renderSeen();
+        cards.querySelectorAll<HTMLElement>('.fb-card').forEach((el) => {
+          const g = groups.find((x) => x.key === el.dataset.key);
+          el.querySelectorAll<HTMLElement>('.fb-members li > span').forEach((span, i) => {
+            const m = g?.members[i];
+            if (m && !span.querySelector('.fb-seen-dot')) span.insertAdjacentHTML('beforeend', seenDot(m.id));
+          });
+        });
+        say('Updated who checked their result.');
+      } catch (error) {
+        say(`${error instanceof Error ? error.message : 'Could not load.'} Try again.`, true);
+      } finally {
+        seenRefresh.disabled = false;
       }
     });
 
@@ -574,6 +716,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         entries = data.entries;
         plan = data.plan;
         if (data.release) showRelease(data.release);
+        setViews(data.views);
         const roster: Student[] = data.roster;
         groups = buildGroups(entries, roster, plan);
         const { notes, orphans } = placeNotes(groups, data.feedback as Feedback);
@@ -583,6 +726,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         box.innerHTML = orphans.length ? `<b>Feedback for groups that no longer exist</b><p class="small faint">Their hand-ins were deleted. Copy anything you still need.</p>${orphans.map(([k, n]) => `<div><span class="mono small">${esc(k)}</span><blockquote>${esc(n.text)}</blockquote></div>`).join('')}` : '';
         renderSummary();
         renderCards();
+        renderSeen();
         live.textContent = `${plural(groups.length, 'group')} · loaded ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       } catch (error) {
         live.textContent = error instanceof Error ? error.message : 'Could not load.';

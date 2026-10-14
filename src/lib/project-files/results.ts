@@ -32,3 +32,18 @@ export function resultFor(groups: readonly Group[], plan: Pick<Plan, 'choices'>,
     feedback: notes.get(g.key)?.text.trim() || null,
   };
 }
+
+/** One student's lookups of their result (recorded by /api/project/result when the ID is in a group). */
+export type View = { studentId: string; firstAt: string; lastAt: string; count: number };
+
+export type Checked = { name: string; id: string; group: string; view: View | null };
+
+/**
+ * Who has looked up their result, for the admin feedback page: every group member with their lookups (or none).
+ * Note that anyone who knows an ID can type it, so this shows the ID was looked up, not who typed it.
+ */
+export function whoChecked(groups: readonly Group[], views: readonly View[]): { rows: Checked[]; checked: number; total: number } {
+  const byId = new Map(views.map((v) => [normId(v.studentId), v]));
+  const rows = groups.flatMap((g) => g.members.map((m) => ({ name: m.name, id: m.id, group: groupLabel(g), view: byId.get(m.id) ?? null })));
+  return { rows, checked: rows.filter((r) => r.view).length, total: rows.length };
+}
