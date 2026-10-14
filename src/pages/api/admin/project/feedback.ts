@@ -52,10 +52,14 @@ export const PUT: APIRoute = async ({ url, request, cookies }) => {
       const file = await store.get(url.searchParams.get('file') ?? '');
       if (!file) return json({ error: 'Not found.' }, 404);
       const key = `plan:${file.id}`;
-      const plan = cleanPlan(await store.getGroupData<unknown>(key));
-      const changed = setChoice(plan, body);
+      let changed = { ok: false, error: 'Unknown group.' } as ReturnType<typeof setChoice>;
+      // atomic: an approval and a save from the Groups page at the same moment don't overwrite each other
+      const plan = await store.updateGroupData(key, (current) => {
+        const p = cleanPlan(current);
+        changed = setChoice(p, body);
+        return p;
+      });
       if (!changed.ok) return json({ error: changed.error }, 400);
-      await store.setGroupData(key, plan);
       return json({ ok: true, choice: plan.choices[changed.key] ?? null });
     } catch (error) {
       console.error('[project-feedback] could not save the idea', error);
@@ -68,8 +72,8 @@ export const PUT: APIRoute = async ({ url, request, cookies }) => {
     const file = await store.get(url.searchParams.get('file') ?? '');
     if (!file) return json({ error: 'Not found.' }, 404);
     const key = `feedback:${file.id}`;
-    const next = setNote(cleanFeedback(await store.getGroupData<unknown>(key)), note.value.key, note.value.text, note.value.entries, a.by);
-    await store.setGroupData(key, next);
+    // atomic: two cards saving at the same moment keep both notes
+    const next = await store.updateGroupData(key, (current) => setNote(cleanFeedback(current), note.value.key, note.value.text, note.value.entries, a.by));
     return json({ ok: true, note: next[note.value.key] ?? null });
   } catch (error) {
     console.error('[project-feedback] could not save', error);

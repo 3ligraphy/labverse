@@ -203,6 +203,25 @@ class FilesStore {
     );
   }
 
+  /**
+   * Read-change-write of one value without losing a write made at the same moment (two feedback cards saving
+   * together, or two staff on one page): the write only lands if nobody wrote since the read, otherwise it reads
+   * again and retries.
+   */
+  async updateGroupData<T>(key: string, change: (current: unknown) => T, tries = 8): Promise<T> {
+    for (let i = 0; i < tries; i++) {
+      // the stamp is compared as text: a JS Date would round away the microseconds and never match
+      const [row] = await this.q(`select data, updated_at::text as stamp from ${this.groups} where key = $1`, [key]);
+      const next = change(row ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : null);
+      const done = row
+        ? await this.q(`update ${this.groups} set data = $2::jsonb, updated_at = clock_timestamp() where key = $1 and updated_at::text = $3 returning key`, [key, JSON.stringify(next), row.stamp])
+        : await this.q(`insert into ${this.groups} (key, data) values ($1, $2::jsonb) on conflict (key) do nothing returning key`, [key, JSON.stringify(next)]);
+      if (done.length) return next;
+      await new Promise((r) => setTimeout(r, 20 + Math.random() * 60));
+    }
+    throw new Error('The data is busy. Try again.');
+  }
+
   async removeEntry(id: string): Promise<Entry | null> {
     const [row] = await this.q(`delete from ${this.entries} where id = $1 returning *`, [id]);
     return row ? toEntry(row) : null;
