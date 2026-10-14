@@ -99,6 +99,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
           <button class="btn btn-primary btn-sm" type="button" data-gp-assign disabled>Assign random members</button>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-undo>Undo additions</button>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-renumber>Renumber all</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-solos title="Each one-person group joins a two-person group, then a three-person group, at random">Place solo students in groups</button>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-sheet="groups">Download sheet</button>
         </div>
       </div>
@@ -370,7 +371,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   import { readDocText, renderPdf } from '@/scripts/doc-text';
   import { playBox } from '@/scripts/box-shuffle';
   import {
-    SCAN_VERSION, TEAM_SIZE, assignRandom, autoNumber, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
+    SCAN_VERSION, TEAM_SIZE, assignRandom, autoNumber, buildGroups, mergeSolos, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
     randomIdea, unassigned, lastHandIn, sortGroups, SORTS, type Group, type Plan, type Sort, type Student,
   } from '@/lib/project-files/groups';
   import { notATeamNumber, type Entry } from '@/lib/project-files/core';
@@ -711,6 +712,49 @@ if (!file) return Astro.redirect('/admin/project', 303);
       render();
       save();
     });
+    /* -------------------------------------------- solo students into small groups */
+    // A draw is shown first and only saved on Confirm; the plan before it is kept so the move can be undone.
+    let soloTrial: { plan: Plan; moves: ReturnType<typeof mergeSolos>['moves']; left: Student[] } | null = null;
+    let soloBefore: Plan | null = null;
+    function drawSolos() {
+      const trial = structuredClone(plan);
+      const r = mergeSolos(groups, trial);
+      if (!r.moves.length) {
+        soloTrial = null;
+        return say(r.left.length ? `No two- or three-person group has room for the ${plural(r.left.length, 'solo student')}.` : 'There are no one-person groups.', false, assignMsg);
+      }
+      soloTrial = { plan: trial, ...r };
+      assignMsg.className = 'gp-msg';
+      assignMsg.innerHTML = `<b>Preview, not saved yet:</b> ${r.moves.map((m) => `${esc(m.student.name)} (${esc(titleOf(m.from))}) → ${esc(titleOf(m.to))}`).join(' · ')}.`
+        + (r.left.length ? ` ${r.left.length === 1 ? 'This solo student stays' : `These ${r.left.length} solo students stay`} as they are (no group has room): ${r.left.map((s) => esc(s.name)).join(', ')}.` : '')
+        + ` <span class="gp-row"><button class="btn btn-primary btn-sm" type="button" data-solo="confirm">Confirm ${plural(r.moves.length, 'move')}</button>`
+        + `<button class="btn btn-ghost btn-sm" type="button" data-solo="again">Shuffle again</button><button class="btn btn-ghost btn-sm" type="button" data-solo="cancel">Cancel</button></span>`;
+    }
+    $('[data-gp-solos]').addEventListener('click', drawSolos);
+    assignMsg.addEventListener('click', (e) => {
+      const act = (e.target as HTMLElement).closest<HTMLElement>('[data-solo]')?.dataset.solo;
+      if (act === 'again') return drawSolos();
+      if (act === 'cancel') { soloTrial = null; return say('Nothing was changed.', false, assignMsg); }
+      if (act === 'undo' && soloBefore) {
+        plan = soloBefore;
+        soloBefore = null;
+        render();
+        save();
+        return say('Undone: the solo students are back in their own groups.', false, assignMsg);
+      }
+      if (act !== 'confirm' || !soloTrial) return;
+      soloBefore = structuredClone(plan);
+      const { moves } = soloTrial;
+      plan = soloTrial.plan;
+      soloTrial = null;
+      const titles = new Map(groups.map((g) => [g.key, g.title]));
+      render();
+      save();
+      assignMsg.className = 'gp-msg';
+      assignMsg.innerHTML = `Moved ${plural(moves.length, 'student')}: ${moves.map((m) => `${esc(m.student.name)} → ${esc(titles.get(m.to) ?? m.to)}`).join(' · ')}. `
+        + '<button class="btn btn-ghost btn-sm" type="button" data-solo="undo">Undo</button> <button class="btn btn-ghost btn-sm" type="button" data-gp-sheet="groups">Download sheet</button>';
+    });
+
     $('[data-gp-select-under]').addEventListener('click', () => { for (const g of groups) if (openSeats(g)) selected.add(g.key); renderRows(); });
     $('[data-gp-select-none]').addEventListener('click', () => { selected.clear(); renderRows(); });
     $('[data-gp-count]').addEventListener('input', () => { counts.clear(); renderRows(); });

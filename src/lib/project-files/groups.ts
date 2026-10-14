@@ -586,6 +586,41 @@ export function autoNumber(groups: readonly Group[], plan: Plan, rand: Rand = cr
   return Object.fromEntries(targets.map((g, i) => [g.key, numberGroup(plan, moved[i], String(free[i]))]));
 }
 
+/**
+ * Breaks up one-person groups: each solo student's hand-in joins another group, drawn at random. The two-person
+ * groups take one each first (becoming three); any solos left then go to three-person groups (becoming four).
+ * A group never passes the team size, and only numbered groups receive anyone. What was saved for a solo's old
+ * group (its chosen idea, typed ideas, "later") is dropped: the student takes the new group's idea.
+ * Returns each move and the solos that found no seat (they stay as they are).
+ */
+export function mergeSolos(groups: readonly Group[], plan: Plan, rand: Rand = cryptoRand):
+  { moves: { student: Student; from: string; to: string }[]; left: Student[] } {
+  const shuffle = <T>(list: T[]) => { for (let i = list.length - 1; i > 0; i--) { const j = rand(i + 1); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+  const solos = shuffle(groups.filter((g) => g.members.length === 1 && g.entries.length));
+  const size = new Map(groups.map((g) => [g.key, g.members.length]));
+  const open = (n: number) => shuffle(groups.filter((g) => g.numbered && g.members.length > 1 && size.get(g.key) === n && cleanTeam(g.key)));
+  const moves: { student: Student; from: string; to: string }[] = [];
+  const left: Student[] = [];
+  // two-person groups first; then the original three-person groups, then the ones that just reached three
+  let targets = open(2);
+  const threes = open(3);
+  for (const solo of solos) {
+    const student = { id: solo.members[0].id, name: solo.members[0].name };
+    if (!targets.length && threes.length) targets = threes.splice(0);
+    const to = targets.shift();
+    if (!to || (size.get(to.key) ?? 0) >= TEAM_SIZE) { left.push(student); continue; }
+    for (const id of solo.entries) plan.teams[id] = to.key;
+    for (const m of [plan.added, plan.removed, plan.extraIdeas]) delete m[solo.key];
+    delete plan.choices[solo.key];
+    plan.later = plan.later.filter((k) => k !== solo.key);
+    size.set(to.key, (size.get(to.key) ?? 0) + 1);
+    // a group that just reached three can take a fourth once the original threes are full
+    if (size.get(to.key) === 3) threes.push(to);
+    moves.push({ student, from: solo.key, to: to.key });
+  }
+  return { moves, left };
+}
+
 /* ------------------------------------------------------------------- sheet */
 
 const who = (m: Student) => `${m.name} (${m.id})`;
