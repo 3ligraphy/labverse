@@ -105,12 +105,11 @@ export const ATTENDANCE_MIN_SEEN = 3;
 export function attendanceEligibility(input: {
   student: { name: string; device_key: string | null } | null;
   name: string;
-  deviceKey: string;
   activeSec: number;
   seen: number;
 }): { ok: true } | { ok: false; reason: 'identity' | 'participation' } {
   const sameName = input.student?.name.trim().toLocaleLowerCase() === input.name.trim().toLocaleLowerCase();
-  if (!input.student || input.student.device_key !== input.deviceKey || !sameName) return { ok: false, reason: 'identity' };
+  if (!input.student || !sameName) return { ok: false, reason: 'identity' };
   if (input.activeSec < ATTENDANCE_MIN_ACTIVE_SEC || input.seen < ATTENDANCE_MIN_SEEN) return { ok: false, reason: 'participation' };
   return { ok: true };
 }
@@ -136,16 +135,6 @@ export function sessionState(s: { opens_at: string; closes_at: string | null } |
   if (!s) return { open: false, closesAt: null };
   const open = Date.parse(s.opens_at) <= now && (s.closes_at === null || Date.parse(s.closes_at) > now);
   return { open, closesAt: open ? s.closes_at : null };
-}
-
-/* ------------------------------------------------------------ device lock */
-
-/** One student ID belongs to one browser until the admin unlocks it. */
-export function decideLock(existing: { device_key: string | null } | null, deviceKey: string): 'create' | 'ok' | 'relock' | 'conflict' {
-  if (!existing) return 'create';
-  if (existing.device_key === deviceKey) return 'ok';
-  if (existing.device_key === null) return 'relock';
-  return 'conflict';
 }
 
 /* ---------------------------------------------------------- lab structure */

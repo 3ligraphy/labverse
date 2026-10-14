@@ -5,7 +5,7 @@
  */
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
-import { decideLock, type Best, type Identity } from './core.ts';
+import { type Best, type Identity } from './core.ts';
 
 export type StudentRow = { student_key: string; student_id: string; name: string; device_key: string | null; created_at: string; last_seen: string; group_name?: string; session_started_at?: string };
 export type AttemptRow = { id: number; exercise: string; passed: number; total: number; code: string; created_at: string };
@@ -106,11 +106,7 @@ export class MemoryStore implements ProgressStore {
 
   async touchStudent(i: Identity & { studentKey: string }) {
     const row = this.students.get(i.studentKey) ?? null;
-    const deviceOwner = [...this.students.values()].find((student) => student.device_key === i.deviceKey && student.student_key !== i.studentKey);
-    if (deviceOwner) return 'conflict' as const;
     if (row && row.name.trim().toLocaleLowerCase() !== i.name.trim().toLocaleLowerCase()) return 'conflict' as const;
-    const d = decideLock(row, i.deviceKey);
-    if (d === 'conflict') return 'conflict' as const;
     const t = this.stamp();
     this.students.set(i.studentKey, {
       student_key: i.studentKey, student_id: i.studentId, name: i.name, device_key: i.deviceKey,
@@ -313,12 +309,8 @@ export class NeonStore implements ProgressStore {
       `create table if not exists ${students} (
         student_key text primary key, student_id text not null, name text not null, device_key text,
         created_at timestamptz not null default now(), last_seen timestamptz not null default now())`,
-      `with duplicates as (
-         select student_key, row_number() over (partition by device_key order by created_at, student_key) as position
-         from ${students} where device_key is not null
-       ) update ${students} as s set device_key = null from duplicates as d
-         where s.student_key = d.student_key and d.position > 1`,
-      `create unique index if not exists ${students}_one_device on ${students} (device_key) where device_key is not null`,
+      // Students may use any device (shared lab PCs included), so one browser is no longer tied to one ID.
+      `drop index if exists ${students}_one_device`,
       `create table if not exists ${attempts} (
         id bigint generated always as identity primary key,
         student_key text not null references ${students}(student_key) on delete cascade,
@@ -381,43 +373,24 @@ export class NeonStore implements ProgressStore {
 
   async touchStudent(i: Identity & { studentKey: string }) {
     const { students } = this.t;
+    // The ID + name is the identity; any device may be used and the latest one is recorded.
     for (let round = 0; round < 2; round++) {
-      const [deviceOwner] = await this.q<{ student_key: string }>(`select student_key from ${students} where device_key = $1 and student_key <> $2 limit 1`, [i.deviceKey, i.studentKey]);
-      if (deviceOwner) return 'conflict' as const;
-      const [row] = await this.q<{ device_key: string | null; name: string }>(`select device_key, name from ${students} where student_key = $1`, [i.studentKey]);
+      const [row] = await this.q<{ name: string }>(`select name from ${students} where student_key = $1`, [i.studentKey]);
       if (row && row.name.trim().toLocaleLowerCase() !== i.name.trim().toLocaleLowerCase()) return 'conflict' as const;
-      const d = decideLock(row ?? null, i.deviceKey);
-      if (d === 'conflict') return 'conflict' as const;
-      if (d === 'create') {
-        let made: unknown[];
-        try {
-          made = await this.q(
-            `insert into ${students} (student_key, student_id, name, device_key) values ($1, $2, $3, $4)
-             on conflict (student_key) do nothing returning student_key`,
-            [i.studentKey, i.studentId, i.name, i.deviceKey],
-          );
-        } catch (error) {
-          if (/unique|duplicate/i.test(String(error))) return 'conflict' as const;
-          throw error;
-        }
+      if (!row) {
+        const made = await this.q(
+          `insert into ${students} (student_key, student_id, name, device_key) values ($1, $2, $3, $4)
+           on conflict (student_key) do nothing returning student_key`,
+          [i.studentKey, i.studentId, i.name, i.deviceKey],
+        );
         if (made.length) return 'ok' as const;
         continue; // someone created it at the same moment: decide again
       }
-      // 'ok' (same device) or 'relock' (unlocked by the admin): only succeeds if nobody else took it meanwhile
-      let updated: unknown[];
-      try {
-        updated = await this.q(
-          `update ${students} set name = $2, student_id = $3, device_key = $4, last_seen = now()
-           where student_key = $1 and (device_key = $4 or device_key is null) returning student_key`,
-          [i.studentKey, i.name, i.studentId, i.deviceKey],
-        );
-      } catch (error) {
-        // The unique device index is the final guard against two concurrent
-        // requests assigning one browser to different student IDs.
-        if (/unique|duplicate/i.test(String(error))) return 'conflict' as const;
-        throw error;
-      }
-      if (updated.length) return 'ok' as const;
+      await this.q(
+        `update ${students} set name = $2, student_id = $3, device_key = $4, last_seen = now() where student_key = $1`,
+        [i.studentKey, i.name, i.studentId, i.deviceKey],
+      );
+      return 'ok' as const;
     }
     return 'conflict' as const;
   }

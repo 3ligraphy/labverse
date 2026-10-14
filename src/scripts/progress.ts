@@ -103,9 +103,9 @@ async function flush() {
         return;
       }
       if (res.status === 409) {
-        // this ID is locked to another browser: drop its queued items, ask for a TA
+        // this ID is registered under another name: drop its queued items, ask for a TA
         const data = await res.json().catch(() => ({}));
-        conflictMessage = data.message ?? 'This student ID is used on another device.';
+        conflictMessage = data.message ?? 'This student ID is registered under a different name.';
         write(QUEUE, read<Item[]>(QUEUE, []).filter((q) => q.body.studentId !== item!.body.studentId));
         setState('conflict');
         showSheetError(conflictMessage);
