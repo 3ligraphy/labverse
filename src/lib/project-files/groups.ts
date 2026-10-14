@@ -586,36 +586,6 @@ export function autoNumber(groups: readonly Group[], plan: Plan, rand: Rand = cr
   return Object.fromEntries(targets.map((g, i) => [g.key, numberGroup(plan, moved[i], String(free[i]))]));
 }
 
-/** A group made of one student: the only kind that can be moved into another group by hand. */
-export const isSolo = (g: Pick<Group, 'members' | 'entries'>) => g.members.length === 1 && g.entries.length > 0;
-
-/**
- * Moves a one-person group into another group: the student's hand-ins take the target's number (so the ideas read
- * from their file go with them), ideas typed in for them move too, and their own group closes. The target keeps its
- * approved idea; when it has none, the student's approved idea comes along. A full group (team size) takes no one.
- */
-export function moveSolo(plan: Plan, solo: Group, target: Group): { ok: true } | { ok: false; error: string } {
-  if (!isSolo(solo)) return { ok: false, error: 'Only a student who is alone in a group can be moved.' };
-  if (solo.key === target.key) return { ok: false, error: 'That is the same group.' };
-  if (!target.numbered || !cleanTeam(target.key)) return { ok: false, error: `${target.title} has no group number yet. Number it first.` };
-  if (target.members.length >= TEAM_SIZE) return { ok: false, error: `${target.title} is full (${TEAM_SIZE} members).` };
-  for (const id of solo.entries) plan.teams[id] = target.key;
-  const typed = plan.extraIdeas[solo.key] ?? [];
-  const chosen = plan.choices[solo.key]?.idea;
-  // ideas typed in for the student, and the one approved for them, stay on offer in the new group
-  const carry = [...typed, ...(chosen && !solo.ideas.some((i) => i.toLowerCase() === chosen.toLowerCase()) ? [chosen] : [])];
-  if (carry.length) {
-    const list = plan.extraIdeas[target.key] ?? [];
-    for (const idea of carry) if (!list.some((i) => i.toLowerCase() === idea.toLowerCase())) list.push(idea);
-    plan.extraIdeas[target.key] = list.slice(0, MAX_IDEAS);
-  }
-  if (chosen && !plan.choices[target.key]?.idea) plan.choices[target.key] = { ...plan.choices[solo.key] };
-  for (const m of [plan.added, plan.removed, plan.extraIdeas]) delete m[solo.key];
-  delete plan.choices[solo.key];
-  plan.later = plan.later.filter((k) => k !== solo.key);
-  return { ok: true };
-}
-
 /* ------------------------------------------------------------------- sheet */
 
 const who = (m: Student) => `${m.name} (${m.id})`;

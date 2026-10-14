@@ -62,7 +62,7 @@ export function setNote(all: Feedback, key: string, text: string, entries: strin
 export function placeNotes(groups: readonly Pick<Group, 'key' | 'entries'>[], all: Feedback): { notes: Map<string, Note>; orphans: [string, Note][] } {
   const notes = new Map<string, Note>();
   const orphans: [string, Note][] = [];
-  const from = new Map<string, string>();
+  const newest = (a: Note | undefined, b: Note) => (!a || b.updatedAt > a.updatedAt ? b : a);
   for (const [key, note] of Object.entries(all)) {
     let best: [string, number] | null = null;
     for (const g of groups) {
@@ -70,15 +70,7 @@ export function placeNotes(groups: readonly Pick<Group, 'key' | 'entries'>[], al
       if (n && (!best || n > best[1])) best = [g.key, n];
     }
     const home = best?.[0] ?? (groups.some((g) => g.key === key) ? key : null);
-    if (!home) { orphans.push([key, note]); continue; }
-    const held = notes.get(home);
-    // Two notes for one group: the group's own note (saved under its key) wins, otherwise the newest. The other
-    // one (a group that was merged in) is listed apart, so its text is never lost.
-    const mine = key === home, heldMine = from.get(home) === home;
-    if (!held || (mine && !heldMine) || (mine === heldMine && note.updatedAt > held.updatedAt)) {
-      if (held) orphans.push([from.get(home)!, held]);
-      notes.set(home, note); from.set(home, key);
-    } else orphans.push([key, note]);
+    if (home) notes.set(home, newest(notes.get(home), note)); else orphans.push([key, note]);
   }
   return { notes, orphans };
 }

@@ -707,19 +707,3 @@ html.reveal-ready [data-reveal]:not(.in) { animation: none; }
 .module-canvas-link { position: relative; z-index: 2; justify-self: start; padding: 9px 14px; border: 1px solid var(--hero-line); border-radius: 10px; color: var(--hero-text); font: 500 12px var(--font-mono); }
 .module-canvas-link:hover { background: var(--c); color: #0b0d10; }
 .module-canvas-link[hidden] { display: none; }
-
-/* ---------- dragging a one-person group into another group (src/scripts/solo-drag.ts) ---------- */
-.solo-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.solo-handle { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 12px; border: 1px dashed var(--accent-text); border-radius: var(--r-md); background: var(--accent-soft); color: var(--text); font: 600 13px var(--font-body); cursor: grab; touch-action: none; user-select: none; }
-.solo-handle:active { cursor: grabbing; }
-.solo-handle:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
-.solo-move { width: auto; flex: 1 1 180px; height: 36px; font-size: 13px; }
-.dragging { opacity: .45; }
-body.solo-dragging, body.solo-dragging * { cursor: grabbing !important; user-select: none; }
-.drop-ok { outline: 2px solid var(--accent-text) !important; outline-offset: 2px; background-color: color-mix(in oklab, var(--accent) 8%, var(--surface)) !important; }
-.drop-no { outline: 2px dashed var(--danger) !important; outline-offset: 2px; }
-.solo-ghost { position: fixed; z-index: 400; left: 0; top: 0; pointer-events: none; display: grid; gap: 2px; padding: 8px 12px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--accent-text); box-shadow: var(--shadow-lg); font-size: 13.5px; color: var(--text); }
-.solo-ghost small { color: var(--accent-text); font-size: 12px; }
-.solo-ghost.no { border-color: var(--danger); }
-.solo-ghost.no small { color: var(--danger); }
-@media (max-width: 719px) { .solo-move { font-size: 16px; } }

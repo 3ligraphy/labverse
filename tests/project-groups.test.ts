@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  assignRandom, autoNumber, buildGroups, moveSolo, isSolo, lastHandIn, sortGroups, cleanTeam, entryKeys, numberGroup, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
+  assignRandom, autoNumber, buildGroups, lastHandIn, sortGroups, cleanTeam, entryKeys, numberGroup, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
   parseRoster, randomIdea, unassigned, type Plan,
 } from '../src/lib/project-files/groups.ts';
 
@@ -307,31 +307,4 @@ test('extractIdeas cleans contents-page dots, page numbers, control characters a
 
 test('findStudents finds an ID typed against the name', () => {
   assert.deepEqual(findStudents('Names: Hassan236184, mazeen235577', [{ id: '236184', name: 'Hassan Saif' }]), ['236184']);
-});
-
-test('moveSolo puts a one-person group into another group with its ideas, and closes it', () => {
-  const es = [entry('a', '23CS0001', 'Sara Ali', 'G1'), entry('b', '23CS0002', 'Omar Hassan', 'G1'), entry('c', '23CS0003', 'Mona Adel', 'G2', 'Idea 1: Parking finder')];
-  const p: Plan = { ...emptyPlan(), extraIdeas: { G2: ['Typed idea'] }, choices: { G2: { mode: 'manual', idea: 'Parking finder' } }, later: ['G2'] };
-  let gs = buildGroups(es, roster.students, p);
-  const solo = gs.find((g) => g.key === 'G2')!, target = gs.find((g) => g.key === 'G1')!;
-  assert.ok(isSolo(solo) && !isSolo(target));
-  assert.deepEqual(moveSolo(p, solo, target), { ok: true });
-  gs = buildGroups(es, roster.students, p);
-  assert.deepEqual(gs.map((g) => g.key), ['G1'], 'the solo group is closed');
-  assert.deepEqual(gs[0].members.map((m) => m.id), ['23CS0001', '23CS0002', '23CS0003']);
-  assert.ok(gs[0].ideas.includes('Parking finder') && gs[0].ideas.includes('Typed idea'), 'the ideas come along');
-  assert.deepEqual(p.choices.G1, { mode: 'manual', idea: 'Parking finder' }, 'the approved idea comes along when the group had none');
-  assert.ok(!('G2' in p.choices) && !('G2' in p.extraIdeas) && !p.later.includes('G2'));
-});
-
-test('moveSolo keeps the target group\'s approved idea and refuses full groups or bigger groups', () => {
-  const es = [entry('a', '23CS0001', 'Sara Ali', 'G1'), entry('b', '23CS0002', 'Omar Hassan', 'G1'), entry('c', '23CS0003', 'Mona Adel', 'G2')];
-  const p: Plan = { ...emptyPlan(), choices: { G1: { mode: 'auto', idea: 'Gym tracker' }, G2: { mode: 'manual', idea: 'Parking finder' } } };
-  const gs = buildGroups(es, roster.students, p);
-  const g1 = gs.find((g) => g.key === 'G1')!, g2 = gs.find((g) => g.key === 'G2')!;
-  assert.equal(moveSolo(p, g1, g2).ok, false, 'a two-person group is not a solo');
-  assert.equal(moveSolo(p, g2, { ...g1, members: [...g1.members, ...g1.members] }).ok, false, 'a full group takes no one');
-  assert.deepEqual(moveSolo(p, g2, g1), { ok: true });
-  assert.deepEqual(p.choices.G1, { mode: 'auto', idea: 'Gym tracker' });
-  assert.ok(p.extraIdeas.G1.includes('Parking finder'), 'the moved student\'s approved idea stays on offer');
 });
