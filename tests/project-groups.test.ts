@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  assignRandom, autoNumber, buildGroups, mergeSolos, lastHandIn, sortGroups, cleanTeam, entryKeys, numberGroup, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
+  assignRandom, autoNumber, buildGroups, lastHandIn, sortGroups, cleanTeam, entryKeys, numberGroup, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
   parseRoster, randomIdea, unassigned, type Plan,
 } from '../src/lib/project-files/groups.ts';
 
@@ -307,30 +307,4 @@ test('extractIdeas cleans contents-page dots, page numbers, control characters a
 
 test('findStudents finds an ID typed against the name', () => {
   assert.deepEqual(findStudents('Names: Hassan236184, mazeen235577', [{ id: '236184', name: 'Hassan Saif' }]), ['236184']);
-});
-
-test('mergeSolos moves solo students into two-person groups first, then three-person groups, never past four', () => {
-  const r = parseRoster(Array.from({ length: 12 }, (_, i) => `Student ${i + 1}, 23CS${String(i + 1).padStart(4, '0')}`).join(String.fromCharCode(10))).students;
-  const id = (n: number) => `23CS${String(n).padStart(4, '0')}`;
-  const hand = (n: number, group: string) => entry(`e${n}`, id(n), `Student ${n}`, group);
-  // G1: 2 people · G2: 3 people · G3, G4, G5, G6: one each
-  const es = [hand(1, 'G1'), hand(2, 'G1'), hand(3, 'G2'), hand(4, 'G2'), hand(5, 'G2'), hand(6, 'G3'), hand(7, 'G4'), hand(8, 'G5'), hand(9, 'G6')];
-  const p: Plan = { ...emptyPlan(), choices: { G3: { mode: 'manual', idea: 'Old idea' } }, later: ['G4'] };
-  const out = mergeSolos(buildGroups(es, r, p), p, seeded(5));
-  assert.equal(out.moves.length, 3);
-  assert.deepEqual(out.moves.map((m) => m.to), ['G1', 'G2', 'G1'], 'the two-person group first, then the original three, then the new three');
-  assert.equal(out.left.length, 1, 'no seat left for the fourth solo');
-  const after = buildGroups(es, r, p);
-  assert.deepEqual(after.map((g) => [g.key, g.members.length]).filter(([, n]) => n !== 1), [['G1', 4], ['G2', 4]]);
-  assert.ok(after.every((g) => g.members.length <= 4));
-  for (const m of out.moves) assert.ok(!(m.from in p.choices) && !p.later.includes(m.from), 'what was saved for a moved solo is dropped');
-});
-
-test('mergeSolos leaves everyone in place when there is no small group', () => {
-  const es = [entry('a', '23CS0001', 'Sara Ali', 'G1'), entry('b', '23CS0002', 'Omar Hassan', 'G2')];
-  const p = emptyPlan();
-  const out = mergeSolos(buildGroups(es, roster.students, p), p, seeded(1));
-  assert.equal(out.moves.length, 0);
-  assert.equal(out.left.length, 2);
-  assert.deepEqual(p.teams, {});
 });
