@@ -30,10 +30,12 @@ if (!file) return Astro.redirect('/admin/project', 303);
       </div>
       <div class="fb-actions">
         <span class="live mono" data-fb-live>loading…</span>
+        <button class="btn btn-ghost btn-sm" type="button" data-fb-release disabled aria-pressed="false">Publish results to students</button>
         <button class="btn btn-primary btn-sm" type="button" data-fb-pdf disabled>Generate PDF report</button>
       </div>
     </header>
 
+    <p class="fb-release" data-fb-release-note hidden></p>
     <div class="fb-summary" data-fb-summary></div>
 
     <div class="fb-tools">
@@ -160,6 +162,8 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .fb-foot .err { color: var(--danger); }
   .fb-foot .ok { color: var(--accent-text); }
   .fb-msg { min-height: 20px; font-size: 13px; color: var(--accent-text); }
+  .fb-release { padding: 12px 14px; border-radius: var(--r-md); border: 1px solid color-mix(in oklab, var(--accent-text) 40%, var(--line-2)); background: var(--accent-soft); font-size: 13.5px; color: var(--text); }
+  [data-fb-release][aria-pressed="true"] { border-color: var(--accent-text); color: var(--accent-text); }
   .fb-msg.err { color: var(--danger); }
   .fb-orphans { padding: 16px 18px; border: 1px dashed var(--line-2); border-radius: var(--r-lg); font-size: 13px; color: var(--text-2); display: grid; gap: 8px; }
   .fb-orphans blockquote { margin: 0; padding: 8px 12px; border-radius: var(--r-sm); background: var(--surface-2); white-space: pre-wrap; color: var(--text-2); }
@@ -522,6 +526,45 @@ if (!file) return Astro.redirect('/admin/project', 303);
       }
     });
 
+    /* ------------------------------------------- results shown to students */
+    const releaseBtn = $<HTMLButtonElement>('[data-fb-release]');
+    const releaseNote = $('[data-fb-release-note]');
+    let published = false;
+    const showRelease = (r: { published: boolean; at: string; by: string }) => {
+      published = r.published;
+      releaseBtn.disabled = false;
+      releaseBtn.setAttribute('aria-pressed', String(published));
+      releaseBtn.textContent = published ? 'Hide results from students' : 'Publish results to students';
+      releaseNote.hidden = !published;
+      releaseNote.innerHTML = published
+        ? `Students can see their own group's approved idea and feedback on the <a href="/project#results">Project page</a> (they type their student ID). Published ${esc(when(r.at))}${r.by ? ` by ${esc(r.by)}` : ''}. Changes you make here show there straight away.`
+        : '';
+    };
+    releaseBtn.addEventListener('click', async () => {
+      const next = !published;
+      if (next && releaseBtn.dataset.armed !== '1') {
+        releaseBtn.dataset.armed = '1';
+        releaseBtn.textContent = 'Confirm: publish to students';
+        setTimeout(() => { if (releaseBtn.dataset.armed === '1') { releaseBtn.dataset.armed = ''; releaseBtn.textContent = 'Publish results to students'; } }, 5000);
+        return;
+      }
+      releaseBtn.dataset.armed = '';
+      releaseBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/admin/project/feedback?file=${encodeURIComponent(fileId)}`, {
+          method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'release', published: next }),
+        });
+        if (res.status === 401) return location.reload();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error ?? 'Could not save.');
+        showRelease(data.release);
+        say(next ? 'Published: each student can now look up their own result on the Project page.' : 'Hidden: students no longer see the results.');
+      } catch (error) {
+        releaseBtn.disabled = false;
+        say(`${error instanceof Error ? error.message : 'Could not save.'} Try again.`, true);
+      }
+    });
+
     async function load() {
       try {
         const res = await fetch(`/api/admin/project/feedback?file=${encodeURIComponent(fileId)}`, { cache: 'no-store' });
@@ -530,6 +573,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         if (!res.ok) throw new Error(data.error ?? 'Could not load.');
         entries = data.entries;
         plan = data.plan;
+        if (data.release) showRelease(data.release);
         const roster: Student[] = data.roster;
         groups = buildGroups(entries, roster, plan);
         const { notes, orphans } = placeNotes(groups, data.feedback as Feedback);

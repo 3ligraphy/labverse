@@ -14,6 +14,7 @@ const required = d?.features.filter((f) => f.required) ?? [];
 const stretch = d?.features.filter((f) => !f.required) ?? [];
 const nav = d ? [
   ['overview', 'Overview'],
+  ['results', 'Your result'],
   ['files', 'Submissions'],
   ['journey', 'Milestones'],
   ['requirements', 'Requirements'],
@@ -66,6 +67,24 @@ const nav = d ? [
               <p set:html={inline(d.problem)} />
             </div>
             {d.objectives.length > 0 && <ul class="dash-list">{d.objectives.map((o) => <li set:html={inline(o)} />)}</ul>}
+          </div>
+        </section>
+
+        <section id="results" class="pj-sec pj-split" data-pj-results hidden>
+          <div>
+            <h2 class="h-2">Your proposal result</h2>
+            <p class="muted pjr-intro">Type your student ID to see your group, the idea approved for it and your feedback. Only your own group is shown.</p>
+          </div>
+          <div class="pjr">
+            <form class="pjr-form" data-pjr-form novalidate>
+              <label for="pjr-id">Student ID</label>
+              <div class="pjr-row">
+                <input id="pjr-id" class="input mono" name="studentId" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="e.g. 241995" required />
+                <button class="btn btn-primary" type="submit">Show my result</button>
+              </div>
+              <p class="pjr-msg" role="status" data-pjr-msg></p>
+            </form>
+            <div class="pjr-out" data-pjr-out aria-live="polite"></div>
           </div>
         </section>
 
@@ -230,6 +249,24 @@ const nav = d ? [
   :global(.pjf small) { display: block; margin-top: 8px; font-size: 12px; color: var(--text-3); }
   :global(.pjf-due) { color: var(--warn); }
   :global(.pjf-act) { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .pjr { display: grid; gap: 16px; min-width: 0; }
+  .pjr-form { display: grid; gap: 8px; }
+  .pjr-form label { font-weight: 600; font-size: 14px; }
+  .pjr-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .pjr-row .input { flex: 1 1 200px; max-width: 280px; }
+  .pjr-msg { min-height: 20px; font-size: 14px; color: var(--text-2); margin: 0 !important; }
+  .pjr-msg.err { color: var(--danger); }
+  :global(.pjr-card) { display: grid; gap: 12px; padding: 20px; border: 1px solid color-mix(in oklab, var(--accent-text) 40%, var(--line)); border-radius: var(--r-lg); background: var(--surface); }
+  :global(.pjr-card + .pjr-card) { margin-top: 4px; }
+  :global(.pjr-item) { font-size: 12px; color: var(--text-3); margin: 0 !important; }
+  :global(.pjr-group) { margin: 0 !important; font-size: var(--fs-xl); letter-spacing: -0.03em; }
+  :global(.pjr-members) { margin: 0 !important; color: var(--text-2); }
+  :global(.pjr-block) { display: grid; gap: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+  :global(.pjr-label) { font: 600 12px var(--font-mono); color: var(--text-3); }
+  :global(.pjr-idea) { margin: 0 !important; font-size: 1.15rem; font-weight: 600; color: var(--text); }
+  :global(.pjr-fb) { margin: 0 !important; white-space: pre-wrap; color: var(--text); line-height: 1.6; }
+  :global(.pjr-none) { margin: 0 !important; color: var(--text-3); }
 </style>
 
 <script>
@@ -277,8 +314,50 @@ const nav = d ? [
     if (link) link.hidden = false;
   }
 
+  /** Proposal results: shown only once staff publish them; a student sees their own group by typing their ID. */
+  async function loadResults() {
+    const sec = document.querySelector<HTMLElement>('[data-pj-results]');
+    const link = document.querySelector<HTMLElement>('[data-sub="results"]')?.parentElement;
+    if (link) link.hidden = true;
+    if (!sec || sec.dataset.wired) return;
+    const data = await fetch('/api/project/result').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!data?.items?.length) return;
+    sec.dataset.wired = '1';
+    sec.hidden = false;
+    if (link) link.hidden = false;
+    const form = sec.querySelector<HTMLFormElement>('[data-pjr-form]')!;
+    const input = form.querySelector<HTMLInputElement>('input')!;
+    const msg = sec.querySelector<HTMLElement>('[data-pjr-msg]')!;
+    const out = sec.querySelector<HTMLElement>('[data-pjr-out]')!;
+    type Result = { item: string; group: string; members: string[]; idea: string; feedback: string | null };
+    const card = (r: Result) => `
+      <article class="pjr-card">
+        <p class="pjr-item mono">${esc(r.item)}</p>
+        <h3 class="pjr-group">${esc(r.group)}</h3>
+        <p class="pjr-members"><b>Members:</b> ${r.members.map(esc).join(', ')}</p>
+        <div class="pjr-block"><span class="pjr-label">Approved idea</span>${r.idea ? `<p class="pjr-idea">${esc(r.idea)}</p>` : '<p class="pjr-none">No idea approved yet. Check again later or ask your TA.</p>'}</div>
+        <div class="pjr-block"><span class="pjr-label">Feedback</span>${r.feedback ? `<p class="pjr-fb">${esc(r.feedback)}</p>` : '<p class="pjr-none">No feedback.</p>'}</div>
+      </article>`;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = input.value.trim().toUpperCase();
+      out.innerHTML = '';
+      if (!/^[A-Z0-9]{3,20}$/.test(id)) { input.setAttribute('aria-invalid', 'true'); msg.className = 'pjr-msg err'; msg.textContent = 'Type your student ID (letters and numbers only).'; input.focus(); return; }
+      input.removeAttribute('aria-invalid');
+      msg.className = 'pjr-msg'; msg.textContent = 'Looking up your group…';
+      const res = await fetch(`/api/project/result?studentId=${encodeURIComponent(id)}`, { cache: 'no-store' }).catch(() => null);
+      const body = res ? await res.json().catch(() => ({})) : {};
+      if (!res || !res.ok) { msg.className = 'pjr-msg err'; msg.textContent = body.error ?? 'Could not load your result. Check your connection and try again.'; return; }
+      const results: Result[] = body.results ?? [];
+      if (!results.length) { msg.className = 'pjr-msg err'; msg.textContent = `No group found for ${id}. Check the ID, or ask your TA if you think you should be in a group.`; return; }
+      msg.textContent = '';
+      out.innerHTML = results.map(card).join('');
+    });
+  }
+
   onPageLoad( () => {
     enablePreviewButtons();
+    loadResults();
     loadFiles();
     const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-sub]'));
     if (!links.length) return;
