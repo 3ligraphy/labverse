@@ -177,7 +177,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
   import { enablePreviewButtons, openPreview } from '@/scripts/file-preview';
   import { TEAM_NUMBER_ERROR, notATeamNumber } from '@/lib/project-files/core';
 
-  type Status = { submitted: boolean; locked?: boolean; at?: string; late?: boolean };
+  type Status = { submitted: boolean; at?: string; late?: boolean };
 
   const store = {
     get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -258,8 +258,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
       checked = sid;
       const s: Status = await fetch(`/api/submissions/${encodeURIComponent(id)}?studentId=${encodeURIComponent(sid)}&deviceKey=${encodeURIComponent(deviceKey())}`)
         .then((r) => r.json()).catch(() => ({ submitted: false }));
-      if (s.locked) say('This student ID already handed in from another browser. Use that browser, or ask your TA.', 'err');
-      else if (s.submitted && s.at) showDone(s.at, Boolean(s.late), false);
+      if (s.submitted && s.at) showDone(s.at, Boolean(s.late), false);
     };
     field('studentId').addEventListener('blur', check);
     if (field('studentId').value) void check();
