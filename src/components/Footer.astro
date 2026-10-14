@@ -5,7 +5,7 @@ import { course, nav, secondaryNav, platform } from '@/site.config';
 // Inside the built-in course the footer lists its sections; elsewhere (module chooser, builder modules,
 // sign-in, admin) it stays platform-level, so students choose a module first.
 const path = Astro.url.pathname;
-const inCourse = /^\/(course|labs|coursework|project|commands|tools|setup|resources|troubleshooting|extra|submit|attendance)(\/|$)/.test(path);
+const inCourse = /^\/mobile-development(\/|$)/.test(path);
 const groups = inCourse
   ? [
       { title: 'Learn', links: nav.slice(1, 4) },
@@ -38,7 +38,7 @@ const groups = inCourse
       <svg class="f-nova" viewBox="0 0 24 24"><path d="M12 0c.9 6.1 3 8.2 9.1 9.1C15 10 12.9 12.1 12 18.2 11.1 12.1 9 10 2.9 9.1 9 8.2 11.1 6.1 12 0Z" /></svg>
     </div>
     <div class="f-bottom mono">
-      {inCourse ? <span>Module leader: {course.instructor} · <a href="/course#team">Teaching team</a></span> : <span>{platform.name} · {platform.tagline}</span>}
+      {inCourse ? <span>Module leader: {course.instructor} · <a href="/mobile-development#team">Teaching team</a></span> : <span>{platform.name} · {platform.tagline}</span>}
       <span>Built for students and teaching teams</span>
     </div>
   </div>

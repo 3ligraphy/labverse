@@ -65,7 +65,7 @@ const q = preview ? '?preview' : '';
         <div class="container">
           <nav class="crumbs" aria-label="Breadcrumb">
             <a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span>
-            <a href={`/m/${moduleSlug}${q}`}>{moduleSlug}</a><span aria-hidden="true">/</span><span aria-current="page">{item.lab.slug}</span>
+            <a href={`/${moduleSlug}${q}`}>{moduleSlug}</a><span aria-hidden="true">/</span><span aria-current="page">{item.lab.slug}</span>
           </nav>
           {preview && <p class="bl-prev mono">Admin preview{!item.lab.published ? ' · draft' : ''}</p>}
           <div class="bl-grid">
@@ -136,10 +136,10 @@ const q = preview ? '?preview' : '';
 
           <nav class="pn" aria-label="Lab navigation">
             {prev
-              ? <a href={`/m/${moduleSlug}/${prev.lab.slug}${q}`} class="pn-a"><span class="mono faint">← Lab {pad(prev.n)}</span><span>{prev.compiled.meta.title}</span></a>
-              : <a href={`/m/${moduleSlug}${q}`} class="pn-a"><span class="mono faint">← Module</span><span>{data!.meta.title}</span></a>}
+              ? <a href={`/${moduleSlug}/${prev.lab.slug}${q}`} class="pn-a"><span class="mono faint">← Lab {pad(prev.n)}</span><span>{prev.compiled.meta.title}</span></a>
+              : <a href={`/${moduleSlug}${q}`} class="pn-a"><span class="mono faint">← Module</span><span>{data!.meta.title}</span></a>}
             {next
-              ? <a href={`/m/${moduleSlug}/${next.lab.slug}${q}`} class="pn-a next"><span class="mono faint">Lab {pad(next.n)} →</span><span>{next.compiled.meta.title}</span></a>
+              ? <a href={`/${moduleSlug}/${next.lab.slug}${q}`} class="pn-a next"><span class="mono faint">Lab {pad(next.n)} →</span><span>{next.compiled.meta.title}</span></a>
               : <a href="/modules" class="pn-a next"><span class="mono faint">All modules →</span><span>Modules</span></a>}
           </nav>
         </article>

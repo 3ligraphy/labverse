@@ -537,7 +537,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       releaseBtn.textContent = published ? 'Hide results from students' : 'Publish results to students';
       releaseNote.hidden = !published;
       releaseNote.innerHTML = published
-        ? `Students can see their own group's approved idea and feedback on the <a href="/project#results">Project page</a> (they type their student ID). Published ${esc(when(r.at))}${r.by ? ` by ${esc(r.by)}` : ''}. Changes you make here show there straight away.`
+        ? `Students can see their own group's approved idea and feedback on the <a href="/mobile-development/project#results">Project page</a> (they type their student ID). Published ${esc(when(r.at))}${r.by ? ` by ${esc(r.by)}` : ''}. Changes you make here show there straight away.`
         : '';
     };
     releaseBtn.addEventListener('click', async () => {

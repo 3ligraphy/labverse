@@ -27,7 +27,7 @@ let lastWeek = '';
 const firstLab = data?.items[0];
 const taskCount = data?.items.reduce((sum, item) => sum + item.compiled.blocks.filter((b) => b.kind === 'task').length, 0) ?? 0;
 const weeks = new Set(data?.items.map((item) => item.week).filter(Boolean));
-const labHref = (slug: string) => `/m/${data!.module.slug}/${slug}${preview ? '?preview' : ''}`;
+const labHref = (slug: string) => `/${data!.module.slug}/${slug}${preview ? '?preview' : ''}`;
 const sections = moduleSections(Astro.params.module ?? '');
 const requestedTab = Astro.url.searchParams.get('tab') ?? 'overview';
 const activeTab = sections.some((s) => s.toLowerCase() === requestedTab) ? requestedTab : 'overview';

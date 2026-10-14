@@ -321,6 +321,9 @@ type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 export const MAX_NODES = 300;
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/;
+/** Course pages live in their own folders, so a module or a built-in course lab can't take these addresses. */
+export const COURSE_SECTIONS = ['labs', 'coursework', 'project', 'commands', 'tools', 'setup', 'resources', 'troubleshooting', 'extra', 'attendance', 'submit'];
+export const RESERVED_MODULE_SLUGS = new Set(['admin', 'api', 'login', 'account', 'modules', 'invite', 'm', 'course', 'search-index', '404', 'runner', 'lab-runtime', 'lab', 'guides', '_astro', ...COURSE_SECTIONS]);
 
 /** "Web Development 2!" → "web-development-2" */
 export const slugify = (s: string) =>

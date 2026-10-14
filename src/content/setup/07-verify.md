@@ -17,4 +17,4 @@ Run each command in the **Verification** panel. If every one prints what's expec
 > [!IMPORTANT]
 > Tick the final items in the **Setup checklist** — your progress is saved in this browser.
 
-If anything fails, open the [Troubleshooting center](/troubleshooting).
+If anything fails, open the [Troubleshooting center](/mobile-development/troubleshooting).

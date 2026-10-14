@@ -293,7 +293,7 @@ const nav = d ? [
     const files: ProjectFile[] = data?.files ?? [];
     if (!files.length) return;
     list.innerHTML = files.map((f) => {
-      const submit = `/submit/${encodeURIComponent(f.id)}`;
+      const submit = `/mobile-development/submit/${encodeURIComponent(f.id)}`;
       const title = f.accepting ? `<a href="${submit}">${esc(f.title)}</a>` : esc(f.title);
       const closed = (f.accepting || f.kind === 'proposal') && !canSubmit(f);
       const meta = [esc(KIND[f.kind] ?? 'Document'), f.url && f.size ? `PDF · ${kb(f.size)}` : '', f.due_at ? `<span class="pjf-due">due ${day(f.due_at)}</span>` : ''].filter(Boolean).join(' · ');

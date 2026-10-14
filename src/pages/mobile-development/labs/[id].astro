@@ -106,7 +106,7 @@ const sections = [
   <header class="page-head lab-head">
     <div class="grid-bg" aria-hidden="true"></div>
     <div class="container">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/labs">labs</a><span aria-hidden="true">/</span><span aria-current="page">{lab.id}</span></nav>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/mobile-development/labs">labs</a><span aria-hidden="true">/</span><span aria-current="page">{lab.id}</span></nav>
       <div class="lh-grid">
         <div>
           <p class="lh-no mono" data-reveal>LAB<span>{pad(d.number)}</span></p>
@@ -223,7 +223,7 @@ const sections = [
         <section class="block stuck">
           <h2 class="block-title" id="troubleshooting"><span class="stuck-ic" aria-hidden="true"><Icon name="bug" size={18} /></span>Stuck?</h2>
           <ProblemList items={d.troubleshooting} />
-          <p class="faint mt-4" style="font-size:14px">Still stuck? Search the <a href="/troubleshooting" class="accent">troubleshooting center</a> or ask your TA.</p>
+          <p class="faint mt-4" style="font-size:14px">Still stuck? Search the <a href="/mobile-development/troubleshooting" class="accent">troubleshooting center</a> or ask your TA.</p>
         </section>
       )}
 
@@ -257,12 +257,12 @@ const sections = [
 
       <nav class="pn" aria-label="Lab navigation">
         {prev ? (
-          <a href={`/labs/${prev.id}`} class="pn-a"><span class="mono faint">← Lab {pad(prev.data.number)}</span><span>{prev.data.title}</span></a>
-        ) : <a href="/labs" class="pn-a"><span class="mono faint">← All labs</span><span>Labs</span></a>}
+          <a href={`/mobile-development/labs/${prev.id}`} class="pn-a"><span class="mono faint">← Lab {pad(prev.data.number)}</span><span>{prev.data.title}</span></a>
+        ) : <a href="/mobile-development/labs" class="pn-a"><span class="mono faint">← All labs</span><span>Labs</span></a>}
         {next ? (
-          <a href={`/labs/${next.id}`} class="pn-a next"><span class="mono faint">Lab {pad(next.data.number)} →</span><span>{next.data.title}</span></a>
+          <a href={`/mobile-development/labs/${next.id}`} class="pn-a next"><span class="mono faint">Lab {pad(next.data.number)} →</span><span>{next.data.title}</span></a>
         ) : (
-          <a href="/commands" class="pn-a next"><span class="mono faint">Keep handy →</span><span>Command Handbook</span></a>
+          <a href="/mobile-development/commands" class="pn-a next"><span class="mono faint">Keep handy →</span><span>Command Handbook</span></a>
         )}
       </nav>
     </article>

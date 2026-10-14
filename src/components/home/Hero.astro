@@ -5,11 +5,11 @@ import { course } from '@/site.config';
 interface Props { counts: { labs: number; coursework: number; commands: number; tools: number } }
 const { counts } = Astro.props;
 const quick = [
-  { label: 'Labs', href: '/labs', n: counts.labs },
-  { label: 'Coursework', href: '/coursework', n: counts.coursework },
-  { label: 'Project', href: '/project', n: 1 },
-  { label: 'Commands', href: '/commands', n: counts.commands },
-  { label: 'Tools', href: '/tools', n: counts.tools },
+  { label: 'Labs', href: '/mobile-development/labs', n: counts.labs },
+  { label: 'Coursework', href: '/mobile-development/coursework', n: counts.coursework },
+  { label: 'Project', href: '/mobile-development/project', n: 1 },
+  { label: 'Commands', href: '/mobile-development/commands', n: counts.commands },
+  { label: 'Tools', href: '/mobile-development/tools', n: counts.tools },
 ];
 ---
 <section class="hero" data-hero aria-labelledby="hero-title">
@@ -28,7 +28,7 @@ const quick = [
       <p class="lead hero-lead hero-in" style="--d:260ms">{course.tagline}</p>
       <div class="hero-cta hero-in" style="--d:340ms">
         <a href="#roadmap" class="btn btn-primary btn-lg">Start Learning <Icon name="arrow" class="arrow" /></a>
-        <a href="/labs" class="btn btn-ghost btn-lg"><Icon name="flask" /> Explore Labs</a>
+        <a href="/mobile-development/labs" class="btn btn-ghost btn-lg"><Icon name="flask" /> Explore Labs</a>
       </div>
       <nav class="hero-quick hero-in" style="--d:420ms" aria-label="Course sections">
         {quick.map((q) => (

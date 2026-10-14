@@ -10,7 +10,7 @@ const groups = [...groupBy(tools, (t) => t.data.category)];
 ---
 <Base title="Tools" description="Every tool used in the Mobile Development course — what it is, why we use it and how to install it.">
   <PageHeader eyebrow="Development toolkit" title="The tools <span class='accent'>of the trade.</span>" lead="Everything you'll install this term. Each page explains why we use it, how to install and configure it, and how to fix it when it breaks." crumbs={[{ label: 'tools' }]}>
-    <a href="/setup" class="btn btn-primary">Guided setup <Icon name="arrow" class="arrow" /></a>
+    <a href="/mobile-development/setup" class="btn btn-primary">Guided setup <Icon name="arrow" class="arrow" /></a>
   </PageHeader>
 
   <section class="container tools-wrap">
@@ -22,7 +22,7 @@ const groups = [...groupBy(tools, (t) => t.data.category)];
         <ul class="tg-list">
           {items.map((t, i) => (
             <li data-reveal style={`--d:${i * 50}ms`}>
-              <a href={`/tools/${t.id}`} class="row tool-row" style={`--c:${t.data.color ?? 'var(--accent)'}`}>
+              <a href={`/mobile-development/tools/${t.id}`} class="row tool-row" style={`--c:${t.data.color ?? 'var(--accent)'}`}>
                 <ToolLogo logo={t.data.logo} monogram={t.data.monogram} name={t.data.name} color={t.data.color} />
                 <span class="tl-main">
                   <span class="tl-name">{t.data.name}{!t.data.required && <span class="badge badge-optional tl-opt">Optional</span>}</span>

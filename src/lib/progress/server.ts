@@ -173,7 +173,7 @@ async function labChoices(labs: LabStructure[]) {
       title: key && l.title.startsWith(`${moduleTitle}: `) ? l.title.slice(moduleTitle.length + 2) : l.title,
       module, moduleTitle, faculty,
       facultyName: faculty === ANY_FACULTY ? 'All faculties' : facultyName.get(faculty) ?? faculty,
-      href: key ? `/m/${key.module}/${key.lab}` : `/labs/${l.lab}`,
+      href: key ? `/${key.module}/${key.lab}` : `/mobile-development/labs/${l.lab}`,
     };
   });
 }

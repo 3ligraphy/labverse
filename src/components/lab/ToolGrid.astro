@@ -12,7 +12,7 @@ const tools = await Promise.all(items.map(async ([id, why]) => ({ entry: await g
 ---
 <div class="tgrid" data-reveal>
   {tools.map(({ entry, id, why }, i) => entry && (
-    <a href={`/tools/${id}`} class="tg-item stg" style={`--i:${i}; --c:${entry.data.color ?? 'var(--accent)'}`}>
+    <a href={`/mobile-development/tools/${id}`} class="tg-item stg" style={`--i:${i}; --c:${entry.data.color ?? 'var(--accent)'}`}>
       <ToolLogo logo={entry.data.logo} monogram={entry.data.monogram} name={entry.data.name} color={entry.data.color} size={48} class="tg-logo" />
       <span class="tg-txt">
         <span class="tg-name">{entry.data.name}{!entry.data.required && <span class="tg-opt mono">optional</span>}</span>

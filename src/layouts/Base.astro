@@ -12,7 +12,7 @@ import '@/styles/global.css';
 interface Props { title?: string; description?: string; noindex?: boolean; module?: { slug: string; title: string; color?: string } }
 const { title, description = platform.tagline, noindex = false, module } = Astro.props;
 const fullTitle = title ? `${title} · ${platform.name}` : `${platform.name} — ${platform.tagline}`;
-const builtInCourse = /^\/(course|labs|coursework|project|commands|tools|setup|resources|troubleshooting|extra|submit|attendance)(\/|$)/.test(Astro.url.pathname);
+const builtInCourse = /^\/mobile-development(\/|$)/.test(Astro.url.pathname);
 ---
 <!doctype html>
 <html lang="en" class="no-js">

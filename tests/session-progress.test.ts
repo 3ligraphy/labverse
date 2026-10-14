@@ -12,8 +12,8 @@ test('empty and malformed progress cannot claim completion', () => {
   assert.deepEqual(sessionProgress(['1.1'], { '1.1': true }), { done: 0, total: 1, percent: 0 });
 });
 test('module section links preserve preview and stay scoped to their module', () => {
-  assert.equal(moduleSectionHref('technology-for-psychology', 'Labs', true), '/m/technology-for-psychology?tab=labs&preview=');
-  assert.equal(moduleSectionHref('another-module', 'Overview'), '/m/another-module');
+  assert.equal(moduleSectionHref('technology-for-psychology', 'Labs', true), '/technology-for-psychology?tab=labs&preview=');
+  assert.equal(moduleSectionHref('another-module', 'Overview'), '/another-module');
   assert.ok(moduleSections('technology-for-psychology').includes('Project'));
   assert.ok(!moduleSections('another-module').includes('Project'));
 });

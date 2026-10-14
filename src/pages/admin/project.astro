@@ -216,7 +216,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             ${f.url ? `<button class="btn btn-ghost btn-sm" type="button" data-preview-url="${esc(f.url)}" data-preview-title="${esc(f.title)}" data-preview-meta="Attached PDF" data-preview-group="briefs">Preview PDF</button>` : ''}
             <button class="btn btn-ghost btn-sm" type="button" data-toggle="${esc(f.id)}" data-on="${f.accepting ? '1' : ''}">${f.accepting ? 'Close' : 'Open'}</button>
             <a class="btn btn-ghost btn-sm" href="/admin/project/${encodeURIComponent(f.id)}#settings">Manage</a>
-            <a class="btn btn-ghost btn-sm" href="/submit/${encodeURIComponent(f.id)}" target="_blank" rel="noopener">View ↗</a>
+            <a class="btn btn-ghost btn-sm" href="/mobile-development/submit/${encodeURIComponent(f.id)}" target="_blank" rel="noopener">View ↗</a>
             <button class="btn btn-ghost btn-sm pf-del" type="button" data-del="${esc(f.id)}" data-title="${esc(f.title)}" data-count="${f.entries}">Delete</button>
           </div>
         </li>`).join('') : '<li class="muted">Nothing published yet.</li>';

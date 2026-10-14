@@ -15,7 +15,7 @@ const labs = [
   ...sourceLabs.map((lab) => ({
     number: lab.data.number, title: lab.data.title, description: lab.data.description,
     difficulty: lab.data.difficulty, estimatedTime: lab.data.estimatedTime,
-    objectives: lab.data.objectives, skills: lab.data.skills, href: `/labs/${lab.id}`, canvas: false,
+    objectives: lab.data.objectives, skills: lab.data.skills, href: `/mobile-development/labs/${lab.id}`, canvas: false,
   })),
   ...(canvasModule?.items.map(({ lab, compiled, n }) => ({
     number: Number(lab.slug.match(/^lab-(\d+)$/)?.[1] ?? n),
@@ -23,7 +23,7 @@ const labs = [
     description: compiled.meta.description, difficulty: compiled.meta.difficulty,
     estimatedTime: compiled.meta.estimatedTime, objectives: compiled.meta.objectives,
     skills: ['Semester Project', 'NativeWind', 'Architecture', 'Navigation'],
-    href: `/m/${BUILT_IN_MODULE.slug}/${lab.slug}`, canvas: true,
+    href: `/${BUILT_IN_MODULE.slug}/${lab.slug}`, canvas: true,
   })) ?? []),
 ].sort((a, b) => a.number - b.number);
 const levels = ['Beginner', 'Intermediate', 'Advanced'].filter((d) => labs.some((l) => l.difficulty === d));

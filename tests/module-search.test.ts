@@ -10,12 +10,12 @@ test('module search links every section, lab, task and setup step to the current
   const slug = 'technology-for-psychology';
   const compiled = compileLab(psychologyTechnologyLab01(), `${slug}--lab-01`);
   const items = moduleSearchItems(slug, 'Technology for Psychology', [{ slug: 'lab-01', compiled }]);
-  assert.ok(items.every((item) => item.u.startsWith(`/m/${slug}`)));
+  assert.ok(items.every((item) => item.u.startsWith(`/${slug}`)));
   assert.ok(items.some((item) => item.u.endsWith('#task-1-1')));
   assert.ok(items.some((item) => item.u.includes('?tab=setup#setup-')));
   assert.ok(items.some((item) => item.t === 'Project'));
   const other = moduleSearchItems('other-course', 'Other course', []);
-  assert.ok(other.every((item) => item.u.startsWith('/m/other-course')));
+  assert.ok(other.every((item) => item.u.startsWith('/other-course')));
   assert.ok(!other.some((item) => item.k === 'Setup'));
   assert.ok(moduleSearchItems(slug, 'Preview', [{ slug: 'lab-01', compiled }], true).every((item) => item.u.includes('preview')));
 });

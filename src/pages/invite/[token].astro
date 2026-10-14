@@ -85,7 +85,7 @@ const role = invite ? (invite.module_role ? ROLE_NAMES[invite.module_role] : ROL
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { msg.textContent = d.error ?? 'Could not accept the invitation.'; return; }
       const staff = d.user.role !== 'student';
-      location.href = d.module ? (d.module === 'mobile-development' ? '/course' : `/m/${d.module}`) : staff ? '/admin' : '/';
+      location.href = d.module ? (d.module === 'mobile-development' ? '/mobile-development' : `/${d.module}`) : staff ? '/admin' : '/';
     });
   });
 </script>

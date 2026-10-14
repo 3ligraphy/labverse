@@ -10,8 +10,8 @@ import type { APIRoute } from 'astro';
 import { access } from '@/lib/accounts/access';
 import type { Permission } from '@/lib/accounts/permissions';
 import { json } from '@/lib/progress/server';
-import { LAB_NODES, SLUG_RE, addedDisallowed, compileLab, labKey, sanitizeFlow, slugify } from '@/lib/platform/core';
-import { getPlatformStore } from '@/lib/platform/server';
+import { COURSE_SECTIONS, LAB_NODES, SLUG_RE, addedDisallowed, compileLab, labKey, sanitizeFlow, slugify } from '@/lib/platform/core';
+import { BUILT_IN_MODULE, getPlatformStore } from '@/lib/platform/server';
 
 export const prerender = false;
 
@@ -34,9 +34,11 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     const existing = new Set((await g.store.listLabs(module)).map((l) => l.slug));
     let slug = body.slug ? String(body.slug).trim() : slugify(title);
     if (!SLUG_RE.test(slug)) return json({ error: 'The address may only use lowercase letters, numbers and dashes.' }, 400);
+    // the built-in course's own sections sit at /mobile-development/<section>
+    if (module === BUILT_IN_MODULE.slug && COURSE_SECTIONS.includes(slug)) return json({ error: `/${module}/${slug} is already a page on the site. Choose another address.` }, 409);
     if (!body.slug) for (let n = 2; existing.has(slug); n++) slug = `${slugify(title)}-${n}`;
     const lab = await g.store.createLab(module, slug, title);
-    return lab ? json({ lab }, 201) : json({ error: `A lab at /m/${module}/${slug} already exists.` }, 409);
+    return lab ? json({ lab }, 201) : json({ error: `A lab at /${module}/${slug} already exists.` }, 409);
   } catch (error) {
     console.error('[platform] create lab failed', error);
     return json({ error: 'Could not create the lab.' }, 500);

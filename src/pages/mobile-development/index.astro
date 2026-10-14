@@ -24,14 +24,14 @@ const [labs, coursework, tools, setup, project, commands, resources, extra, chec
 const counts = { labs: labs.length, coursework: coursework.length, commands: commands.length, tools: tools.length };
 
 const workspace = [
-  { path: 'labs/', label: 'Labs', desc: 'Step-by-step practical sessions', href: '/labs', n: labs.length, icon: 'flask' },
-  { path: 'coursework/', label: 'Coursework', desc: 'Graded assignments & deadlines', href: '/coursework', n: coursework.length, icon: 'file' },
-  { path: 'project/', label: 'Course Project', desc: 'The capstone app you ship', href: '/project', n: project ? 1 : 0, icon: 'rocket' },
-  { path: 'commands/', label: 'Command Handbook', desc: 'Searchable, copyable commands', href: '/commands', n: commands.length, icon: 'terminal' },
-  { path: 'tools/', label: 'Development Tools', desc: 'Everything you install & why', href: '/tools', n: tools.length, icon: 'wrench' },
-  { path: 'setup/', label: 'Setup & Installation', desc: 'From zero to a working machine', href: '/setup', n: setup.length, icon: 'download' },
-  { path: 'troubleshooting/', label: 'Troubleshooting', desc: 'Errors, causes and fixes', href: '/troubleshooting', n: troubles.length, icon: 'bug' },
-  { path: 'resources/', label: 'Resources', desc: 'Docs, tutorials & cheat sheets', href: '/resources', n: resources.length, icon: 'book' },
+  { path: 'labs/', label: 'Labs', desc: 'Step-by-step practical sessions', href: '/mobile-development/labs', n: labs.length, icon: 'flask' },
+  { path: 'coursework/', label: 'Coursework', desc: 'Graded assignments & deadlines', href: '/mobile-development/coursework', n: coursework.length, icon: 'file' },
+  { path: 'project/', label: 'Course Project', desc: 'The capstone app you ship', href: '/mobile-development/project', n: project ? 1 : 0, icon: 'rocket' },
+  { path: 'commands/', label: 'Command Handbook', desc: 'Searchable, copyable commands', href: '/mobile-development/commands', n: commands.length, icon: 'terminal' },
+  { path: 'tools/', label: 'Development Tools', desc: 'Everything you install & why', href: '/mobile-development/tools', n: tools.length, icon: 'wrench' },
+  { path: 'setup/', label: 'Setup & Installation', desc: 'From zero to a working machine', href: '/mobile-development/setup', n: setup.length, icon: 'download' },
+  { path: 'troubleshooting/', label: 'Troubleshooting', desc: 'Errors, causes and fixes', href: '/mobile-development/troubleshooting', n: troubles.length, icon: 'bug' },
+  { path: 'resources/', label: 'Resources', desc: 'Docs, tutorials & cheat sheets', href: '/mobile-development/resources', n: resources.length, icon: 'book' },
 ] as const;
 
 const cmdGroups = [...groupBy(commands, (c) => c.data.category)].slice(0, 5);
@@ -94,13 +94,13 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
         </div>
         <div class="ov-row" data-reveal>
           <h3 class="mono ov-k">You'll use</h3>
-          <p>{course.overview.tools} <a href="/tools" class="inline-link">See the toolkit →</a></p>
+          <p>{course.overview.tools} <a href="/mobile-development/tools" class="inline-link">See the toolkit →</a></p>
         </div>
         <div class="ov-row" data-reveal id="assessment">
           <h3 class="mono ov-k">Assessment</h3>
           <div class="asm">
             <SplitBar items={assessment.map((a) => ({ label: a.label, value: a.weight, sub: a.detail }))} size="md" />
-            <a href="/coursework" class="inline-link">Coursework breakdown →</a>
+            <a href="/mobile-development/coursework" class="inline-link">Coursework breakdown →</a>
           </div>
         </div>
         <div class="ov-row" data-reveal id="team">
@@ -136,7 +136,7 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
         </div>
         <div class="flex between items-center wrap gap-4" data-reveal>
           <p class="muted" style="max-width:40ch">Guided, hands-on sessions. Each lab has objectives, steps, testing, troubleshooting and a submission checklist.</p>
-          <a href="/labs" class="btn btn-ghost btn-sm">All labs <Icon name="arrow" class="arrow" /></a>
+          <a href="/mobile-development/labs" class="btn btn-ghost btn-sm">All labs <Icon name="arrow" class="arrow" /></a>
         </div>
       </div>
       {labs.length === 0 ? (
@@ -144,7 +144,7 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
       ) : (
         <div class="row-list lab-rows">
           {labs.slice(0, 6).map((l, i) => (
-            <a href={`/labs/${l.id}`} class="row lab-row" data-reveal style={`--d:${i * 50}ms`}>
+            <a href={`/mobile-development/labs/${l.id}`} class="row lab-row" data-reveal style={`--d:${i * 50}ms`}>
               <span class="lab-no mono">LAB<b>{pad(l.data.number)}</b></span>
               <span class="lab-main">
                 <span class="lab-t">{l.data.title}</span>
@@ -169,13 +169,13 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
         <p class="eyebrow" data-reveal>Coursework</p>
         <h2 id="cw-title" class="h-2 mt-4" data-reveal>Assessed work,<br />clearly explained.</h2>
         <p class="muted mt-6" data-reveal style="max-width:38ch">Objectives, tasks, deliverables, grading and deadlines — one readable page per assignment.</p>
-        <a href="/coursework" class="btn btn-ghost btn-sm mt-8" data-reveal>View coursework <Icon name="arrow" class="arrow" /></a>
+        <a href="/mobile-development/coursework" class="btn btn-ghost btn-sm mt-8" data-reveal>View coursework <Icon name="arrow" class="arrow" /></a>
       </div>
       <div class="cw-list">
         {coursework.length === 0 ? (
           <EmptyState title="No coursework published yet." body="Assignments will appear here with their deadlines." path="coursework/" />
         ) : coursework.map((c, i) => (
-          <a href={`/coursework/${c.id}`} class="cw-item" data-reveal style={`--d:${i * 80}ms`}>
+          <a href={`/mobile-development/coursework/${c.id}`} class="cw-item" data-reveal style={`--d:${i * 80}ms`}>
             <div class="cw-top mono"><span>CW{pad(c.data.number)}</span><span class="cw-due"><Icon name="calendar" size={14} /> Due {formatDeadline(c.data.deadline)}</span></div>
             <h3 class="h-3">{c.data.title}</h3>
             <p class="muted">{c.data.description}</p>
@@ -212,7 +212,7 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
             ))}
           </ol>
           <div class="pj-cta">
-            <a href="/project" class="btn btn-primary">Open the project brief <Icon name="arrow" class="arrow" /></a>
+            <a href="/mobile-development/project" class="btn btn-primary">Open the project brief <Icon name="arrow" class="arrow" /></a>
             <span class="mono faint pj-feat">{project.data.features.filter((f) => f.required).length} required features · {project.data.deliverables.length} deliverables</span>
           </div>
         </div>
@@ -230,7 +230,7 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
         </div>
         <div class="flex between items-center wrap gap-4" data-reveal>
           <p class="muted" style="max-width:40ch">{commands.length} commands across Git, terminal, packages, Android, builds and debugging — searchable and one-click copyable.</p>
-          <a href="/commands" class="btn btn-ghost btn-sm">Open handbook <Icon name="arrow" class="arrow" /></a>
+          <a href="/mobile-development/commands" class="btn btn-ghost btn-sm">Open handbook <Icon name="arrow" class="arrow" /></a>
         </div>
       </div>
       <div class="term-demo" data-reveal data-tabs>
@@ -250,7 +250,7 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
                 <p class="td-desc"><strong>{c.data.title}.</strong> {c.data.description}</p>
               </div>
             ))}
-            <a href={`/commands?c=${encodeURIComponent(cat)}`} class="td-more mono">→ all {cat} commands</a>
+            <a href={`/mobile-development/commands?c=${encodeURIComponent(cat)}`} class="td-more mono">→ all {cat} commands</a>
           </div>
         ))}
       </div>
@@ -269,7 +269,7 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
       </div>
       <div class="tk">
         {tools.map((t, i) => (
-          <a href={`/tools/${t.id}`} class="tk-item" data-reveal style={`--d:${i * 50}ms; --c:${t.data.color ?? 'var(--accent)'}`}>
+          <a href={`/mobile-development/tools/${t.id}`} class="tk-item" data-reveal style={`--d:${i * 50}ms; --c:${t.data.color ?? 'var(--accent)'}`}>
             <ToolLogo logo={t.data.logo} monogram={t.data.monogram} name={t.data.name} color={t.data.color} size={52} class="tk-logo" />
             <span class="tk-cat mono">{t.data.category}</span>
             <span class="tk-name">{t.data.name}</span>
@@ -294,13 +294,13 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
             <span class="mono" data-mini-label>0 / {checklist.length}</span>
           </div>
           <div class="su-bar"><i data-mini-bar></i></div>
-          <a href="/setup#checklist" class="btn btn-primary btn-sm mt-4">Open checklist <Icon name="arrow" class="arrow" /></a>
+          <a href="/mobile-development/setup#checklist" class="btn btn-primary btn-sm mt-4">Open checklist <Icon name="arrow" class="arrow" /></a>
         </div>
       </div>
       <ol class="su-steps">
         {setup.map((s, i) => (
           <li data-reveal style={`--d:${i * 50}ms`}>
-            <a href={`/setup/${s.id}`} class="su-step">
+            <a href={`/mobile-development/setup/${s.id}`} class="su-step">
               <span class="su-n mono">{pad(s.data.step)}</span>
               <span class="su-t">{s.data.title}</span>
               {s.data.estimatedTime && <span class="su-time mono">{s.data.estimatedTime}</span>}
@@ -321,7 +321,7 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
         </div>
         <div class="flex between items-center wrap gap-4" data-reveal>
           <p class="muted" style="max-width:40ch">Official docs, tutorials and references chosen for this course.</p>
-          <a href="/resources" class="btn btn-ghost btn-sm">All resources <Icon name="arrow" class="arrow" /></a>
+          <a href="/mobile-development/resources" class="btn btn-ghost btn-sm">All resources <Icon name="arrow" class="arrow" /></a>
         </div>
       </div>
       <div class="res-cols">
@@ -349,9 +349,9 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
           <p class="muted">Not required for grades. For students who want to go further.</p>
         </div>
         <ul class="ex-tags">
-          {extra.map((e) => <li><a href={`/extra#${e.id}`}>{e.data.category}</a></li>)}
+          {extra.map((e) => <li><a href={`/mobile-development/extra#${e.id}`}>{e.data.category}</a></li>)}
         </ul>
-        <a href="/extra" class="btn btn-ghost btn-sm">Explore <Icon name="arrow" class="arrow" /></a>
+        <a href="/mobile-development/extra" class="btn btn-ghost btn-sm">Explore <Icon name="arrow" class="arrow" /></a>
       </div>
     </div>
   </section>
@@ -362,8 +362,8 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
       <p class="eyebrow no-slash mono" data-reveal>$ where is everything?</p>
       <h2 class="h-1 final-t" data-reveal>Right <span class="accent">here.</span></h2>
       <div class="flex wrap gap-3 mt-8" data-reveal style="justify-content:center">
-        <a href="/labs/lab-01" class="btn btn-primary btn-lg">Start with Lab 01 <Icon name="arrow" class="arrow" /></a>
-        <a href="/setup" class="btn btn-ghost btn-lg">Set up my computer</a>
+        <a href="/mobile-development/labs/lab-01" class="btn btn-primary btn-lg">Start with Lab 01 <Icon name="arrow" class="arrow" /></a>
+        <a href="/mobile-development/setup" class="btn btn-ghost btn-lg">Set up my computer</a>
       </div>
     </div>
   </section>

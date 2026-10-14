@@ -13,23 +13,24 @@ import { moduleSections, moduleSectionHref } from '@/lib/platform/module-section
 interface Props { module?: { slug: string; title: string; color?: string } }
 const { module } = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
-const COURSE = /^\/(course|labs|coursework|project|commands|tools|setup|resources|troubleshooting|extra|submit|attendance)(\/|$)/;
+const COURSE = /^\/mobile-development(\/|$)/;
 const context = module
   ? { title: module.title, color: module.color ?? '#7cb1ff', items: moduleSections(module.slug).map((label) => ({ label, href: moduleSectionHref(module.slug, label, Astro.url.searchParams.has('preview')) })) }
   : COURSE.test(path) ? { title: course.name, color: '#c8ff4d', items: nav } : null;
 const PLATFORM = [{ label: 'Your modules', href: '/' }, { label: 'All modules', href: '/modules' }];
 const items = context?.items ?? PLATFORM;
 // remembered by the script, so platform pages can offer "back to the module you were in"
-const contextLink = module ? `/m/${module.slug}` : context ? '/course' : '';
+const contextLink = module ? `/${module.slug}` : context ? '/mobile-development' : '';
 // the sign-in page is the sign-in: no second "Sign in" button above it
 const onLogin = path === '/login';
 const isActive = (href: string) => {
   if (module) {
     const target = new URL(href, Astro.url);
     const section = target.searchParams.get('tab') ?? 'overview';
-    return path.startsWith(`/m/${module.slug}/`) ? section === 'labs' : path === target.pathname && section === (Astro.url.searchParams.get('tab') ?? 'overview');
+    return path.startsWith(`/${module.slug}/`) ? section === 'labs' : path === target.pathname && section === (Astro.url.searchParams.get('tab') ?? 'overview');
   }
-  return path === href.replace(/#.*$/, '') || (href !== '/' && !href.includes('#') && path.startsWith(href + '/'));
+  // the course home is the parent of every course page, so it is only active on itself
+  return path === href.replace(/#.*$/, '') || (href !== '/' && href !== '/mobile-development' && !href.includes('#') && path.startsWith(href + '/'));
 };
 
 /** Phones: the main sections as a bottom tab bar, like an app. "More" opens the full menu. */
@@ -38,8 +39,8 @@ const tabs: Tab[] = module
   ? [{ label: 'Modules', icon: 'grid', href: '/' }, { label: 'Overview', icon: 'book', href: moduleSectionHref(module.slug, 'overview', Astro.url.searchParams.has('preview')) },
      { label: 'Labs', icon: 'flask', href: moduleSectionHref(module.slug, 'labs', Astro.url.searchParams.has('preview')) }, { label: 'Search', icon: 'search', kind: 'search' }]
   : COURSE.test(path)
-    ? [{ label: 'Course', icon: 'book', href: '/course' }, { label: 'Labs', icon: 'flask', href: '/labs' },
-       { label: 'Coursework', icon: 'file', href: '/coursework' }, { label: 'Project', icon: 'rocket', href: '/project' }]
+    ? [{ label: 'Course', icon: 'book', href: '/mobile-development' }, { label: 'Labs', icon: 'flask', href: '/mobile-development/labs' },
+       { label: 'Coursework', icon: 'file', href: '/mobile-development/coursework' }, { label: 'Project', icon: 'rocket', href: '/mobile-development/project' }]
     : [{ label: 'Modules', icon: 'grid', href: '/', on: path === '/' || path === '/modules' }, { label: 'Search', icon: 'search', kind: 'search' },
        { label: 'Account', icon: 'key', href: '/login', kind: 'account', on: path === '/login' || path === '/account' }];
 for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.href));

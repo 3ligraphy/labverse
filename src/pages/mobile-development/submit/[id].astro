@@ -31,7 +31,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
       <header class="sbh">
         <div class="sbh-bg" aria-hidden="true"></div>
         <div class="container sbh-inner">
-          <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/project#files">project</a><span aria-hidden="true">/</span><span aria-current="page">submit</span></nav>
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/mobile-development/project#files">project</a><span aria-hidden="true">/</span><span aria-current="page">submit</span></nav>
           <p class="sbh-k mono">
             <span class:list={['sbh-state', { open }]}><span class="dot"></span>{open ? 'Open for submissions' : cutoffPassed ? 'Cut-off passed' : 'Closed'}</span>
             <span>{KIND_LABEL[file.kind]}</span>

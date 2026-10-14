@@ -23,17 +23,17 @@ export const platform = { name: 'BUENOVA', tagline: 'Interactive courses platfor
 
 /** Sections of the built-in course, shown in the nav once a student is inside it. */
 export const nav = [
-  { label: 'Overview', href: '/course' },
-  { label: 'Labs', href: '/labs' },
-  { label: 'Coursework', href: '/coursework' },
-  { label: 'Project', href: '/project' },
-  { label: 'Commands', href: '/commands' },
-  { label: 'Tools', href: '/tools' },
-  { label: 'Setup', href: '/setup' },
-  { label: 'Resources', href: '/resources' },
+  { label: 'Overview', href: '/mobile-development' },
+  { label: 'Labs', href: '/mobile-development/labs' },
+  { label: 'Coursework', href: '/mobile-development/coursework' },
+  { label: 'Project', href: '/mobile-development/project' },
+  { label: 'Commands', href: '/mobile-development/commands' },
+  { label: 'Tools', href: '/mobile-development/tools' },
+  { label: 'Setup', href: '/mobile-development/setup' },
+  { label: 'Resources', href: '/mobile-development/resources' },
 ];
 
 export const secondaryNav = [
-  { label: 'Troubleshooting', href: '/troubleshooting' },
-  { label: 'Extra Learning', href: '/extra' },
+  { label: 'Troubleshooting', href: '/mobile-development/troubleshooting' },
+  { label: 'Extra Learning', href: '/mobile-development/extra' },
 ];

@@ -27,7 +27,7 @@ const guides = await getSetup();
           {guides.map((g, i) => (
             <li class="step" data-reveal style={`--d:${i * 40}ms`}>
               <span class="step-rail" aria-hidden="true"><span class="step-n mono">{pad(g.data.step)}</span></span>
-              <a href={`/setup/${g.id}`} class="step-card">
+              <a href={`/mobile-development/setup/${g.id}`} class="step-card">
                 <span class="step-top">
                   <span class="step-t">{g.data.title}</span>
                   {g.data.estimatedTime && <span class="mono faint step-time"><Icon name="clock" size={13} /> {g.data.estimatedTime}</span>}
@@ -48,7 +48,7 @@ const guides = await getSetup();
           <p><strong>Stuck on an error?</strong></p>
           <p class="muted">The troubleshooting center covers installation, SDK, emulator and Git problems.</p>
         </div>
-        <a href="/troubleshooting" class="btn btn-ghost btn-sm">Troubleshooting <Icon name="arrow" class="arrow" /></a>
+        <a href="/mobile-development/troubleshooting" class="btn btn-ghost btn-sm">Troubleshooting <Icon name="arrow" class="arrow" /></a>
       </div>
     </section>
 

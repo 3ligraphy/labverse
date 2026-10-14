@@ -14,7 +14,7 @@ const items = await getCoursework();
     ) : (
       <div class="row-list">
         {items.map((c, i) => (
-          <a href={`/coursework/${c.id}`} class="row cw-row" data-reveal style={`--d:${i * 60}ms`}>
+          <a href={`/mobile-development/coursework/${c.id}`} class="row cw-row" data-reveal style={`--d:${i * 60}ms`}>
             <span class="cw-no mono">CW<b>{pad(c.data.number)}</b></span>
             <span class="cw-main">
               <span class="cw-t">{c.data.title}</span>

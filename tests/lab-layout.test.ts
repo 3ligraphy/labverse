@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const page = fs.readFileSync(new URL('../src/pages/labs/[id].astro', import.meta.url), 'utf8');
+const page = fs.readFileSync(new URL('../src/pages/mobile-development/labs/[id].astro', import.meta.url), 'utf8');
 const lab02 = fs.readFileSync(new URL('../src/content/labs/lab-02.mdx', import.meta.url), 'utf8');
 const interactiveCss = fs.readFileSync(new URL('../src/styles/lab-interactive.css', import.meta.url), 'utf8');
 const admin = fs.readFileSync(new URL('../src/pages/admin/sessions.astro', import.meta.url), 'utf8');

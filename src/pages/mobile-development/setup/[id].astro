@@ -27,10 +27,10 @@ const sections = [
   <header class="page-head">
     <div class="grid-bg" aria-hidden="true"></div>
     <div class="container">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/setup">setup</a><span aria-hidden="true">/</span><span aria-current="page">{guide.id}</span></nav>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/mobile-development/setup">setup</a><span aria-hidden="true">/</span><span aria-current="page">{guide.id}</span></nav>
       <ol class="sg-dots" aria-label="Setup progress">
         {all.map((g) => (
-          <li><a href={`/setup/${g.id}`} class:list={[{ on: g.data.step <= d.step, cur: g.id === guide.id }]} aria-current={g.id === guide.id ? 'step' : undefined} aria-label={`Step ${g.data.step}: ${g.data.title}`}></a></li>
+          <li><a href={`/mobile-development/setup/${g.id}`} class:list={[{ on: g.data.step <= d.step, cur: g.id === guide.id }]} aria-current={g.id === guide.id ? 'step' : undefined} aria-label={`Step ${g.data.step}: ${g.data.title}`}></a></li>
         ))}
       </ol>
       <p class="eyebrow mt-6" data-reveal>Step {pad(d.step)} of {pad(all.length)}</p>
@@ -38,7 +38,7 @@ const sections = [
       <p class="lead mt-6" data-reveal style="--d:120ms">{d.summary}</p>
       <div class="flex wrap gap-3 mt-8 items-center" data-reveal style="--d:180ms">
         {d.estimatedTime && <span class="badge"><Icon name="clock" size={13} /> {d.estimatedTime}</span>}
-        {tool && <a href={`/tools/${tool.id}`} class="badge badge-accent">Tool: {tool.data.name} →</a>}
+        {tool && <a href={`/mobile-development/tools/${tool.id}`} class="badge badge-accent">Tool: {tool.data.name} →</a>}
       </div>
     </div>
   </header>
@@ -73,8 +73,8 @@ const sections = [
         </section>
       )}
       <nav class="pn" aria-label="Setup navigation">
-        {prev ? <a href={`/setup/${prev.id}`} class="pn-a"><span class="mono faint">← Step {pad(prev.data.step)}</span><span>{prev.data.title}</span></a> : <a href="/setup" class="pn-a"><span class="mono faint">← Overview</span><span>Setup center</span></a>}
-        {next ? <a href={`/setup/${next.id}`} class="pn-a next"><span class="mono faint">Step {pad(next.data.step)} →</span><span>{next.data.title}</span></a> : <a href="/labs" class="pn-a next"><span class="mono faint">All set →</span><span>Start the labs</span></a>}
+        {prev ? <a href={`/mobile-development/setup/${prev.id}`} class="pn-a"><span class="mono faint">← Step {pad(prev.data.step)}</span><span>{prev.data.title}</span></a> : <a href="/mobile-development/setup" class="pn-a"><span class="mono faint">← Overview</span><span>Setup center</span></a>}
+        {next ? <a href={`/mobile-development/setup/${next.id}`} class="pn-a next"><span class="mono faint">Step {pad(next.data.step)} →</span><span>{next.data.title}</span></a> : <a href="/mobile-development/labs" class="pn-a next"><span class="mono faint">All set →</span><span>Start the labs</span></a>}
       </nav>
     </article>
     <div class="doc-aside"><Toc items={sections} /></div>

@@ -31,7 +31,7 @@ const sections = [
   <header class="page-head">
     <div class="grid-bg" aria-hidden="true"></div>
     <div class="container th">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/tools">tools</a><span aria-hidden="true">/</span><span aria-current="page">{tool.id}</span></nav>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/mobile-development/tools">tools</a><span aria-hidden="true">/</span><span aria-current="page">{tool.id}</span></nav>
       <div class="th-grid">
         <div data-reveal class="th-logo-wrap"><ToolLogo logo={d.logo} monogram={d.monogram} name={d.name} color={d.color} size={120} /></div>
         <div>
@@ -39,7 +39,7 @@ const sections = [
           <h1 class="h-1 mt-4" data-reveal style="--d:60ms">{d.name}</h1>
           <p class="lead mt-6" data-reveal style="--d:120ms">{d.description}</p>
           <div class="flex wrap gap-3 mt-8 items-center" data-reveal style="--d:180ms">
-            {setupGuides[0] && <a href={`/setup/${setupGuides[0].id}`} class="btn btn-primary"><Icon name="download" /> Install guide</a>}
+            {setupGuides[0] && <a href={`/mobile-development/setup/${setupGuides[0].id}`} class="btn btn-primary"><Icon name="download" /> Install guide</a>}
             {d.docs && <a href={d.docs} target="_blank" rel="noopener" class="btn btn-ghost">Official docs <Icon name="external" /></a>}
             <span class="flex gap-2 wrap">{d.platforms.map((p) => <span class="badge">{p}</span>)}</span>
           </div>
@@ -84,7 +84,7 @@ const sections = [
           <h2 class="block-title" id="related">Related labs</h2>
           <div class="row-list">
             {labs.map((l) => (
-              <a href={`/labs/${l.id}`} class="row" style="grid-template-columns: 80px 1fr 36px">
+              <a href={`/mobile-development/labs/${l.id}`} class="row" style="grid-template-columns: 80px 1fr 36px">
                 <span class="mono accent">LAB {pad(l.data.number)}</span><span>{l.data.title}</span><span class="go"><Icon name="arrow-up-right" /></span>
               </a>
             ))}

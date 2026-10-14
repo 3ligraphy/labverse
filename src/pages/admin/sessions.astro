@@ -110,7 +110,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             </div>
             <div class="board-actions">
               <span class="live mono" data-lp-live>loading…</span>
-              <a class="btn btn-ghost btn-sm" data-open-lab href="/labs" target="_blank" rel="noopener">Open lab ↗</a>
+              <a class="btn btn-ghost btn-sm" data-open-lab href="/mobile-development/labs" target="_blank" rel="noopener">Open lab ↗</a>
             </div>
           </header>
           <div class="kpis" data-lp-kpis></div>
@@ -487,7 +487,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     const t = s.totals;
     root.dataset.lab = s.structure.lab;
     root.querySelector('[data-lab-title]')!.textContent = `${s.structure.title}${'id' in s.session ? ` · ${s.session.time_slot} · ${s.session.ta_name}` : ''}`;
-    (root.querySelector('[data-open-lab]') as HTMLAnchorElement).href = s.labs.find((l) => l.id === s.structure.lab)?.href ?? `/labs/${encodeURIComponent(s.structure.lab)}`;
+    (root.querySelector('[data-open-lab]') as HTMLAnchorElement).href = s.labs.find((l) => l.id === s.structure.lab)?.href ?? `/mobile-development/labs/${encodeURIComponent(s.structure.lab)}`;
     root.querySelector('[data-lp-started]')!.textContent = String(t.active);
     root.querySelector('[data-lp-kpis]')!.innerHTML = [
       ['accent', t.checkedIn, 'checked in'],
