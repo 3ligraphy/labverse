@@ -27,6 +27,7 @@ export function mountStart(lab: string) {
   let session: PublicSession | null = null;
   let sessions: PublicSession[] = [];
   let practice = false; // the admin's "open practice" toggle: solve without a session, nothing recorded
+  let staff = false; // TAs, doctors and admins: try every exercise any time, nothing recorded
   const labRoot = root.closest<HTMLElement>('[data-lab]');
 
   /** Explains a blocked control right under it (role=status), instead of a click that silently does nothing. */
@@ -36,7 +37,9 @@ export function mountStart(lab: string) {
     const access = labRoot?.dataset.sessionAccess;
     // a task's "Done" tick is a visually hidden checkbox: explain under the task header instead
     const block = target.closest<HTMLElement>('.task-head') ?? target.closest<HTMLElement>(GATED) ?? target.closest<HTMLElement>('section, article, .card') ?? target;
-    const text = access === 'practice'
+    const text = access === 'staff'
+      ? 'Staff preview: hand-ins and check-in are for students in a live session. Everything else runs, and nothing is recorded.'
+      : access === 'practice'
       ? 'Hand-ins and check-in need a live lab session. Exercises and demos work now in practice mode.'
       : sessions.length
         ? 'Join the session first: enter your name, ID and group in Start lab. Then you can edit, run and check.'
@@ -58,7 +61,7 @@ export function mountStart(lab: string) {
       const p = document.createElement('p');
       p.textContent = text;
       note.replaceChildren(p);
-      if (access !== 'practice' && sessions.length) {
+      if (access !== 'practice' && access !== 'staff' && sessions.length) {
         const go = document.createElement('button');
         go.type = 'button';
         go.className = 'btn btn-ghost btn-sm';
@@ -77,9 +80,10 @@ export function mountStart(lab: string) {
     const guard = (event: Event) => {
       if (labRoot.dataset.sessionAccess === 'active') return;
       const target = event.target as HTMLElement | null;
-      if (!target || target.closest('[data-lab-start]') || target.closest('[data-gate-note]') || target.closest('a')) return;
-      // Practice: exercises and demos work, but attendance and submissions still need a session.
-      if (labRoot.dataset.sessionAccess === 'practice' && !target.closest('[data-repo-submit],[data-checkin]')) return;
+      // the app walkthrough only shows code and a live preview (nothing is recorded), so it is always usable
+      if (!target || target.closest('[data-lab-start]') || target.closest('[data-gate-note]') || target.closest('a') || target.closest('[data-walkthrough]')) return;
+      // Practice and staff preview: exercises and demos work, but attendance and submissions still need a session.
+      if (/^(practice|staff)$/.test(labRoot.dataset.sessionAccess ?? '') && !target.closest('[data-repo-submit],[data-checkin]')) return;
       // moving focus, scrolling and copying stay available, so keyboard users are never trapped
       if (event instanceof KeyboardEvent && (PASS_KEYS.test(event.key) || ((event.ctrlKey || event.metaKey) && /^[ac]$/i.test(event.key)))) return;
       if (target.closest('button,input,textarea,select,[contenteditable="true"],.cm-editor,[data-exercise],[data-playground],[data-repo-submit],[data-checkin]')) {
@@ -95,10 +99,11 @@ export function mountStart(lab: string) {
   const markGated = () => {
     if (!labRoot) return;
     const access = labRoot.dataset.sessionAccess;
-    const scope = access === 'active' ? '' : access === 'practice' ? '[data-repo-submit],[data-checkin]' : GATED;
+    const open = access === 'practice' || access === 'staff';
+    const scope = access === 'active' ? '' : open ? '[data-repo-submit],[data-checkin]' : GATED;
     labRoot.querySelectorAll('[data-gate-off]').forEach((el) => { el.removeAttribute('data-gate-off'); el.removeAttribute('aria-disabled'); });
     if (scope) labRoot.querySelectorAll<HTMLElement>(`:is(${scope}) :is(button, input, select, textarea), [data-task-check]:is(button, input)`).forEach((el) => {
-      if (access === 'practice' && el.matches('[data-task-check]')) return;
+      if (open && el.matches('[data-task-check]')) return;
       if (el.closest('[data-gate-note]') || el.hasAttribute('aria-disabled')) return;
       el.setAttribute('aria-disabled', 'true');
       el.setAttribute('data-gate-off', '');
@@ -110,7 +115,7 @@ export function mountStart(lab: string) {
     const student = getStudent();
     const current = Boolean(student && session?.open && student.sessionId === session.id);
     form.hidden = sessions.length === 0;
-    if (labRoot) labRoot.dataset.sessionAccess = current ? 'active' : practice ? 'practice' : 'readonly';
+    if (labRoot) labRoot.dataset.sessionAccess = current ? 'active' : staff ? 'staff' : practice ? 'practice' : 'readonly';
     formBox.hidden = current;
     signed.hidden = !current;
     root.classList.toggle('is-signed', current);
@@ -143,7 +148,9 @@ export function mountStart(lab: string) {
       sessionIn.value = preferredId;
       session = sessions.find((item) => item.id === preferredId) ?? null;
       sessionField.hidden = sessions.length < 2;
-      status.textContent = sessions.length > 1
+      status.textContent = staff && !getStudent()
+        ? 'Staff preview: you can edit, run and check every exercise and demo now, without starting a session. Nothing you do here is recorded.'
+        : sessions.length > 1
         ? `${sessions.length} sessions are running. Choose your time slot and TA, then enter your details.`
         : session
           ? `Session started by ${session.ta_name ?? 'your TA'} · ${session.time_slot ?? 'current time slot'}. Enter your details to begin.`
@@ -228,6 +235,12 @@ export function mountStart(lab: string) {
   void (async () => {
     const me = await getMe<{ user: { name: string; role: string; studentId: string | null } | null }>();
     const u = me?.user;
+    if (u && u.role !== 'student') {
+      // staff try the lab without joining a session; joining one stays possible (e.g. to test a hand-in)
+      staff = true;
+      await refreshSession();
+      return;
+    }
     if (!u || u.role !== 'student' || !u.studentId) return;
     nameIn.value = u.name;
     idIn.value = u.studentId;
