@@ -135,8 +135,10 @@ function setupPlayground(root: HTMLElement) {
     const allPass = results.length > 0 && results.every((r) => r.pass);
     root.classList.toggle('is-passed', allPass);
     // progress tracking: every Check is saved with its score and code (only when signed in)
-    const lab = root.closest<HTMLElement>('[data-lab]')?.dataset.lab;
-    if (lab) record.attempt({ lab, exercise: def.id, passed: results.filter((r) => r.pass).length, total: results.length, files });
+    const labEl = root.closest<HTMLElement>('[data-lab]');
+    const lab = labEl?.dataset.lab;
+    // staff try the lab without a session: nothing is recorded
+    if (lab && labEl?.dataset.sessionAccess !== 'staff') record.attempt({ lab, exercise: def.id, passed: results.filter((r) => r.pass).length, total: results.length, files });
     if (allPass) {
       // solving the exercise ticks its task → updates the ring, tracker and session plan
       const box = root.closest('.task')?.querySelector<HTMLInputElement>('[data-task-check]');
@@ -155,7 +157,8 @@ function setupPlayground(root: HTMLElement) {
   const check = async () => {
     if (!checkBtn) return;
     checkBtn.disabled = true;
-    await ensureIdentity(); // first Check: ask for name + ID (skipping still runs the check)
+    // first Check: ask for name + ID (skipping still runs the check); staff are never asked
+    if (root.closest<HTMLElement>('[data-lab]')?.dataset.sessionAccess !== 'staff') await ensureIdentity();
     root.classList.add('is-checking');
     root.classList.remove('is-dirty');
     items.forEach((li) => {
@@ -237,7 +240,9 @@ function setupWalkthrough(root: HTMLElement) {
   nearView(root, () => frame.send({ type: 'run', files: def.files }), '0px');
 }
 
+/** Starts every playground and walkthrough on the page once (both components load this script). */
 export function initPlaygrounds() {
-  document.querySelectorAll<HTMLElement>('[data-playground]').forEach(setupPlayground);
-  document.querySelectorAll<HTMLElement>('[data-walkthrough]').forEach(setupWalkthrough);
+  const fresh = (el: HTMLElement) => !el.dataset.pgWired && (el.dataset.pgWired = '1');
+  document.querySelectorAll<HTMLElement>('[data-playground]').forEach((el) => fresh(el) && setupPlayground(el));
+  document.querySelectorAll<HTMLElement>('[data-walkthrough]').forEach((el) => fresh(el) && setupWalkthrough(el));
 }

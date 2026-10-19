@@ -83,7 +83,7 @@ function Header({ title, back, options }: { title: string; back: boolean; option
   return (
     <View style={[s.header, options.headerStyle]}>
       {back && (
-        <Pressable onPress={() => router.back()} style={s.back} accessibilityLabel="Back">
+        <Pressable onPress={() => router.back()} style={s.back} accessibilityRole="button" accessibilityLabel="Back">
           <Text style={[s.backText, { color: options.headerTintColor ?? '#2563eb' }]}>‹ Back</Text>
         </Pressable>
       )}
@@ -141,6 +141,51 @@ function TabsNavigator({ children, screenOptions }: NavProps) {
 }
 export const Tabs = Object.assign(TabsNavigator, { Screen: ScreenConfig });
 
+/** expo-router/drawer: the screens of this folder in a side menu opened from the header's ☰ button. */
+function DrawerNavigator({ children, screenOptions }: NavProps) {
+  const { depth, name, options, setOptions, configs, nav, match, routes } = useNavigator(children, screenOptions);
+  const [open, setOpen] = useState(false);
+  const layout = match.route.layouts[depth];
+  const order = [...configs.keys()];
+  const rank = (n: string) => (order.indexOf(n) === -1 ? 999 : order.indexOf(n));
+  const items = routes
+    .filter((r) => r.layouts[depth] === layout && r.layouts.length === depth + 1 && !isDynamicRoute(r))
+    .sort((a, b) => rank(a.name) - rank(b.name));
+  const tint = (options as { drawerActiveTintColor?: string }).drawerActiveTintColor ?? '#2563eb';
+  return (
+    <View style={s.fill}>
+      {options.headerShown !== false && (
+        <View style={[s.header, options.headerStyle]}>
+          <Pressable onPress={() => setOpen(true)} style={s.back} accessibilityRole="button" accessibilityLabel="Open menu">
+            <Text style={[s.backText, { fontSize: 20, color: options.headerTintColor ?? '#11181c' }]}>☰</Text>
+          </Pressable>
+          <Text style={[s.title, { color: options.headerTintColor ?? '#11181c' }]} numberOfLines={1}>{options.title ?? name}</Text>
+        </View>
+      )}
+      <OptionsCtx.Provider value={setOptions}>
+        <View style={s.fill}><Level depth={depth + 1} /></View>
+      </OptionsCtx.Provider>
+      {open && (
+        <View style={s.drawerWrap}>
+          <Pressable style={s.scrim} onPress={() => setOpen(false)} accessibilityLabel="Close menu" />
+          <View style={s.drawer} accessibilityRole="menu">
+            {items.map((r) => {
+              const o = { ...screenOptions, ...configs.get(r.name) } as Options & { drawerLabel?: string };
+              const focused = r.name === name;
+              return (
+                <Pressable key={r.file} accessibilityRole="menuitem" style={[s.drawerItem, focused && { backgroundColor: `${tint}22` }]} onPress={() => { setOpen(false); nav.replace(hrefOf(r)); }}>
+                  <Text style={[s.drawerLabel, { color: focused ? tint : '#11181c' }]}>{o.drawerLabel ?? o.title ?? r.name}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+export const Drawer = Object.assign(DrawerNavigator, { Screen: ScreenConfig });
+
 type LinkProps = { href: Href; replace?: boolean; asChild?: boolean; children?: ReactNode; style?: any; [k: string]: any };
 export function Link({ href, replace, asChild, children, style, ...rest }: LinkProps) {
   const go = () => (replace ? router.replace(href) : router.push(href));
@@ -189,4 +234,9 @@ const s = StyleSheet.create({
   tabbar: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e5e7eb', backgroundColor: '#fff', paddingTop: 6, paddingBottom: 10 },
   tab: { flex: 1, alignItems: 'center', gap: 2 },
   tabLabel: { fontSize: 11, fontWeight: '500' },
+  drawerWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row' },
+  scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' },
+  drawer: { width: '72%', height: '100%', paddingTop: 56, paddingHorizontal: 12, gap: 4, backgroundColor: '#fff' },
+  drawerItem: { paddingVertical: 12, paddingHorizontal: 12, borderRadius: 10 },
+  drawerLabel: { fontSize: 15, fontWeight: '600' },
 });

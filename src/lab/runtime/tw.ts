@@ -6,7 +6,7 @@
 import { palette } from './tw-colors.ts';
 
 export type RNStyle = Record<string, unknown>;
-export type ClassResult = { style: RNStyle; active?: RNStyle; unknown: string[] };
+export type ClassResult = { style: RNStyle; active?: RNStyle; disabled?: RNStyle; unknown: string[] };
 
 const SCALE = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 96];
 const FONT_SIZE: Record<string, [number, number]> = {
@@ -88,7 +88,9 @@ const SPACING_PROPS: Record<string, string[]> = {
 const BORDER_SIDES: Record<string, string> = { t: 'Top', r: 'Right', b: 'Bottom', l: 'Left' };
 
 /** Applies one class to `s`. Returns false if the class is unknown. */
-function apply(cls: string, s: RNStyle, ratio: { leading?: number; tracking?: number }): boolean {
+type Ratio = { leading?: number; tracking?: number; transform?: RNStyle[] };
+
+function apply(cls: string, s: RNStyle, ratio: Ratio): boolean {
   const neg = cls.startsWith('-');
   const c = neg ? cls.slice(1) : cls;
 
@@ -144,6 +146,7 @@ function apply(cls: string, s: RNStyle, ratio: { leading?: number; tracking?: nu
     return typeof v === 'number' ? ((s.lineHeight = v), true) : false;
   }
   if ((m = /^tracking-(.+)$/.exec(c)) && TRACKING[m[1]] !== undefined) return (ratio.tracking = TRACKING[m[1]]), true;
+  if ((m = /^tracking-\[(-?\d+(?:\.\d+)?)px\]$/.exec(c))) return (s.letterSpacing = Number(m[1])), true;
 
   // backgrounds & borders
   if ((m = /^bg-(.+)$/.exec(c))) {
@@ -151,7 +154,8 @@ function apply(cls: string, s: RNStyle, ratio: { leading?: number; tracking?: nu
     return col ? ((s.backgroundColor = col), true) : false;
   }
   if ((m = /^rounded(?:-([trbl]{1,2}))?(?:-(.+))?$/.exec(c))) {
-    const r = RADIUS[m[2] ?? ''];
+    const arb = m[2] ? /^\[(\d+(?:\.\d+)?)(px)?\]$/.exec(m[2]) : null;
+    const r = arb ? Number(arb[1]) : RADIUS[m[2] ?? ''];
     if (r === undefined) return false;
     if (!m[1]) s.borderRadius = r;
     else {
@@ -171,6 +175,43 @@ function apply(cls: string, s: RNStyle, ratio: { leading?: number; tracking?: nu
   if ((m = /^border-(.+)$/.exec(c))) {
     const col = color(m[1]);
     return col ? ((s.borderColor = col), true) : false;
+  }
+
+  // space-x / space-y: NativeWind adds margins between children; a gap on the parent gives the same layout
+  if ((m = /^space-(x|y)-(.+)$/.exec(c))) {
+    const v = size(m[2], false);
+    if (typeof v !== 'number') return false;
+    s[m[1] === 'x' ? 'columnGap' : 'rowGap'] = v;
+    return true;
+  }
+  if ((m = /^max-w-(\[.+\])$/.exec(c))) {
+    const v = size(m[1], false);
+    return v === undefined ? false : ((s.maxWidth = v), true);
+  }
+
+  // transforms: translate-x-2, -translate-y-1, rotate-45, scale-95
+  if ((m = /^translate-(x|y)-(.+)$/.exec(c))) {
+    const v = size(m[2], false);
+    if (v === undefined) return false;
+    const value = neg && typeof v === 'number' ? -v : v;
+    ratio.transform = [...(ratio.transform ?? []), { [m[1] === 'x' ? 'translateX' : 'translateY']: value }];
+    return true;
+  }
+  if ((m = /^rotate-(\d+)$/.exec(c))) return (ratio.transform = [...(ratio.transform ?? []), { rotate: `${neg ? '-' : ''}${m[1]}deg` }]), true;
+  if ((m = /^scale-(x-|y-)?(\d+)$/.exec(c))) {
+    const key = m[1] === 'x-' ? 'scaleX' : m[1] === 'y-' ? 'scaleY' : 'scale';
+    ratio.transform = [...(ratio.transform ?? []), { [key]: Number(m[2]) / 100 }];
+    return true;
+  }
+
+  // images & touch
+  const resize: Record<string, string> = { 'object-cover': 'cover', 'object-contain': 'contain', 'object-fill': 'stretch', 'object-center': 'center' };
+  if (resize[c]) return (s.resizeMode = resize[c]), true;
+  if (c === 'pointer-events-none') return (s.pointerEvents = 'none'), true;
+  if (c === 'pointer-events-auto') return (s.pointerEvents = 'auto'), true;
+  if ((m = /^tint-(.+)$/.exec(c))) {
+    const col = color(m[1]);
+    return col ? ((s.tintColor = col), true) : false;
   }
 
   // effects & layering
@@ -216,26 +257,55 @@ export function knownClasses(): string[] {
 
 const cache = new Map<string, ClassResult>();
 
-/** className → React Native style. `active:` classes apply while a Pressable is pressed. */
-export function classToStyle(className: string): ClassResult {
-  const hit = cache.get(className);
-  if (hit) return hit;
-  const style: RNStyle = {};
-  const active: RNStyle = {};
-  const unknown: string[] = [];
-  const ratio: { leading?: number; tracking?: number } = {};
-  for (const raw of className.split(/\s+/).filter(Boolean)) {
-    const parts = raw.split(':');
-    const cls = parts.pop()!;
-    const variants = parts;
-    if (variants.some((v) => v !== 'active')) continue; // dark:, md:, ios: … are not simulated in the preview
-    const target = variants.includes('active') ? active : style;
-    if (!apply(cls, target, ratio)) unknown.push(raw);
+/** Platform variants that apply in the current preview frame: the phone frame is iOS, the browser frame is web. */
+let platforms = new Set(['ios', 'native']);
+export function setPlatform(frame: 'phone' | 'web') {
+  const next = frame === 'phone' ? ['ios', 'native'] : ['web'];
+  if (next.join() !== [...platforms].join()) {
+    platforms = new Set(next);
+    cache.clear();
   }
+}
+/** Variants the preview cannot reproduce (dark mode, screen sizes, hover, focus): skipped without a warning. */
+const UNSIMULATED = /^(dark|light|sm|md|lg|xl|2xl|hover|focus|focus-visible|group-hover|group-active|peer-focus|landscape|portrait|rtl|ltr|print|motion-safe|motion-reduce)$/;
+const PLATFORMS = /^(ios|android|web|native|windows|macos)$/;
+
+function finish(style: RNStyle, ratio: Ratio) {
   const fontSize = typeof style.fontSize === 'number' ? style.fontSize : 16;
   if (ratio.leading !== undefined) style.lineHeight = Math.round(ratio.leading * fontSize);
   if (ratio.tracking !== undefined) style.letterSpacing = +(ratio.tracking * fontSize).toFixed(2);
-  const result: ClassResult = { style, ...(Object.keys(active).length ? { active } : null), unknown };
+  if (ratio.transform?.length) style.transform = ratio.transform;
+  return style;
+}
+
+/**
+ * className → React Native style. `active:` classes apply while a Pressable is pressed, `disabled:` while it is
+ * disabled, and `ios:` / `android:` / `web:` / `native:` follow the preview frame.
+ */
+export function classToStyle(className: string): ClassResult {
+  const hit = cache.get(className);
+  if (hit) return hit;
+  const buckets = { style: {} as RNStyle, active: {} as RNStyle, disabled: {} as RNStyle };
+  const ratios: Record<keyof typeof buckets, Ratio> = { style: {}, active: {}, disabled: {} };
+  const unknown: string[] = [];
+  for (const raw of className.split(/\s+/).filter(Boolean)) {
+    const parts = raw.split(':');
+    const cls = parts.pop()!;
+    let bucket: keyof typeof buckets = 'style';
+    let skip = false;
+    for (const v of parts) {
+      if (v === 'active') bucket = 'active';
+      else if (v === 'disabled') bucket = 'disabled';
+      else if (PLATFORMS.test(v)) skip ||= !platforms.has(v);
+      else if (UNSIMULATED.test(v)) skip = true;
+      else skip = true;
+    }
+    if (!apply(cls, skip ? {} : buckets[bucket], skip ? {} : ratios[bucket])) unknown.push(raw);
+  }
+  const style = finish(buckets.style, ratios.style);
+  const active = finish(buckets.active, ratios.active);
+  const disabled = finish(buckets.disabled, ratios.disabled);
+  const result: ClassResult = { style, ...(Object.keys(active).length ? { active } : null), ...(Object.keys(disabled).length ? { disabled } : null), unknown };
   cache.set(className, result);
   return result;
 }

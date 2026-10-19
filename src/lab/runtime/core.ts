@@ -8,6 +8,8 @@ import * as RN from './rn-shim.ts';
 import { createBuiltins } from './builtins.ts';
 import { createModuleSystem, LabError, locate } from './modules.ts';
 import { createDomDriver } from './driver-dom.ts';
+import { createRouterApp } from '../../runner/router-shim.tsx';
+import { setPlatform } from './tw.ts';
 import type { FromRuntime, LabErrorInfo, LogLevel, RunRequest } from './protocol.ts';
 
 type Outgoing = FromRuntime extends infer M ? (M extends { __lab: 1 } ? Omit<M, '__lab'> : never) : never;
@@ -115,6 +117,8 @@ export function createRuntime(opts: { container: HTMLElement; post: Post; onFram
     unmount();
     RN.resetClassWarnings();
     RN.setInsets(request.frame === 'phone' ? PHONE_INSETS : NO_INSETS);
+    setPlatform(request.frame);
+    RN.setFrameOS(request.frame);
     opts.onFrame?.(request.frame);
 
     let renderedByCode = false;
@@ -132,6 +136,18 @@ export function createRuntime(opts: { container: HTMLElement; post: Post; onFram
     modules = createModuleSystem(builtins, request.files);
 
     try {
+      // an expo-router project: app/_layout.tsx → the screen for the current address, with real navigation
+      if (request.entry.startsWith('app/')) {
+        const system = modules;
+        const RouterApp = createRouterApp(Object.keys(request.files), (file) => system.load(file), () => {});
+        mount(createElement(RouterApp));
+        return new Promise((resolve) =>
+          setTimeout(() => {
+            if (!errored) post({ type: 'rendered', id: request.id });
+            resolve();
+          }, 40),
+        );
+      }
       const exports = modules.load(request.entry);
       if (!renderedByCode) {
         const App = pickComponent(exports);

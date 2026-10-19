@@ -8,6 +8,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import * as ReactNative from 'react-native-web';
 import * as ExpoRouter from './router-shim.tsx';
 import { createModuleSystem } from './modules.ts';
+import { createPackages, PACKAGE_NAMES } from '../lab/runtime/packages.tsx';
 import { runCheck, stripComments } from './checks.ts';
 import type { CheckResult, Files, FromRunner, ToRunner } from './protocol.ts';
 
@@ -22,7 +23,9 @@ const builtins: Record<string, unknown> = {
   'react-native': ReactNative,
   'react-native-web': ReactNative,
   'expo-router': ExpoRouter,
-  'expo-status-bar': { StatusBar: () => null },
+  'expo-router/drawer': { Drawer: ExpoRouter.Drawer },
+  // React Navigation, icons, gradients, AsyncStorage… (shared with the lab workbench)
+  ...createPackages({ SafeAreaView: ReactNative.SafeAreaView, insets: { top: 0, bottom: 0, left: 0, right: 0 } }),
 };
 
 /* ---------- console → page ---------- */
@@ -71,7 +74,7 @@ async function mount(files: Files) {
   redbox.hidden = true;
   root = createRoot(host, { onUncaughtError: showError, onCaughtError: showError });
   try {
-    const sys = createModuleSystem(files, builtins);
+    const sys = createModuleSystem(files, builtins, PACKAGE_NAMES);
     const names = Object.keys(files);
     let App: React.ComponentType;
     if (names.some((f) => f.startsWith('app/'))) {

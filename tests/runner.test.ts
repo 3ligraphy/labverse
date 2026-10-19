@@ -40,7 +40,8 @@ test('module system gives friendly errors', () => {
   const sys = createModuleSystem({ 'App.tsx': `import x from 'lodash';\nexport default x;` }, {});
   assert.throws(() => sys.require('App.tsx'), /lodash.*isn't available/);
   const bad = createModuleSystem({ 'App.tsx': `const = 1;` }, {});
-  assert.throws(() => bad.require('App.tsx'), /^(?!.*App\.tsx.*App\.tsx).*App\.tsx.*\(1:7\)/);
+  // the file and line once, then a plain-English message
+  assert.throws(() => bad.require('App.tsx'), /^Error: App\.tsx \(line 1\): Unexpected "="\.(?!.*App\.tsx)/);
   const missing = createModuleSystem({ 'App.tsx': `import x from './nope';\nexport default x;` }, {});
   assert.throws(() => missing.require('App.tsx'), /Can't find file "\.\/nope"/);
 });

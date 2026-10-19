@@ -48,7 +48,7 @@ function assertNoRawText(children: unknown, name: string) {
 }
 
 function fromClassName(className: unknown) {
-  if (!className) return { style: undefined, active: undefined };
+  if (!className) return { style: undefined, active: undefined, disabled: undefined };
   const result = classToStyle(String(className));
   for (const cls of result.unknown) {
     if (warned.has(cls)) continue;
@@ -66,7 +66,9 @@ function lab(name: string, Base: ComponentType<any>, viewLike = false, pressable
       // NativeWind's className for ScrollView / FlatList content
       rest.contentContainerStyle = [fromClassName(contentContainerClassName).style, rest.contentContainerStyle];
     }
-    const { style: fromClass, active } = fromClassName(className);
+    const { style: classStyle, active, disabled } = fromClassName(className);
+    // disabled: classes apply while the control is disabled
+    const fromClass = disabled && rest.disabled ? [classStyle, disabled] : classStyle;
     const merged =
       pressable && (typeof style === 'function' || active)
         ? (state: { pressed?: boolean }) => [fromClass, state?.pressed ? active : undefined, typeof style === 'function' ? style(state) : style]
@@ -120,5 +122,24 @@ export const Alert = {
     banner.textContent = message ? `${title}\n${message}` : title;
     document.body.appendChild(banner);
     setTimeout(() => banner.remove(), 2500);
+  },
+};
+
+/** Platform follows the preview frame: the phone frame behaves like iOS, the browser frame like the web. */
+let os: 'ios' | 'web' = 'ios';
+export function setFrameOS(frame: 'phone' | 'web') {
+  os = frame === 'phone' ? 'ios' : 'web';
+}
+export const Platform = {
+  get OS() {
+    return os;
+  },
+  get Version() {
+    return os === 'ios' ? '18.0' : '';
+  },
+  isPad: false,
+  isTV: false,
+  select<T>(choices: Partial<Record<'ios' | 'android' | 'web' | 'native' | 'default', T>>): T | undefined {
+    return choices[os] ?? (os === 'web' ? undefined : choices.native) ?? choices.default;
   },
 };

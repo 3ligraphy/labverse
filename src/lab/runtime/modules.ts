@@ -11,6 +11,9 @@ export class LabError extends Error {
   }
 }
 
+import { createLoopGuard, PREVIEW_ENV } from '../engine/guard.ts';
+import { PACKAGE_NAMES } from './packages.tsx';
+
 export type Builtins = Record<string, unknown>;
 
 const EXTENSIONS = ['', '.tsx', '.ts', '.jsx', '.js', '/index.tsx', '/index.ts', '/index.jsx', '/index.js'];
@@ -69,10 +72,15 @@ const SHADOWED = ['Text', 'Image'] as const;
 export function createModuleSystem(builtins: Builtins, files: Record<string, string>) {
   const cache = new Map<string, { exports: Record<string, unknown> }>();
   const shadows = SHADOWED.map(missingImport);
+  // stops a loop that never ends (see compile.ts) instead of freezing the preview
+  const loopGuard = createLoopGuard((line) => new LabError(`The loop on line ${line} never stopped, so it was halted.`, 'Check its condition: something inside the loop must change so the condition becomes false.'));
+  const process = { env: { ...PREVIEW_ENV } };
 
   function resolveFile(from: string, spec: string): string | null {
     const target = spec.startsWith('@/') ? spec.slice(2) : spec.startsWith('/') ? spec.slice(1) : join(dirname(from), spec);
-    for (const ext of EXTENSIONS) if (own(files, target + ext)) return target + ext;
+    // '@/x' is the project root in the Expo template and src/ with "paths": { "@/*": ["src/*"] }: try both
+    const bases = spec.startsWith('@/') ? [target, `src/${target}`] : [target];
+    for (const base of bases) for (const ext of EXTENSIONS) if (own(files, base + ext)) return base + ext;
     return null;
   }
 
@@ -85,8 +93,7 @@ export function createModuleSystem(builtins: Builtins, files: Record<string, str
         if (file) return load(file);
         throw new LabError(`Cannot find '${spec}' (imported in ${from}).`, 'Check the file name and that the path starts with ./');
       }
-      const packages = Object.keys(builtins).filter((k) => !k.includes('/') || k.startsWith('@'));
-      throw new LabError(`The package '${spec}' isn't available in this lab.`, `You can import from: ${packages.join(', ')}.`);
+      throw new LabError(`The package '${spec}' isn't available in this lab.`, `You can import from: ${PACKAGE_NAMES.join(', ')}.`);
     };
   }
 
@@ -97,8 +104,8 @@ export function createModuleSystem(builtins: Builtins, files: Record<string, str
     if (code === undefined) throw new LabError(`The file '${path}' doesn't exist.`);
     const module = { exports: {} as Record<string, unknown> };
     cache.set(path, module);
-    const factory = new Function('require', 'module', 'exports', ...SHADOWED, `${code}\n//# sourceURL=lab:///${path}`);
-    factory(requireFrom(path), module, module.exports, ...shadows);
+    const factory = new Function('require', 'module', 'exports', '__labLoop', 'process', ...SHADOWED, `${code}\n//# sourceURL=lab:///${path}`);
+    factory(requireFrom(path), module, module.exports, loopGuard, process, ...shadows);
     return module.exports;
   }
 
