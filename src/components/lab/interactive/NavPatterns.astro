@@ -1,0 +1,218 @@
+---
+/**
+ * Stack, tabs and drawer side by side on one phone: students tap inside the phone and watch the history and the
+ * navigation call change. <NavPatterns />
+ */
+import Device from '../../Device.astro';
+const EVENTS = [
+  { id: 'e41', title: 'Coding night', place: 'Lab 3 · Wed 18:00' },
+  { id: 'e42', title: 'Campus Fair', place: 'Hall B · Thu 12:00' },
+  { id: 'e43', title: 'Robotics demo', place: 'Atrium · Sun 14:00' },
+];
+---
+<figure class="np" data-np data-reveal>
+  <div class="np-modes" role="tablist" aria-label="Navigation pattern">
+    <button type="button" role="tab" aria-selected="true" data-np-mode="stack"><b>Stack</b><small>go deeper, come back</small></button>
+    <button type="button" role="tab" aria-selected="false" data-np-mode="tabs"><b>Tabs</b><small>switch between equals</small></button>
+    <button type="button" role="tab" aria-selected="false" data-np-mode="drawer"><b>Drawer</b><small>occasional places</small></button>
+  </div>
+
+  <div class="np-grid">
+    <div class="np-phone">
+      <Device light interactive label="A phone you can tap: it shows the selected navigation pattern">
+        <div class="np-app">
+          <div class="np-head">
+            <button type="button" class="np-back" data-np-back hidden>‹ Back</button>
+            <button type="button" class="np-menu" data-np-menu hidden aria-label="Open menu">☰</button>
+            <b data-np-title>Events</b>
+          </div>
+          <div class="np-body" data-np-body></div>
+          <div class="np-tabs" data-np-tabs hidden>
+            <button type="button" data-np-tab="Discover"><i>⌕</i>Discover</button>
+            <button type="button" data-np-tab="Saved"><i>🔖</i>Saved</button>
+            <button type="button" data-np-tab="Profile"><i>👤</i>Profile</button>
+          </div>
+          <div class="np-drawer" data-np-drawer hidden>
+            <div class="np-scrim" data-np-close></div>
+            <nav class="np-panel" aria-label="Menu">
+              <b>Campus Companion</b>
+              {['Home', 'Settings', 'Help', 'About'].map((n) => <button type="button" data-np-go={n}>{n}</button>)}
+            </nav>
+          </div>
+        </div>
+      </Device>
+    </div>
+
+    <div class="np-side">
+      <p class="np-k mono">Last call</p>
+      <code class="np-call" data-np-call>—</code>
+      <p class="np-k mono">History</p>
+      <ol class="np-history" data-np-history></ol>
+      <p class="np-note" data-np-note></p>
+    </div>
+  </div>
+  <figcaption>Tap inside the phone. Watch what the <b>Back</b> button would do: that is the question every navigation choice answers.</figcaption>
+</figure>
+
+<script define:vars={{ EVENTS }}>
+  // define:vars scripts run once per page; the lab page's onPageLoad re-runs nothing here, so we wire on DOMContentLoaded too
+  const wire = () => document.querySelectorAll('[data-np]:not([data-wired])').forEach((root) => {
+    root.dataset.wired = '1';
+    const $ = (s) => root.querySelector(s);
+    const body = $('[data-np-body]');
+    const title = $('[data-np-title]');
+    const back = $('[data-np-back]');
+    const menu = $('[data-np-menu]');
+    const tabs = $('[data-np-tabs]');
+    const drawer = $('[data-np-drawer]');
+    const callEl = $('[data-np-call]');
+    const historyEl = $('[data-np-history]');
+    const note = $('[data-np-note]');
+    let mode = 'stack';
+    let stack = [{ name: 'Home' }];
+    let tab = 'Discover';
+    let tabHistory = ['Discover'];
+    let page = 'Home';
+
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+    const list = () => EVENTS.map((e) => `<button type="button" class="np-row" data-np-open="${e.id}"><b>${esc(e.title)}</b><small>${esc(e.place)}</small></button>`).join('');
+
+    function render(call) {
+      if (call) {
+        callEl.textContent = call;
+        callEl.classList.remove('flash');
+        void callEl.offsetWidth;
+        callEl.classList.add('flash');
+      }
+      back.hidden = !(mode === 'stack' && stack.length > 1);
+      menu.hidden = mode !== 'drawer';
+      tabs.hidden = mode !== 'tabs';
+      drawer.hidden = true;
+      if (mode === 'stack') {
+        const top = stack[stack.length - 1];
+        if (top.name === 'Home') {
+          title.textContent = 'Events';
+          body.innerHTML = list();
+        } else {
+          const e = EVENTS.find((x) => x.id === top.itemId);
+          title.textContent = 'Event';
+          body.innerHTML = `<div class="np-detail"><span class="np-hero">🎪</span><b>${esc(e.title)}</b><small>${esc(e.place)}</small><span class="np-param mono">route.params.itemId = '${e.id}'</span></div>`;
+        }
+        historyEl.innerHTML = stack.map((r, i) => `<li class="${i === stack.length - 1 ? 'on' : ''}">${r.name}${r.itemId ? ` <span class="mono">{ itemId: '${r.itemId}' }</span>` : ''}</li>`).join('');
+        note.textContent = stack.length > 1 ? `Back removes ${stack[stack.length - 1].name} and shows ${stack[stack.length - 2].name}.` : 'Tap an event to push Details on top.';
+      } else if (mode === 'tabs') {
+        title.textContent = tab;
+        body.innerHTML = tab === 'Discover' ? list() : `<div class="np-empty">${tab === 'Saved' ? 'Your saved events' : 'Mariam Ahmed'}</div>`;
+        tabs.querySelectorAll('[data-np-tab]').forEach((b) => b.classList.toggle('on', b.dataset.npTab === tab));
+        historyEl.innerHTML = ['Discover', 'Saved', 'Profile'].map((t) => `<li class="${t === tab ? 'on' : ''}">${t}${t === tab ? ' <span class="mono">focused</span>' : ''}</li>`).join('');
+        note.textContent = 'All three tabs stay mounted: switching keeps each tab’s scroll position and state. There is no Back between equals.';
+      } else {
+        title.textContent = page;
+        body.innerHTML = `<div class="np-empty">${page === 'Home' ? 'Tap ☰ to open the menu' : `${page} page`}</div>`;
+        historyEl.innerHTML = ['Home', 'Settings', 'Help', 'About'].map((n) => `<li class="${n === page ? 'on' : ''}">${n}</li>`).join('');
+        note.textContent = 'Occasional destinations hide behind ☰, so they don’t take space from the content.';
+      }
+    }
+
+    root.querySelectorAll('[data-np-mode]').forEach((b) => b.addEventListener('click', () => {
+      mode = b.dataset.npMode;
+      root.querySelectorAll('[data-np-mode]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      stack = [{ name: 'Home' }];
+      render(mode === 'stack' ? "<Stack.Navigator> · initialRouteName='Home'" : mode === 'tabs' ? '<Tab.Navigator> · 3 equal screens' : '<Drawer.Navigator> · header shows ☰');
+    }));
+    body.addEventListener('click', (ev) => {
+      const open = ev.target.closest('[data-np-open]');
+      if (!open) return;
+      const itemId = open.dataset.npOpen;
+      if (mode === 'stack') {
+        stack.push({ name: 'Details', itemId });
+        render(`navigation.navigate('Details', { itemId: '${itemId}' })`);
+      } else if (mode === 'tabs') {
+        render(`// inside a tab, details would open in a stack: navigate('Details', { itemId: '${itemId}' })`);
+      }
+    });
+    back.addEventListener('click', () => {
+      stack.pop();
+      render('navigation.goBack()');
+    });
+    tabs.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-np-tab]');
+      if (!b) return;
+      tab = b.dataset.npTab;
+      tabHistory = [...tabHistory.filter((t) => t !== tab), tab];
+      render(`navigation.navigate('${tab}')  // or jumpTo('${tab}')`);
+    });
+    menu.addEventListener('click', () => {
+      drawer.hidden = false;
+      callEl.textContent = 'navigation.openDrawer()';
+    });
+    drawer.addEventListener('click', (ev) => {
+      const go = ev.target.closest('[data-np-go]');
+      if (ev.target.closest('[data-np-close]')) {
+        drawer.hidden = true;
+        callEl.textContent = 'navigation.closeDrawer()';
+      } else if (go) {
+        page = go.dataset.npGo;
+        render(`navigation.navigate('${page}')  // closes the drawer`);
+      }
+    });
+    render();
+  });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .np { margin: 24px 0 32px; display: grid; gap: 16px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .np-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .np-modes button { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text-2); text-align: left; cursor: pointer; transition: border-color .2s var(--ease-out), background .2s var(--ease-out); }
+  .np-modes button b { font-size: 15px; color: var(--text); }
+  .np-modes button small { font-size: 12px; color: var(--text-3); }
+  .np-modes button[aria-selected='true'] { border-color: var(--accent-text); background: var(--accent-soft); }
+  .np-modes button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .np-grid { display: grid; gap: 20px; align-items: center; }
+  @media (min-width: 760px) { .np-grid { grid-template-columns: auto 1fr; } }
+  .np-phone { justify-self: center; }
+  .np-phone :global(.device) { --w: 230px; }
+  .np-app { position: absolute; inset: 0; display: flex; flex-direction: column; color: #11181c; font-size: 13px; background: #fff; }
+  .np-head { position: relative; flex: none; height: 40px; display: grid; place-items: center; border-bottom: 1px solid #e5e7eb; }
+  .np-head b { font-size: 14px; }
+  .np-back, .np-menu { position: absolute; left: 6px; top: 50%; translate: 0 -50%; border: 0; background: none; color: #059669; font-size: 13px; cursor: pointer; padding: 6px; }
+  .np-menu { color: #11181c; font-size: 17px; }
+  .np-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px; overflow: hidden; }
+  .np-body :global(.np-row) { display: grid; gap: 1px; text-align: left; padding: 9px 10px; border: 0; border-radius: 10px; background: #f1f5f9; color: #11181c; cursor: pointer; transition: transform .15s var(--ease-out), background .15s; }
+  .np-body :global(.np-row:active) { transform: scale(.98); background: #e2e8f0; }
+  .np-body :global(.np-row b) { font-size: 13px; }
+  .np-body :global(.np-row small) { font-size: 11.5px; color: #64748b; }
+  .np-body :global(.np-detail) { display: grid; justify-items: center; gap: 4px; padding-top: 16px; text-align: center; animation: np-in .28s var(--ease-out); }
+  .np-body :global(.np-hero) { font-size: 38px; }
+  .np-body :global(.np-param) { margin-top: 10px; padding: 4px 8px; border-radius: 8px; background: #ecfdf5; color: #047857; font-size: 11px; }
+  .np-body :global(.np-empty) { margin: auto; color: #64748b; text-align: center; padding: 0 12px; }
+  .np-tabs { flex: none; display: flex; border-top: 1px solid #e5e7eb; padding: 4px 0 14px; }
+  .np-tabs button { flex: 1; display: grid; justify-items: center; gap: 1px; border: 0; background: none; font-size: 11.5px; color: #6c6c70; cursor: pointer; }
+  .np-tabs button i { font-style: normal; font-size: 14px; filter: grayscale(1); opacity: .7; }
+  .np-tabs button.on { color: #059669; font-weight: 700; }
+  .np-tabs button.on i { filter: none; opacity: 1; }
+  .np-drawer { position: absolute; inset: 0; display: flex; }
+  .np-scrim { position: absolute; inset: 0; background: rgb(0 0 0 / .35); animation: np-fade .2s var(--ease-out); }
+  .np-panel { position: relative; width: 72%; height: 100%; display: grid; align-content: start; gap: 4px; padding: 52px 10px 10px; background: #fff; box-shadow: 8px 0 24px rgb(0 0 0 / .18); animation: np-slide .26s var(--ease-out); }
+  .np-panel b { font-size: 13px; padding: 0 8px 8px; }
+  .np-panel button { text-align: left; padding: 9px 8px; border: 0; border-radius: 8px; background: none; font-size: 13px; color: #11181c; cursor: pointer; }
+  .np-panel button:hover { background: #f1f5f9; }
+  .np-side { display: grid; gap: 8px; align-content: start; min-width: 0; }
+  .np-k { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin: 0 !important; }
+  .np-call { display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: 12.5px; color: var(--accent-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .np-call.flash { animation: np-flash .6s var(--ease-out); }
+  .np-history { list-style: none; padding: 0; margin: 0 !important; display: flex; flex-wrap: wrap; gap: 6px; }
+  .np-history :global(li) { margin: 0 !important; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 13px; color: var(--text-2); }
+  .np-history :global(li.on) { border-color: var(--accent-text); color: var(--text); background: var(--accent-soft); }
+  .np-history :global(li .mono) { font-size: 11px; color: var(--text-3); }
+  .np-note { margin: 0 !important; font-size: 14px; color: var(--text-2); }
+  .np figcaption { font-size: 14px; color: var(--text-2); }
+  @keyframes np-in { from { opacity: 0; transform: translateX(14px); } }
+  @keyframes np-slide { from { transform: translateX(-100%); } }
+  @keyframes np-fade { from { opacity: 0; } }
+  @keyframes np-flash { 0% { box-shadow: 0 0 0 3px var(--accent-soft); border-color: var(--accent-text); } }
+  @media (prefers-reduced-motion: reduce) { .np-body :global(.np-detail), .np-panel, .np-scrim, .np-call.flash { animation: none; } }
+  @media (max-width: 520px) { .np-modes button small { display: none; } }
+</style>

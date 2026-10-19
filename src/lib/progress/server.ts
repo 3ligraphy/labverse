@@ -8,7 +8,8 @@
 import { getSecret } from 'astro:env/server';
 import { getCollection } from 'astro:content';
 import { getPlayground } from '@/lib/playgrounds';
-import { EXERCISES as LAB02_EXERCISES } from '@/lab/exercises/lab-02/meta';
+import { exerciseMeta } from '@/lab/exercises/registry';
+import { claimedByFileLab } from '@/lib/lab/claimed';
 import { noStore } from '@/lib/attendance/server';
 import { exerciseStats, labStructure, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
 import { NeonStore, type ProgressStore } from './store';
@@ -51,7 +52,8 @@ export async function getStructures(): Promise<LabStructure[]> {
     builderLabs = {
       at: Date.now(),
       labs: publishedLabSources()
-        .then((sources) => sources.map((l) => labStructure(l.key, l.title, l.outline, (id) => {
+        // a builder lab rewritten as a file lab is counted once, as the file lab
+        .then((sources) => sources.filter((l) => !claimedByFileLab(l.key)).map((l) => labStructure(l.key, l.title, l.outline, (id) => {
           const ex = l.exercises[id];
           return ex ? { title: ex.title, checks: ex.checks.length } : null;
         })))
@@ -67,12 +69,12 @@ function fileStructures(): Promise<LabStructure[]> {
   structures = (async () => {
     const labs = (await getCollection('labs', (e) => !e.data.draft)).sort((a, b) => a.data.number - b.data.number);
     return labs.map((lab) =>
-      labStructure(lab.id, `Lab ${String(lab.data.number).padStart(2, '0')}: ${lab.data.title}`, lab.body ?? '', (id) => {
+      labStructure(lab.data.trackingKey ?? lab.id, `Lab ${String(lab.data.number).padStart(2, '0')}: ${lab.data.title}`, lab.body ?? '', (id) => {
         try {
           const p = getPlayground(id);
           return { title: p.title, checks: p.checks.length };
         } catch {
-          const exercise = lab.id === 'lab-02' ? LAB02_EXERCISES.find((item) => item.id === id) : null;
+          const exercise = exerciseMeta(id);
           return exercise ? { title: exercise.title, checks: 1, task: String(exercise.block) } : null;
         }
       }),
@@ -173,7 +175,7 @@ async function labChoices(labs: LabStructure[]) {
       title: key && l.title.startsWith(`${moduleTitle}: `) ? l.title.slice(moduleTitle.length + 2) : l.title,
       module, moduleTitle, faculty,
       facultyName: faculty === ANY_FACULTY ? 'All faculties' : facultyName.get(faculty) ?? faculty,
-      href: key ? `/${key.module}/${key.lab}` : `/mobile-development/labs/${l.lab}`,
+      href: claimedByFileLab(l.lab) ? `/mobile-development/labs/${claimedByFileLab(l.lab)}` : key ? `/${key.module}/${key.lab}` : `/mobile-development/labs/${l.lab}`,
     };
   });
 }

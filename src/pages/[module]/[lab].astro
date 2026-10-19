@@ -15,6 +15,7 @@ import { isAdmin } from '@/lib/attendance/server';
 import Locked from '@/components/platform/Locked.astro';
 import { moduleAccess } from '@/lib/accounts/enrolment';
 import { labKey } from '@/lib/platform/core';
+import { claimedByFileLab } from '@/lib/lab/claimed';
 import { renderBlocks } from '@/lib/platform/render';
 import { loadModule } from '@/lib/platform/server';
 import { minutes } from '@/lib/lab';
@@ -26,6 +27,9 @@ const preview = isAdmin(Astro.cookies) && Astro.url.searchParams.has('preview');
 Astro.response.headers.set('cache-control', 'private, no-store');
 
 const moduleSlug = Astro.params.module ?? '';
+// a builder lab rewritten as a file lab: its old address forwards there
+const claimed = claimedByFileLab(labKey(moduleSlug, Astro.params.lab ?? ''));
+if (claimed) return Astro.redirect(`/mobile-development/labs/${claimed}${Astro.url.search}`, 301);
 const data = await loadModule(moduleSlug, { drafts: preview }).catch(() => null);
 const gate = data ? await moduleAccess(Astro.cookies, data.module.slug) : { ok: false, signedIn: false };
 const idx = data ? data.items.findIndex((i) => i.lab.slug === Astro.params.lab) : -1;

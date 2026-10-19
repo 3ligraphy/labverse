@@ -44,6 +44,8 @@ export const labSchema = <I extends z.ZodTypeAny = ReturnType<typeof imagePath>>
     draft: z.boolean().default(false),
     /** interactive lab: in-browser exercises + progress tracking (see src/lab/) */
     interactive: z.boolean().default(false),
+    /** progress key when it differs from the file name (a lab that moved from the builder keeps its key) */
+    trackingKey: z.string().optional(),
   });
 
 export const courseworkSchema = z.object({

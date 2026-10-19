@@ -3,12 +3,13 @@
  * Students' browsers send events (start / check / hint); /admin reads aggregated stats.
  */
 import { validateCheckIn } from '../attendance/core.ts';
-import { EXERCISES as LAB02_EXERCISES, FINAL_ID as LAB02_FINAL } from '../../lab/exercises/lab-02/meta.ts';
+import { INTERACTIVE_LABS } from '../../lab/exercises/registry.ts';
 
 export type LabExercise = { id: string; n: number; title: string; block: number };
-export const LABS: Record<string, { exercises: LabExercise[]; final: string }> = {
-  'lab-02': { exercises: LAB02_EXERCISES, final: LAB02_FINAL },
-};
+/** interactive labs by progress key */
+export const LABS: Record<string, { exercises: LabExercise[]; final: string }> = Object.fromEntries(
+  Object.values(INTERACTIVE_LABS).map((l) => [l.LAB_ID, { exercises: l.EXERCISES, final: l.FINAL_ID }]),
+);
 
 export type LabEventKind = 'start' | 'check' | 'hint';
 export type CheckResult = 'pass' | 'partial' | 'fail';

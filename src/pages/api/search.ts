@@ -3,6 +3,8 @@ import { loadModule } from '@/lib/platform/server';
 import { moduleAccess } from '@/lib/accounts/enrolment';
 import { isAdmin } from '@/lib/attendance/server';
 import { moduleSearchItems } from '@/lib/platform/search';
+import { labKey } from '@/lib/platform/core';
+import { claimedByFileLab } from '@/lib/lab/claimed';
 
 export const prerender = false;
 export const GET: APIRoute = async ({ url, cookies }) => {
@@ -18,5 +20,5 @@ export const GET: APIRoute = async ({ url, cookies }) => {
   const data = await loadModule(slug, { drafts: preview });
   if (!data) return json([]);
   return json(moduleSearchItems(slug, data.meta.title || data.module.title,
-    data.items.map(({ lab, compiled }) => ({ slug: lab.slug, compiled })), preview));
+    data.items.filter(({ lab }) => !claimedByFileLab(labKey(slug, lab.slug))).map(({ lab, compiled }) => ({ slug: lab.slug, compiled })), preview));
 };

@@ -5,6 +5,8 @@ import EmptyState from '@/components/EmptyState.astro';
 import Icon from '@/components/Icon.astro';
 import { getLabs, pad, slug } from '@/lib/content';
 import { BUILT_IN_MODULE, loadModule } from '@/lib/platform/server';
+import { labKey } from '@/lib/platform/core';
+import { claimedByFileLab } from '@/lib/lab/claimed';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'public, s-maxage=60, stale-while-revalidate=300');
@@ -17,7 +19,8 @@ const labs = [
     difficulty: lab.data.difficulty, estimatedTime: lab.data.estimatedTime,
     objectives: lab.data.objectives, skills: lab.data.skills, href: `/mobile-development/labs/${lab.id}`, canvas: false,
   })),
-  ...(canvasModule?.items.map(({ lab, compiled, n }) => ({
+  // builder labs, except those now written as file labs
+  ...(canvasModule?.items.filter(({ lab }) => !claimedByFileLab(labKey(BUILT_IN_MODULE.slug, lab.slug))).map(({ lab, compiled, n }) => ({
     number: Number(lab.slug.match(/^lab-(\d+)$/)?.[1] ?? n),
     title: compiled.meta.title.replace(/^Lab\s+\d+\s*[—–-]\s*/i, ''),
     description: compiled.meta.description, difficulty: compiled.meta.difficulty,

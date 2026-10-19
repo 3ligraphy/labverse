@@ -60,16 +60,18 @@ import RnMap from '@/components/lab/interactive/RnMap.astro';
 import FlexAxes from '@/components/lab/interactive/FlexAxes.astro';
 import FlatListWindow from '@/components/lab/interactive/FlatListWindow.astro';
 import ClassMap from '@/components/lab/interactive/ClassMap.astro';
-import { EXERCISES as LAB02_EXERCISES } from '@/lab/exercises/lab-02/meta';
+import NavPatterns from '@/components/lab/interactive/NavPatterns.astro';
+import EnvSwitcher from '@/components/lab/interactive/EnvSwitcher.astro';
+import BriefBuilder from '@/components/lab/interactive/BriefBuilder.astro';
+import { INTERACTIVE_LABS } from '@/lab/exercises/registry';
 
 const components = {
   Part, Task, Checkpoint, Terminal, Explain, Cards, ToolGrid, TeamCards, Timeline, FileTree, AppPhone, AppWalkthrough, MockScreen, BeforeAfter,
   GitFlow, BranchPerMember, ClickPath, SplitBar, GhSignup, GhNewRepo, GhQuickSetup, GhToken, GcmDialog, GhPullRequest, VsCode,
   RepoSubmit, Exercise, Demo, AppStartFlow, ComponentTree, PropsFlow, StateLoop, EffectTimeline, RnMap, FlexAxes, FlatListWindow, ClassMap,
+  NavPatterns, EnvSwitcher, BriefBuilder,
 };
 
-/** exercise lists of interactive labs (by lab id) */
-const INTERACTIVE: Record<string, typeof LAB02_EXERCISES> = { 'lab-02': LAB02_EXERCISES };
 
 export async function getStaticPaths() {
   const labs = await getLabs();
@@ -79,7 +81,9 @@ const { lab, prev, next } = Astro.props;
 const d = lab.data;
 const { Content, headings } = await render(lab);
 
-const exercises = d.interactive ? (INTERACTIVE[lab.id] ?? []) : [];
+const exercises = d.interactive ? (INTERACTIVE_LABS[lab.id]?.EXERCISES ?? []) : [];
+// where sessions, check-ins and progress are stored (a lab moved from the builder keeps its old key)
+const key = d.trackingKey ?? lab.id;
 const interactive = exercises.length > 0;
 // interactive labs: each <Part> (block) lists its exercises instead of <Task> checkboxes
 const outline = parseLabOutline(lab.body).map((p) =>
@@ -160,10 +164,10 @@ const sections = [
     </div>
   </header>
 
-  {interactive && <LabProgress />}
-  <div class:list={['container doc', { 'is-interactive': interactive }]} data-lab={lab.id} data-total={tasks.length} data-lab-interactive={interactive ? lab.id : undefined}>
+  {interactive && <LabProgress lab={lab.id} />}
+  <div class:list={['container doc', { 'is-interactive': interactive }]} data-lab={key} data-total={tasks.length} data-lab-interactive={interactive ? lab.id : undefined}>
     <article class="doc-main">
-      {isMission && <LabStart id={lab.id} lab={`Lab ${pad(d.number)}`} />}
+      {isMission && <LabStart id={key} lab={`Lab ${pad(d.number)}`} />}
 
       {(d.objectives.length > 0 || d.prerequisites.length > 0) && (
         <section class="brief" data-reveal>
@@ -253,7 +257,7 @@ const sections = [
         </section>
       )}
 
-      {isMission && <CheckinCard lab={lab.id} label={`Lab ${pad(d.number)}`} />}
+      {isMission && <CheckinCard lab={key} label={`Lab ${pad(d.number)}`} />}
 
       <nav class="pn" aria-label="Lab navigation">
         {prev ? (

@@ -1,9 +1,10 @@
 ---
 /** Placeholder for a live, editable demo: <Demo id="hooks" /> */
-import { demos } from '@/lab/exercises/lab-02/demos';
+import { demos as lab02 } from '@/lab/exercises/lab-02/demos';
+import { demos as lab03 } from '@/lab/exercises/lab-03/demos';
 interface Props { id: string }
 const { id } = Astro.props;
-const demo = demos[id];
+const demo = lab02[id] ?? lab03[id];
 if (!demo) throw new Error(`<Demo id="${id}">: no such demo in demos.ts`);
 ---
 <div class="demo-mount" data-demo={id}>

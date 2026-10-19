@@ -1,0 +1,123 @@
+---
+/**
+ * Fill in the semester app's product brief and see it as a product card and as docs/product-brief.md, ready to
+ * copy into the repository. Kept in this browser only (a convenience, not a submission). <BriefBuilder />
+ */
+const FIELDS = [
+  { key: 'name', label: 'App name', example: 'Campus Companion' },
+  { key: 'problem', label: 'Problem (one sentence)', example: 'Students miss campus events because announcements are scattered across chat groups.' },
+  { key: 'user', label: 'Primary user — and when they need it', example: 'First-year students, between lectures, on their phone' },
+  { key: 'f1', label: 'Core feature 1', example: 'Discover this week’s events' },
+  { key: 'f2', label: 'Core feature 2', example: 'Save events to a list' },
+  { key: 'f3', label: 'Core feature 3', example: 'Get a reminder before it starts' },
+  { key: 'device', label: 'One device feature', example: 'Local notifications for reminders' },
+  { key: 'api', label: 'One external API', example: 'The university events API (JSON)' },
+  { key: 'metric', label: 'A measurable sign it is useful', example: '6 of 10 testers save an event within 2 minutes' },
+];
+---
+<figure class="bb" data-bb data-reveal>
+  <form class="bb-form" novalidate>
+    {FIELDS.map((f) => (
+      <label class:list={['bb-field', { wide: ['problem', 'user', 'metric'].includes(f.key) }]}>
+        <span>{f.label}</span>
+        <input class="input" name={f.key} placeholder={f.example} maxlength="160" autocomplete="off" />
+      </label>
+    ))}
+  </form>
+
+  <div class="bb-out">
+    <article class="bb-card" aria-live="polite">
+      <p class="bb-k mono">Semester app</p>
+      <h3 data-bb-name>Campus Companion</h3>
+      <p class="bb-problem" data-bb-problem></p>
+      <ul class="bb-feats" data-bb-feats></ul>
+      <p class="bb-meta"><span>📱 <b data-bb-device></b></span><span>🔌 <b data-bb-api></b></span></p>
+      <p class="bb-metric">🎯 <span data-bb-metric></span></p>
+    </article>
+    <div class="bb-md">
+      <div class="bb-md-head"><span class="mono">docs/product-brief.md</span><button type="button" class="btn btn-ghost btn-sm" data-bb-copy>Copy Markdown</button></div>
+      <pre data-bb-md></pre>
+    </div>
+  </div>
+  <figcaption>Empty fields use the Campus Companion example. What you type stays in this browser only; copy the Markdown into your repository.</figcaption>
+</figure>
+
+<script>
+  const KEY = 'buenova:lab03-brief';
+  const wire = () => document.querySelectorAll<HTMLElement>('[data-bb]:not([data-wired])').forEach((root) => {
+    root.dataset.wired = '1';
+    const form = root.querySelector('form')!;
+    const inputs = [...form.querySelectorAll<HTMLInputElement>('input')];
+    const val = (name: string) => {
+      const input = inputs.find((i) => i.name === name)!;
+      return input.value.trim() || input.placeholder;
+    };
+    const set = (sel: string, text: string) => (root.querySelector(sel)!.textContent = text);
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, string>;
+      for (const i of inputs) if (saved[i.name]) i.value = saved[i.name];
+    } catch { /* storage unavailable: start empty */ }
+
+    const markdown = () => [
+      `# ${val('name')} — product brief`, '',
+      `**Problem:** ${val('problem')}`, '',
+      `**Primary user:** ${val('user')}`, '',
+      '## Core features', `1. ${val('f1')}`, `2. ${val('f2')}`, `3. ${val('f3')}`, '',
+      `**Device feature:** ${val('device')}`, '',
+      `**External API:** ${val('api')}`, '',
+      `**Success metric:** ${val('metric')}`, '',
+    ].join('\n');
+
+    const paint = () => {
+      set('[data-bb-name]', val('name'));
+      set('[data-bb-problem]', val('problem'));
+      set('[data-bb-device]', val('device'));
+      set('[data-bb-api]', val('api'));
+      set('[data-bb-metric]', val('metric'));
+      const feats = root.querySelector('[data-bb-feats]')!;
+      feats.replaceChildren(...['f1', 'f2', 'f3'].map((k) => Object.assign(document.createElement('li'), { textContent: val(k) })));
+      set('[data-bb-md]', markdown());
+      try {
+        localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(inputs.map((i) => [i.name, i.value]))));
+      } catch { /* private window: nothing kept */ }
+    };
+    form.addEventListener('input', paint);
+    const copy = root.querySelector<HTMLButtonElement>('[data-bb-copy]')!;
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(markdown());
+        copy.textContent = 'Copied ✓';
+      } catch {
+        copy.textContent = 'Select the text to copy';
+      }
+      setTimeout(() => (copy.textContent = 'Copy Markdown'), 1800);
+    });
+    paint();
+  });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .bb { margin: 24px 0 32px; display: grid; gap: 18px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .bb-form { display: grid; gap: 10px; grid-template-columns: 1fr; }
+  @media (min-width: 680px) { .bb-form { grid-template-columns: 1fr 1fr 1fr; } .bb-field.wide { grid-column: span 3; } .bb-field:first-child { grid-column: span 3; } }
+  .bb-field { display: grid; gap: 4px; }
+  .bb-field span { font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .bb-field .input { height: 40px; padding: 0 12px; font-size: 14px; }
+  .bb-out { display: grid; gap: 14px; align-items: start; }
+  @media (min-width: 820px) { .bb-out { grid-template-columns: 1fr 1fr; } }
+  .bb-card { display: grid; gap: 8px; padding: 20px; border-radius: 22px; background: #0f172a; color: #e2e8f0; border: 1px solid #1e293b; }
+  .bb-k { margin: 0 !important; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #6ee7b7; }
+  .bb-card h3 { margin: 0; font-size: 26px; letter-spacing: -.02em; color: #fff; text-wrap: balance; }
+  .bb-problem { margin: 0 !important; font-size: 14.5px; line-height: 1.55; color: #cbd5e1; }
+  .bb-feats { margin: 4px 0 0 !important; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .bb-feats :global(li) { margin: 0 !important; padding: 8px 10px; border-radius: 10px; background: #1e293b; font-size: 13.5px; }
+  .bb-meta { margin: 4px 0 0 !important; display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; color: #94a3b8; }
+  .bb-meta b { color: #e2e8f0; font-weight: 600; }
+  .bb-metric { margin: 0 !important; padding: 8px 10px; border-radius: 10px; background: rgb(110 231 183 / .12); color: #6ee7b7; font-size: 13.5px; }
+  .bb-md { display: grid; border-radius: 14px; border: 1px solid var(--line-2); overflow: hidden; min-width: 0; }
+  .bb-md-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-2); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--text-3); }
+  .bb-md pre { margin: 0; padding: 14px; max-height: 330px; overflow: auto; font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; color: var(--text-2); background: var(--surface); }
+  .bb figcaption { font-size: 14px; color: var(--text-2); }
+</style>

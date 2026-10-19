@@ -4,6 +4,7 @@
  * sleeps when far away, so 18 previews never run at once on a student laptop.
  */
 import * as lab02 from '../exercises/lab-02/index.ts';
+import * as lab03 from '../exercises/lab-03/index.ts';
 import type { Exercise } from '../exercises/types.ts';
 import { mountFlex } from './flex.ts';
 import { initProgress } from './progress.ts';
@@ -11,7 +12,8 @@ import { startTracker } from './tracker.ts';
 import { mountLabel, mountMatch, mountOrder, mountPredict } from './widgets.ts';
 import { Workbench } from './workbench.ts';
 
-const LABS = { 'lab-02': lab02 } as const;
+/** by the lab's content id (data-lab-interactive); each registry's LAB_ID is where progress is stored */
+const LABS = { 'lab-02': lab02, 'lab-03': lab03 } as const;
 
 export function mountLab(): (() => void) | undefined {
   const root = document.querySelector<HTMLElement>('[data-lab-interactive]');
