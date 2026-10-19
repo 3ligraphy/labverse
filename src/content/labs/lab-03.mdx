@@ -190,9 +190,21 @@ Keep each feature’s screens, components, hooks, API calls and types together. 
 
 <Exercise id="mobile-development--lab-03--imports-predict" />
 
-### Replace fragile relative paths with `@/`
+### Relative paths vs the `@/` alias
 
-Configure the alias once. Use `@/` across architecture boundaries; nearby files inside one feature may keep `./` and `../`.
+An import path tells Metro **where the file is**. There are two ways to write it:
+
+<Cards cols={3} items={[
+  { icon: 'map', title: 'Relative: ./ and ../', text: 'Directions **from the file you are in**. `./` = this folder, `../` = one folder up. Short for neighbours, but `../../../` is hard to read and breaks when the file moves.' },
+  { icon: 'target', title: 'Alias: @/', text: 'An address **from `src/`**, the same from every file: `@/components/ui/AppButton`. Moving the importing file changes nothing.' },
+  { icon: 'check', title: 'The rule', text: 'Inside one feature → `./` or `../`. Across boundaries (shared UI, theme, services) → `@/`.' },
+]} />
+
+Pick what `ProfileScreen.tsx` imports and watch the path walk the folders. Then move the file:
+
+<ImportPaths />
+
+`@/` is not built in — you define it once in `tsconfig.json`. `"@/*": ["src/*"]` means: replace `@/` with `src/`. Expo’s bundler reads the same setting, so TypeScript and the running app agree.
 
 ```json title="tsconfig.json"
 {

@@ -1,0 +1,192 @@
+---
+/**
+ * How an import path is walked: pick what ProfileScreen imports and watch `../` climb one folder at a time,
+ * then move the file and see the relative path change while the `@/` path stays the same. <ImportPaths />
+ */
+const TREE = [
+  'src',
+  'src/components',
+  'src/components/ui',
+  'src/components/ui/AppButton.tsx',
+  'src/features',
+  'src/features/events',
+  'src/features/events/components',
+  'src/features/events/components/EventCard.tsx',
+  'src/features/profile',
+  'src/features/profile/api.ts',
+  'src/features/profile/screens',
+  'src/features/profile/screens/ProfileScreen.tsx',
+  'src/features/profile/screens/edit',
+  'src/features/profile/screens/edit/ProfileScreen.tsx',
+  'src/theme',
+  'src/theme/tokens.ts',
+];
+const TARGETS = [
+  { file: 'src/components/ui/AppButton.tsx', name: '{ AppButton }', note: 'shared UI — another part of src' },
+  { file: 'src/theme/tokens.ts', name: '{ colors }', note: 'shared theme — another part of src' },
+  { file: 'src/features/profile/api.ts', name: '{ updateProfile }', note: 'same feature — a neighbour' },
+  { file: 'src/features/events/components/EventCard.tsx', name: '{ EventCard }', note: 'another feature' },
+];
+---
+<figure class="ip" data-ip data-reveal>
+  <div class="ip-legend">
+    <span><code>./</code> this folder</span>
+    <span><code>../</code> one folder up</span>
+    <span><code>@/</code> start at <code>src/</code></span>
+  </div>
+
+  <div class="ip-pick" role="radiogroup" aria-label="What ProfileScreen imports">
+    {TARGETS.map((t, i) => (
+      <button type="button" role="radio" aria-checked={i === 0 ? 'true' : 'false'} data-ip-target={t.file} data-ip-name={t.name}>
+        <b class="mono">{t.file.split('/').pop()}</b><small>{t.note}</small>
+      </button>
+    ))}
+  </div>
+
+  <div class="ip-grid">
+    <ol class="ip-tree" aria-label="Project folders">
+      {TREE.map((p) => {
+        const depth = p.split('/').length - 1;
+        const file = /\.\w+$/.test(p);
+        return (
+          <li data-ip-node={p} style={`--d:${depth}`} class:list={[{ file, moved: p.includes('/edit') }]}>
+            <span aria-hidden="true">{file ? '📄' : '📁'}</span>{p.split('/').pop()}
+          </li>
+        );
+      })}
+    </ol>
+
+    <div class="ip-side">
+      <label class="ip-move"><input type="checkbox" data-ip-move /> Move <code>ProfileScreen.tsx</code> into <code>screens/edit/</code></label>
+      <p class="ip-k mono">Relative path from <span data-ip-from></span></p>
+      <code class="ip-line" data-ip-rel></code>
+      <ol class="ip-steps" data-ip-steps></ol>
+      <p class="ip-k mono">Alias path (same from anywhere)</p>
+      <code class="ip-line alias" data-ip-alias></code>
+      <p class="ip-verdict" data-ip-verdict></p>
+      <button type="button" class="btn btn-ghost btn-sm" data-ip-play>▶ Walk the path again</button>
+    </div>
+  </div>
+  <figcaption>A relative path is directions <b>from where the file is</b>. <code>@/</code> is an address <b>from <code>src/</code></b>: it never changes when the file moves.</figcaption>
+</figure>
+
+<script>
+  const dir = (p: string) => p.slice(0, p.lastIndexOf('/'));
+  const noExt = (p: string) => p.replace(/\.(tsx?|jsx?)$/, '');
+
+  /** The steps a relative import takes: climb to the shared folder, then go down. */
+  function walk(from: string, to: string) {
+    const a = dir(from).split('/');
+    const b = noExt(to).split('/');
+    let common = 0;
+    while (common < a.length && common < b.length - 1 && a[common] === b[common]) common++;
+    const ups = a.length - common;
+    const down = b.slice(common);
+    const steps: { seg: string; at: string; up: boolean }[] = [];
+    for (let i = 1; i <= ups; i++) steps.push({ seg: '..', at: a.slice(0, a.length - i).join('/'), up: true });
+    down.forEach((seg, i) => steps.push({ seg, at: [...a.slice(0, common), ...down.slice(0, i + 1)].join('/'), up: false }));
+    const rel = ups === 0 ? `./${down.join('/')}` : `${Array(ups).fill('..').join('/')}/${down.join('/')}`;
+    return { rel, steps, ups };
+  }
+
+  const wire = () => document.querySelectorAll<HTMLElement>('[data-ip]:not([data-wired])').forEach((root) => {
+    root.dataset.wired = '1';
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+    const nodes = [...root.querySelectorAll<HTMLElement>('[data-ip-node]')];
+    const move = $<HTMLInputElement>('[data-ip-move]');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let target = root.querySelector<HTMLElement>('[data-ip-target]')!;
+    let timer = 0;
+
+    const paint = (animate: boolean) => {
+      clearTimeout(timer);
+      const from = move.checked ? 'src/features/profile/screens/edit/ProfileScreen.tsx' : 'src/features/profile/screens/ProfileScreen.tsx';
+      const to = target.dataset.ipTarget!;
+      const name = target.dataset.ipName!;
+      const { rel, steps, ups } = walk(from, to);
+      root.classList.toggle('is-moved', move.checked);
+      $('[data-ip-from]').textContent = dir(from).replace('src/', '') + '/';
+      $('[data-ip-rel]').innerHTML = `import ${name} from '<span class="seg">${rel.split('/').map((s) => `<i class="${s === '..' ? 'up' : s === '.' ? 'here' : 'down'}">${s}</i>`).join('/')}</span>';`;
+      $('[data-ip-alias]').textContent = `import ${name} from '@/${noExt(to).replace('src/', '')}';`;
+      const sameFeature = to.startsWith('src/features/profile/');
+      const otherFeature = to.startsWith('src/features/') && !sameFeature;
+      $('[data-ip-verdict]').innerHTML = sameFeature
+        ? '✅ Same feature: keep the short relative path.'
+        : otherFeature
+          ? '⚠️ Another feature’s internals: move <code>EventCard</code> to <code>src/components</code> if both features need it.'
+          : `✅ Use <code>@/</code>: ${ups} × <code>..</code> breaks the moment this file moves.`;
+      const list = $('[data-ip-steps]');
+      list.innerHTML = [`<li data-i="-1">start in <b>${dir(from).split('/').pop()}/</b></li>`, ...steps.map((s, i) => `<li data-i="${i}"><code class="${s.up ? 'up' : 'down'}">${s.seg}</code> → <b>${s.at.split('/').pop()}${i === steps.length - 1 ? '' : '/'}</b></li>`)].join('');
+      const order = [dir(from), ...steps.map((s) => s.at)];
+      const show = (n: number) => {
+        nodes.forEach((el) => el.classList.remove('on', 'trail', 'from', 'to'));
+        order.slice(0, n + 1).forEach((p, i) => {
+          const el = nodes.find((x) => noExt(x.dataset.ipNode!) === p || x.dataset.ipNode === p);
+          el?.classList.add(i === n ? 'on' : 'trail');
+        });
+        nodes.find((x) => x.dataset.ipNode === from)?.classList.add('from');
+        if (n === order.length - 1) nodes.find((x) => x.dataset.ipNode === to)?.classList.add('to');
+        list.querySelectorAll('li').forEach((li) => li.classList.toggle('on', Number(li.dataset.i) === n - 1));
+      };
+      if (!animate || reduce) return show(order.length - 1);
+      let n = 0;
+      const tick = () => {
+        show(n);
+        if (n++ < order.length - 1) timer = window.setTimeout(tick, 650);
+      };
+      tick();
+    };
+
+    root.querySelectorAll<HTMLElement>('[data-ip-target]').forEach((b) => b.addEventListener('click', () => {
+      target = b;
+      root.querySelectorAll('[data-ip-target]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+      paint(true);
+    }));
+    move.addEventListener('change', () => paint(true));
+    $('[data-ip-play]').addEventListener('click', () => paint(true));
+    paint(false);
+  });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .ip { margin: 24px 0 32px; display: grid; gap: 16px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .ip-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; color: var(--text-2); }
+  .ip-legend code { font-size: 13px; color: var(--accent-text); }
+  .ip-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+  .ip-pick button { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text-2); text-align: left; cursor: pointer; transition: border-color .2s var(--ease-out), background .2s var(--ease-out); }
+  .ip-pick button b { font-size: 13px; color: var(--text); }
+  .ip-pick button small { font-size: 12px; color: var(--text-3); }
+  .ip-pick button[aria-checked='true'] { border-color: var(--accent-text); background: var(--accent-soft); }
+  .ip-pick button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .ip-grid { display: grid; gap: 18px; }
+  @media (min-width: 820px) { .ip-grid { grid-template-columns: minmax(250px, .9fr) 1.1fr; } }
+  .ip-tree { list-style: none; margin: 0 !important; padding: 12px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--bg-2); font: 13px var(--font-mono); }
+  .ip-tree li { margin: 0 !important; padding: 3px 8px 3px calc(8px + var(--d) * 16px); border-radius: 7px; color: var(--text-3); display: flex; gap: 6px; transition: background .25s var(--ease-out), color .25s var(--ease-out); }
+  .ip-tree li.moved { display: none; }
+  .ip.is-moved .ip-tree li.moved { display: flex; }
+  .ip.is-moved .ip-tree li[data-ip-node='src/features/profile/screens/ProfileScreen.tsx'] { display: none; }
+  .ip-tree li.trail { color: var(--text); background: color-mix(in oklab, #ffb547 14%, transparent); }
+  .ip-tree li.on { color: var(--text); background: color-mix(in oklab, #ffb547 32%, transparent); }
+  .ip-tree li.from { color: #7cb1ff; font-weight: 700; }
+  .ip-tree li.to { color: var(--accent-text); font-weight: 700; background: var(--accent-soft); }
+  .ip-side { display: grid; gap: 8px; align-content: start; min-width: 0; }
+  .ip-move { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-2); cursor: pointer; }
+  .ip-move input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .ip-k { margin: 6px 0 0 !important; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .ip-line { display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+  .ip-line.alias { color: var(--accent-text); }
+  .ip-line :global(i) { font-style: normal; }
+  .ip-line :global(i.up) { color: #ffb547; font-weight: 700; }
+  .ip-line :global(i.down) { color: #7cb1ff; }
+  .ip-steps { list-style: none; margin: 0 !important; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .ip-steps :global(li) { margin: 0 !important; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 12.5px; color: var(--text-2); transition: border-color .2s, background .2s; }
+  .ip-steps :global(li.on) { border-color: #ffb547; background: color-mix(in oklab, #ffb547 18%, transparent); color: var(--text); }
+  .ip-steps :global(code.up) { color: #ffb547; }
+  .ip-steps :global(code.down) { color: #7cb1ff; }
+  .ip-verdict { margin: 4px 0 0 !important; font-size: 14px; color: var(--text-2); }
+  .ip-side .btn { justify-self: start; }
+  .ip figcaption { font-size: 14px; color: var(--text-2); }
+  @media (prefers-reduced-motion: reduce) { .ip-tree li, .ip-steps :global(li) { transition: none; } }
+</style>
