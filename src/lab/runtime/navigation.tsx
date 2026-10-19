@@ -13,6 +13,7 @@ import React, {
   type ComponentType, type ReactElement, type ReactNode,
 } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native-web';
+import { safeArea } from './safe-area.ts';
 
 type Params = Record<string, unknown> | undefined;
 export type Route = { key: string; name: string; params?: Params };
@@ -77,6 +78,9 @@ export const DefaultTheme: Theme = { dark: false, colors: { primary: '#007AFF', 
 export const DarkTheme: Theme = { dark: true, colors: { primary: '#0A84FF', background: '#010101', card: '#121212', text: '#e5e5e7', border: '#272729', notification: '#ff453a' } };
 
 const ThemeCtx = createContext<Theme>(DefaultTheme);
+/** Whether the status bar / home indicator space is still free: only the outermost header and tab bar pad for it. */
+const TopFreeCtx = createContext(true);
+const BottomFreeCtx = createContext(true);
 const ContainerCtx = createContext(false);
 /** The screen a component is rendered in (what useNavigation / useRoute return). */
 const ScreenCtx = createContext<{ navigation: Navigation; route: Route; focused: boolean } | null>(null);
@@ -169,6 +173,8 @@ function createNavigator(kind: Kind) {
     if (!useContext(ContainerCtx)) missingContainer();
     const theme = useTheme();
     const parent = useContext(ScreenCtx);
+    const topFree = useContext(TopFreeCtx);
+    const bottomFree = useContext(BottomFreeCtx);
     const screens = collectScreens(children);
     if (!screens.length) throw new Error(`A ${kind} navigator needs at least one <Screen name="…" component={…} />.`);
     const byName = new Map(screens.map((sc) => [sc.name, sc]));
@@ -337,7 +343,10 @@ function createNavigator(kind: Kind) {
     }, [focusedRoute.key, visited]);
     const mounted = kind === 'stack' ? state.routes : state.routes.filter((r) => r.key === focusedRoute.key || visited.has(r.key));
 
+    const hasHeader = focusedOptions.headerShown !== false;
     const body = (
+      <TopFreeCtx.Provider value={topFree && !hasHeader}>
+      <BottomFreeCtx.Provider value={bottomFree && kind !== 'tabs'}>
       <View style={s.fill}>
         {mounted.map((route) => {
           const sc = byName.get(route.name)!;
@@ -353,6 +362,8 @@ function createNavigator(kind: Kind) {
           );
         })}
       </View>
+      </BottomFreeCtx.Provider>
+      </TopFreeCtx.Provider>
     );
 
     const nav = navOf(focusedRoute);
@@ -364,6 +375,7 @@ function createNavigator(kind: Kind) {
         menu={kind === 'drawer' ? () => nav.toggleDrawer() : undefined}
         navigation={nav}
         theme={theme}
+        top={topFree ? safeArea.top : 0}
       />
     );
 
@@ -374,7 +386,7 @@ function createNavigator(kind: Kind) {
         <View style={s.fill}>
           {header}
           {body}
-          <View style={[s.tabbar, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border }, focusedOptions.tabBarStyle]} accessibilityRole="tablist">
+          <View style={[s.tabbar, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border }, { paddingBottom: 10 + (bottomFree ? safeArea.bottom : 0) }, focusedOptions.tabBarStyle]} accessibilityRole="tablist">
             {state.routes.map((route, i) => {
               const o = optionsOf(route);
               const focused = i === state.index;
@@ -403,7 +415,7 @@ function createNavigator(kind: Kind) {
           {state.drawerOpen && (
             <View style={s.drawerWrap}>
               <Pressable style={s.scrim} accessibilityLabel="Close menu" onPress={() => nav.closeDrawer()} />
-              <View style={[s.drawer, { backgroundColor: theme.colors.card }]} accessibilityRole="menu">
+              <View style={[s.drawer, { backgroundColor: theme.colors.card, paddingTop: 56 + safeArea.top }]} accessibilityRole="menu">
                 {state.routes.map((route, i) => {
                   const o = optionsOf(route);
                   const focused = i === state.index;
@@ -432,12 +444,12 @@ function createNavigator(kind: Kind) {
   return () => ({ Navigator, Screen, Group });
 }
 
-function Header({ options, title, back, menu, navigation, theme }: { options: Options; title: string; back?: () => void; menu?: () => void; navigation: Navigation; theme: Theme }) {
+function Header({ options, title, back, menu, navigation, theme, top = 0 }: { options: Options; title: string; back?: () => void; menu?: () => void; navigation: Navigation; theme: Theme; top?: number }) {
   const tint = options.headerTintColor ?? theme.colors.primary;
   const titleColor = options.headerTintColor ?? theme.colors.text;
   const left = options.headerLeft?.({ tintColor: tint, canGoBack: Boolean(back) });
   return (
-    <View style={[s.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }, options.headerStyle]}>
+    <View style={[s.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border, paddingTop: top, height: 52 + top }, options.headerStyle]}>
       <View style={s.side}>
         {left ?? (back ? (
           <Pressable onPress={back} accessibilityRole="button" accessibilityLabel="Go back" style={s.backBtn}>

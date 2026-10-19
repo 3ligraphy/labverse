@@ -10,6 +10,7 @@ import { createModuleSystem, LabError, locate } from './modules.ts';
 import { createDomDriver } from './driver-dom.ts';
 import { createRouterApp } from '../../runner/router-shim.tsx';
 import { setPlatform } from './tw.ts';
+import { setSafeArea } from './safe-area.ts';
 import type { FromRuntime, LabErrorInfo, LogLevel, RunRequest } from './protocol.ts';
 
 type Outgoing = FromRuntime extends infer M ? (M extends { __lab: 1 } ? Omit<M, '__lab'> : never) : never;
@@ -119,6 +120,7 @@ export function createRuntime(opts: { container: HTMLElement; post: Post; onFram
     RN.setInsets(request.frame === 'phone' ? PHONE_INSETS : NO_INSETS);
     setPlatform(request.frame);
     RN.setFrameOS(request.frame);
+    setSafeArea(request.frame === 'phone' ? { top: PHONE_INSETS.top, bottom: PHONE_INSETS.bottom } : { top: 0, bottom: 0 });
     opts.onFrame?.(request.frame);
 
     let renderedByCode = false;

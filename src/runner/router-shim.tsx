@@ -4,6 +4,7 @@
  */
 import React, { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useLayoutEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native-web';
+import { safeArea } from '../lab/runtime/safe-area.ts';
 import { buildHref, buildRoutes, childName, hrefOf, isDynamicRoute, matchRoute, type Href, type Match, type Route } from './routes.ts';
 
 type Options = {
@@ -81,7 +82,7 @@ function useNavigator(children: ReactNode, screenOptions: Options = {}) {
 
 function Header({ title, back, options }: { title: string; back: boolean; options: Options }) {
   return (
-    <View style={[s.header, options.headerStyle]}>
+    <View style={[s.header, { paddingTop: safeArea.top, height: 48 + safeArea.top }, options.headerStyle]}>
       {back && (
         <Pressable onPress={() => router.back()} style={s.back} accessibilityRole="button" accessibilityLabel="Back">
           <Text style={[s.backText, { color: options.headerTintColor ?? '#2563eb' }]}>‹ Back</Text>
@@ -123,7 +124,7 @@ function TabsNavigator({ children, screenOptions }: NavProps) {
       <OptionsCtx.Provider value={setOptions}>
         <View style={s.fill}><Level depth={depth + 1} /></View>
       </OptionsCtx.Provider>
-      <View style={s.tabbar} accessibilityRole="tablist">
+      <View style={[s.tabbar, { paddingBottom: 10 + safeArea.bottom }]} accessibilityRole="tablist">
         {tabs.map((t) => {
           const o = { ...screenOptions, ...configs.get(t.name) };
           const focused = t.name === name;
@@ -155,7 +156,7 @@ function DrawerNavigator({ children, screenOptions }: NavProps) {
   return (
     <View style={s.fill}>
       {options.headerShown !== false && (
-        <View style={[s.header, options.headerStyle]}>
+        <View style={[s.header, { paddingTop: safeArea.top, height: 48 + safeArea.top }, options.headerStyle]}>
           <Pressable onPress={() => setOpen(true)} style={s.back} accessibilityRole="button" accessibilityLabel="Open menu">
             <Text style={[s.backText, { fontSize: 20, color: options.headerTintColor ?? '#11181c' }]}>☰</Text>
           </Pressable>
@@ -228,7 +229,7 @@ const s = StyleSheet.create({
   fill: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
   header: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: '#fff', paddingHorizontal: 64 },
-  back: { position: 'absolute', left: 6, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 6 },
+  back: { position: 'absolute', left: 6, bottom: 0, height: 48, justifyContent: 'center', paddingHorizontal: 6 },
   backText: { fontSize: 15 },
   title: { fontSize: 16, fontWeight: '600' },
   tabbar: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#e5e7eb', backgroundColor: '#fff', paddingTop: 6, paddingBottom: 10 },

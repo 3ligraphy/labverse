@@ -167,6 +167,41 @@ You have theme tokens, a shared `AppButton` with typed props, pressed feedback, 
 
 Keep each feature’s screens, components, hooks, API calls and types together. Extract shared code only when several features need it.
 
+**Example.** The TA asks: *“add a ‘128 going’ counter to events.”* Which folders do you open?
+
+<div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+  <div style={{ flex: '1 1 260px' }}>
+    <FileTree title="❌ by file type — 4 folders" lines={[
+      'screens/',
+      '  EventListScreen.tsx *',
+      '  LoginScreen.tsx -',
+      '  ProfileScreen.tsx -',
+      'components/',
+      '  EventCard.tsx *',
+      '  Avatar.tsx -',
+      'hooks/',
+      '  useEvents.ts *',
+      'api/',
+      '  events.ts *',
+      '  auth.ts -',
+    ]} />
+  </div>
+  <div style={{ flex: '1 1 260px' }}>
+    <FileTree title="✅ by feature — 1 folder" lines={[
+      'features/',
+      '  events/ # everything for events *',
+      '    screens/EventListScreen.tsx *',
+      '    components/EventCard.tsx *',
+      '    hooks/useEvents.ts *',
+      '    api.ts *',
+      '  auth/ -',
+      '  profile/ -',
+    ]} />
+  </div>
+</div>
+
+Same files, but by feature everything for one change is in **one folder** — and you can’t break login by accident.
+
 <FileTree title="src" lines={[
   'app/',
   '  navigation/ # the shell: navigators, linking *',
@@ -192,7 +227,11 @@ Keep each feature’s screens, components, hooks, API calls and types together. 
 
 ### Relative paths vs the `@/` alias
 
-An import path tells Metro **where the file is**. There are two ways to write it:
+An import path tells Metro **where the file is**. There are two ways to write it — like giving someone directions vs giving them an address:
+
+> **Directions (relative):** “From my room, go out, down one floor, the kitchen is on the left.” Works only if you start in my room.
+>
+> **Address (alias):** “12 Nile Street, flat 4.” Works from anywhere.
 
 <Cards cols={3} items={[
   { icon: 'map', title: 'Relative: ./ and ../', text: 'Directions **from the file you are in**. `./` = this folder, `../` = one folder up. Short for neighbours, but `../../../` is hard to read and breaks when the file moves.' },
@@ -203,6 +242,10 @@ An import path tells Metro **where the file is**. There are two ways to write it
 Pick what `ProfileScreen.tsx` imports and watch the path walk the folders. Then move the file:
 
 <ImportPaths />
+
+Now try both kinds in a real project. Open each file tab, then follow the **Try** suggestions and read the errors:
+
+<Demo id="imports" />
 
 `@/` is not built in — you define it once in `tsconfig.json`. `"@/*": ["src/*"]` means: replace `@/` with `src/`. Expo’s bundler reads the same setting, so TypeScript and the running app agree.
 
@@ -222,6 +265,14 @@ Pick what `ProfileScreen.tsx` imports and watch the path walk the folders. Then 
 <Exercise id="mobile-development--lab-03--alias-code" />
 
 <Part n="4" title="Typed navigation" time="55 min" />
+
+### You already use all three
+
+<Cards cols={3} items={[
+  { icon: 'layers', title: 'Stack — the Settings app', text: 'Settings → Wi-Fi → your network. Each tap goes **deeper**; Back returns one step.' },
+  { icon: 'grid', title: 'Tabs — WhatsApp’s bottom bar', text: 'Chats · Updates · Calls: a few **equal** places, one tap apart, each keeps its scroll position.' },
+  { icon: 'menu', title: 'Drawer — Gmail’s ☰ menu', text: 'Sent, Drafts, Spam, Settings: **many, occasional** places hidden until you need them.' },
+]} />
 
 ### Stack, tabs or drawer?
 
@@ -248,7 +299,13 @@ Choose by **how the user moves**. Switch between the three patterns and tap insi
   { icon: 'phone', title: 'Screen', text: 'A **name** to navigate to + the **component** to draw. It receives `navigation` and `route` as props.' },
 ]} />
 
-Step through what happens when the user taps an event:
+### Your first navigator
+
+The smallest working example: two screens and one parameter. Read the 4 numbered comments, run it, then follow the **Try** suggestions:
+
+<Demo id="first-stack" />
+
+Now step through what happened when you tapped the event:
 
 <NavFlow />
 

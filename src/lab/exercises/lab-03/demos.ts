@@ -2,6 +2,119 @@
 import type { Demo } from '../types.ts';
 
 export const demos: Record<string, Demo> = {
+  imports: {
+    id: 'imports',
+    title: 'Both kinds of import in one real screen',
+    frame: 'phone',
+    entry: 'App.tsx',
+    files: {
+      'src/features/profile/screens/ProfileScreen.tsx': `import { useState } from 'react';
+import { View, Text } from 'react-native';
+
+// @/  = start at src/      →  src/components/ui/AppButton.tsx
+import { AppButton } from '@/components/ui/AppButton';
+// @/  = start at src/      →  src/theme/tokens.ts
+import { colors } from '@/theme/tokens';
+// ../ = up one folder (screens/ → profile/), then api.ts  →  src/features/profile/api.ts
+import { updateProfile } from '../api';
+
+export default function ProfileScreen() {
+  const [saved, setSaved] = useState(false);
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', padding: 24, gap: 16, backgroundColor: colors.background }}>
+      <Text style={{ color: colors.text, fontSize: 24, fontWeight: '700' }}>Mariam Ahmed</Text>
+      <AppButton label={saved ? 'Saved ✓' : 'Save profile'} onPress={async () => { await updateProfile('Mariam'); setSaved(true); }} />
+    </View>
+  );
+}
+`,
+      'App.tsx': `// App.tsx is at the root, so it uses @/ too
+import ProfileScreen from '@/features/profile/screens/ProfileScreen';
+
+export default function App() {
+  return <ProfileScreen />;
+}
+`,
+      'src/features/profile/api.ts': `// lives next to the profile screens: src/features/profile/api.ts
+export async function updateProfile(name: string) {
+  return { ok: true, name };
+}
+`,
+      'src/components/ui/AppButton.tsx': `import { Pressable, Text } from 'react-native';
+
+// shared by every feature: src/components/ui/AppButton.tsx
+export function AppButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} className="items-center rounded-xl bg-emerald-300 px-5 py-3 active:opacity-70">
+      <Text className="font-bold text-slate-950">{label}</Text>
+    </Pressable>
+  );
+}
+`,
+      'src/theme/tokens.ts': `// one place for colours: src/theme/tokens.ts
+export const colors = { background: '#0B1020', text: '#F8FAFC', primary: '#7CFFB2' } as const;
+`,
+    },
+    tryThis: [
+      "Change `'../api'` to `'./api'` and read the error: there is no api.ts inside screens/",
+      "Change `'@/theme/tokens'` to `'../../../theme/tokens'`: same file, a longer path",
+      "Change `'@/theme/tokens'` to `'@/theme/colors'`: the error names the missing file",
+    ],
+  },
+
+  'first-stack': {
+    id: 'first-stack',
+    title: 'Your first navigator: two screens, one parameter',
+    frame: 'phone',
+    entry: 'App.tsx',
+    files: {
+      'App.tsx': `import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { View, Text, Pressable } from 'react-native';
+
+// 1. create a stack navigator
+const Stack = createNativeStackNavigator();
+
+// 2. screen one: the navigator gives it "navigation"
+function HomeScreen({ navigation }) {
+  return (
+    <View className="flex-1 gap-3 bg-white p-6">
+      <Pressable
+        onPress={() => navigation.navigate('Details', { itemId: 'e42' })}
+        className="rounded-xl bg-emerald-100 p-4 active:opacity-70"
+      >
+        <Text className="text-lg font-semibold">Campus Fair →</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// 3. screen two: the navigator gives it "route", with the params Home sent
+function DetailsScreen({ route }) {
+  return <Text className="p-6 text-2xl font-bold">Event {route.params.itemId}</Text>;
+}
+
+// 4. put it together: container → navigator → screens
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator>
+        <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Events' }} />
+        <Stack.Screen name="Details" component={DetailsScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+`,
+    },
+    tryThis: [
+      'Tap “Campus Fair”, then the header’s Back',
+      "Send `{ itemId: 'e99' }` instead and tap again",
+      "Misspell `'Details'` only inside navigate(…) and read the console",
+      'Add a third screen “Map” and a second button that opens it',
+    ],
+  },
+
   'ui-system': {
     id: 'ui-system',
     title: 'A small UI system: tokens, a primitive and a screen',
