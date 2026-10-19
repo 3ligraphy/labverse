@@ -1,0 +1,146 @@
+---
+/**
+ * Nested navigators: a navigate() call is offered to the screen's own navigator first, then to its parent,
+ * and so on up. Pick a call and watch who handles it. <NestedNav />
+ */
+const CASES = [
+  {
+    from: 'Settings', call: "navigate('Main', { screen: 'Profile', params: { userId: '42' } })", ok: true,
+    path: [
+      ['stack', 'The <b>Stack</b> knows a screen called <code>Main</code> → it goes back to Main.'],
+      ['main', '<code>Main</code> is a <b>Tab navigator</b>. It reads <code>{ screen: \'Profile\' }</code> …'],
+      ['profile', '… and focuses the <b>Profile</b> tab with <code>params.userId = \'42\'</code>. ✅'],
+    ],
+  },
+  {
+    from: 'Settings', call: "navigate('Profile')", ok: false,
+    path: [
+      ['stack', 'The <b>Stack</b> has only <code>Main</code> and <code>Settings</code> — no <code>Profile</code> …'],
+      ['root', '… it asks its parent, the container: nobody else to ask. ❌ “The action NAVIGATE … was not handled by any navigator.” Profile is <i>inside</i> Main, so name Main first.'],
+    ],
+  },
+  {
+    from: 'Feed', call: "navigate('Settings')", ok: true,
+    path: [
+      ['main', 'The <b>Tabs</b> have <code>Feed</code> and <code>Profile</code> — no <code>Settings</code> …'],
+      ['stack', '… so the call <b>bubbles up</b> to the Stack, which has <code>Settings</code> …'],
+      ['settings', '… and pushes Settings on top. ✅ Names bubble <b>up</b> automatically.'],
+    ],
+  },
+  {
+    from: 'Feed', call: "navigate('Profile', { userId: '7' })", ok: true,
+    path: [
+      ['main', 'The <b>Tabs</b> own <code>Profile</code> → the tab switches. ✅ A sibling never needs the nested form.'],
+      ['profile', 'Profile shows user 7.'],
+    ],
+  },
+];
+---
+<figure class="nn" data-nn data-reveal>
+  <div class="nn-pick" role="radiogroup" aria-label="Choose a call">
+    {CASES.map((c, i) => (
+      <button type="button" role="radio" aria-checked={i === 0 ? 'true' : 'false'} data-nn-i={i}>
+        <small>from <b>{c.from}</b></small><code>{c.call}</code>
+      </button>
+    ))}
+  </div>
+
+  <div class="nn-grid">
+    <div class="nn-tree" aria-label="Navigator tree">
+      <div class="nn-box root" data-nn-node="root">
+        <span class="nn-label mono">NavigationContainer</span>
+        <div class="nn-box stack" data-nn-node="stack">
+          <span class="nn-label mono">Stack.Navigator</span>
+          <div class="nn-kids">
+            <div class="nn-box tabs" data-nn-node="main">
+              <span class="nn-label mono">Main · Tab.Navigator</span>
+              <div class="nn-kids">
+                <span class="nn-screen" data-nn-node="feed">Feed</span>
+                <span class="nn-screen" data-nn-node="profile">Profile</span>
+              </div>
+            </div>
+            <span class="nn-screen" data-nn-node="settings">Settings</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ol class="nn-log" data-nn-log aria-live="polite"></ol>
+  </div>
+  <button type="button" class="btn btn-ghost btn-sm nn-replay" data-nn-replay>▶ Replay</button>
+  <script type="application/json" data-nn-cases set:html={JSON.stringify(CASES)} />
+  <figcaption>A call goes to the screen’s own navigator first, then <b>up</b> to its parents. To reach a screen <b>inside</b> another navigator, name the outer one: <code>navigate('Main', {'{'} screen: 'Profile' {'}'})</code>.</figcaption>
+</figure>
+
+<script>
+  type Case = { from: string; call: string; ok: boolean; path: [string, string][] };
+  const wire = () => document.querySelectorAll<HTMLElement>('[data-nn]:not([data-wired])').forEach((root) => {
+    root.dataset.wired = '1';
+    const cases = JSON.parse(root.querySelector('[data-nn-cases]')!.textContent!) as Case[];
+    const log = root.querySelector<HTMLElement>('[data-nn-log]')!;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let current = 0;
+    let timers: number[] = [];
+    const node = (id: string) => root.querySelector<HTMLElement>(`[data-nn-node="${id}"]`);
+    const play = () => {
+      timers.forEach(clearTimeout);
+      timers = [];
+      const c = cases[current];
+      root.querySelectorAll<HTMLElement>('[data-nn-node]').forEach((n) => n.classList.remove('asked', 'from', 'done', 'fail'));
+      node(c.from.toLowerCase())?.classList.add('from');
+      log.innerHTML = `<li class="start"><b>${c.from}</b> calls <code>${c.call}</code></li>`;
+      c.path.forEach(([id, text], i) => {
+        const step = () => {
+          node(id)?.classList.add('asked');
+          const last = i === c.path.length - 1;
+          if (last) node(id)?.classList.add(c.ok ? 'done' : 'fail');
+          log.insertAdjacentHTML('beforeend', `<li class="${last ? (c.ok ? 'ok' : 'bad') : ''}">${text}</li>`);
+        };
+        if (reduce) step();
+        else timers.push(window.setTimeout(step, 700 * (i + 1)));
+      });
+    };
+    root.querySelectorAll<HTMLElement>('[data-nn-i]').forEach((b) => b.addEventListener('click', () => {
+      current = Number(b.dataset.nnI);
+      root.querySelectorAll('[data-nn-i]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+      play();
+    }));
+    root.querySelector('[data-nn-replay]')!.addEventListener('click', play);
+    play();
+  });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .nn { margin: 24px 0 32px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .nn-pick { display: grid; gap: 6px; }
+  @media (min-width: 820px) { .nn-pick { grid-template-columns: 1fr 1fr; } }
+  .nn-pick button { display: grid; gap: 3px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); text-align: left; cursor: pointer; min-width: 0; transition: border-color .2s var(--ease-out), background .2s var(--ease-out); }
+  .nn-pick small { font-size: 12px; color: var(--text-3); }
+  .nn-pick code { font-size: 12px; color: var(--text); overflow-wrap: anywhere; }
+  .nn-pick button[aria-checked='true'] { border-color: var(--accent-text); background: var(--accent-soft); }
+  .nn-pick button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .nn-grid { display: grid; gap: 16px; align-items: start; }
+  @media (min-width: 820px) { .nn-grid { grid-template-columns: 1fr 1fr; } }
+  .nn-box { display: grid; gap: 8px; padding: 10px; border-radius: 12px; border: 1px dashed var(--line-2); transition: border-color .3s var(--ease-out), background .3s var(--ease-out); }
+  .nn-box.root { border-style: solid; }
+  .nn-label { font-size: 12px; color: var(--text-3); }
+  .nn-kids { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+  .nn-kids > .nn-box { flex: 1 1 200px; }
+  .nn-screen { padding: 8px 12px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: 13.5px; font-weight: 600; color: var(--text-2); transition: border-color .3s var(--ease-out), background .3s var(--ease-out), color .3s; }
+  .nn [data-nn-node].from { border-color: #7cb1ff; color: var(--text); background: color-mix(in oklab, #7cb1ff 16%, transparent); }
+  .nn [data-nn-node].asked { border-color: #ffb547; border-style: solid; background: color-mix(in oklab, #ffb547 12%, transparent); }
+  .nn [data-nn-node].asked > .nn-label { color: var(--text); }
+  .nn [data-nn-node].done { border-color: var(--accent-text); background: var(--accent-soft); color: var(--text); }
+  .nn [data-nn-node].fail { border-color: var(--danger); background: color-mix(in oklab, var(--danger) 12%, transparent); }
+  .nn-log { margin: 0 !important; padding: 0; list-style: none; display: grid; gap: 6px; counter-reset: s; }
+  .nn-log :global(li) { margin: 0 !important; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg-2); font-size: 13.5px; color: var(--text-2); animation: nn-in .3s var(--ease-out); }
+  .nn-log :global(li.start) { color: var(--text); }
+  .nn-log :global(li.ok) { border-color: var(--accent-text); }
+  .nn-log :global(li.bad) { border-color: var(--danger); }
+  .nn-log :global(code) { font-size: 12px; }
+  .nn-replay { justify-self: start; }
+  .nn figcaption { font-size: 14px; color: var(--text-2); }
+  @keyframes nn-in { from { opacity: 0; transform: translateY(6px); } }
+  @media (prefers-reduced-motion: reduce) { .nn-box, .nn-screen { transition: none; } .nn-log :global(li) { animation: none; } }
+</style>

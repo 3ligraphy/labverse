@@ -1,0 +1,148 @@
+---
+/**
+ * How the navigation pieces fit, one step at a time: container → navigator → screens → props →
+ * navigate(name, params) → route.params → goBack. The code line, the phone and the history light up together.
+ * <NavFlow />
+ */
+const CODE = [
+  { s: 1, t: '<NavigationContainer>' },
+  { s: 2, t: '  <Stack.Navigator>' },
+  { s: 3, t: '    <Stack.Screen name="Home" component={HomeScreen} />' },
+  { s: 3, t: '    <Stack.Screen name="Details" component={DetailsScreen} />' },
+  { s: 2, t: '  </Stack.Navigator>' },
+  { s: 1, t: '</NavigationContainer>' },
+  { s: 0, t: '' },
+  { s: 4, t: 'function HomeScreen({ navigation, route }) {' },
+  { s: 5, t: "  … onPress={() => navigation.navigate('Details', { itemId: 'e42' })}" },
+  { s: 4, t: '}' },
+  { s: 6, t: 'function DetailsScreen({ route }) {' },
+  { s: 6, t: '  return <Text>Event {route.params.itemId}</Text>;' },
+  { s: 6, t: '}' },
+];
+const STEPS = [
+  { title: 'NavigationContainer', text: 'Holds the navigation state for the <b>whole app</b>. Exactly one, at the root.' },
+  { title: 'Stack.Navigator', text: 'Draws the header and keeps a <b>history list</b> of open screens. It starts with the first screen.' },
+  { title: 'Stack.Screen', text: 'Registers a <b>name</b> you can navigate to and the <b>component</b> to draw for it.' },
+  { title: 'Screen props', text: 'Every screen receives <code>navigation</code> (to move) and <code>route</code> (its name and params).' },
+  { title: "navigate('Details', { itemId })", text: 'Pushes Details on top of the history and hands it the <b>params object</b>.' },
+  { title: 'route.params', text: 'Details reads what it was given: <code>route.params.itemId</code> is <code>\'e42\'</code>.' },
+  { title: 'goBack()', text: 'The header’s <b>Back</b> removes Details from the history. Home is still there, unchanged.' },
+];
+---
+<figure class="nf" data-nf data-reveal>
+  <div class="nf-grid">
+    <pre class="nf-code" aria-label="Navigation code">{CODE.map((l) => <span class="nf-l" data-s={l.s}>{l.t || ' '}</span>)}</pre>
+
+    <div class="nf-stage">
+      <div class="nf-phone" data-nf-phone>
+        <div class="nf-head"><span class="nf-back" data-nf-back>‹ Back</span><b data-nf-title>Home</b></div>
+        <div class="nf-screen" data-nf-screen>
+          <span class="nf-row">Coding night</span>
+          <span class="nf-row" data-nf-tap>Campus Fair</span>
+        </div>
+        <span class="nf-param mono" data-nf-param>{'{ itemId: \'e42\' }'}</span>
+      </div>
+      <div class="nf-info">
+        <p class="nf-k mono">History</p>
+        <ol class="nf-history" data-nf-history></ol>
+        <p class="nf-k mono">Props of the screen on top</p>
+        <code class="nf-props" data-nf-props></code>
+      </div>
+    </div>
+  </div>
+
+  <div class="nf-explain" aria-live="polite">
+    <span class="nf-n mono" data-nf-n>1 / {STEPS.length}</span>
+    <b data-nf-t>{STEPS[0].title}</b>
+    <p data-nf-x set:html={STEPS[0].text}></p>
+  </div>
+  <div class="nf-nav">
+    <button type="button" class="btn btn-ghost btn-sm" data-nf-prev>← Back a step</button>
+    <ol class="nf-dots">{STEPS.map((_, i) => <li><button type="button" data-nf-go={i} aria-label={`Step ${i + 1}`}></button></li>)}</ol>
+    <button type="button" class="btn btn-primary btn-sm" data-nf-next>Next step →</button>
+  </div>
+  <script type="application/json" data-nf-steps set:html={JSON.stringify(STEPS)} />
+</figure>
+
+<script>
+  const wire = () => document.querySelectorAll<HTMLElement>('[data-nf]:not([data-wired])').forEach((root) => {
+    root.dataset.wired = '1';
+    const steps = JSON.parse(root.querySelector('[data-nf-steps]')!.textContent!) as { title: string; text: string }[];
+    const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+    let i = 0;
+    const paint = () => {
+      const n = i + 1;
+      root.dataset.step = String(n);
+      root.querySelectorAll<HTMLElement>('.nf-l').forEach((l) => l.classList.toggle('on', Number(l.dataset.s) === n || (n === 7 && l.dataset.s === '2')));
+      const onDetails = n === 5 || n === 6;
+      $('[data-nf-title]').textContent = onDetails ? 'Details' : 'Home';
+      $('[data-nf-screen]').innerHTML = n === 6
+        ? '<b class="nf-big">Event e42</b><small>route.params.itemId</small>'
+        : n === 5 ? '<span class="nf-load">opening…</span>' : '<span class="nf-row">Coding night</span><span class="nf-row" data-nf-tap>Campus Fair</span>';
+      const history = n < 2 ? [] : onDetails ? ['Home', "Details { itemId: 'e42' }"] : ['Home'];
+      $('[data-nf-history]').innerHTML = history.length ? history.map((h, k) => `<li class="${k === history.length - 1 ? 'top' : ''}">${h}</li>`).join('') : '<li class="none">— empty —</li>';
+      $('[data-nf-props]').textContent = n < 4 ? '—' : onDetails
+        ? "{ navigation, route: { name: 'Details', params: { itemId: 'e42' } } }"
+        : "{ navigation, route: { name: 'Home', params: undefined } }";
+      $('[data-nf-n]').textContent = `${n} / ${steps.length}`;
+      $('[data-nf-t]').textContent = steps[i].title;
+      $('[data-nf-x]').innerHTML = steps[i].text;
+      root.querySelectorAll<HTMLElement>('[data-nf-go]').forEach((d) => d.setAttribute('aria-current', String(Number(d.dataset.nfGo) === i)));
+      ($('[data-nf-prev]') as HTMLButtonElement).disabled = i === 0;
+      $('[data-nf-next]').textContent = i === steps.length - 1 ? '↺ Start again' : 'Next step →';
+    };
+    $('[data-nf-next]').addEventListener('click', () => { i = i === steps.length - 1 ? 0 : i + 1; paint(); });
+    $('[data-nf-prev]').addEventListener('click', () => { i = Math.max(0, i - 1); paint(); });
+    root.querySelectorAll<HTMLElement>('[data-nf-go]').forEach((d) => d.addEventListener('click', () => { i = Number(d.dataset.nfGo); paint(); }));
+    paint();
+  });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .nf { margin: 24px 0 32px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .nf-grid { display: grid; gap: 16px; align-items: center; }
+  @media (min-width: 900px) { .nf-grid { grid-template-columns: 1.25fr 1fr; } }
+  .nf-code { margin: 0; padding: 12px 0; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); font: 12.5px/1.55 var(--font-mono); overflow-x: auto; }
+  .nf-l { display: block; padding: 0 14px; color: var(--text-3); white-space: pre; transition: background .25s var(--ease-out), color .25s var(--ease-out); }
+  .nf-l.on { color: var(--text); background: color-mix(in oklab, var(--accent) 16%, transparent); }
+  .nf-stage { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .nf-phone { position: relative; width: 170px; height: 300px; flex: none; display: flex; flex-direction: column; border-radius: 26px; background: #fff; color: #11181c; box-shadow: 0 0 0 7px #15181d, 0 20px 40px -20px rgb(0 0 0 / .6); overflow: hidden; transition: box-shadow .3s var(--ease-out); }
+  .nf[data-step='1'] .nf-phone { box-shadow: 0 0 0 7px #15181d, 0 0 0 11px var(--accent-text); }
+  .nf-head { position: relative; height: 38px; flex: none; display: grid; place-items: center; border-bottom: 1px solid #e5e7eb; font-size: 13px; transition: background .25s; }
+  .nf[data-step='2'] .nf-head, .nf[data-step='7'] .nf-head { background: #ecfdf5; }
+  .nf-back { position: absolute; left: 8px; top: 50%; translate: 0 -50%; font-size: 12px; color: #059669; opacity: 0; transition: opacity .2s; }
+  .nf[data-step='5'] .nf-back, .nf[data-step='6'] .nf-back { opacity: 1; }
+  .nf[data-step='7'] .nf-back { opacity: 1; animation: nf-press .6s var(--ease-out); }
+  .nf-screen { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 10px; }
+  .nf-screen :global(.nf-row) { padding: 9px 10px; border-radius: 9px; background: #f1f5f9; font-size: 12.5px; font-weight: 600; }
+  .nf[data-step='3'] .nf-screen :global(.nf-row), .nf[data-step='4'] .nf-screen :global(.nf-row) { outline: 2px solid color-mix(in oklab, var(--accent-text) 60%, transparent); }
+  .nf-screen :global([data-nf-tap]) { position: relative; }
+  .nf-screen :global(.nf-big) { margin-top: 30px; text-align: center; font-size: 18px; animation: nf-in .3s var(--ease-out); }
+  .nf-screen :global(small) { text-align: center; font: 10.5px var(--font-mono); color: #059669; }
+  .nf-screen :global(.nf-load) { margin: auto; color: #94a3b8; font-size: 12px; }
+  .nf-param { position: absolute; left: 50%; bottom: 14px; translate: -50% 0; padding: 4px 8px; border-radius: 8px; background: #059669; color: #fff; font-size: 10.5px; white-space: nowrap; opacity: 0; }
+  .nf[data-step='5'] .nf-param { animation: nf-fly 1.1s var(--ease-out) forwards; }
+  .nf-info { display: grid; gap: 6px; min-width: 180px; flex: 1; }
+  .nf-k { margin: 0 !important; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .nf-history { list-style: none; margin: 0 !important; padding: 0; display: flex; flex-direction: column-reverse; gap: 4px; }
+  .nf-history :global(li) { margin: 0 !important; padding: 5px 9px; border-radius: 8px; border: 1px solid var(--line-2); font: 12px var(--font-mono); color: var(--text-2); }
+  .nf-history :global(li.top) { border-color: var(--accent-text); color: var(--text); background: var(--accent-soft); }
+  .nf-history :global(li.none) { color: var(--text-3); border-style: dashed; }
+  .nf-props { display: block; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: 11.5px; color: var(--accent-text); overflow-wrap: anywhere; }
+  .nf-explain { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: baseline; padding: 12px 14px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+  .nf-n { grid-row: span 2; font-size: 12px; color: var(--text-3); }
+  .nf-explain b { font-family: var(--font-mono); font-size: 14px; color: var(--accent-text); }
+  .nf-explain p { margin: 0 !important; font-size: 14.5px; color: var(--text-2); }
+  .nf-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .nf-dots { list-style: none; margin: 0 !important; padding: 0; display: flex; gap: 6px; }
+  .nf-dots li { margin: 0 !important; }
+  .nf-dots button { width: 10px; height: 10px; padding: 0; border-radius: 50%; border: 0; background: var(--line-2); cursor: pointer; }
+  .nf-dots button[aria-current='true'] { background: var(--accent-text); transform: scale(1.25); }
+  @media (max-width: 520px) { .nf-dots { display: none; } }
+  @keyframes nf-fly { 0% { opacity: 0; transform: translateY(-150px) scale(.9); } 25% { opacity: 1; } 100% { opacity: 1; transform: translateY(0); } }
+  @keyframes nf-in { from { opacity: 0; transform: translateX(16px); } }
+  @keyframes nf-press { 40% { transform: scale(1.25); } }
+  @media (prefers-reduced-motion: reduce) { .nf-l, .nf-head, .nf-phone { transition: none; } .nf[data-step='5'] .nf-param { animation: none; opacity: 1; } .nf-screen :global(.nf-big), .nf[data-step='7'] .nf-back { animation: none; } }
+</style>

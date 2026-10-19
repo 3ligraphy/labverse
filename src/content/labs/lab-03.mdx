@@ -240,9 +240,36 @@ Choose by **how the user moves**. Switch between the three patterns and tap insi
   '# restart Expo after native dependency changes',
 ]} />
 
+### How the pieces fit
+
+<Cards cols={3} items={[
+  { icon: 'layers', title: 'NavigationContainer', text: 'Holds the navigation state of the whole app. **One**, at the root.' },
+  { icon: 'grid', title: 'Navigator', text: '`Stack`, `Tab` or `Drawer`. Draws the header or tab bar and remembers the **history**.' },
+  { icon: 'phone', title: 'Screen', text: 'A **name** to navigate to + the **component** to draw. It receives `navigation` and `route` as props.' },
+]} />
+
+Step through what happens when the user taps an event:
+
+<NavFlow />
+
+**Params** are the data a screen needs to open: `navigate('Details', { itemId: 'e42' })` sends them, and Details reads `route.params.itemId`. Send small things — an id, not the whole event object — and let the screen load the rest.
+
 ### Type every route once
 
-`undefined` means “no params”; an object makes them required and typed. Never hide a wrong call with `as any` — fix the param list or the call.
+The **param list** is a contract for every screen:
+
+<Cards compact items={[
+  { icon: 'check', title: 'Home: undefined', text: 'This screen takes **no** params.' },
+  { icon: 'key', title: 'Details: { itemId: string }', text: 'Params are **required**, and `itemId` must be a string.' },
+  { icon: 'sparkle', title: "source?: 'search' | 'featured'", text: 'The `?` makes it **optional**; only these two values are allowed.' },
+  { icon: 'link', title: "NativeStackScreenProps<List, 'Details'>", text: 'Types the props of one screen, so `route.params.itemId` is known to be a string.' },
+]} />
+
+Pick a call and see what TypeScript says — while you type, before the app runs:
+
+<TypedRoutes />
+
+Never hide a red line with `as any`: fix the param list or the call.
 
 ```tsx title="src/app/navigation/RootNavigator.tsx"
 import { NavigationContainer } from '@react-navigation/native';
@@ -265,11 +292,23 @@ export type DetailsProps = NativeStackScreenProps<RootStackParamList, 'Details'>
 
 ### Tabs for the main areas
 
+A tab navigator draws one button per `Tab.Screen`. `screenOptions` can be a **function of the route**, so one line gives every tab its own icon. The navigator passes `color` (green when active) and `size`:
+
+```tsx
+<Tab.Navigator screenOptions={({ route }) => ({
+  tabBarIcon: ({ color, size }) => <Ionicons name={ICONS[route.name]} color={color} size={size} />,
+})}>
+```
+
 <Exercise id="mobile-development--lab-03--tabs-code" />
 
 ### Nesting: tabs inside a stack
 
-A common root is `Stack(Auth, MainTabs, Details)`. Type the nested navigator with `NavigatorScreenParams`, and nest as little as possible — every navigator adds history and options.
+A common root is `Stack(Auth, MainTabs, Details)`: the tabs live **inside** one stack screen. A `navigate()` call is offered to the screen’s own navigator first, then **bubbles up** to its parents. Pick a call and watch who handles it:
+
+<NestedNav />
+
+Type the nested navigator with `NavigatorScreenParams`, and nest as little as possible — every navigator adds history and options.
 
 ```ts title="src/app/navigation/types.ts"
 import type { NavigatorScreenParams } from '@react-navigation/native';

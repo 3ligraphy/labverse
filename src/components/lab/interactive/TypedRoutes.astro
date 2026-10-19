@@ -1,0 +1,94 @@
+---
+/**
+ * What typing the routes buys you: pick a navigate() call and see what TypeScript says in the editor —
+ * before the app runs — and what would happen at runtime without types. <TypedRoutes />
+ */
+const CALLS = [
+  { code: "navigate('Details', { itemId: 'e42' })", ok: true, mark: '', ts: 'OK — Details needs { itemId: string }, and it got one.', run: 'Details opens and shows “Event e42”.' },
+  { code: "navigate('Home')", ok: true, mark: '', ts: 'OK — Home is `undefined`: it takes no params.', run: 'Home opens.' },
+  { code: "navigate('Details')", ok: false, mark: "navigate('Details')", ts: "Expected 2 arguments, but got 1. Details requires params: { itemId: string }.", run: 'Details opens, reads route.params.itemId and crashes: “Cannot read properties of undefined”.' },
+  { code: "navigate('Details', { itemId: 42 })", ok: false, mark: '42', ts: "Type 'number' is not assignable to type 'string'.", run: 'It runs, but every “=== \'e42\'” comparison quietly fails — a bug you find days later.' },
+  { code: "navigate('Detials', { itemId: 'e42' })", ok: false, mark: "'Detials'", ts: "Argument of type '\"Detials\"' is not assignable to parameter of type '\"Home\" | \"Details\" | \"Main\"'.", run: 'Nothing happens on tap; the console says the action “was not handled by any navigator”.' },
+  { code: "navigate('Details', { itemId: 'e42', source: 'email' })", ok: false, mark: "'email'", ts: "Type '\"email\"' is not assignable to type '\"search\" | \"featured\" | undefined'.", run: 'Runs, but your analytics now receive a value nobody planned for.' },
+  { code: "navigate('Main', { screen: 'Profile', params: { userId: '42' } })", ok: true, mark: '', ts: 'OK — Main is NavigatorScreenParams<MainTabParamList>, so TypeScript checks the inner screen and its params too.', run: 'The Profile tab inside Main opens with userId 42.' },
+];
+---
+<figure class="tr" data-tr data-reveal>
+  <pre class="tr-types"><code>{`type RootStackParamList = {
+  Home: undefined;                                   // no params
+  Details: { itemId: string; source?: 'search' | 'featured' };  // required + optional
+  Main: NavigatorScreenParams<MainTabParamList>;     // a nested navigator
+};
+type MainTabParamList = { Feed: undefined; Profile: { userId: string } };`}</code></pre>
+
+  <div class="tr-pick" role="radiogroup" aria-label="Choose a navigate call">
+    {CALLS.map((c, i) => (
+      <button type="button" role="radio" aria-checked={i === 0 ? 'true' : 'false'} data-tr-i={i} class:list={[{ bad: !c.ok }]}>
+        <span class="tr-dot" aria-hidden="true"></span><code>{c.code}</code>
+      </button>
+    ))}
+  </div>
+
+  <div class="tr-out">
+    <div class="tr-editor">
+      <p class="tr-k mono">In your editor (before running)</p>
+      <code class="tr-line" data-tr-line></code>
+      <p class="tr-msg" data-tr-ts></p>
+    </div>
+    <div class="tr-runtime">
+      <p class="tr-k mono">Without types, on the phone</p>
+      <p class="tr-msg" data-tr-run></p>
+    </div>
+  </div>
+  <script type="application/json" data-tr-calls set:html={JSON.stringify(CALLS)} />
+  <figcaption>The param list is written once. After that, every <code>navigate()</code> in the project is checked against it — mistakes turn red while you type, instead of crashing in front of a user.</figcaption>
+</figure>
+
+<script>
+  type Call = { code: string; ok: boolean; mark: string; ts: string; run: string };
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const wire = () => document.querySelectorAll<HTMLElement>('[data-tr]:not([data-wired])').forEach((root) => {
+    root.dataset.wired = '1';
+    const calls = JSON.parse(root.querySelector('[data-tr-calls]')!.textContent!) as Call[];
+    const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+    const show = (i: number) => {
+      const c = calls[i];
+      root.querySelectorAll<HTMLElement>('[data-tr-i]').forEach((b) => b.setAttribute('aria-checked', String(Number(b.dataset.trI) === i)));
+      const full = `navigation.${c.code};`;
+      const at = c.mark ? full.indexOf(c.mark) : -1;
+      $('[data-tr-line]').innerHTML = at < 0 ? esc(full) : `${esc(full.slice(0, at))}<span class="tr-squiggle">${esc(c.mark)}</span>${esc(full.slice(at + c.mark.length))}`;
+      root.classList.toggle('is-bad', !c.ok);
+      $('[data-tr-ts]').innerHTML = `${c.ok ? '✅' : '❌'} ${esc(c.ts)}`;
+      $('[data-tr-run]').innerHTML = `${c.ok ? '📱' : '💥'} ${esc(c.run)}`;
+    };
+    root.querySelectorAll<HTMLElement>('[data-tr-i]').forEach((b) => b.addEventListener('click', () => show(Number(b.dataset.trI))));
+    show(0);
+  });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .tr { margin: 24px 0 32px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .tr-types { margin: 0; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: 12.5px; line-height: 1.6; overflow-x: auto; }
+  .tr-types code { color: var(--text-2); }
+  .tr-pick { display: grid; gap: 6px; }
+  @media (min-width: 820px) { .tr-pick { grid-template-columns: 1fr 1fr; } }
+  .tr-pick button { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); text-align: left; cursor: pointer; min-width: 0; transition: border-color .2s var(--ease-out), background .2s var(--ease-out); }
+  .tr-pick button code { font-size: 12px; color: var(--text); overflow-wrap: anywhere; }
+  .tr-pick button[aria-checked='true'] { border-color: var(--accent-text); background: var(--accent-soft); }
+  .tr-pick button.bad[aria-checked='true'] { border-color: var(--danger); background: color-mix(in oklab, var(--danger) 12%, transparent); }
+  .tr-pick button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .tr-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--line-2); }
+  .tr-pick button[aria-checked='true'] .tr-dot { background: var(--accent-text); }
+  .tr-pick button.bad[aria-checked='true'] .tr-dot { background: var(--danger); }
+  .tr-out { display: grid; gap: 10px; }
+  @media (min-width: 820px) { .tr-out { grid-template-columns: 1.3fr 1fr; } }
+  .tr-editor, .tr-runtime { display: grid; gap: 6px; align-content: start; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-2); }
+  .tr.is-bad .tr-editor { border-color: color-mix(in oklab, var(--danger) 50%, var(--line-2)); }
+  .tr-k { margin: 0 !important; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .tr-line { display: block; padding: 8px 10px; border-radius: 8px; background: var(--bg-2); font-size: 12.5px; color: var(--text); overflow-wrap: anywhere; }
+  .tr-line :global(.tr-squiggle) { text-decoration: underline wavy var(--danger); text-underline-offset: 4px; text-decoration-thickness: 1.5px; }
+  .tr-msg { margin: 0 !important; font-size: 14px; color: var(--text-2); }
+  .tr figcaption { font-size: 14px; color: var(--text-2); }
+</style>
