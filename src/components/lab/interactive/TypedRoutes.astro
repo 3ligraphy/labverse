@@ -13,7 +13,7 @@ const CALLS = [
   { code: "navigate('Main', { screen: 'Profile', params: { userId: '42' } })", ok: true, mark: '', ts: 'OK — Main is NavigatorScreenParams<MainTabParamList>, so TypeScript checks the inner screen and its params too.', run: 'The Profile tab inside Main opens with userId 42.' },
 ];
 ---
-<figure class="tr" data-tr data-reveal>
+<figure class="tr" data-tr data-reveal data-free>
   <pre class="tr-types"><code>{`type RootStackParamList = {
   Home: undefined;                                   // no params
   Details: { itemId: string; source?: 'search' | 'featured' };  // required + optional

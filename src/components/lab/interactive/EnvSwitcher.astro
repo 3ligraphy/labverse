@@ -9,7 +9,7 @@ const ENVS = [
   { id: 'production', badge: 'LIVE', name: 'Project', bundle: 'com.team.project', api: 'https://api.example.com', eas: 'production', who: 'Real users, from the store', color: '#059669' },
 ];
 ---
-<figure class="es" data-es data-reveal>
+<figure class="es" data-es data-reveal data-free>
   <div class="es-switch" role="radiogroup" aria-label="Build variant">
     {ENVS.map((e, i) => (
       <button type="button" role="radio" aria-checked={i === 1 ? 'true' : 'false'} data-es-env={e.id} style={`--c:${e.color}`}>

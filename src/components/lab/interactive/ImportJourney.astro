@@ -1,0 +1,202 @@
+---
+/**
+ * Folders as boxes inside boxes. A dot travels one path segment at a time: each `..` steps OUT of a box,
+ * `@/` jumps straight to `src/`, each name steps INTO a box. Same target, two ways. <ImportJourney />
+ */
+---
+<figure class="ij" data-ij data-reveal data-free>
+  <div class="ij-modes" role="radiogroup" aria-label="How the import is written">
+    <button type="button" role="radio" aria-checked="true" data-ij-mode="rel"><b>../ relative</b><small>walk out, then in</small></button>
+    <button type="button" role="radio" aria-checked="false" data-ij-mode="alias"><b>@/ alias</b><small>jump to src/, then in</small></button>
+  </div>
+
+  <code class="ij-import" data-ij-import aria-live="polite"></code>
+
+  <div class="ij-map" data-ij-map>
+    <div class="ij-box b-src" data-ij-box="src">
+      <span class="ij-name" data-ij-at="src">📁 src</span>
+      <div class="ij-row">
+        <div class="ij-box b-components" data-ij-box="components">
+          <span class="ij-name" data-ij-at="components">📁 components</span>
+          <div class="ij-box b-ui" data-ij-box="ui">
+            <span class="ij-name" data-ij-at="ui">📁 ui</span>
+            <span class="ij-file target" data-ij-at="AppButton">📄 AppButton.tsx</span>
+          </div>
+        </div>
+        <div class="ij-box b-features" data-ij-box="features">
+          <span class="ij-name" data-ij-at="features">📁 features</span>
+          <div class="ij-box b-profile" data-ij-box="profile">
+            <span class="ij-name" data-ij-at="profile">📁 profile</span>
+            <div class="ij-box b-screens" data-ij-box="screens">
+              <span class="ij-name" data-ij-at="screens">📁 screens</span>
+              <span class="ij-file start" data-ij-at="start">📄 ProfileScreen.tsx <i>you are here</i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="ij-dot" data-ij-dot aria-hidden="true"></span>
+  </div>
+
+  <div class="ij-say" aria-live="polite"><span class="mono" data-ij-n></span><p data-ij-say></p></div>
+
+  <div class="ij-controls">
+    <button type="button" class="btn btn-ghost btn-sm" data-ij-back>← Step</button>
+    <button type="button" class="btn btn-primary btn-sm" data-ij-next>Next step →</button>
+    <button type="button" class="btn btn-ghost btn-sm" data-ij-play>▶ Play all</button>
+  </div>
+
+  <table class="ij-compare">
+    <thead><tr><th></th><th><code>../../../components/ui/AppButton</code></th><th><code>@/components/ui/AppButton</code></th></tr></thead>
+    <tbody>
+      <tr><th>Starts from</th><td>the file you are in</td><td><code>src/</code>, always</td></tr>
+      <tr><th>Steps</th><td>3 out + 3 in = 6</td><td>1 jump + 3 in = 4</td></tr>
+      <tr><th>Move ProfileScreen one folder deeper</th><td>❌ breaks — needs <code>../../../../</code></td><td>✅ still works</td></tr>
+      <tr><th>Best for</th><td>a neighbour in the same feature: <code>../api</code></td><td>shared code across the app</td></tr>
+    </tbody>
+  </table>
+</figure>
+
+<script>
+  type Step = { seg: string; at: string; box: string; say: string };
+  const ROUTES: Record<'rel' | 'alias', Step[]> = {
+    rel: [
+      { seg: '', at: 'start', box: 'screens', say: 'Start where the importing file is: <b>ProfileScreen.tsx</b>, inside <code>screens/</code>.' },
+      { seg: '..', at: 'profile', box: 'profile', say: '<code>..</code> = step <b>out</b> of <code>screens/</code>. Now you are in <code>profile/</code>.' },
+      { seg: '..', at: 'features', box: 'features', say: '<code>..</code> again = out of <code>profile/</code>. Now in <code>features/</code>.' },
+      { seg: '..', at: 'src', box: 'src', say: '<code>..</code> a third time = out of <code>features/</code>. Now in <code>src/</code> — the top of your code.' },
+      { seg: 'components', at: 'components', box: 'components', say: '<code>components</code> = step <b>into</b> the components folder.' },
+      { seg: 'ui', at: 'ui', box: 'ui', say: '<code>ui</code> = into <code>ui/</code>.' },
+      { seg: 'AppButton', at: 'AppButton', box: 'ui', say: '<code>AppButton</code> = the file (the <code>.tsx</code> is optional). Found it — after <b>6 steps</b>.' },
+    ],
+    alias: [
+      { seg: '', at: 'start', box: 'screens', say: 'Same start: <b>ProfileScreen.tsx</b>. But this time it doesn’t matter where we start…' },
+      { seg: '@', at: 'src', box: 'src', say: '<code>@/</code> = <b>jump straight to <code>src/</code></b>, from anywhere. No counting folders.' },
+      { seg: 'components', at: 'components', box: 'components', say: '<code>components</code> = into the components folder.' },
+      { seg: 'ui', at: 'ui', box: 'ui', say: '<code>ui</code> = into <code>ui/</code>.' },
+      { seg: 'AppButton', at: 'AppButton', box: 'ui', say: '<code>AppButton</code> = the file. Found it in <b>4 steps</b> — and the path never mentions where we started.' },
+    ],
+  };
+  const PATH = { rel: ['..', '..', '..', 'components', 'ui', 'AppButton'], alias: ['@', 'components', 'ui', 'AppButton'] };
+
+  const wire = () => document.querySelectorAll<HTMLElement>('[data-ij]:not([data-wired])').forEach((root) => {
+    root.dataset.wired = '1';
+    const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+    const map = $('[data-ij-map]');
+    const dot = $('[data-ij-dot]');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let mode: 'rel' | 'alias' = 'rel';
+    let i = 0;
+    let playing = 0;
+
+    const placeDot = (at: string, jump: boolean) => {
+      const el = root.querySelector<HTMLElement>(`[data-ij-at="${at}"]`)!;
+      const m = map.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      const x = r.left - m.left + 11;
+      const y = r.top - m.top + r.height / 2;
+      const to = `translate(${x}px, ${y}px)`;
+      if (reduce) dot.style.transform = to;
+      else dot.animate([{ transform: dot.style.transform || to }, ...(jump ? [{ transform: `${to} scale(1.8)`, offset: 0.5 }] : []), { transform: to }], { duration: jump ? 700 : 450, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' });
+      dot.style.transform = to;
+    };
+
+    const paint = (animate = true) => {
+      const steps = ROUTES[mode];
+      const s = steps[i];
+      const segs = PATH[mode];
+      // the import string, with the segments already walked lit up
+      $('[data-ij-import]').innerHTML = `import { AppButton } from '${segs.map((seg, k) => {
+        return `<span class="seg ${seg === '..' ? 'up' : seg === '@' ? 'jump' : 'down'} ${k === i - 1 ? 'now' : k < i ? 'done' : ''}">${seg}</span>`;
+      }).join('<span class="sl">/</span>')}';`;
+      root.querySelectorAll<HTMLElement>('[data-ij-box]').forEach((b) => b.classList.toggle('here', b.dataset.ijBox === s.box));
+      root.querySelectorAll<HTMLElement>('.ij-file.target').forEach((f) => f.classList.toggle('found', s.at === 'AppButton'));
+      $('[data-ij-n]').textContent = `${i + 1} / ${steps.length}`;
+      $('[data-ij-say]').innerHTML = s.say;
+      ($('[data-ij-back]') as HTMLButtonElement).disabled = i === 0;
+      $('[data-ij-next]').textContent = i === steps.length - 1 ? '↺ Again' : 'Next step →';
+      if (animate) placeDot(s.at, s.seg === '@');
+      else {
+        const el = root.querySelector<HTMLElement>(`[data-ij-at="${s.at}"]`)!;
+        const m = map.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        dot.style.transform = `translate(${r.left - m.left + 11}px, ${r.top - m.top + r.height / 2}px)`;
+      }
+    };
+    const stop = () => { clearTimeout(playing); playing = 0; };
+    const next = () => { i = i === ROUTES[mode].length - 1 ? 0 : i + 1; paint(); };
+
+    root.querySelectorAll<HTMLElement>('[data-ij-mode]').forEach((b) => b.addEventListener('click', () => {
+      stop();
+      mode = b.dataset.ijMode as 'rel' | 'alias';
+      root.querySelectorAll('[data-ij-mode]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+      root.classList.toggle('is-alias', mode === 'alias');
+      i = 0;
+      paint();
+    }));
+    $('[data-ij-next]').addEventListener('click', () => { stop(); next(); });
+    $('[data-ij-back]').addEventListener('click', () => { stop(); i = Math.max(0, i - 1); paint(); });
+    $('[data-ij-play]').addEventListener('click', () => {
+      stop();
+      i = 0;
+      paint();
+      const tick = () => {
+        if (i >= ROUTES[mode].length - 1) return stop();
+        i++;
+        paint();
+        playing = window.setTimeout(tick, 1400);
+      };
+      playing = window.setTimeout(tick, 1100);
+    });
+    new ResizeObserver(() => paint(false)).observe(map);
+    paint(false);
+  });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .ij { margin: 24px 0 32px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .ij-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ij-modes button { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); text-align: left; cursor: pointer; transition: border-color .2s var(--ease-out), background .2s var(--ease-out); }
+  .ij-modes b { font: 700 15px var(--font-mono); color: var(--text); }
+  .ij-modes small { font-size: 12.5px; color: var(--text-3); }
+  .ij-modes button[aria-checked='true'] { border-color: var(--accent-text); background: var(--accent-soft); }
+  .ij-modes button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .ij-import { display: block; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: clamp(13px, 1.6vw, 16px); color: var(--text-3); overflow-wrap: anywhere; }
+  .ij-import :global(.seg) { padding: 1px 3px; border-radius: 5px; transition: background .25s, color .25s; }
+  .ij-import :global(.seg.done) { color: var(--text); }
+  .ij-import :global(.seg.up.done) { color: #ffb547; }
+  .ij-import :global(.seg.jump.done) { color: #c084fc; }
+  .ij-import :global(.seg.down.done) { color: #7cb1ff; }
+  .ij-import :global(.seg.now) { background: color-mix(in oklab, var(--accent) 28%, transparent); color: var(--text); }
+  .ij-import :global(.sl) { color: var(--text-3); }
+
+  .ij-map { position: relative; }
+  .ij-box { position: relative; display: grid; gap: 8px; align-content: start; padding: 10px; border-radius: 14px; border: 1.5px dashed var(--line-2); transition: border-color .3s var(--ease-out), background .3s var(--ease-out), box-shadow .3s; }
+  .ij-box.here { border-style: solid; border-color: var(--accent-text); background: color-mix(in oklab, var(--accent) 9%, transparent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .ij-row { display: grid; gap: 10px; }
+  @media (min-width: 720px) { .ij-row { grid-template-columns: 1fr 1.25fr; align-items: start; } }
+  .ij-name { justify-self: start; padding: 2px 8px 2px 24px; border-radius: 7px; font: 600 13px var(--font-mono); color: var(--text-2); }
+  .ij-file { justify-self: start; padding: 6px 10px 6px 24px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--bg-2); font: 600 13px var(--font-mono); color: var(--text); }
+  .ij-file i { margin-left: 6px; font: 500 11px var(--font-body); font-style: normal; color: #7cb1ff; }
+  .ij-file.start { border-color: #7cb1ff; }
+  .ij-file.target.found { border-color: var(--accent-text); background: var(--accent-soft); animation: ij-found .6s var(--ease-out); }
+  .ij-dot { position: absolute; top: 0; left: 0; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft), 0 0 18px var(--accent-glow, var(--accent)); pointer-events: none; z-index: 1; }
+  .ij.is-alias .ij-dot { background: #c084fc; box-shadow: 0 0 0 4px rgb(192 132 252 / .25), 0 0 18px #c084fc; }
+
+  .ij-say { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: baseline; padding: 12px 14px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+  .ij-say .mono { font-size: 12px; color: var(--text-3); }
+  .ij-say p { margin: 0 !important; font-size: 15px; color: var(--text-2); }
+  .ij-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .ij-compare { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .ij-compare th, .ij-compare td { text-transform: none; letter-spacing: normal; font-family: var(--font-body); padding: 8px 10px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+  .ij-compare thead th { border-top: 0; font-weight: 500; }
+  .ij-compare thead code { font-size: 12px; }
+  .ij-compare tbody th { color: var(--text-3); font-weight: 500; width: 28%; }
+  .ij-compare td { color: var(--text-2); }
+  @media (max-width: 620px) { .ij-compare thead code { font-size: 11px; word-break: break-all; } }
+  @keyframes ij-found { 40% { transform: scale(1.08); } }
+  @media (prefers-reduced-motion: reduce) { .ij-box, .ij-import :global(.seg) { transition: none; } .ij-file.target.found { animation: none; } }
+</style>

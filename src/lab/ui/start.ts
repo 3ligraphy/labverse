@@ -80,13 +80,15 @@ export function mountStart(lab: string) {
     const guard = (event: Event) => {
       if (labRoot.dataset.sessionAccess === 'active') return;
       const target = event.target as HTMLElement | null;
-      // the app walkthrough only shows code and a live preview (nothing is recorded), so it is always usable
-      if (!target || target.closest('[data-lab-start]') || target.closest('[data-gate-note]') || target.closest('a') || target.closest('[data-walkthrough]')) return;
+      // the app walkthrough and the explanation visuals ([data-free]) record nothing, so they are always usable
+      if (!target || target.closest('[data-lab-start]') || target.closest('[data-gate-note]') || target.closest('a') || target.closest('[data-walkthrough],[data-free]')) return;
       // Practice and staff preview: exercises and demos work, but attendance and submissions still need a session.
       if (/^(practice|staff)$/.test(labRoot.dataset.sessionAccess ?? '') && !target.closest('[data-repo-submit],[data-checkin]')) return;
       // moving focus, scrolling and copying stay available, so keyboard users are never trapped
       if (event instanceof KeyboardEvent && (PASS_KEYS.test(event.key) || ((event.ctrlKey || event.metaKey) && /^[ac]$/i.test(event.key)))) return;
-      if (target.closest('button,input,textarea,select,[contenteditable="true"],.cm-editor,[data-exercise],[data-playground],[data-repo-submit],[data-checkin]')) {
+      // only what needs a session is held back: exercises, demos, editors, hand-in, check-in and Done ticks.
+      // Copy buttons, tabs and explanation visuals elsewhere on the page always work.
+      if (target.closest('.cm-editor,[data-exercise],[data-playground],[data-demo],[data-repo-submit],[data-checkin],.task-done,[data-task-check]')) {
         event.preventDefault();
         event.stopImmediatePropagation();
         if (event.type !== 'change' && event.type !== 'submit') explain(target);

@@ -233,6 +233,10 @@ An import path tells Metro **where the file is**. There are two ways to write it
 >
 > **Address (alias):** “12 Nile Street, flat 4.” Works from anywhere.
 
+Here are both ways to the **same file**. Folders are drawn as boxes inside boxes: `..` steps **out** of a box, `@/` **jumps** to `src/`, and each name steps **into** a box. Press **Play all**, then switch to `@/`:
+
+<ImportJourney />
+
 <Cards cols={3} items={[
   { icon: 'map', title: 'Relative: ./ and ../', text: 'Directions **from the file you are in**. `./` = this folder, `../` = one folder up. Short for neighbours, but `../../../` is hard to read and breaks when the file moves.' },
   { icon: 'target', title: 'Alias: @/', text: 'An address **from `src/`**, the same from every file: `@/components/ui/AppButton`. Moving the importing file changes nothing.' },

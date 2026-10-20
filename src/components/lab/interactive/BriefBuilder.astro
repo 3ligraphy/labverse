@@ -15,7 +15,7 @@ const FIELDS = [
   { key: 'metric', label: 'A measurable sign it is useful', example: '6 of 10 testers save an event within 2 minutes' },
 ];
 ---
-<figure class="bb" data-bb data-reveal>
+<figure class="bb" data-bb data-reveal data-free>
   <form class="bb-form" novalidate>
     {FIELDS.map((f) => (
       <label class:list={['bb-field', { wide: ['problem', 'user', 'metric'].includes(f.key) }]}>
