@@ -313,7 +313,25 @@ Now step through what happened when you tapped the event:
 
 <NavFlow />
 
-**Params** are the data a screen needs to open: `navigate('Details', { itemId: 'e42' })` sends them, and Details reads `route.params.itemId`. Send small things — an id, not the whole event object — and let the screen load the rest.
+### Params: how does a screen know *which* item?
+
+Think of a shopping app. It sells hundreds of products, but there is only **one** Product screen. When you tap the headphones, how does that screen know to show headphones and not shoes?
+
+The list sends a small **ticket** with the product’s id. The Product screen reads the ticket and finds the product. Tap a product:
+
+<ParamsShop />
+
+<Cards compact items={[
+  { icon: 'arrow', title: 'Send', text: "`navigation.navigate('Product', { productId: 'p2' })` — the screen name, then a params object." },
+  { icon: 'key', title: 'Read', text: "`route.params.productId` is `'p2'` inside the Product screen." },
+  { icon: 'check', title: 'Why only the id?', text: 'It is small, the screen always shows the latest price and stock, and it also works when the app opens from a link or a notification.' },
+]} />
+
+Now in real code. Add a product, send an id that doesn’t exist, and print what the screen received:
+
+<Demo id="shop" />
+
+Campus Companion works exactly the same way: `itemId` is the event’s id — `navigate('Details', { itemId: 'e42' })` sends it, and Details reads `route.params.itemId` to find the event.
 
 ### Type every route once
 

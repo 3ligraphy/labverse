@@ -1,0 +1,150 @@
+---
+/**
+ * Route params with a shopping app: tap a product and only its id travels to the Product screen, which looks
+ * the product up. Shows the three moments — send, carry, read — side by side. <ParamsShop />
+ */
+const PRODUCTS = [
+  { id: 'p1', name: 'Running shoes', price: 1450, emoji: '👟' },
+  { id: 'p2', name: 'Headphones', price: 2200, emoji: '🎧' },
+  { id: 'p3', name: 'Hoodie', price: 890, emoji: '🧥' },
+];
+---
+<figure class="ps" data-ps data-reveal data-free>
+  <div class="ps-grid">
+    <div class="ps-phone" data-ps-phone>
+      <div class="ps-head"><button type="button" class="ps-back" data-ps-back hidden>‹ Back</button><b data-ps-title>Shop</b></div>
+      <div class="ps-list" data-ps-list>
+        {PRODUCTS.map((p) => (
+          <button type="button" class="ps-item" data-ps-open={p.id}>
+            <span class="ps-emoji" aria-hidden="true">{p.emoji}</span>
+            <span><b>{p.name}</b><small>{p.price} EGP</small></span>
+            <span class="ps-id mono">{p.id}</span>
+          </button>
+        ))}
+      </div>
+      <div class="ps-detail" data-ps-detail hidden></div>
+      <span class="ps-ticket mono" data-ps-ticket aria-hidden="true"></span>
+    </div>
+
+    <ol class="ps-steps">
+      <li data-ps-step="1">
+        <span class="ps-n">1</span>
+        <div><b>Send</b> — the list screen says <i>which</i> product was tapped
+          <code data-ps-send>navigation.navigate('Product', {'{'} productId: '…' {'}'})</code></div>
+      </li>
+      <li data-ps-step="2">
+        <span class="ps-n">2</span>
+        <div><b>Carry</b> — only a small ticket travels, not the whole product
+          <code data-ps-carry>{'{ productId: \'…\' }'}</code></div>
+      </li>
+      <li data-ps-step="3">
+        <span class="ps-n">3</span>
+        <div><b>Read</b> — the Product screen reads the ticket and finds the product
+          <code data-ps-read>route.params.productId  →  PRODUCTS.find(…)</code></div>
+      </li>
+    </ol>
+  </div>
+  <p class="ps-hint" data-ps-hint>👆 Tap a product in the phone.</p>
+  <script type="application/json" data-ps-products set:html={JSON.stringify(PRODUCTS)} />
+  <figcaption>Like the number on a shop’s order ticket: the cashier doesn’t carry the shoe to the stockroom — just its number. The Product screen uses the number to find the right item. <b>One screen, any product.</b></figcaption>
+</figure>
+
+<script>
+  type Product = { id: string; name: string; price: number; emoji: string };
+  const wire = () => document.querySelectorAll<HTMLElement>('[data-ps]:not([data-wired])').forEach((root) => {
+    root.dataset.wired = '1';
+    const products = JSON.parse(root.querySelector('[data-ps-products]')!.textContent!) as Product[];
+    const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let timers: number[] = [];
+    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, reduce ? 0 : ms));
+    const step = (n: number) => root.querySelectorAll<HTMLElement>('[data-ps-step]').forEach((li) => {
+      const k = Number(li.dataset.psStep);
+      li.classList.toggle('on', k === n);
+      li.classList.toggle('done', k < n);
+    });
+
+    const open = (id: string) => {
+      timers.forEach(clearTimeout);
+      timers = [];
+      const p = products.find((x) => x.id === id)!;
+      const ticket = $('[data-ps-ticket]');
+      $('[data-ps-send]').textContent = `navigation.navigate('Product', { productId: '${id}' })`;
+      $('[data-ps-carry]').textContent = `{ productId: '${id}' }`;
+      $('[data-ps-read]').textContent = `route.params.productId  →  '${id}'  →  ${p.name}`;
+      $('[data-ps-hint]').textContent = 'Watch the ticket travel…';
+      root.querySelectorAll<HTMLElement>('[data-ps-open]').forEach((b) => b.classList.toggle('tapped', b.dataset.psOpen === id));
+      step(1);
+      later(700, () => {
+        step(2);
+        ticket.textContent = `{ productId: '${id}' }`;
+        ticket.classList.remove('fly');
+        void ticket.offsetWidth;
+        ticket.classList.add('fly');
+      });
+      later(1700, () => {
+        step(3);
+        $('[data-ps-list]').hidden = true;
+        $('[data-ps-back]').hidden = false;
+        $('[data-ps-title]').textContent = 'Product';
+        const d = $('[data-ps-detail]');
+        d.hidden = false;
+        d.innerHTML = `<span class="ps-big" aria-hidden="true">${p.emoji}</span><b>${p.name}</b><span class="ps-price">${p.price} EGP</span><span class="ps-from mono">found with productId '${id}'</span><span class="ps-cart">Add to cart</span>`;
+        $('[data-ps-hint]').innerHTML = 'Same <b>Product</b> screen for every item — only the ticket changes. Press <b>Back</b> and try another one.';
+      });
+    };
+    root.querySelectorAll<HTMLElement>('[data-ps-open]').forEach((b) => b.addEventListener('click', () => open(b.dataset.psOpen!)));
+    $('[data-ps-back]').addEventListener('click', () => {
+      timers.forEach(clearTimeout);
+      $('[data-ps-list]').hidden = false;
+      $('[data-ps-detail]').hidden = true;
+      $('[data-ps-back]').hidden = true;
+      $('[data-ps-title]').textContent = 'Shop';
+      $('[data-ps-ticket]').classList.remove('fly');
+      root.querySelectorAll('[data-ps-open]').forEach((b) => b.classList.remove('tapped'));
+      step(0);
+      $('[data-ps-hint]').textContent = '👆 Tap a product in the phone.';
+    });
+  });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .ps { margin: 24px 0 32px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .ps-grid { display: grid; gap: 20px; align-items: center; }
+  @media (min-width: 820px) { .ps-grid { grid-template-columns: auto 1fr; } }
+  .ps-phone { position: relative; justify-self: center; width: 220px; height: 400px; display: flex; flex-direction: column; border-radius: 30px; background: #fff; color: #11181c; box-shadow: 0 0 0 7px #15181d, 0 24px 48px -24px rgb(0 0 0 / .6); overflow: hidden; }
+  .ps-head { position: relative; flex: none; height: 42px; display: grid; place-items: center; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+  .ps-back { position: absolute; left: 6px; top: 50%; translate: 0 -50%; border: 0; background: none; color: #ea580c; font-size: 13px; cursor: pointer; padding: 6px; }
+  .ps-list { display: grid; gap: 8px; padding: 10px; }
+  .ps-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 10px; border: 0; border-radius: 12px; background: #fff7ed; text-align: left; cursor: pointer; transition: transform .15s var(--ease-out), background .15s; }
+  .ps-item:hover { background: #ffedd5; }
+  .ps-item:active, .ps-item.tapped { transform: scale(.97); background: #fed7aa; }
+  .ps-item:focus-visible { outline: 2px solid #ea580c; outline-offset: 2px; }
+  .ps-emoji { font-size: 26px; }
+  .ps-item b { display: block; font-size: 13px; }
+  .ps-item small { font-size: 11.5px; color: #64748b; }
+  .ps-id { font-size: 10.5px; padding: 2px 6px; border-radius: 6px; background: #fff; color: #ea580c; border: 1px solid #fdba74; }
+  .ps-detail { flex: 1; display: grid; justify-items: center; align-content: start; gap: 6px; padding: 26px 14px; text-align: center; animation: ps-in .3s var(--ease-out); }
+  .ps-detail :global(.ps-big) { font-size: 56px; }
+  .ps-detail :global(b) { font-size: 17px; }
+  .ps-detail :global(.ps-price) { font-size: 15px; font-weight: 700; color: #ea580c; }
+  .ps-detail :global(.ps-from) { margin-top: 6px; padding: 3px 8px; border-radius: 7px; background: #ecfdf5; color: #047857; font-size: 10.5px; }
+  .ps-detail :global(.ps-cart) { margin-top: 14px; padding: 9px 18px; border-radius: 999px; background: #11181c; color: #fff; font-size: 13px; font-weight: 700; }
+  .ps-ticket { position: absolute; left: 50%; top: 50%; translate: -50% -50%; padding: 6px 10px; border-radius: 8px; background: #ea580c; color: #fff; font-size: 11px; white-space: nowrap; opacity: 0; pointer-events: none; box-shadow: 0 8px 20px -8px rgb(234 88 12 / .7); }
+  .ps-ticket.fly { animation: ps-fly 1s var(--ease-out) forwards; }
+  .ps-steps { list-style: none; margin: 0 !important; padding: 0; display: grid; gap: 10px; min-width: 0; }
+  .ps-steps li { margin: 0 !important; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text-2); font-size: 14.5px; transition: border-color .25s var(--ease-out), background .25s var(--ease-out), opacity .25s; }
+  .ps-steps li.on { border-color: #fb923c; background: color-mix(in oklab, #fb923c 12%, transparent); color: var(--text); }
+  .ps-steps li.done { border-color: color-mix(in oklab, #fb923c 40%, var(--line-2)); }
+  .ps-steps b { color: var(--text); }
+  .ps-steps code { display: block; margin-top: 6px; font-size: 12.5px; color: var(--accent-text); overflow-wrap: anywhere; }
+  .ps-n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3, var(--line)); color: var(--text-2); font: 700 13px var(--font-mono); }
+  .ps-steps li.on .ps-n, .ps-steps li.done .ps-n { background: #fb923c; color: #1c1300; }
+  .ps-hint { margin: 0 !important; font-size: 14.5px; color: var(--text-2); }
+  .ps figcaption { font-size: 14px; color: var(--text-2); }
+  @keyframes ps-fly { 0% { opacity: 0; transform: translateY(-80px) scale(.8); } 30% { opacity: 1; } 80% { opacity: 1; transform: translateY(40px) scale(1.05); } 100% { opacity: 0; transform: translateY(60px) scale(.9); } }
+  @keyframes ps-in { from { opacity: 0; transform: translateX(16px); } }
+  @media (prefers-reduced-motion: reduce) { .ps-ticket.fly, .ps-detail { animation: none; } .ps-steps li, .ps-item { transition: none; } }
+</style>

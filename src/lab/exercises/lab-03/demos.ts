@@ -62,6 +62,82 @@ export const colors = { background: '#0B1020', text: '#F8FAFC', primary: '#7CFFB
     ],
   },
 
+  shop: {
+    id: 'shop',
+    title: 'A shop: one Product screen for every product',
+    frame: 'phone',
+    entry: 'App.tsx',
+    files: {
+      'App.tsx': `import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { View, Text, Pressable, FlatList } from 'react-native';
+
+// The shop's "database": every product has an id
+const PRODUCTS = [
+  { id: 'p1', name: 'Running shoes', price: 1450, emoji: '👟' },
+  { id: 'p2', name: 'Headphones', price: 2200, emoji: '🎧' },
+  { id: 'p3', name: 'Hoodie', price: 890, emoji: '🧥' },
+];
+
+const Stack = createNativeStackNavigator();
+
+// 1. SEND: the list knows which product was tapped, and sends only its id
+function ShopScreen({ navigation }) {
+  return (
+    <FlatList
+      data={PRODUCTS}
+      keyExtractor={(p) => p.id}
+      contentContainerClassName="gap-3 p-4"
+      renderItem={({ item }) => (
+        <Pressable
+          onPress={() => navigation.navigate('Product', { productId: item.id })}
+          className="flex-row items-center gap-3 rounded-2xl bg-orange-50 p-4 active:opacity-70"
+        >
+          <Text className="text-3xl">{item.emoji}</Text>
+          <View className="flex-1">
+            <Text className="font-bold">{item.name}</Text>
+            <Text className="text-slate-500">{item.price} EGP</Text>
+          </View>
+        </Pressable>
+      )}
+    />
+  );
+}
+
+// 2. READ: ONE Product screen for every product. It reads the id and finds the product.
+function ProductScreen({ route }) {
+  const { productId } = route.params;
+  const product = PRODUCTS.find((p) => p.id === productId);
+  if (!product) return <Text className="p-6 text-lg">Product not found</Text>;
+  return (
+    <View className="flex-1 items-center gap-2 bg-white p-8">
+      <Text className="text-7xl">{product.emoji}</Text>
+      <Text className="text-2xl font-bold">{product.name}</Text>
+      <Text className="text-lg font-bold text-orange-600">{product.price} EGP</Text>
+      <Text className="font-mono text-xs text-slate-400">route.params.productId = {productId}</Text>
+    </View>
+  );
+}
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator>
+        <Stack.Screen name="Shop" component={ShopScreen} />
+        <Stack.Screen name="Product" component={ProductScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+`,
+    },
+    tryThis: [
+      'Add a 4th product to PRODUCTS — the Product screen shows it with no new code',
+      "Send `productId: 'p9'` (an id that doesn't exist) and read the screen",
+      'Show everything the screen received: `<Text>{JSON.stringify(route.params)}</Text>`',
+    ],
+  },
+
   'first-stack': {
     id: 'first-stack',
     title: 'Your first navigator: two screens, one parameter',
