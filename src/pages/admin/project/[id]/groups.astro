@@ -272,7 +272,9 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-idea button { border: 0; background: none; color: var(--text-3); cursor: pointer; }
   .gp-pick { padding: 10px; border-radius: 10px; border: 1px solid var(--accent-text); background: var(--accent-soft); font-size: 13.5px; }
   .gp-pick small { display: block; color: var(--text-3); font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
-  .gp-new { display: flex; gap: 6px; }
+  .gp-new { display: flex; flex-wrap: wrap; gap: 6px; }
+  .gp-add-id input[name='sid'] { flex: 0 1 130px; min-width: 110px; }
+  .gp-add-id input[name='sname'] { flex: 1 1 180px; }
   .gp-new input { flex: 1; height: 34px; padding: 0 10px; font-size: 13px; }
   .gp-foot { padding-top: 6px; border-top: 1px solid var(--line); }
   .gp-msg { min-height: 20px; font-size: 13px; color: var(--accent-text); }
@@ -371,7 +373,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   import { playBox } from '@/scripts/box-shuffle';
   import {
     SCAN_VERSION, TEAM_SIZE, assignRandom, autoNumber, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
-    randomIdea, unassigned, lastHandIn, sortGroups, SORTS, type Group, type Plan, type Sort, type Student,
+    normId, randomIdea, unassigned, lastHandIn, sortGroups, SORTS, type Group, type Plan, type Sort, type Student,
   } from '@/lib/project-files/groups';
   import { notATeamNumber, type Entry } from '@/lib/project-files/core';
 
@@ -528,6 +530,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
           <h3><span><span class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</span>${stamp(g)}</span><span class="gp-size ${short ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></h3>
           <button class="btn btn-ghost btn-sm gp-view" type="button" data-view="${esc(g.key)}">View file &amp; extracted text</button>
           <p class="members">${g.members.map((m) => `${esc(m.name)}${m.source === 'added' ? ' <b>(new)</b>' : ''}`).join(', ') || 'No members found'}</p>
+          <form class="gp-new gp-add-id" data-add-id="${esc(g.key)}"><input class="input mono" name="sid" maxlength="20" placeholder="Student ID" aria-label="Student ID to add to ${esc(g.title)}" autocomplete="off" /><input class="input" name="sname" maxlength="80" placeholder="Name (if not in the class list)" aria-label="Their name, if they are not in the class list" autocomplete="off" /><button class="btn btn-ghost btn-sm" type="submit">Add student</button></form>
           ${short ? later
             ? `<p class="small faint">Fill later · <button class="btn btn-ghost btn-sm" type="button" data-unlater="${esc(g.key)}">Show options</button></p>`
             : `<div class="gp-short"><span>This group has ${g.members.length} of ${TEAM_SIZE} members. Add a random student who is in no group now (optional), or do it later.</span>
@@ -828,6 +831,40 @@ if (!file) return Astro.redirect('/admin/project', 303);
       render();
       save();
       root.querySelector<HTMLInputElement>(`[data-new-idea="${CSS.escape(key)}"] input`)?.focus();
+    });
+
+    // Put one particular student in a group: from the class list, or added to it with their name.
+    root.addEventListener('submit', async (e) => {
+      const form = (e.target as HTMLElement).closest<HTMLFormElement>('[data-add-id]');
+      if (!form) return;
+      e.preventDefault();
+      const key = form.dataset.addId!;
+      const g = groups.find((x) => x.key === key);
+      const id = normId(form.sid.value);
+      const name = form.sname.value.replace(/\s+/g, ' ').trim();
+      if (!g) return;
+      const note = (text: string) => {
+        let el = form.nextElementSibling as HTMLElement | null;
+        if (!el?.classList.contains('gp-add-msg')) { el = Object.assign(document.createElement('p'), { className: 'gp-msg err gp-add-msg' }); el.setAttribute('role', 'alert'); form.after(el); }
+        el.textContent = text;
+      };
+      if (!/^[A-Z0-9-]{3,20}$/.test(id)) return note('Type the student ID (letters, numbers and dashes).');
+      if (g.members.some((m) => m.id === id)) return note(`${id} is already in ${g.title}.`);
+      const other = groups.find((x) => x !== g && x.members.some((m) => m.id === id));
+      if (other) return note(`${id} is in ${other.title}. Take them out there first (× in the table), then add them here.`);
+      if (!roster.some((st) => st.id === id)) {
+        if (name.length < 2) { form.sname.focus(); return note(`${id} is not in the class list. Type their name too, and they are added to it.`); }
+        const next = [...roster, { id, name }];
+        const res = await fetch('/api/admin/project/groups', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ roster: next }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return note(data.error ?? 'Could not add them to the class list.');
+        roster = data.roster;
+      }
+      plan.added[key] = [...(plan.added[key] ?? []), id];
+      plan.later = plan.later.filter((k) => k !== key);
+      say(`Added ${roster.find((st) => st.id === id)?.name ?? id} (${id}) to ${g.title}.`, false, assignMsg);
+      render();
+      save();
     });
 
     /* --------------------------------------------------------------- sheet */

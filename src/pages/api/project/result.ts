@@ -2,7 +2,7 @@
  * A student's proposal result (public, for /project). Only items whose results staff have published are shown.
  *   GET                      { items: [{ id, title }] }  the published items (so the page knows to show the box)
  *   GET ?studentId=…         { results: [{ item, group, members, idea, feedback }] }  the student's own group only
- * Lookups are limited per network address, so nobody can try every ID; members are names only, never IDs.
+ * Lookups are limited per network address, so nobody can try every ID; members come with their IDs so teammates can find each other.
  * Each lookup that finds a group is recorded, so staff can see who has checked (admin feedback page).
  */
 import type { APIRoute } from 'astro';

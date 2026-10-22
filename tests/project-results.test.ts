@@ -14,14 +14,14 @@ test('a student sees only their own group: number, member names, approved idea a
   plan.choices.G1 = { mode: 'manual', idea: 'Campus Companion' };
   const groups = buildGroups(entries, roster, plan);
   const { notes } = placeNotes(groups, setNote({}, 'G1', '  Strong idea, narrow the scope.  ', ['a', 'b'], 'Dr. A'));
-  assert.deepEqual(resultFor(groups, plan, notes, '23cs0002'), { group: 'Group 1', members: ['Sara Ali', 'Omar Hassan'], idea: 'Campus Companion', feedback: 'Strong idea, narrow the scope.' });
+  assert.deepEqual(resultFor(groups, plan, notes, '23cs0002'), { group: 'Group 1', members: [{ name: 'Sara Ali', id: '23CS0001' }, { name: 'Omar Hassan', id: '23CS0002' }], idea: 'Campus Companion', feedback: 'Strong idea, narrow the scope.' });
 });
 
 test('no approved idea and no feedback come back empty, and an unknown ID finds nothing', () => {
   const plan = emptyPlan();
   const groups = buildGroups(entries, roster, plan);
   const { notes } = placeNotes(groups, {});
-  assert.deepEqual(resultFor(groups, plan, notes, '23CS0003'), { group: 'Group 2', members: ['Mona Adel'], idea: '', feedback: null });
+  assert.deepEqual(resultFor(groups, plan, notes, '23CS0003'), { group: 'Group 2', members: [{ name: 'Mona Adel', id: '23CS0003' }], idea: '', feedback: null });
   assert.equal(resultFor(groups, plan, notes, '23CS9999'), null);
 });
 
