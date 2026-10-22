@@ -99,6 +99,7 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
       <span class="ash-av" aria-hidden="true">{initials}</span>
       <span><b>{who}</b><small class="mono">{role}{modules.length ? ` · ${modules.length} module${modules.length === 1 ? '' : 's'}` : ''}</small></span>
     </div>
+    {ctx && <div class="ash-ctx-bar"><ModuleSwitcher ctx={ctx} modules={manageable} faculties={ctxFaculties} where="toolbar" /></div>}
     <nav class="ash-nav">
       {groups.map((g) => (
         <div class="ash-group">
@@ -194,13 +195,13 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
   /* shared admin look: frosted cards with a soft gradient rim */
   .ash-main :is(.adm-card, .ac-card, .bh-card, .tm-card, .pf-card, .si-card, .gp-card, .as-card, .ss, .bh-mod, .cat-card) {
     background: linear-gradient(180deg, color-mix(in oklab, var(--surface) 92%, transparent), color-mix(in oklab, var(--surface) 80%, transparent));
-    border-color: color-mix(in oklab, var(--line-2) 80%, transparent); box-shadow: 0 1px 0 color-mix(in oklab, var(--text) 5%, transparent) inset, 0 20px 50px -34px rgb(0 0 0 / .45);
-    backdrop-filter: blur(10px); }
+    border-color: color-mix(in oklab, var(--line-2) 80%, transparent); box-shadow: 0 1px 0 color-mix(in oklab, var(--text) 5%, transparent) inset, 0 20px 50px -34px rgb(0 0 0 / .45); }
+  /* (no backdrop-filter on cards: Chrome renders the text inside them soft) */
   /* tablets: the menu row sits above the page, so the page doesn't need its own clearance for the header */
   @media (max-width: 1099px) { .ash-main > :first-child { padding-top: 24px !important; } }
 
   /* phones: an app layout — bottom tab bar + "More" sheet instead of the menu row */
-  .ash-tabbar, .ash-scrim, .ash-sheet { display: none; }
+  .ash-tabbar, .ash-scrim, .ash-sheet, .ash-ctx-bar { display: none; }
   @media (max-width: 719px) {
     .ash-side { display: none; }
     .ash-main > :first-child { padding-top: calc(var(--nav-h) + 18px) !important; padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
@@ -237,13 +238,16 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
   /* phones and tablets: who's signed in + profile/sign out on one row, the menu as a swipeable row of pills.
      Kept after the desktop rules so it wins over them. */
   @media (max-width: 1099px) {
-    .ash-side { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "me foot" "nav nav"; align-items: center; gap: 10px;
+    .ash-side { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "me foot" "ctx ctx" "nav nav"; align-items: center; gap: 10px;
       padding: calc(var(--nav-h) + 12px) 16px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
     .ash-brand, .ash-gt, .ash-module-menu, .ash-foot a[target] { display: none !important; }
     /* tablets: the "Managing" box sits on its own row above the menu pills */
-    .ash-nav .ash-ctx { order: -1; flex: 1 0 100%; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); align-items: end; margin: 0 0 4px; padding: 8px 10px; }
-    .ash-nav .ash-ctx-role { display: none; }
-    .ash-nav { flex-wrap: wrap; }
+    /* the module switcher gets its own row; the menu stays one swipeable row of pills */
+    .ash-nav .ash-ctx { display: none !important; }
+    .ash-ctx-bar { display: block; grid-area: ctx; min-width: 0; }
+    .ash-ctx-bar .ash-ctx { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); align-items: end; margin: 0; padding: 8px 10px; }
+    .ash-ctx-bar .ash-ctx-role { display: none; }
+    .ash-nav { flex-wrap: nowrap; }
     .ash-me { grid-area: me; min-width: 0; padding: 8px 10px; }
     .ash-me > span:last-child { min-width: 0; }
     .ash-me b, .ash-me small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -91,8 +91,10 @@ if (!(await access(Astro.cookies)).can('platform.settings')) return Astro.redire
   .cat-two label { display: grid; gap: 6px; font-size: 12.5px; font-weight: 600; }
   .cat-two .input { height: 40px; padding: 0 10px; }
   .cat-list { display: grid; gap: 6px; }
-  .cat-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 6px 6px 6px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); }
-  .cat-item input.name { border: 0; background: none; color: var(--text); font: 600 14px var(--font-body); padding: 6px 0; min-width: 0; }
+  .cat-item { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 6px 6px 6px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); }
+  .cat-item input.name { flex: 1 1 170px; border: 0; background: none; color: var(--text); font: 600 14px var(--font-body); padding: 6px 0; min-width: 0; }
+  .cat-item .cat-acts { margin-left: auto; }
+  .cat-item .cat-renamed { flex-basis: 100%; }
   .cat-item input.name:focus { outline: none; box-shadow: 0 2px 0 var(--accent-text); }
   .cat-acts { display: flex; gap: 4px; align-items: center; }
   .cat-acts button { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line-2); background: none; color: var(--text-2); cursor: pointer; }

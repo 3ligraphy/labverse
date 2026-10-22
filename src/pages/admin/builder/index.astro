@@ -122,7 +122,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .bh-fh { font-size: 12px; font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin-top: 12px; }
   .bh-fh:first-child { margin-top: 0; }
   .bh-mod { display: grid; gap: 12px; padding: 18px 20px; border: 1px solid color-mix(in oklab, var(--c) 35%, var(--line-2)); border-radius: var(--r-lg); background: var(--surface); }
-  @media (min-width: 720px) { .bh-mod { grid-template-columns: 1fr auto; align-items: center; } }
+  @media (min-width: 720px) { .bh-mod { grid-template-columns: minmax(260px, 1fr) auto; align-items: center; } }
+  @media (min-width: 720px) and (max-width: 1399px) { .bh-mod { grid-template-columns: minmax(0, 1fr); } }
   .bh-code { font-size: 12px; color: var(--text-3); }
   .bh-mod h3 { font-size: 1.2rem; margin-top: 2px; }
   .bh-pub { color: var(--warn); }

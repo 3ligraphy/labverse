@@ -5,7 +5,7 @@
  * (2) the login form, or (3) the live table.
  */
 import Base from '@/layouts/Base.astro';
-import { isAdmin, setupStatus, isDoctor } from '@/lib/attendance/server';
+import { isAdmin, setupStatus } from '@/lib/attendance/server';
 import { progressSetup } from '@/lib/progress/server';
 import { tokenSecret } from '@/lib/accounts/server';
 
@@ -24,7 +24,6 @@ const error = Astro.url.searchParams.get('e');
 // signing in happens on the workspace home (account or admin password)
 if (ready && !admin) return Astro.redirect('/admin', 303);
 
-const doctor = isDoctor(Astro.cookies);
 import AdminShell from '@/components/admin/AdminShell.astro';
 ---
 <Base title="Attendance admin" noindex>
@@ -140,19 +139,13 @@ import AdminShell from '@/components/admin/AdminShell.astro';
               <span class="live mono" data-att-live>loading…</span>
               <button class="btn btn-primary btn-sm" type="button" data-open-sessions>Manage selected session</button>
               <a class="btn btn-ghost btn-sm" data-session-insights href="/admin/progress">Session insights →</a>
-            {doctor && <a class="btn btn-ghost btn-sm" href="/admin/cms">CMS →</a>}
-            {doctor && <a class="btn btn-ghost btn-sm" href="/admin/builder">Builder →</a>}
-            {doctor && <a class="btn btn-ghost btn-sm" href="/admin/accounts">Accounts →</a>}
-            <a class="btn btn-ghost btn-sm" href="/admin/assessment/mobile-development" data-assessment-link>Assessment →</a>
-            <a class="btn btn-ghost btn-sm" href="/admin/project">Submissions →</a>
-            <form method="post" action="/api/admin/logout"><button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
           </div>
         </header>
         <p class="muted small">This attendance list belongs only to the teaching session selected above. Students, check-ins and progress from parallel sessions remain separate.</p>
         <p class="muted small">Use Mark present to manually record attendance for a student in this session, even after it has ended.</p>
         <form class="session-create" data-add-attendance>
           <label><span>Student name</span><input class="input" name="name" required minlength="2" maxlength="60" autocomplete="off" placeholder="Full name" /></label>
-          <label><span>Student ID</span><input class="input" name="studentId" required minlength="3" maxlength="20" pattern="[A-Za-z0-9-]{3,20}" autocomplete="off" placeholder="Student ID" /></label>
+          <label><span>Student ID</span><input class="input" name="studentId" required minlength="3" maxlength="20" pattern="[0-9]{5,9}" inputmode="numeric" autocomplete="off" placeholder="Student ID (digits)" /></label>
           <button class="btn btn-primary" type="submit" disabled>Add student &amp; mark present</button>
         </form>
         <p class="muted small" data-add-attendance-context>Select a session to add attendance. Students do not need to have joined online.</p>
@@ -261,6 +254,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .session-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
   .session-head .muted { margin-top: 8px; }
   .session-create { display: grid; grid-template-columns: minmax(180px, 0.8fr) minmax(240px, 1.2fr) 120px auto; align-items: end; gap: 12px; padding: 18px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); }
+  .session-create[data-add-attendance] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
   .session-create label, .session-list :global(label) { display: grid; gap: 6px; min-width: 0; font-size: 12px; font-weight: 650; color: var(--text-2); }
   .session-create .input, .session-list :global(.input) { height: 40px; padding: 0 12px; border-radius: 10px; }
   .session-message { min-height: 1.25em; color: var(--text-3); }
