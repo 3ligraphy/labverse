@@ -1,0 +1,346 @@
+---
+/**
+ * /admin/stats — one module's statistics, across every lab session: attendance, progress, hard exercises,
+ * groups and when students work. Data: buildStats (src/lib/progress/server.ts); the charts are drawn below as SVG.
+ */
+import Base from '@/layouts/Base.astro';
+import AdminShell from '@/components/admin/AdminShell.astro';
+import { isAdmin } from '@/lib/attendance/server';
+import { access } from '@/lib/accounts/access';
+import { canOnLab } from '@/lib/accounts/labscope';
+import { buildStats, progressSetup } from '@/lib/progress/server';
+import { ADMIN_MODULE_COOKIE } from '@/scripts/admin-module';
+
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store, max-age=0');
+if (!isAdmin(Astro.cookies)) return Astro.redirect('/admin', 303);
+const a = await access(Astro.cookies);
+const module = Astro.url.searchParams.get('module') ?? Astro.cookies.get(ADMIN_MODULE_COOKIE)?.value ?? 'mobile-development';
+const allowed = a.can('module.progress', module);
+const stats = allowed && progressSetup().database
+  ? await buildStats(module, (lab) => canOnLab(a, 'module.progress', lab)).catch((e) => { console.error('[stats] failed', e); return null; })
+  : null;
+---
+<Base title="Statistics" noindex>
+  <AdminShell active="stats">
+    <section class="st container" data-st>
+      <header class="st-head">
+        <h1>Statistics</h1>
+        <p class="muted">Every lab session of this module so far. Hover or tap a bar for its numbers; each chart can also show its table.</p>
+      </header>
+
+      {!allowed ? (
+        <p class="st-note">You don’t follow lab progress in this module. Pick another module in the menu.</p>
+      ) : !stats ? (
+        <p class="st-note">Statistics need the progress database. Open <a href="/admin/progress">Lab progress</a> for setup.</p>
+      ) : !stats.labs.length ? (
+        <p class="st-note">This module has no published labs yet.</p>
+      ) : (
+        <>
+          <dl class="st-tiles">
+            <div><dt>Students</dt><dd data-n>{stats.totals.students}</dd><span>joined at least one session</span></div>
+            <div><dt>Sessions run</dt><dd>{stats.totals.sessions}</dd><span>across {stats.labs.length} {stats.labs.length === 1 ? 'lab' : 'labs'}</span></div>
+            <div><dt>Attendance</dt><dd>{stats.totals.attendancePct}<small>%</small></dd><span>of joined students checked in</span></div>
+            <div><dt>Checks run</dt><dd>{stats.totals.checks}</dd><span>{stats.totals.solved} exercises solved</span></div>
+            <div><dt>First-try pass</dt><dd>{stats.totals.firstTryPct}<small>%</small></dd><span>exercises right on the first Check</span></div>
+          </dl>
+
+          <div class="st-grid">
+            <figure class="st-card wide">
+              <figcaption><h2>Attendance by session</h2><p>Students who joined each session, and how many checked in.</p></figcaption>
+              <div class="st-legend" aria-hidden="true"><span><i class="k1"></i>Joined</span><span><i class="k2"></i>Checked in</span></div>
+              <div class="st-chart" data-chart="sessions"></div>
+              <details><summary>Show as table</summary><div data-table="sessions"></div></details>
+            </figure>
+
+            <figure class="st-card">
+              <figcaption><h2>Average progress by lab</h2><p>Mean score of the students in each lab.</p></figcaption>
+              <div class="st-chart" data-chart="labs"></div>
+              <details><summary>Show as table</summary><div data-table="labs"></div></details>
+            </figure>
+
+            <figure class="st-card">
+              <figcaption><h2>Groups</h2><p>Average progress per group, over all its labs.</p></figcaption>
+              <div class="st-chart" data-chart="groups"></div>
+              <details><summary>Show as table</summary><div data-table="groups"></div></details>
+            </figure>
+
+            <div class="st-filter wide">
+              <label><span>Lab</span><select class="input" data-lab></select></label>
+              <p class="muted" data-lab-sum></p>
+            </div>
+
+            <figure class="st-card">
+              <figcaption><h2>Progress spread</h2><p>How many students reached each score band in this lab.</p></figcaption>
+              <div class="st-chart" data-chart="spread"></div>
+              <details><summary>Show as table</summary><div data-table="spread"></div></details>
+            </figure>
+
+            <figure class="st-card">
+              <figcaption><h2>Exercise difficulty</h2><p>Share of the lab’s students who solved each exercise. The lowest bar is the hardest.</p></figcaption>
+              <div class="st-chart" data-chart="exercises"></div>
+              <details><summary>Show as table</summary><div data-table="exercises"></div></details>
+            </figure>
+
+            <figure class="st-card wide">
+              <figcaption><h2>When students work</h2><p>Checks by weekday and hour (Cairo time), all labs. Darker means busier.</p></figcaption>
+              <div class="st-chart" data-chart="heat"></div>
+              <details><summary>Show as table</summary><div data-table="heat"></div></details>
+            </figure>
+          </div>
+          <script type="application/json" data-st-data set:html={JSON.stringify(stats)} />
+        </>
+      )}
+      <div class="st-tip" role="tooltip" data-tipbox hidden></div>
+    </section>
+  </AdminShell>
+</Base>
+
+<style is:global>
+  .st {
+    --s1: #2a78d6; --s2: #eb6834; --seq0: #edf3fb;
+    --h1: #cde2fb; --h2: #9ec5f4; --h3: #6da7ec; --h4: #3987e5; --h5: #256abf; --h6: #184f95;
+    min-height: 80dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 22px; align-content: start;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme='light'])) .st { --s1: #3987e5; --s2: #d95926; --seq0: #1d2530; --h1: #104281; --h2: #184f95; --h3: #256abf; --h4: #3987e5; --h5: #6da7ec; --h6: #9ec5f4; }
+  }
+  :root[data-theme='dark'] .st { --s1: #3987e5; --s2: #d95926; --seq0: #1d2530; --h1: #104281; --h2: #184f95; --h3: #256abf; --h4: #3987e5; --h5: #6da7ec; --h6: #9ec5f4; }
+
+  .st-head h1 { font-size: var(--fs-xl); letter-spacing: -.04em; text-wrap: balance; }
+  .st-head p { max-width: 70ch; margin-top: 6px; }
+  .st-note { padding: 18px; border-radius: var(--r-lg); border: 1px solid var(--line-2); background: var(--surface); }
+
+  .st-tiles { display: flex; flex-wrap: wrap; gap: 1px; margin: 0; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--line); }
+  .st-tiles > div { flex: 1 1 170px; display: grid; gap: 2px; align-content: start; padding: 16px 18px; background: var(--surface); }
+  .st-tiles dt { font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .st-tiles dd { margin: 0; font-family: var(--font-display); font-size: 2rem; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text); }
+  .st-tiles dd small { font-size: 1rem; color: var(--text-3); margin-left: 2px; }
+  .st-tiles span { font-size: 12.5px; color: var(--text-3); }
+
+  .st-grid { display: grid; gap: 16px; }
+  @media (min-width: 1100px) { .st-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } .st-grid .wide { grid-column: 1 / -1; } }
+  .st-card { margin: 0; display: grid; gap: 12px; align-content: start; padding: 18px 20px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); min-width: 0; }
+  .st-card h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
+  .st-card figcaption p { margin-top: 2px; font-size: 13.5px; color: var(--text-2); max-width: 65ch; }
+  .st-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-2); }
+  .st-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .st-legend i { width: 10px; height: 10px; border-radius: 3px; }
+  .st-legend .k1 { background: var(--s1); }
+  .st-legend .k2 { background: var(--s2); }
+  .st-chart { position: relative; min-height: 80px; }
+  .st-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .st-chart text { font-family: var(--font-sans, inherit); }
+  .st-chart .ax { fill: var(--text-3); font-size: 11.5px; }
+  .st-chart .lb { fill: var(--text-2); font-size: 12.5px; }
+  .st-chart .vl { fill: var(--text); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .st-chart .grid { stroke: var(--line); stroke-width: 1; }
+  .st-chart .base { stroke: var(--line-2); stroke-width: 1; }
+  .st-chart [data-tip] { cursor: default; transition: opacity 120ms; }
+  .st-chart.hovering [data-tip]:not(.hot) { opacity: .45; }
+  .st-chart .empty { padding: 26px 0; text-align: center; color: var(--text-3); font-size: 14px; }
+  .st-card details { font-size: 13px; }
+  .st-card summary { cursor: pointer; color: var(--text-3); width: max-content; }
+  .st-card summary:hover { color: var(--text); }
+  .st-card table { width: 100%; margin-top: 8px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .st-card th, .st-card td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+  .st-card th { font-weight: 600; color: var(--text-2); }
+  .st-card td.n, .st-card th.n { text-align: right; }
+  .st-card details > div { overflow-x: auto; }
+
+  .st-filter { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 18px; padding-top: 6px; }
+  .st-filter label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .st-filter select { height: 40px; padding: 0 12px; border-radius: 10px; min-width: min(320px, 100%); }
+  .st-filter p { font-size: 14px; padding-bottom: 10px; }
+
+  .st-tip { position: fixed; z-index: 300; pointer-events: none; max-width: 260px; padding: 8px 10px; border-radius: 10px; background: var(--text); color: var(--bg); font-size: 12.5px; line-height: 1.45; box-shadow: var(--shadow-lg); }
+  .st-tip b { display: block; font-size: 13px; }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+
+  type Stats = {
+    sessions: { id: string; lab: string; ta: string; slot: string; at: string; joined: number; attended: number }[];
+    labs: { lab: string; title: string; students: number; sessions: number; avgPercent: number; finished: number; spread: number[];
+      exercises: { id: string; title: string; tried: number; solvedPct: number; avgTries: number; firstTryPct: number }[] }[];
+    groups: { group: string; entries: number; avgPercent: number }[];
+    heat: number[][];
+  };
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = (tag: string, attrs: Record<string, string | number> = {}, text?: string) => {
+    const el = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+    if (text != null) el.textContent = text;
+    return el;
+  };
+  const esc = (s: string) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  /** a bar with 4px rounded ends away from the baseline */
+  const barPath = (x: number, y: number, w: number, h: number, horizontal: boolean) => {
+    const r = Math.min(4, horizontal ? h / 2 : w / 2, horizontal ? w : h);
+    if (h <= 0 || w <= 0) return '';
+    return horizontal
+      ? `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`
+      : `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  };
+  /** a top value that splits into four whole-number steps (0, 6, 12, 18, 24 …) */
+  const niceMax = (v: number) => {
+    const raw = Math.max(1, v / 4);
+    const p = 10 ** Math.floor(Math.log10(raw));
+    return 4 * [1, 2, 3, 4, 5, 6, 8, 10].map((m) => m * p).find((m) => m >= raw)!;
+  };
+  const table = (head: string[], rows: (string | number)[][], numeric: number[] = []) =>
+    `<table><thead><tr>${head.map((h, i) => `<th${numeric.includes(i) ? ' class="n"' : ''}>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows
+      .map((r) => `<tr>${r.map((c, i) => `<td${numeric.includes(i) ? ' class="n"' : ''}>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+
+  /** vertical bars, one or two series side by side */
+  function vBars(el: HTMLElement, cats: string[], series: { color: string; values: number[] }[], tip: (i: number) => string) {
+    const W = Math.max(280, el.clientWidth), H = 230, L = 34, B = 34, T = 8;
+    const max = niceMax(Math.max(1, ...series.flatMap((s) => s.values)));
+    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
+    for (let k = 0; k <= 4; k++) {
+      const y = T + ((H - T - B) * k) / 4;
+      root.append(svg('line', { x1: L, x2: W, y1: y, y2: y, class: k === 4 ? 'base' : 'grid' }), svg('text', { x: L - 8, y: y + 4, 'text-anchor': 'end', class: 'ax' }, String(Math.round(max - (max * k) / 4))));
+    }
+    const slot = (W - L) / cats.length;
+    const bw = Math.min(28, Math.max(4, (slot * 0.7 - 2 * (series.length - 1)) / series.length));
+    const every = Math.ceil(cats.length / Math.max(1, Math.floor((W - L) / 64)));
+    cats.forEach((c, i) => {
+      const g = svg('g', { 'data-tip': tip(i), tabindex: 0 });
+      const groupW = bw * series.length + 2 * (series.length - 1);
+      const x0 = L + slot * i + (slot - groupW) / 2;
+      g.append(svg('rect', { x: L + slot * i, y: T, width: slot, height: H - T - B, fill: 'transparent' }));
+      series.forEach((s, j) => {
+        const h = ((H - T - B) * s.values[i]) / max;
+        const d = barPath(x0 + j * (bw + 2), H - B - h, bw, h, false);
+        if (d) g.append(svg('path', { d, fill: s.color }));
+      });
+      root.append(g);
+      if (i % every === 0) root.append(svg('text', { x: L + slot * i + slot / 2, y: H - B + 18, 'text-anchor': 'middle', class: 'ax' }, c));
+    });
+    el.replaceChildren(root);
+  }
+
+  /** horizontal bars on a 0–100 % scale with the value at the end of each bar */
+  function hBars(el: HTMLElement, rows: { label: string; value: number; tip: string }[], color = 'var(--s1)') {
+    if (!rows.length) return void (el.innerHTML = '<p class="empty">No data yet.</p>');
+    const W = Math.max(280, el.clientWidth);
+    const labelW = Math.min(Math.round(W * 0.42), 220), row = 30, T = 4, H = T + rows.length * row + 22, R = 40;
+    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
+    const x = (v: number) => labelW + ((W - labelW - R) * v) / 100;
+    for (const v of [0, 25, 50, 75, 100]) root.append(svg('line', { x1: x(v), x2: x(v), y1: T, y2: H - 22, class: v === 0 ? 'base' : 'grid' }), svg('text', { x: x(v), y: H - 6, 'text-anchor': 'middle', class: 'ax' }, `${v}%`));
+    rows.forEach((r, i) => {
+      const y = T + i * row;
+      const g = svg('g', { 'data-tip': r.tip, tabindex: 0 });
+      const fit = Math.floor((labelW - 12) / 6.6); // ~6.6px per character at 12.5px
+      const label = r.label.length > fit ? `${r.label.slice(0, fit - 1)}…` : r.label;
+      g.append(svg('rect', { x: 0, y, width: W, height: row, fill: 'transparent' }), svg('text', { x: labelW - 10, y: y + row / 2 + 4, 'text-anchor': 'end', class: 'lb' }, label));
+      const d = barPath(x(0), y + 7, x(r.value) - x(0), row - 14, true);
+      if (d) g.append(svg('path', { d, fill: color }));
+      g.append(svg('text', { x: x(r.value) + 6, y: y + row / 2 + 4, class: 'vl' }, `${r.value}%`));
+      root.append(g);
+    });
+    el.replaceChildren(root);
+  }
+
+  function heat(el: HTMLElement, grid: number[][]) {
+    const used = grid.flatMap((r) => r.map((n, h) => (n ? h : -1))).filter((h) => h >= 0);
+    const from = Math.min(8, ...used), to = Math.max(20, ...used);
+    const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i);
+    const max = Math.max(1, ...grid.flat());
+    const steps = ['var(--h1)', 'var(--h2)', 'var(--h3)', 'var(--h4)', 'var(--h5)', 'var(--h6)'];
+    const W = Math.max(320, el.clientWidth), L = 40, T = 4, B = 24;
+    const cw = (W - L) / hours.length, ch = Math.min(30, Math.max(18, cw * 0.8)), H = T + 7 * ch + B;
+    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
+    grid.forEach((row, d) => {
+      root.append(svg('text', { x: L - 8, y: T + d * ch + ch / 2 + 4, 'text-anchor': 'end', class: 'ax' }, DAYS[d]));
+      hours.forEach((hr, i) => {
+        const n = row[hr];
+        root.append(svg('rect', {
+          x: L + i * cw + 1, y: T + d * ch + 1, width: Math.max(1, cw - 2), height: ch - 2, rx: 3,
+          fill: n ? steps[Math.min(5, Math.floor((n / max) * 6))] : 'var(--seq0)',
+          'data-tip': `<b>${DAYS[d]} ${String(hr).padStart(2, '0')}:00</b>${n} ${n === 1 ? 'Check' : 'Checks'}`,
+        }));
+      });
+    });
+    const every = cw < 26 ? 3 : cw < 40 ? 2 : 1;
+    hours.forEach((hr, i) => i % every === 0 && root.append(svg('text', { x: L + i * cw + cw / 2, y: H - 6, 'text-anchor': 'middle', class: 'ax' }, String(hr).padStart(2, '0'))));
+    el.replaceChildren(root);
+  }
+
+  onPageLoad(() => {
+    const root = document.querySelector<HTMLElement>('[data-st]');
+    const raw = root?.querySelector('[data-st-data]')?.textContent;
+    if (!root || !raw || root.dataset.wired) return;
+    root.dataset.wired = '1';
+    const d = JSON.parse(raw) as Stats;
+    const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+    const pick = $('[data-lab]') as HTMLSelectElement;
+    const busiest = [...d.labs].sort((a, b) => b.students - a.students)[0];
+    pick.replaceChildren(...d.labs.map((l) => new Option(l.title, l.lab, false, l.lab === busiest?.lab)));
+
+    const drawAll = () => {
+      const sessions = d.sessions.slice(-16);
+      const labTitle = (id: string) => d.labs.find((l) => l.lab === id)?.title ?? id;
+      if (sessions.length) vBars($('[data-chart="sessions"]'), sessions.map((s) => day(s.at)), [
+        { color: 'var(--s1)', values: sessions.map((s) => s.joined) },
+        { color: 'var(--s2)', values: sessions.map((s) => s.attended) },
+      ], (i) => {
+        const s = sessions[i];
+        return `<b>${esc(labTitle(s.lab))}</b>${esc(day(s.at))} · ${esc(s.slot)} · ${esc(s.ta)}<br>${s.joined} joined · ${s.attended} checked in${s.joined ? ` (${Math.round((100 * s.attended) / s.joined)}%)` : ''}`;
+      });
+      else $('[data-chart="sessions"]').innerHTML = '<p class="empty">No sessions yet.</p>';
+      $('[data-table="sessions"]').innerHTML = table(['Date', 'Lab', 'Time slot', 'TA', 'Joined', 'Checked in'], d.sessions.map((s) => [day(s.at), labTitle(s.lab), s.slot, s.ta, s.joined, s.attended]), [4, 5]);
+
+      hBars($('[data-chart="labs"]'), d.labs.map((l) => ({ label: l.title, value: l.avgPercent, tip: `<b>${esc(l.title)}</b>${l.students} students · ${l.sessions} sessions<br>average ${l.avgPercent}% · ${l.finished} at 80%+` })));
+      $('[data-table="labs"]').innerHTML = table(['Lab', 'Students', 'Sessions', 'Average', '80%+'], d.labs.map((l) => [l.title, l.students, l.sessions, `${l.avgPercent}%`, l.finished]), [1, 2, 3, 4]);
+
+      hBars($('[data-chart="groups"]'), d.groups.map((g) => ({ label: g.group, value: g.avgPercent, tip: `<b>${esc(g.group)}</b>average ${g.avgPercent}% over ${g.entries} lab ${g.entries === 1 ? 'entry' : 'entries'}` })));
+      $('[data-table="groups"]').innerHTML = table(['Group', 'Lab entries', 'Average'], d.groups.map((g) => [g.group, g.entries, `${g.avgPercent}%`]), [1, 2]);
+
+      const lab = d.labs.find((l) => l.lab === pick.value) ?? d.labs[0];
+      $('[data-lab-sum]').textContent = `${lab.students} students · ${lab.sessions} ${lab.sessions === 1 ? 'session' : 'sessions'} · average ${lab.avgPercent}%`;
+      const bands = lab.spread.map((_, i) => (i === 9 ? '90–100' : `${i * 10}–${i * 10 + 9}`));
+      vBars($('[data-chart="spread"]'), bands.map((b) => b.split('–')[0]), [{ color: 'var(--s1)', values: lab.spread }], (i) => `<b>${bands[i]}%</b>${lab.spread[i]} ${lab.spread[i] === 1 ? 'student' : 'students'}`);
+      $('[data-table="spread"]').innerHTML = table(['Score', 'Students'], bands.map((b, i) => [`${b}%`, lab.spread[i]]), [1]);
+
+      hBars($('[data-chart="exercises"]'), lab.exercises.map((e, i) => ({
+        label: `E${i + 1} ${e.title}`, value: e.solvedPct,
+        tip: `<b>E${i + 1} · ${esc(e.title)}</b>${e.solvedPct}% solved · ${e.tried} tried<br>${e.avgTries} tries on average · ${e.firstTryPct}% right first time`,
+      })));
+      $('[data-table="exercises"]').innerHTML = table(['Exercise', 'Solved', 'Tried', 'Avg tries', 'First try'], lab.exercises.map((e, i) => [`E${i + 1} ${e.title}`, `${e.solvedPct}%`, e.tried, e.avgTries, `${e.firstTryPct}%`]), [1, 2, 3, 4]);
+
+      heat($('[data-chart="heat"]'), d.heat);
+      $('[data-table="heat"]').innerHTML = table(['Day', ...Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'))], d.heat.map((r, i) => [DAYS[i], ...r]), Array.from({ length: 24 }, (_, i) => i + 1));
+    };
+    drawAll();
+    pick.addEventListener('change', drawAll);
+    let last = root.clientWidth;
+    const ro = new ResizeObserver(() => { if (Math.abs(root.clientWidth - last) > 8) { last = root.clientWidth; drawAll(); } });
+    ro.observe(root);
+
+    // one tooltip for every chart: hover, focus or tap a mark
+    const tipBox = $('[data-tipbox]');
+    const show = (mark: Element | null, x: number, y: number) => {
+      root.querySelectorAll('.hot').forEach((m) => m.classList.remove('hot'));
+      root.querySelectorAll('.hovering').forEach((c) => c.classList.remove('hovering'));
+      if (!mark) return void (tipBox.hidden = true);
+      mark.classList.add('hot');
+      mark.closest('.st-chart')?.classList.add('hovering');
+      tipBox.innerHTML = mark.getAttribute('data-tip')!;
+      tipBox.hidden = false;
+      const w = tipBox.offsetWidth, h = tipBox.offsetHeight;
+      tipBox.style.left = `${Math.min(innerWidth - w - 8, Math.max(8, x + 14))}px`;
+      tipBox.style.top = `${y - h - 12 < 8 ? y + 18 : y - h - 12}px`;
+    };
+    root.addEventListener('pointermove', (e) => show((e.target as Element).closest?.('.st-chart [data-tip]') ?? null, e.clientX, e.clientY));
+    root.addEventListener('pointerleave', () => show(null, 0, 0));
+    root.addEventListener('focusin', (e) => {
+      const m = (e.target as Element).closest?.('.st-chart [data-tip]');
+      if (m) { const r = m.getBoundingClientRect(); show(m, r.left + r.width / 2, r.top); }
+    });
+    root.addEventListener('focusout', () => show(null, 0, 0));
+  });
+</script>

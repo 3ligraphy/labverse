@@ -11,7 +11,7 @@ import { getPlayground } from '@/lib/playgrounds';
 import { exerciseMeta } from '@/lab/exercises/registry';
 import { claimedByFileLab } from '@/lib/lab/claimed';
 import { noStore } from '@/lib/attendance/server';
-import { exerciseStats, labStructure, liveClass, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
+import { exerciseStats, labStructure, liveClass, moduleStats, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
 import { NeonStore, type ProgressStore } from './store';
 import { publishedLabSources } from '@/lib/platform/server';
 import { splitLabKey } from '@/lib/platform/core';
@@ -178,6 +178,17 @@ async function labChoices(labs: LabStructure[]) {
       href: claimedByFileLab(l.lab) ? `/mobile-development/labs/${claimedByFileLab(l.lab)}` : key ? `/${key.module}/${key.lab}` : `/mobile-development/labs/${l.lab}`,
     };
   });
+}
+
+/** The statistics page for one module: every lab the person may see, across all sessions. */
+export async function buildStats(moduleSlug: string, allow: (lab: string) => boolean) {
+  const s = getProgressStore();
+  if (!s) return null;
+  const labs = (await getStructures()).filter((l) => allow(l.lab) && (splitLabKey(l.lab)?.module ?? 'mobile-development') === moduleSlug);
+  const titles = new Map((await labChoices(labs)).map((c) => [c.id, c.title]));
+  const raw = labs.length ? await s.statsRaw(labs.map((l) => l.lab)) : { sessions: [], best: [], tasks: [], subs: [], members: [], heat: [] };
+  const stats = moduleStats(labs.map((l) => ({ ...l, title: titles.get(l.lab) ?? l.title })), raw);
+  return { ...stats, updatedAt: new Date().toISOString() };
 }
 
 /** Everything /admin/progress shows for one lab. */

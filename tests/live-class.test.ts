@@ -71,3 +71,28 @@ test('memory store activity: latest Check, fails since the last pass, and a newe
   assert.equal(a.events[0].kind, 'task');
   assert.equal(a.events[1].ref, 'e2');
 });
+
+test('module statistics: attendance, per-lab progress, spread, exercise difficulty and groups', async () => {
+  const { moduleStats } = await import('../src/lib/progress/core.ts');
+  const store = new MemoryStore(() => NOW);
+  const s = await store.createSession('lab-03', 'TA', 'Sun 10:00', 90);
+  for (const [key, group] of [['240001', 'G1'], ['240002', 'G1'], ['240003', 'G2']]) {
+    await store.touchStudent({ studentKey: key, studentId: key, name: key, deviceKey: 'd' });
+    await store.joinSession(s.id, key, group);
+  }
+  await store.checkIn('240001', 'lab-03', s.id);
+  await store.checkIn('240002', 'lab-03', s.id);
+  const check = (key: string, exercise: string, passed: number) => store.addAttempt({ studentKey: key, lab: 'lab-03', exercise, passed, total: 3, code: '', sessionId: s.id });
+  await check('240001', 'e1', 3); // first try
+  await check('240001', 'e2', 3);
+  await check('240002', 'e1', 1);
+  await check('240002', 'e1', 3); // second try
+  const st = moduleStats([lab], await store.statsRaw(['lab-03']));
+  assert.deepEqual(st.totals, { students: 3, sessions: 1, attendancePct: 67, checks: 4, solved: 3, firstTryPct: 67 });
+  assert.equal(st.sessions[0].joined, 3);
+  const l = st.labs[0];
+  assert.equal(l.students, 3);
+  assert.deepEqual(l.exercises.map((e) => [e.solvedPct, e.tried, e.avgTries, e.firstTryPct]), [[67, 2, 1.5, 50], [33, 1, 1, 100]]);
+  assert.equal(l.spread.reduce((a, b) => a + b, 0), 3);
+  assert.deepEqual(st.groups.map((g) => [g.group, g.entries]), [['G1', 2], ['G2', 1]]);
+});

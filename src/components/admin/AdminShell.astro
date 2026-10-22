@@ -46,6 +46,7 @@ const tool = (key: string, label: string, tpl: string, icon: string, show: boole
 const toolsFor = (m: { slug: string; builtIn: boolean }) => [
   (a.can('module.sessions', m.slug) || a.can('module.progress', m.slug)) && 'sessions',
   a.can('module.progress', m.slug) && 'progress',
+  a.can('module.progress', m.slug) && 'stats',
   a.can('module.build', m.slug) && 'canvas',
   'assessment',
   a.can('module.invite', m.slug) && 'team',
@@ -58,6 +59,7 @@ const anyTools = new Set(manageable.flatMap(toolsFor));
 const teaching: Item[] = ctx ? [
   tool('sessions', 'Sessions & attendance', `/admin/sessions?module=${M}`, '◷', true),
   tool('progress', 'Lab progress', `/admin/progress?module=${M}`, '▤', true),
+  tool('stats', 'Statistics', `/admin/stats?module=${M}`, '◫', true),
   tool('canvas', 'Lab canvas', `/admin/builder/${M}`, '⬡', true),
   tool('assessment', 'Assessment', `/admin/assessment/${M}`, '％', true),
   tool('team', 'Team & invites', `/admin/team/${M}`, '✉', true),
@@ -94,7 +96,7 @@ const allItems = groups.flatMap((g) => g.items);
 const current = allItems.find((i) => i.key === active);
 const tabItems = allItems.filter((i) => !i.off).slice(0, 4);
 if (current && !tabItems.includes(current)) tabItems[3] = current;
-const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessions: 'Sessions', progress: 'Progress', submissions: 'Projects', canvas: 'Canvas', assessment: 'Assessment', team: 'Team', banner: 'Banners', builder: 'Builder', teams: 'Teams', catalogue: 'Catalogue', components: 'Components', accounts: 'Accounts', cms: 'CMS' };
+const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessions: 'Sessions', progress: 'Progress', stats: 'Stats', submissions: 'Projects', canvas: 'Canvas', assessment: 'Assessment', team: 'Team', banner: 'Banners', builder: 'Builder', teams: 'Teams', catalogue: 'Catalogue', components: 'Components', accounts: 'Accounts', cms: 'CMS' };
 ---
 <div class="ash" data-ash-active={active}>
   <script type="application/json" data-ash-modules set:html={JSON.stringify(manageable.map((m) => ({ slug: m.slug, title: m.title, code: m.code, role: m.role, faculty: m.faculty, color: m.color, tools: toolsFor(m) })))} />
@@ -276,7 +278,7 @@ const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessi
   import { ADMIN_MODULE_EVENT, rememberAdminModule } from '@/scripts/admin-module';
   /** Module tools: switching module reopens the same tool for the new module. */
   const FOLLOW: Record<string, string> = {
-    sessions: '/admin/sessions?module=__M__', progress: '/admin/progress?module=__M__', assessment: '/admin/assessment/__M__',
+    sessions: '/admin/sessions?module=__M__', progress: '/admin/progress?module=__M__', stats: '/admin/stats?module=__M__', assessment: '/admin/assessment/__M__',
     team: '/admin/team/__M__', banner: '/admin/banner/__M__',
   };
   type Mod = { slug: string; title: string; code: string; role: string; faculty: string; color: string; tools: string[] };

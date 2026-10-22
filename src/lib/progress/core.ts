@@ -251,6 +251,87 @@ export function liveClass(
   return { rows, counts };
 }
 
+/* ------------------------------------------------------------- statistics */
+
+/** Raw rows for a module's statistics page, across every session of its labs (from ProgressStore.statsRaw). */
+export type StatsRaw = {
+  sessions: { id: string; lab: string; ta_name: string; time_slot: string; opens_at: string; joined: number; attended: number }[];
+  /** per lab, student and exercise: best result, tries, and whether the first try passed */
+  best: { lab: string; student_key: string; exercise: string; passed: number; total: number; attempts: number; first_ok: boolean }[];
+  tasks: { lab: string; student_key: string; done: number }[];
+  subs: { lab: string; student_key: string }[];
+  /** the group a student last joined each lab with */
+  members: { lab: string; student_key: string; group_name: string }[];
+  /** Checks by weekday (0 = Sunday) and hour, Cairo time */
+  heat: { dow: number; hour: number; n: number }[];
+};
+
+const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0);
+
+export function moduleStats(labs: LabStructure[], raw: StatsRaw) {
+  const known = new Set(labs.map((l) => l.lab));
+  const percents = new Map<string, number>(); // `${lab}|${student}` → score
+  const perLab = labs.map((l) => {
+    const students = [...new Set(raw.members.filter((m) => m.lab === l.lab).map((m) => m.student_key))];
+    const scores = students.map((key) => {
+      const best = raw.best.filter((b) => b.lab === l.lab && b.student_key === key)
+        .map((b) => ({ exercise: b.exercise, passed: b.passed, total: b.total, attempts: b.attempts, firstAt: '', solvedAt: null }));
+      const done = raw.tasks.find((t) => t.lab === l.lab && t.student_key === key)?.done ?? 0;
+      const sub = raw.subs.some((x) => x.lab === l.lab && x.student_key === key);
+      const p = scoreStudent(l, best, done, sub).percent;
+      percents.set(`${l.lab}|${key}`, p);
+      return p;
+    });
+    const spread = Array.from({ length: 10 }, () => 0);
+    for (const p of scores) spread[Math.min(9, Math.floor(p / 10))]++;
+    const exercises = l.exercises.map((e) => {
+      const rows = raw.best.filter((b) => b.lab === l.lab && b.exercise === e.id && students.includes(b.student_key));
+      const solved = rows.filter((b) => b.total > 0 && b.passed >= b.total);
+      return {
+        id: e.id, title: e.title, tried: rows.length,
+        solvedPct: students.length ? Math.round((100 * solved.length) / students.length) : 0,
+        avgTries: rows.length ? Math.round((rows.reduce((a, b) => a + b.attempts, 0) / rows.length) * 10) / 10 : 0,
+        firstTryPct: rows.length ? Math.round((100 * rows.filter((b) => b.first_ok).length) / rows.length) : 0,
+      };
+    });
+    const sessions = raw.sessions.filter((s) => s.lab === l.lab);
+    return {
+      lab: l.lab, title: l.title, students: students.length, sessions: sessions.length,
+      avgPercent: avg(scores), finished: scores.filter((p) => p >= 80).length, spread, exercises,
+    };
+  });
+
+  const groupScores = new Map<string, number[]>();
+  for (const m of raw.members) {
+    if (!known.has(m.lab)) continue;
+    const g = m.group_name && m.group_name !== '—' ? m.group_name : 'No group';
+    groupScores.set(g, [...(groupScores.get(g) ?? []), percents.get(`${m.lab}|${m.student_key}`) ?? 0]);
+  }
+  const groups = [...groupScores].map(([group, xs]) => ({ group, entries: xs.length, avgPercent: avg(xs) }))
+    .sort((a, b) => (a.group === 'No group' ? 1 : b.group === 'No group' ? -1 : a.group.localeCompare(b.group, undefined, { numeric: true })));
+
+  const sessions = raw.sessions.filter((s) => known.has(s.lab)).sort((a, b) => a.opens_at.localeCompare(b.opens_at));
+  const joined = sessions.reduce((a, s) => a + s.joined, 0);
+  const attended = sessions.reduce((a, s) => a + s.attended, 0);
+  const heat = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+  for (const h of raw.heat) if (h.dow >= 0 && h.dow < 7 && h.hour >= 0 && h.hour < 24) heat[h.dow][h.hour] += h.n;
+  const inLabs = raw.best.filter((b) => known.has(b.lab));
+  return {
+    totals: {
+      students: new Set(raw.members.filter((m) => known.has(m.lab)).map((m) => m.student_key)).size,
+      sessions: sessions.length,
+      attendancePct: joined ? Math.round((100 * attended) / joined) : 0,
+      checks: inLabs.reduce((a, b) => a + b.attempts, 0),
+      solved: inLabs.filter((b) => b.total > 0 && b.passed >= b.total).length,
+      firstTryPct: inLabs.length ? Math.round((100 * inLabs.filter((b) => b.first_ok).length) / inLabs.length) : 0,
+    },
+    sessions: sessions.map((s) => ({ id: s.id, lab: s.lab, ta: s.ta_name, slot: s.time_slot, at: s.opens_at, joined: s.joined, attended: s.attended })),
+    labs: perLab,
+    groups,
+    heat,
+  };
+}
+
 /* -------------------------------------------------------------------- CSV */
 
 export function toCsv(rows: (string | number)[][]): string {

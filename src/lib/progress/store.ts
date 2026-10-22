@@ -5,7 +5,7 @@
  */
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
-import { type Activity, type Best, type Identity } from './core.ts';
+import { type Activity, type Best, type Identity, type StatsRaw } from './core.ts';
 
 export type StudentRow = { student_key: string; student_id: string; name: string; device_key: string | null; created_at: string; last_seen: string; group_name?: string; session_started_at?: string };
 export type AttemptRow = { id: number; exercise: string; passed: number; total: number; code: string; created_at: string };
@@ -53,6 +53,8 @@ export interface ProgressStore {
   studentData(lab: string, studentKey: string, sessionId?: string): Promise<StudentData>;
   /** Live class view: latest Check per student, last activity, and the newest events of one session. */
   activity(sessionId: string, limit?: number): Promise<Activity>;
+  /** Everything the statistics page needs for these labs, across all their sessions. */
+  statsRaw(labs: string[]): Promise<StatsRaw>;
   unlock(studentKey: string): Promise<void>;
   review(studentKey: string, lab: string, reviewed: boolean, note: string, sessionId?: string): Promise<void>;
   /* per-lab attendance + reading */
@@ -273,6 +275,35 @@ export class MemoryStore implements ProgressStore {
     v.active_sec += activeSec;
     this.views.set(k, v);
     this.acted.set(`${sessionId ?? ''}|${studentKey}`, this.stamp());
+  }
+  async statsRaw(labs: string[]): Promise<StatsRaw> {
+    const sessions = [...this.sessions.values()].filter((x) => labs.includes(x.lab));
+    const labOf = new Map(sessions.map((x) => [x.id, x.lab]));
+    const members = [...this.memberships.values()].filter((m) => labOf.has(m.session_id));
+    const att = this.attempts.filter((a) => a.session_id && labOf.has(a.session_id));
+    const groups = new Map<string, typeof att>();
+    for (const a of att) groups.set(`${a.lab}|${a.student_key}|${a.exercise}`, [...(groups.get(`${a.lab}|${a.student_key}|${a.exercise}`) ?? []), a]);
+    const done = new Map<string, Set<string>>();
+    for (const t of this.tasks.values()) if (t.done && t.session_id && labOf.has(t.session_id)) done.set(`${t.lab}|${t.student_key}`, (done.get(`${t.lab}|${t.student_key}`) ?? new Set()).add(t.task));
+    const heat = new Map<string, number>();
+    for (const a of att) {
+      const d = new Date(Date.parse(a.created_at) + 3 * 3600_000); // Cairo (UTC+3 in the teaching term)
+      const k = `${d.getUTCDay()}|${d.getUTCHours()}`;
+      heat.set(k, (heat.get(k) ?? 0) + 1);
+    }
+    return {
+      sessions: sessions.map((x) => ({ id: x.id, lab: x.lab, ta_name: x.ta_name, time_slot: x.time_slot, opens_at: x.opens_at,
+        joined: members.filter((m) => m.session_id === x.id).length,
+        attended: [...this.checkins.values()].filter((c) => c.session_id === x.id).length })),
+      best: [...groups.values()].map((g) => {
+        const top = [...g].sort((a, b) => b.passed - a.passed || b.id - a.id)[0];
+        return { lab: top.lab, student_key: top.student_key, exercise: top.exercise, passed: top.passed, total: top.total, attempts: g.length, first_ok: g[0].passed >= g[0].total };
+      }),
+      tasks: [...done].map(([k, set]) => ({ lab: k.split('|')[0], student_key: k.split('|')[1], done: set.size })),
+      subs: [...this.subs.values()].filter((x) => x.session_id && labOf.has(x.session_id)).map((x) => ({ lab: x.lab, student_key: x.student_key })),
+      members: [...new Map([...members].sort((a, b) => a.joined_at.localeCompare(b.joined_at)).map((m) => [`${labOf.get(m.session_id)}|${m.student_key}`, { lab: labOf.get(m.session_id)!, student_key: m.student_key, group_name: m.group_name }])).values()],
+      heat: [...heat].map(([k, n]) => ({ dow: Number(k.split('|')[0]), hour: Number(k.split('|')[1]), n })),
+    };
   }
   async activity(sessionId: string, limit = 40): Promise<Activity> {
     const att = this.attempts.filter((a) => a.session_id === sessionId);
@@ -542,6 +573,34 @@ export class NeonStore implements ProgressStore {
       })),
       tasks: taskRows.map((r) => ({ student_key: r.student_key, done: Number(r.done) })),
       submissions: subRows.map((r) => ({ ...r, updated_at: iso(r.updated_at)! })),
+    };
+  }
+
+  async statsRaw(labs: string[]): Promise<StatsRaw> {
+    const v = this.v2;
+    const [sessions, best, tasks, subs, members, heat] = await Promise.all([
+      this.q(`select s.id, s.lab, s.ta_name, s.time_slot, s.opens_at,
+                (select count(*) from ${v.members} m where m.session_id = s.id)::int as joined,
+                (select count(*) from ${v.checkins} c where c.session_id = s.id)::int as attended
+              from ${v.sessions} s where s.lab = any($1)`, [labs]),
+      this.q(`select lab, student_key, exercise, max(passed) as passed, (array_agg(total order by passed desc, id desc))[1] as total,
+                count(*)::int as attempts, (array_agg(passed >= total order by id))[1] as first_ok
+              from ${v.attempts} where lab = any($1) group by lab, student_key, exercise`, [labs]),
+      this.q(`select lab, student_key, (count(distinct task) filter (where done))::int as done from ${v.tasks} where lab = any($1) group by lab, student_key`, [labs]),
+      this.q(`select distinct lab, student_key from ${v.subs} where lab = any($1)`, [labs]),
+      this.q(`select distinct on (s.lab, m.student_key) s.lab, m.student_key, m.group_name
+              from ${v.members} m join ${v.sessions} s on s.id = m.session_id where s.lab = any($1)
+              order by s.lab, m.student_key, m.joined_at desc`, [labs]),
+      this.q(`select extract(dow from created_at at time zone 'Africa/Cairo')::int as dow, extract(hour from created_at at time zone 'Africa/Cairo')::int as hour, count(*)::int as n
+              from ${v.attempts} where lab = any($1) group by 1, 2`, [labs]),
+    ]);
+    return {
+      sessions: sessions.map((r) => ({ id: r.id, lab: r.lab, ta_name: r.ta_name, time_slot: r.time_slot, opens_at: iso(r.opens_at)!, joined: Number(r.joined), attended: Number(r.attended) })),
+      best: best.map((r) => ({ lab: r.lab, student_key: r.student_key, exercise: r.exercise, passed: Number(r.passed), total: Number(r.total), attempts: Number(r.attempts), first_ok: Boolean(r.first_ok) })),
+      tasks: tasks.map((r) => ({ lab: r.lab, student_key: r.student_key, done: Number(r.done) })),
+      subs: subs.map((r) => ({ lab: r.lab, student_key: r.student_key })),
+      members: members.map((r) => ({ lab: r.lab, student_key: r.student_key, group_name: r.group_name })),
+      heat: heat.map((r) => ({ dow: Number(r.dow), hour: Number(r.hour), n: Number(r.n) })),
     };
   }
 
