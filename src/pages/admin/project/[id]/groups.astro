@@ -273,8 +273,13 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-pick { padding: 10px; border-radius: 10px; border: 1px solid var(--accent-text); background: var(--accent-soft); font-size: 13.5px; }
   .gp-pick small { display: block; color: var(--text-3); font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
   .gp-new { display: flex; flex-wrap: wrap; gap: 6px; }
-  .gp-add-id input[name='sid'] { flex: 0 1 130px; min-width: 110px; }
-  .gp-add-id input[name='sname'] { flex: 1 1 180px; }
+  .gp-add-chip { cursor: pointer; border-style: dashed; color: var(--accent-text); font-weight: 600; }
+  .gp-add-chip:hover, .gp-add-chip[aria-expanded='true'] { border-style: solid; border-color: var(--accent-text); background: var(--accent-soft); }
+  .gp-add-id { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .gp-add-id input { height: 34px; padding: 0 10px; font-size: 13px; }
+  .gp-add-id input[name='sid'] { flex: 0 1 120px; min-width: 100px; }
+  .gp-add-id input[name='sname'] { flex: 1 1 170px; }
+  .gp-add-msg { margin-top: 6px; font-size: 13px; }
   .gp-new input { flex: 1; height: 34px; padding: 0 10px; font-size: 13px; }
   .gp-foot { padding-top: 6px; border-top: 1px solid var(--line); }
   .gp-msg { min-height: 20px; font-size: 13px; color: var(--accent-text); }
@@ -392,6 +397,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
 
     let entries: Entry[] = [];
     let roster: Student[] = [];
+    const addOpen = new Set<string>(); // groups whose "+ Add student" form is open in the table
     let plan: Plan = emptyPlan();
     let groups: Group[] = [];
     const selected = new Set<string>();
@@ -498,6 +504,12 @@ if (!file) return Astro.redirect('/admin/project', 303);
     function renderRows() {
       const clash = clashIds();
       const rows = $('[data-gp-rows]');
+      // keep what was typed in open "+ Add student" forms (files being read re-draw the table)
+      const typed: { key: string; sid: string; sname: string; focus: string }[] = [];
+      rows.querySelectorAll<HTMLFormElement>('[data-add-id]').forEach((f) => {
+        const focus = document.activeElement === f.sid ? 'sid' : document.activeElement === f.sname ? 'sname' : '';
+        typed.push({ key: f.dataset.addId ?? '', sid: f.sid.value, sname: f.sname.value, focus });
+      });
       const newCount = groups.filter(isNew).length;
       $('[data-gp-new-sum]').textContent = newCount ? `${plural(newCount, 'group')} with new hand-ins since your last visit` : '';
       rows.innerHTML = groups.length ? view().map((g) => {
@@ -506,12 +518,19 @@ if (!file) return Astro.redirect('/admin/project', 303);
         return `<tr class="${on ? 'sel' : ''} ${open ? '' : 'full'} ${isNew(g) ? 'is-new' : ''}">
           <td class="gp-cb"><input type="checkbox" data-pick="${esc(g.key)}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'} aria-label="Select ${esc(g.title)}" /></td>
           <td><b class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</b>${stamp(g)}${g.labels.length && g.labels.join() !== g.key ? `<br><small class="faint">typed: ${g.labels.map(esc).join(' / ')}</small>` : ''}${teamForm(g)}</td>
-          <td><ul class="gp-chips">${g.members.map((m) => chip(m, g.key, clash)).join('')}</ul>${g.unread ? `<small class="faint">${plural(g.unread, 'file')} could not be read</small>` : ''}${plan.removed[g.key]?.length ? `<small class="faint">${plural(plan.removed[g.key].length, 'student')} taken out · <button class="btn btn-ghost btn-sm" type="button" data-restore="${esc(g.key)}">Restore</button></small>` : ''}</td>
+          <td><ul class="gp-chips">${g.members.map((m) => chip(m, g.key, clash)).join('')}<li><button type="button" class="gp-chip gp-add-chip" data-add-open="${esc(g.key)}" aria-expanded="${addOpen.has(g.key)}">+ Add student</button></li></ul>${addOpen.has(g.key) ? `<form class="gp-add-id" data-add-id="${esc(g.key)}"><input class="input mono" name="sid" maxlength="20" placeholder="Student ID" aria-label="Student ID to add to ${esc(g.title)}" autocomplete="off" inputmode="numeric" /><input class="input" name="sname" maxlength="80" placeholder="Name (if not in the class list)" aria-label="Their name, if they are not in the class list" autocomplete="off" /><button class="btn btn-primary btn-sm" type="submit">Add</button><button class="btn btn-ghost btn-sm" type="button" data-add-close="${esc(g.key)}">Cancel</button></form>` : ''}${g.unread ? `<small class="faint">${plural(g.unread, 'file')} could not be read</small>` : ''}${plan.removed[g.key]?.length ? `<small class="faint">${plural(plan.removed[g.key].length, 'student')} taken out · <button class="btn btn-ghost btn-sm" type="button" data-restore="${esc(g.key)}">Restore</button></small>` : ''}</td>
           <td><span class="gp-size ${open ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></td>
           <td>${open ? `<input class="input mono gp-add" type="number" min="1" max="${open}" value="${wantFor(g)}" data-count-for="${esc(g.key)}" aria-label="Members to add to ${esc(g.title)}" />` : '<small class="faint">full</small>'}</td>
         </tr>`;
       }).join('') + `<tr><td colspan="5"><div class="gp-legend"><span class="gp-chip">handed in</span><span class="gp-chip document">named in the file</span><span class="gp-chip added">added here</span><span class="gp-chip clash">in two groups</span></div></td></tr>`
         : `<tr><td colspan="5" class="muted">${entries.length ? 'Reading files…' : 'No hand-ins yet.'}</td></tr>`;
+      for (const t of typed) {
+        const f = rows.querySelector<HTMLFormElement>(`[data-add-id="${CSS.escape(t.key)}"]`);
+        if (!f) continue;
+        f.sid.value = t.sid;
+        f.sname.value = t.sname;
+        if (t.focus) (f.elements.namedItem(t.focus) as HTMLInputElement).focus();
+      }
       $<HTMLButtonElement>('[data-gp-assign]').disabled = scanning || !roster.length || ![...selected].some((k) => groups.some((g) => g.key === k && openSeats(g)));
     }
 
@@ -530,7 +549,6 @@ if (!file) return Astro.redirect('/admin/project', 303);
           <h3><span><span class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</span>${stamp(g)}</span><span class="gp-size ${short ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></h3>
           <button class="btn btn-ghost btn-sm gp-view" type="button" data-view="${esc(g.key)}">View file &amp; extracted text</button>
           <p class="members">${g.members.map((m) => `${esc(m.name)}${m.source === 'added' ? ' <b>(new)</b>' : ''}`).join(', ') || 'No members found'}</p>
-          <form class="gp-new gp-add-id" data-add-id="${esc(g.key)}"><input class="input mono" name="sid" maxlength="20" placeholder="Student ID" aria-label="Student ID to add to ${esc(g.title)}" autocomplete="off" /><input class="input" name="sname" maxlength="80" placeholder="Name (if not in the class list)" aria-label="Their name, if they are not in the class list" autocomplete="off" /><button class="btn btn-ghost btn-sm" type="submit">Add student</button></form>
           ${short ? later
             ? `<p class="small faint">Fill later · <button class="btn btn-ghost btn-sm" type="button" data-unlater="${esc(g.key)}">Show options</button></p>`
             : `<div class="gp-short"><span>This group has ${g.members.length} of ${TEAM_SIZE} members. Add a random student who is in no group now (optional), or do it later.</span>
@@ -833,6 +851,14 @@ if (!file) return Astro.redirect('/admin/project', 303);
       root.querySelector<HTMLInputElement>(`[data-new-idea="${CSS.escape(key)}"] input`)?.focus();
     });
 
+    root.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-add-open],[data-add-close]');
+      if (!b) return;
+      const key = b.dataset.addOpen ?? b.dataset.addClose!;
+      if (b.dataset.addClose || addOpen.has(key)) addOpen.delete(key); else addOpen.add(key);
+      renderRows();
+      root.querySelector<HTMLInputElement>(`[data-add-id="${CSS.escape(key)}"] input`)?.focus();
+    });
     // Put one particular student in a group: from the class list, or added to it with their name.
     root.addEventListener('submit', async (e) => {
       const form = (e.target as HTMLElement).closest<HTMLFormElement>('[data-add-id]');
@@ -862,6 +888,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       }
       plan.added[key] = [...(plan.added[key] ?? []), id];
       plan.later = plan.later.filter((k) => k !== key);
+      addOpen.delete(key);
       say(`Added ${roster.find((st) => st.id === id)?.name ?? id} (${id}) to ${g.title}.`, false, assignMsg);
       render();
       save();
