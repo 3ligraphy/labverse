@@ -11,7 +11,7 @@ import { getPlayground } from '@/lib/playgrounds';
 import { exerciseMeta } from '@/lab/exercises/registry';
 import { claimedByFileLab } from '@/lib/lab/claimed';
 import { noStore } from '@/lib/attendance/server';
-import { exerciseStats, labStructure, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
+import { exerciseStats, labStructure, liveClass, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
 import { NeonStore, type ProgressStore } from './store';
 import { publishedLabSources } from '@/lib/platform/server';
 import { splitLabKey } from '@/lib/platform/core';
@@ -191,9 +191,9 @@ export async function buildDashboard(labParam: string | null, sessionParam?: str
   if (!structure || !s) return null;
   const sessions = await s.listSessions(structure.lab);
   const selected = sessions.find((session) => session.id === sessionParam) ?? sessions[0] ?? null;
-  const data = selected
-    ? await s.labData(structure.lab, selected.id)
-    : { students: [], best: [], tasks: [], submissions: [], checkins: [], views: [] };
+  const [data, activity] = selected
+    ? await Promise.all([s.labData(structure.lab, selected.id), s.activity(selected.id)])
+    : [{ students: [], best: [], tasks: [], submissions: [], checkins: [], views: [] }, { last: [], active: [], events: [] }];
   const students: DashboardStudent[] = data.students.map((st) => {
     const best = data.best.filter((b) => b.student_key === st.student_key);
     const tasksDone = data.tasks.find((t) => t.student_key === st.student_key)?.done ?? 0;
@@ -221,7 +221,10 @@ export async function buildDashboard(labParam: string | null, sessionParam?: str
   });
   students.sort((a, b) => b.percent - a.percent || a.name.localeCompare(b.name));
   const exercises = exerciseStats(structure, data.students.map((st) => data.best.filter((b) => b.student_key === st.student_key)));
+  const live = liveClass(structure, students, activity, Date.now());
+  const names = new Map(students.map((st) => [st.key, st.name]));
   return {
+    live: { ...live, events: activity.events.filter((e) => names.has(e.student_key)).map((e) => ({ ...e, name: names.get(e.student_key)! })) },
     labs: await labChoices(labs),
     structure,
     students,

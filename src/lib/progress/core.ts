@@ -197,6 +197,60 @@ export function exerciseStats(s: LabStructure, bestByStudent: Best[][]) {
   });
 }
 
+/* ------------------------------------------------------------- live class */
+
+/** What happened in a session lately (from ProgressStore.activity). */
+export type Activity = {
+  /** each student's latest Check, with how many failed Checks on that exercise since it last passed */
+  last: { student_key: string; exercise: string; passed: number; total: number; at: string; fails: number }[];
+  /** the last moment each student did anything (Check, Done tick, page heartbeat, joining) */
+  active: { student_key: string; at: string }[];
+  /** newest first */
+  events: { student_key: string; kind: 'check' | 'task'; ref: string; passed: number; total: number; at: string }[];
+};
+export type LiveStatus = 'help' | 'active' | 'idle' | 'away' | 'done';
+export type LiveRow = { key: string; status: LiveStatus; working: string | null; fails: number; lastActive: string | null; why: string };
+
+export const LIVE = { IDLE_MIN: 4, AWAY_MIN: 10, HELP_FAILS: 3, HELP_WINDOW_MIN: 20 };
+
+/**
+ * The TA's live class view: who is working, who is stuck, who went quiet.
+ *   done   every point earned
+ *   away   nothing for 10+ min
+ *   help   3+ failed Checks in a row on one exercise in the last 20 min
+ *   idle   nothing for 4–10 min
+ *   active otherwise
+ */
+export function liveClass(
+  s: LabStructure,
+  students: { key: string; percent: number; cells: Record<string, { passed: number; total: number }>; startedAt?: string }[],
+  activity: Activity,
+  now: number,
+): { rows: LiveRow[]; counts: Record<LiveStatus, number> } {
+  const last = new Map(activity.last.map((l) => [l.student_key, l]));
+  const active = new Map(activity.active.map((a) => [a.student_key, a.at]));
+  const counts: Record<LiveStatus, number> = { help: 0, active: 0, idle: 0, away: 0, done: 0 };
+  const rows = students.map((st): LiveRow => {
+    const l = last.get(st.key);
+    const solved = (id: string) => { const c = st.cells[id]; return Boolean(c && c.total > 0 && c.passed >= c.total); };
+    const working = l && !solved(l.exercise) ? l.exercise : (s.exercises.find((e) => !solved(e.id))?.id ?? null);
+    const lastActive = active.get(st.key) ?? st.startedAt ?? null;
+    const quietMin = lastActive ? (now - Date.parse(lastActive)) / 60_000 : Infinity;
+    const fails = l && !solved(l.exercise) ? l.fails : 0;
+    const recentFail = l ? (now - Date.parse(l.at)) / 60_000 <= LIVE.HELP_WINDOW_MIN : false;
+    let status: LiveStatus;
+    let why: string;
+    if (st.percent >= 100) { status = 'done'; why = 'Finished the lab'; }
+    else if (quietMin >= LIVE.AWAY_MIN) { status = 'away'; why = lastActive ? `Nothing for ${Math.round(quietMin)} min` : 'Joined, no activity yet'; }
+    else if (fails >= LIVE.HELP_FAILS && recentFail) { status = 'help'; why = `${fails} failed Checks in a row`; }
+    else if (quietMin >= LIVE.IDLE_MIN) { status = 'idle'; why = `Quiet for ${Math.round(quietMin)} min`; }
+    else { status = 'active'; why = 'Working now'; }
+    counts[status]++;
+    return { key: st.key, status, working, fails, lastActive, why };
+  });
+  return { rows, counts };
+}
+
 /* -------------------------------------------------------------------- CSV */
 
 export function toCsv(rows: (string | number)[][]): string {
