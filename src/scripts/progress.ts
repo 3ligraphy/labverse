@@ -13,8 +13,7 @@ const QUEUE = 'progress:queue';
 const SKIP = 'progress:skip';
 const MAX_QUEUE = 200;
 const MAX_CODE = 20_000;
-const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}'’. -]*[\p{L}\p{M}.]$/u;
-const ID_RE = /^[A-Za-z0-9-]{3,20}$/;
+import { ID_HINT, NAME_RE, STUDENT_ID_RE as ID_RE } from '@/lib/identity';
 
 const read = <T>(key: string, fallback: T, store: Storage = localStorage): T => {
   try {
@@ -234,7 +233,7 @@ function wireSheet() {
     const badId = !ID_RE.test(studentId);
     const badGroup = !group || group.length > 30;
     err('name', badName ? 'Please type your full name (letters only).' : '');
-    err('studentId', badId ? 'Your student ID should be 3–20 letters or numbers.' : '');
+    err('studentId', badId ? ID_HINT : '');
     err('group', badGroup ? 'Enter your group (for example, G1).' : '');
     if (badName || badId || badGroup) return (badName ? field('name') : badId ? field('studentId') : field('group')).focus();
     const lab = labId();

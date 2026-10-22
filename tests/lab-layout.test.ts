@@ -43,6 +43,6 @@ test('admin attendance comes from verified lab identities, not the legacy attend
   assert.match(admin, /student\.checkedInAt/);
   assert.doesNotMatch(admin, /getStore\(\)\?\.list/);
   assert.doesNotMatch(admin, /\/api\/admin\/entries/);
-  assert.match(labStart, /Verifying this student and device/);
-  assert.ok(labStart.indexOf("fetch('/api/lab/progress'") < labStart.indexOf('setStudent({ name, id })'));
+  // the identity is saved only after the server accepted it
+  assert.ok(labStart.indexOf("fetch('/api/lab/progress'") < labStart.indexOf('setStudent({ name, id,'));
 });

@@ -47,8 +47,8 @@ test('accounts: password rules, validation, hashing and signed tokens', () => {
   assert.equal(checkPasswordRules('short1'), 'Use at least 10 characters.');
   assert.equal(checkPasswordRules('onlyletters'), 'Mix letters and numbers.');
   assert.equal(checkPasswordRules('Good-pass-2026'), null);
-  const a = parseAccount({ role: 'student', name: 'Sara Ali', email: ' SARA@BUE.edu.eg ', password: 'Good-pass-2026', studentId: '23cs1' }, ['student']);
-  assert.deepEqual(a.ok && [a.value.email, a.value.studentId], ['sara@bue.edu.eg', '23CS1']);
+  const a = parseAccount({ role: 'student', name: 'Sara Ali', email: ' SARA@BUE.edu.eg ', password: 'Good-pass-2026', studentId: ' 23 1001 ' }, ['student']);
+  assert.deepEqual(a.ok && [a.value.email, a.value.studentId], ['sara@bue.edu.eg', '231001']);
   assert.equal(parseAccount({ role: 'doctor', name: 'X Y', email: 'x@y.com', password: 'Good-pass-2026' }, ['student']).ok, false, 'role not allowed');
 
   const h = hashPassword('Good-pass-2026');

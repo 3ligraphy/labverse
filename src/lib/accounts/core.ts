@@ -96,7 +96,8 @@ export function hasSpecialization(s: Pick<Settings, 'years' | 'specFrom'>, year:
 export const BUILT_IN_AUDIENCE = { category: 'Optional', years: '', specializations: '', semester: 'Semester 1', open: true, faculty: DEFAULT_FACULTY };
 
 export const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}'’. -]*[\p{L}\p{M}.]$/u;
-export const STUDENT_ID_RE = /^[A-Za-z0-9-]{3,20}$/;
+export { STUDENT_ID_RE } from '../identity.ts';
+import { STUDENT_ID_RE, ID_HINT, cleanStudentId } from '../identity.ts';
 const EMAIL_RE = /^[^\s@<>()",;]{1,64}@[^\s@<>()",;]{1,190}\.[A-Za-z]{2,24}$/;
 export const MIN_PASSWORD = 10;
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -143,8 +144,8 @@ export function parseAccount(input: Record<string, unknown>, allowed: readonly R
   if (pwError) return { ok: false, error: pwError };
   let studentId: string | null = null;
   if (role === 'student') {
-    studentId = text(input.studentId).toUpperCase();
-    if (!STUDENT_ID_RE.test(studentId)) return { ok: false, error: 'Your student ID should be 3–20 letters or numbers.' };
+    studentId = cleanStudentId(input.studentId);
+    if (!STUDENT_ID_RE.test(studentId)) return { ok: false, error: ID_HINT };
   }
   return { ok: true, value: { role, name, email, password: input.password as string, studentId } };
 }

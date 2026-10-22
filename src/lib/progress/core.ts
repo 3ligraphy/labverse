@@ -4,6 +4,7 @@
  * directly under `node --test` (see tests/progress.test.ts).
  */
 import { parseLabOutline } from '../lab.ts';
+import { cleanName, cleanStudentId, nameError, studentIdError } from '../identity.ts';
 
 /* ---------------------------------------------------------------- types */
 
@@ -24,9 +25,7 @@ export type Best = { exercise: string; passed: number; total: number; attempts: 
 
 /* ----------------------------------------------------------- validation */
 
-// same rules as attendance: letters (any language) + spaces, apostrophes, dots and hyphens
-const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}'’. -]*[\p{L}\p{M}.]$/u;
-const ID_RE = /^[A-Za-z0-9-]{3,20}$/;
+// name and student ID rules are shared with every form that identifies a student (src/lib/identity.ts)
 const DEVICE_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const REPO_RE = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/;
 export const MAX_CODE = 20_000;
@@ -36,11 +35,13 @@ const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isInt
 
 export function validateStudentIdentity(input: unknown): Valid<Pick<Identity, 'name' | 'studentId'>> {
   const o = obj(input);
-  const name = String(o.name ?? '').normalize('NFC').trim().replace(/\s+/g, ' ');
-  const studentId = String(o.studentId ?? '').trim();
+  const name = cleanName(o.name);
+  const studentId = cleanStudentId(o.studentId);
   const errors: Record<string, string> = {};
-  if (name.length < 2 || name.length > 60 || !NAME_RE.test(name)) errors.name = 'Please type your full name (letters only).';
-  if (!ID_RE.test(studentId)) errors.studentId = 'Your student ID should be 3–20 letters or numbers.';
+  const badName = nameError(name);
+  const badId = studentIdError(studentId);
+  if (badName) errors.name = badName;
+  if (badId) errors.studentId = badId;
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, value: { name, studentId, studentKey: studentId.toLowerCase() } };
 }
 

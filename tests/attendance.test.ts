@@ -144,8 +144,8 @@ test('the same device cannot check in twice and gets its first entry back', asyn
 
 test('the same student ID cannot appear twice, even from another device or in other case', async () => {
   const store = newStore();
-  await store.checkIn({ deviceId: DEVICE_A, name: 'Mariam Ahmed', studentId: 'AB123', at: 't1' });
-  const r = await store.checkIn({ deviceId: DEVICE_B, name: 'Mariam A', studentId: 'ab123', at: 't2' });
+  await store.checkIn({ deviceId: DEVICE_A, name: 'Mariam Ahmed', studentId: '231234', at: 't1' });
+  const r = await store.checkIn({ deviceId: DEVICE_B, name: 'Mariam A', studentId: '231234', at: 't2' });
   assert.equal(r.status, 'id');
   assert.equal(await store.count(), 1);
 });

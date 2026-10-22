@@ -1,10 +1,15 @@
 /** The session-aware Start Lab card: name, student ID and group are required. */
-import { clearStudent, deviceId, getStudent, ID_RE, NAME_RE, setStudent } from './store.ts';
+import { clearStudent, deviceId, getStudent, setStudent } from './store.ts';
+import { cleanGroup, cleanName, cleanStudentId, groupError, nameError, studentIdError } from '../../lib/identity.ts';
 import { clearProgressIdentity, getIdentity, setProgressIdentity } from '@/scripts/progress';
 import { getMe } from '@/scripts/me';
 
 type PublicSession = { id: string; open: boolean; ta_name?: string; time_slot?: string };
 type PublicSessionResponse = PublicSession & { sessions?: PublicSession[]; practice?: boolean };
+
+const GROUP_KEY = 'lab:group';
+const savedGroup = () => { try { return localStorage.getItem(GROUP_KEY) ?? ''; } catch { return ''; } };
+const rememberGroup = (g: string) => { try { localStorage.setItem(GROUP_KEY, g); } catch { /* storage off */ } };
 
 const GATED = '[data-exercise],[data-playground],[data-repo-submit],[data-checkin],[data-task-check]';
 const PASS_KEYS = /^(Tab|Escape|Shift|Control|Alt|Meta|CapsLock|Arrow\w+|Home|End|PageUp|PageDown|F\d{1,2})$/;
@@ -28,6 +33,9 @@ export function mountStart(lab: string) {
   let sessions: PublicSession[] = [];
   let practice = false; // the admin's "open practice" toggle: solve without a session, nothing recorded
   let staff = false; // TAs, doctors and admins: try every exercise any time, nothing recorded
+  /** a signed-in student whose account identity is valid: joins the open session by itself */
+  let account: { name: string; id: string } | null = null;
+  const autoTried = new Set<string>();
   const labRoot = root.closest<HTMLElement>('[data-lab]');
 
   /** Explains a blocked control right under it (role=status), instead of a click that silently does nothing. */
@@ -166,6 +174,19 @@ export function mountStart(lab: string) {
       status.textContent = 'Could not check the session status. You can still read the lab content.';
     }
     show();
+    void autoJoin();
+  };
+
+  /** Signed-in students: join the one open session automatically (once per session), no form needed. */
+  const autoJoin = async () => {
+    if (!account || !session?.open || sessions.length !== 1 || autoTried.has(session.id)) return;
+    const student = getStudent();
+    if (student && student.sessionId === session.id) return;
+    autoTried.add(session.id);
+    const typed = cleanGroup(groupIn.value);
+    status.textContent = `Joining ${session.ta_name ? `${session.ta_name}’s` : 'the'} session as ${account.name}…`;
+    const problem = await join(account.name, account.id, typed && !groupError(typed) ? typed : '', session.id);
+    if (problem) err.textContent = problem;
   };
 
   sessionIn.addEventListener('change', () => {
@@ -174,50 +195,67 @@ export function mountStart(lab: string) {
     show();
   });
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const name = nameIn.value.replace(/\s+/g, ' ').trim();
-    const id = idIn.value.trim();
-    const group = groupIn.value.replace(/\s+/g, ' ').trim();
-    if (name.length < 2 || name.length > 60 || !NAME_RE.test(name)) {
-      err.textContent = 'Please type your full name (letters only).';
-      return nameIn.focus();
-    }
-    if (!ID_RE.test(id)) {
-      err.textContent = 'Your student ID should be 3–20 letters or numbers.';
-      return idIn.focus();
-    }
-    if (!group || group.length > 30) {
-      err.textContent = 'Enter your group (for example, G1).';
-      return groupIn.focus();
-    }
-    if (!session?.open) {
-      err.textContent = 'Your TA has not started this session yet. You can read the lab content for now.';
-      return;
-    }
-    err.textContent = 'Verifying this student and device…';
-    submit.disabled = true;
+  /** Joins the open session as this student. Returns an error sentence, or null when it worked. */
+  const join = async (name: string, id: string, group: string, sessionId: string): Promise<string | null> => {
     try {
       const sharedDeviceId = deviceId();
       const response = await fetch('/api/lab/progress', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ lab, name, studentId: id, deviceId: sharedDeviceId, group, sessionId: session.id, event: 'start' }),
+        body: JSON.stringify({ lab, name, studentId: id, deviceId: sharedDeviceId, group, sessionId, event: 'start' }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        err.textContent = data.message ?? data.error ?? 'Could not verify your identity. Ask your TA.';
-        return;
-      }
-      err.textContent = '';
-      // Identity is persisted only after verification: setStudent({ name, id })
-      setStudent({ name, id, group, sessionId: session.id });
-      setProgressIdentity(name, id, group, session.id, sharedDeviceId);
+      if (!response.ok) return data.message ?? data.error ?? 'Could not verify your identity. Ask your TA.';
+      // Identity is persisted only after verification
+      setStudent({ name, id, group: group || '—', sessionId });
+      setProgressIdentity(name, id, group || '—', sessionId, sharedDeviceId);
+      if (group) rememberGroup(group);
       show();
+      return null;
     } catch {
-      err.textContent = 'The server could not verify your identity. Check the connection and try again.';
-    } finally {
-      submit.disabled = !session?.open;
+      return 'The server could not verify your identity. Check the connection and try again.';
     }
+  };
+
+  // Live hints while typing, so a name in the ID box (or an ID in the name box) is caught at once.
+  const hint = (message: string | null, field: HTMLInputElement) => {
+    field.setAttribute('aria-invalid', String(Boolean(message)));
+    err.textContent = message ?? '';
+  };
+  idIn.addEventListener('input', () => {
+    const id = cleanStudentId(idIn.value);
+    hint(id && /[\p{L}]/u.test(id) ? studentIdError(id) : null, idIn);
+  });
+  idIn.addEventListener('blur', () => { const id = cleanStudentId(idIn.value); if (id) hint(studentIdError(id), idIn); });
+  nameIn.addEventListener('input', () => hint(/\d/.test(nameIn.value) ? nameError(cleanName(nameIn.value)) : null, nameIn));
+  groupIn.addEventListener('blur', () => {
+    if (!groupIn.value.trim()) return;
+    groupIn.value = cleanGroup(groupIn.value);
+    hint(groupError(groupIn.value), groupIn);
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = cleanName(nameIn.value);
+    const id = cleanStudentId(idIn.value);
+    const rawGroup = groupIn.value.trim();
+    const group = rawGroup ? cleanGroup(rawGroup) : '';
+    const badName = nameError(name);
+    if (badName) { hint(badName, nameIn); return nameIn.focus(); }
+    const badId = studentIdError(id);
+    if (badId) { hint(badId, idIn); return idIn.focus(); }
+    // signed-in students may leave the group empty; guests must give one
+    const badGroup = group || !account ? groupError(group) : null;
+    if (badGroup) { hint(badGroup, groupIn); return groupIn.focus(); }
+    if (group) groupIn.value = group;
+    if (!session?.open) {
+      err.textContent = 'Your TA has not started this session yet. You can read the lab content for now.';
+      return;
+    }
+    err.textContent = 'Checking…';
+    submit.disabled = true;
+    const problem = await join(name, id, group, session.id);
+    err.textContent = problem ?? '';
+    submit.disabled = !session?.open;
   });
 
   signed.querySelector('[data-ls-change]')?.addEventListener('click', () => {
@@ -248,10 +286,18 @@ export function mountStart(lab: string) {
     idIn.value = u.studentId;
     nameIn.readOnly = idIn.readOnly = true;
     nameIn.title = idIn.title = 'From your account';
+    groupIn.required = false;
+    groupIn.placeholder = 'e.g. G12 (optional)';
+    if (!groupIn.value) groupIn.value = savedGroup();
     const note = document.createElement('p');
     note.className = 'ls-acct';
-    note.textContent = `Signed in as ${u.name}: your name and ID come from your account. Just add your group.`;
+    note.textContent = `Signed in as ${u.name}: you join the lab session automatically when your TA starts it.`;
     form.prepend(note);
+    // a valid account identity joins the open session by itself (no form to fill)
+    if (!nameError(cleanName(u.name)) && !studentIdError(cleanStudentId(u.studentId))) {
+      account = { name: cleanName(u.name), id: cleanStudentId(u.studentId) };
+      await refreshSession();
+    }
   })();
 
   void refreshSession();

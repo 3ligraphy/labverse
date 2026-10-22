@@ -4,6 +4,7 @@
  * directly under `node --test` (see tests/attendance.test.ts).
  */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { cleanName, cleanStudentId, nameError, studentIdError } from '../identity.ts';
 
 /* ---------------------------------------------------------------- types */
 
@@ -20,9 +21,7 @@ export type CheckInResult =
 
 /* ----------------------------------------------------------- validation */
 
-// letters (any language) + spaces, apostrophes, dots and hyphens; starts and ends with a letter (or dot)
-const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}'’. -]*[\p{L}\p{M}.]$/u;
-const ID_RE = /^[A-Za-z0-9-]{3,20}$/;
+// name and student ID rules: src/lib/identity.ts
 const DEVICE_RE = /^[A-Za-z0-9_-]{16,64}$/;
 
 /**
@@ -36,13 +35,15 @@ export function ipFrom(headers: Headers, clientAddress?: string): string {
 
 export function validateCheckIn(input: unknown): Validation {
   const o = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
-  const name = String(o.name ?? '').normalize('NFC').trim().replace(/\s+/g, ' ');
-  const studentId = String(o.studentId ?? '').trim();
+  const name = cleanName(o.name);
+  const studentId = cleanStudentId(o.studentId);
   const deviceId = String(o.deviceId ?? '').trim();
 
   const errors: Partial<Record<keyof CheckInInput, string>> = {};
-  if (name.length < 2 || name.length > 60 || !NAME_RE.test(name)) errors.name = 'Please type your full name (letters only).';
-  if (!ID_RE.test(studentId)) errors.studentId = 'Your student ID should be 3–20 letters or numbers.';
+  const badName = nameError(name);
+  const badId = studentIdError(studentId);
+  if (badName) errors.name = badName;
+  if (badId) errors.studentId = badId;
   if (!DEVICE_RE.test(deviceId)) errors.deviceId = 'This device could not be identified. Refresh the page and try again.';
 
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, name, studentId, deviceId };

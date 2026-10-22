@@ -122,7 +122,7 @@ export async function studentWrite<V extends Identity>(
     }
     if ((await s.hit(`w:${v.value.deviceKey}`, WINDOW_SEC)) > WRITES_PER_WINDOW) return json({ error: 'slow-down' }, 429);
     if ((await s.touchStudent(v.value)) === 'conflict') {
-      return json({ error: 'device', message: 'This browser is linked to another student, or this student ID is linked to another device. Ask your TA to use “Allow new device”.' }, 409);
+      return json({ error: 'device', message: 'This student ID was already used with a different name. Type your name exactly as you did before, or ask your TA to fix it.' }, 409);
     }
     const out = await act(s, { ...v.value, sessionId });
     return out instanceof Response ? out : json({ ok: true, ...(out ?? {}) });
