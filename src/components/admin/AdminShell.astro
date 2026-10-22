@@ -67,8 +67,13 @@ const teaching: Item[] = ctx ? [
   { key: 'sessions', label: 'Sessions & attendance', href: '/admin/sessions', icon: '◷', show: any('module.sessions') || any('module.progress') },
   { key: 'progress', label: 'Lab progress', href: '/admin/progress', icon: '▤', show: any('module.progress') },
 ];
+// anyone who teaches (TA, doctor, module staff, super admin) handles students' forgot-password requests
+const teachingStaff = a.master || (a.user !== null && a.user.role !== 'student') || modules.length > 0;
 const groups: { title: string; items: Item[] }[] = [
-  { title: 'Workspace', items: [{ key: 'home', label: 'Home', href: '/admin', icon: '◎', show: true }] },
+  { title: 'Workspace', items: [
+    { key: 'home', label: 'Home', href: '/admin', icon: '◎', show: true },
+    { key: 'resets', label: 'Password requests', href: '/admin/password-resets', icon: '⚷', show: teachingStaff },
+  ] },
   { title: 'Teaching', items: teaching },
   { title: 'Modules', items: [
     { key: 'builder', label: 'All modules & builder', href: '/admin/builder', icon: '⬡', show: a.can('modules.create') || any('module.build') },
@@ -89,7 +94,7 @@ const allItems = groups.flatMap((g) => g.items);
 const current = allItems.find((i) => i.key === active);
 const tabItems = allItems.filter((i) => !i.off).slice(0, 4);
 if (current && !tabItems.includes(current)) tabItems[3] = current;
-const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', progress: 'Progress', submissions: 'Projects', canvas: 'Canvas', assessment: 'Assessment', team: 'Team', banner: 'Banners', builder: 'Builder', teams: 'Teams', catalogue: 'Catalogue', components: 'Components', accounts: 'Accounts', cms: 'CMS' };
+const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessions: 'Sessions', progress: 'Progress', submissions: 'Projects', canvas: 'Canvas', assessment: 'Assessment', team: 'Team', banner: 'Banners', builder: 'Builder', teams: 'Teams', catalogue: 'Catalogue', components: 'Components', accounts: 'Accounts', cms: 'CMS' };
 ---
 <div class="ash" data-ash-active={active}>
   <script type="application/json" data-ash-modules set:html={JSON.stringify(manageable.map((m) => ({ slug: m.slug, title: m.title, code: m.code, role: m.role, faculty: m.faculty, color: m.color, tools: toolsFor(m) })))} />
@@ -105,7 +110,7 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
         <div class="ash-group">
           <p class="ash-gt mono">{g.title}</p>
           {g.title === 'Teaching' && ctx && <ModuleSwitcher ctx={ctx} modules={manageable} faculties={ctxFaculties} where="sidebar" />}
-          {g.items.map((i) => <a class:list={['ash-link', { on: i.key === active }]} href={i.href} data-ctx-href={i.tpl} data-ctx-key={i.off !== undefined ? i.key : undefined} hidden={i.off} aria-current={i.key === active ? 'page' : undefined}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}</a>)}
+          {g.items.map((i) => <a class:list={['ash-link', { on: i.key === active }]} href={i.href} data-ctx-href={i.tpl} data-ctx-key={i.off !== undefined ? i.key : undefined} hidden={i.off} aria-current={i.key === active ? 'page' : undefined}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}{i.key === 'resets' && <span class="ash-badge" data-reset-badge hidden></span>}</a>)}
         </div>
       ))}
     </nav>
@@ -119,7 +124,7 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
 
   <nav class="ash-tabbar" aria-label="Admin sections">
     {tabItems.map((i) => <a class="ash-tab" href={i.href} data-ctx-href={i.tpl} data-ctx-key={i.off !== undefined ? i.key : undefined} hidden={i.off} aria-current={i.key === active ? 'page' : undefined}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{short[i.key] ?? i.label}</a>)}
-    <button type="button" class="ash-tab" data-ash-more aria-expanded="false" aria-controls="ash-more"><span class="ash-ic" aria-hidden="true">⋯</span>More</button>
+    <button type="button" class="ash-tab" data-ash-more aria-expanded="false" aria-controls="ash-more"><span class="ash-ic" aria-hidden="true">⋯</span>More<span class="ash-badge dot" data-reset-badge hidden></span></button>
   </nav>
   <div class="ash-scrim" data-ash-scrim hidden></div>
   <div class="ash-sheet" id="ash-more" data-ash-sheet hidden role="dialog" aria-label="Admin menu">
@@ -133,7 +138,7 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
         <p class="ash-gt mono">{g.title}</p>
         {g.title === 'Teaching' && ctx && <ModuleSwitcher ctx={ctx} modules={manageable} faculties={ctxFaculties} where="menu" />}
         <div class="ash-sheet-grid">
-          {g.items.map((i) => <a class:list={['ash-sheet-item', { on: i.key === active }]} href={i.href} data-ctx-href={i.tpl} data-ctx-key={i.off !== undefined ? i.key : undefined} hidden={i.off}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}</a>)}
+          {g.items.map((i) => <a class:list={['ash-sheet-item', { on: i.key === active }]} href={i.href} data-ctx-href={i.tpl} data-ctx-key={i.off !== undefined ? i.key : undefined} hidden={i.off}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}{i.key === 'resets' && <span class="ash-badge" data-reset-badge hidden></span>}</a>)}
         </div>
       </div>
     ))}
@@ -189,6 +194,9 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
   .ash-foot a, .ash-foot button { padding: 6px 10px; border-radius: 8px; color: var(--text-3); text-align: left; background: none; border: 0; cursor: pointer; font: inherit; }
   .ash-foot a:hover, .ash-foot button:hover { color: var(--text); background: var(--surface-2); }
   .ash-main { min-width: 0; }
+  .ash-badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: inline-grid; place-items: center; background: var(--danger); color: #fff; font: 700 11px var(--font-mono); }
+  .ash-badge.dot { position: absolute; top: 4px; right: calc(50% - 20px); min-width: 9px; height: 9px; padding: 0; font-size: 0; }
+  .ash-badge[hidden] { display: none; }
   body:has(.ash) .footer { display: none; }
   /* pages inside the shell: no extra top gap on desktop beside the sidebar */
   .ash-main > :first-child { padding-left: clamp(16px, 3vw, 40px) !important; padding-right: clamp(16px, 3vw, 40px) !important; max-width: 1400px; margin-inline: 0; }
@@ -274,7 +282,21 @@ const short: Record<string, string> = { home: 'Home', sessions: 'Sessions', prog
   type Mod = { slug: string; title: string; code: string; role: string; faculty: string; color: string; tools: string[] };
   let followWired = false;
 
+  /** The red badge on "Password requests": how many students are waiting for a TA (refreshed every minute). */
+  let badgeTimer = 0;
+  const refreshBadge = async () => {
+    const badges = document.querySelectorAll<HTMLElement>('[data-reset-badge]');
+    if (!badges.length) return;
+    const d = await fetch('/api/admin/password-resets?count', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const n = Number(d?.pending ?? 0);
+    badges.forEach((b) => { b.hidden = n === 0; b.textContent = n > 99 ? '99+' : String(n); b.setAttribute('aria-label', `${n} waiting`); });
+  };
+
+  document.addEventListener('buenova:resets-changed', () => void refreshBadge());
   onPageLoad( () => {
+    void refreshBadge();
+    clearInterval(badgeTimer);
+    badgeTimer = window.setInterval(() => document.visibilityState === 'visible' && void refreshBadge(), 60_000);
     const shell = document.querySelector<HTMLElement>('.ash');
     const mods: Mod[] = JSON.parse(document.querySelector('[data-ash-modules]')?.textContent || '[]');
     /** Point every Teaching link (sidebar, tab bar, phone menu) and both switchers at this module. */

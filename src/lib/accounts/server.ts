@@ -70,8 +70,18 @@ export const endUserSession = (cookies: AstroCookies) => cookies.delete(USER_COO
 
 /* ------------------------------------------------------------------ store */
 
-type UserRow = PublicUser & { password_hash: string; token_version: number };
+export type UserRow = PublicUser & { password_hash: string; token_version: number };
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v));
+export type ResetStatus = 'pending' | 'approved' | 'rejected' | 'done' | 'replaced';
+export type ResetRow = { id: string; user_id: string; email: string; student_id: string; status: ResetStatus; secret_hash: string; link_hash: string | null; created_at: string; decided_at: string | null; decided_by: string | null; expires_at: string | null; done_at: string | null };
+const toReset = (r: any): ResetRow => ({
+  id: r.id, user_id: r.user_id, email: r.email, student_id: r.student_id, status: r.status, secret_hash: r.secret_hash, link_hash: r.link_hash ?? null,
+  created_at: iso(r.created_at) ?? '', decided_at: iso(r.decided_at), decided_by: r.decided_by ?? null, expires_at: iso(r.expires_at), done_at: iso(r.done_at),
+});
+/** Reset secrets and link tokens are only stored as hashes. */
+export const hashSecret = (secret: string) => createHash('sha256').update(secret).digest('base64url');
+export const newSecret = () => randomBytes(24).toString('base64url');
+
 const toUser = (r: any): UserRow => ({
   id: r.id, role: r.role, name: r.name, email: r.email, studentId: r.student_id ?? null,
   profile: { year: r.year ?? '', specialization: r.specialization ?? '', modules: Array.isArray(r.modules) ? r.modules : [], faculty: r.faculty ?? '' },
@@ -88,6 +98,7 @@ class AccountStore {
   private staff: string;
   private invites: string;
   private enrollments: string;
+  private resets: string;
 
   constructor(url: string, prefix: string, driver: 'neon' | 'postgres') {
     if (driver === 'postgres') {
@@ -102,6 +113,7 @@ class AccountStore {
     this.staff = `${prefix}_module_staff`;
     this.invites = `${prefix}_invites`;
     this.enrollments = `${prefix}_enrollments`;
+    this.resets = `${prefix}_password_resets`;
   }
 
   private async migrate() {
@@ -125,6 +137,13 @@ class AccountStore {
         created_at timestamptz not null default now(), primary key (module, email))`,
       // faculties: accounts from before them keep null (= the default faculty, see facultyOfProfile)
       `alter table ${this.users} add column if not exists faculty text`,
+      // "Forgot password": a student asks, a TA approves, then the student's own browser (or a link the TA sends)
+      // sets the new password. Secrets are stored hashed.
+      `create table if not exists ${this.resets} (
+        id text primary key, user_id text not null, email text not null, student_id text not null,
+        status text not null default 'pending', secret_hash text not null, link_hash text,
+        created_at timestamptz not null default now(), decided_at timestamptz, decided_by text,
+        expires_at timestamptz, done_at timestamptz)`,
     ]) await this.run(s);
     await this.seed();
   }
@@ -329,6 +348,58 @@ class AccountStore {
   }
   async setSetting(key: 'years' | 'specializations' | 'faculties' | 'builtIn' | 'activeSemester' | 'specFrom' | 'categories', value: unknown) {
     await this.q(`insert into ${this.settings} (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value, updated_at = now()`, [key, JSON.stringify(value)]);
+  }
+
+  /* ------------------------------------------------------- forgot password */
+
+  /** A new request replaces the student's earlier open one. */
+  async createReset(user: UserRow, secretHash: string): Promise<ResetRow> {
+    await this.q(`update ${this.resets} set status = 'replaced' where user_id = $1 and status in ('pending', 'approved')`, [user.id]);
+    const [r] = await this.q(
+      `insert into ${this.resets} (id, user_id, email, student_id, secret_hash) values ($1, $2, $3, $4, $5) returning *`,
+      [randomUUID(), user.id, user.email, user.studentId ?? '', secretHash],
+    );
+    return toReset(r);
+  }
+  async getReset(id: string): Promise<ResetRow | null> {
+    const [r] = await this.q(`select * from ${this.resets} where id = $1`, [id]);
+    return r ? toReset(r) : null;
+  }
+  async resetByLink(linkHash: string): Promise<ResetRow | null> {
+    const [r] = await this.q(`select * from ${this.resets} where link_hash = $1`, [linkHash]);
+    return r ? toReset(r) : null;
+  }
+  /** Requests with the student's name, newest first: every pending one plus the last few decided. */
+  async listResets(): Promise<(ResetRow & { name: string; active: boolean })[]> {
+    const rows = await this.q(
+      `select r.*, u.name, u.active from ${this.resets} r join ${this.users} u on u.id = r.user_id
+       where r.status = 'pending' or r.created_at > now() - interval '7 days'
+       order by (r.status = 'pending') desc, r.created_at desc limit 100`,
+    );
+    return rows.map((r: any) => ({ ...toReset(r), name: r.name, active: r.active }));
+  }
+  async pendingResets(): Promise<number> {
+    const [r] = await this.q(`select count(*)::int as n from ${this.resets} where status = 'pending'`);
+    return Number(r?.n ?? 0);
+  }
+  /** Approve (valid for 24 hours, with a one-time link) or reject a pending request. */
+  async decideReset(id: string, approve: boolean, by: string, linkHash: string | null): Promise<ResetRow | null> {
+    const [r] = await this.q(
+      `update ${this.resets} set status = $2, decided_at = now(), decided_by = $3, link_hash = $4,
+         expires_at = case when $2 = 'approved' then now() + interval '24 hours' else null end
+       where id = $1 and status = 'pending' returning *`,
+      [id, approve ? 'approved' : 'rejected', by, approve ? linkHash : null],
+    );
+    return r ? toReset(r) : null;
+  }
+  /** Sets the new password (signing the account out everywhere) and closes the request. */
+  async completeReset(reset: ResetRow, password: string): Promise<UserRow | null> {
+    const [claimed] = await this.q(
+      `update ${this.resets} set status = 'done', done_at = now() where id = $1 and status = 'approved' and expires_at > now() returning id`,
+      [reset.id],
+    );
+    if (!claimed) return null;
+    return this.update(reset.user_id, { password });
   }
 }
 
