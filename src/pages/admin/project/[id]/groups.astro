@@ -8,7 +8,7 @@
 import Base from '@/layouts/Base.astro';
 import AdminShell from '@/components/admin/AdminShell.astro';
 import { canManageSubmissions } from '@/lib/accounts/labscope';
-import { SORTS, TEAM_SIZE } from '@/lib/project-files/groups';
+import { SORTS, TEAM_SIZE, MIN_TEAM_SIZE } from '@/lib/project-files/groups';
 import { getFilesStore } from '@/lib/project-files/server';
 
 export const prerender = false;
@@ -84,16 +84,16 @@ if (!file) return Astro.redirect('/admin/project', 303);
         <div>
           <p class="gp-step mono">Step 3</p>
           <h2>Add random members</h2>
-          <p class="muted small">Select groups with fewer than {TEAM_SIZE} members and how many to add. Only students who are in no group can be picked, and each one goes to one group.</p>
+          <p class="muted small">Select groups with fewer than {MIN_TEAM_SIZE} members. Random assignment fills each selected group to at most {MIN_TEAM_SIZE}. Only students who are in no group can be picked, and each one goes to one group.</p>
         </div>
       </div>
       <div class="gp-tools">
         <div class="gp-row gp-sort-row"><label class="gp-sort small">Sort <select class="input" data-gp-sort aria-label="Sort groups">{Object.entries(SORTS).map(([k, v]) => <option value={k}>{v}</option>)}</select></label><span class="small faint" data-gp-new-sum></span></div>
         <div class="gp-row">
-          <button class="btn btn-ghost btn-sm" type="button" data-gp-select-under>Select all under {TEAM_SIZE}</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-select-under>Select all under {MIN_TEAM_SIZE}</button>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-select-none>Clear</button>
           <label class="gp-num small">Members to add per group
-            <input class="input mono" type="number" min="1" max={TEAM_SIZE - 1} value="1" data-gp-count /></label>
+            <input class="input mono" type="number" min="1" max={MIN_TEAM_SIZE - 1} value={MIN_TEAM_SIZE - 1} data-gp-count /></label>
         </div>
         <div class="gp-row">
           <button class="btn btn-primary btn-sm" type="button" data-gp-assign disabled>Assign random members</button>
@@ -370,7 +370,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
   import { readDocText, renderPdf } from '@/scripts/doc-text';
   import { playBox } from '@/scripts/box-shuffle';
   import {
-    SCAN_VERSION, TEAM_SIZE, assignRandom, autoNumber, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, groupsCsv, openSeats, parseRoster,
+    SCAN_VERSION, TEAM_SIZE, MIN_TEAM_SIZE, assignRandom, autoNumber, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, documentStudents, groupsCsv, openSeats, parseRoster,
     randomIdea, unassigned, lastHandIn, sortGroups, SORTS, type Group, type Plan, type Sort, type Student,
   } from '@/lib/project-files/groups';
   import { notATeamNumber, type Entry } from '@/lib/project-files/core';
@@ -506,7 +506,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
           <td><b class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</b>${stamp(g)}${g.labels.length && g.labels.join() !== g.key ? `<br><small class="faint">typed: ${g.labels.map(esc).join(' / ')}</small>` : ''}${teamForm(g)}</td>
           <td><ul class="gp-chips">${g.members.map((m) => chip(m, g.key, clash)).join('')}</ul>${g.unread ? `<small class="faint">${plural(g.unread, 'file')} could not be read</small>` : ''}${plan.removed[g.key]?.length ? `<small class="faint">${plural(plan.removed[g.key].length, 'student')} taken out · <button class="btn btn-ghost btn-sm" type="button" data-restore="${esc(g.key)}">Restore</button></small>` : ''}</td>
           <td><span class="gp-size ${open ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></td>
-          <td>${open ? `<input class="input mono gp-add" type="number" min="1" max="${open}" value="${wantFor(g)}" data-count-for="${esc(g.key)}" aria-label="Members to add to ${esc(g.title)}" />` : '<small class="faint">full</small>'}</td>
+          <td>${open ? `<input class="input mono gp-add" type="number" min="1" max="${open}" value="${wantFor(g)}" data-count-for="${esc(g.key)}" aria-label="Members to add to ${esc(g.title)}" />` : '<small class="faint">minimum met</small>'}</td>
         </tr>`;
       }).join('') + `<tr><td colspan="5"><div class="gp-legend"><span class="gp-chip">handed in</span><span class="gp-chip document">named in the file</span><span class="gp-chip added">added here</span><span class="gp-chip clash">in two groups</span></div></td></tr>`
         : `<tr><td colspan="5" class="muted">${entries.length ? 'Reading files…' : 'No hand-ins yet.'}</td></tr>`;
@@ -530,7 +530,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
           <p class="members">${g.members.map((m) => `${esc(m.name)}${m.source === 'added' ? ' <b>(new)</b>' : ''}`).join(', ') || 'No members found'}</p>
           ${short ? later
             ? `<p class="small faint">Fill later · <button class="btn btn-ghost btn-sm" type="button" data-unlater="${esc(g.key)}">Show options</button></p>`
-            : `<div class="gp-short"><span>This group has ${g.members.length} of ${TEAM_SIZE} members. Add a random student who is in no group now (optional), or do it later.</span>
+            : `<div class="gp-short"><span>This group has ${g.members.length} members and needs ${MIN_TEAM_SIZE - g.members.length} to reach the minimum of ${MIN_TEAM_SIZE}. Add a random student who is in no group now (optional), or do it later.</span>
                 <div class="gp-row"><button class="btn btn-primary btn-sm" type="button" data-add-one="${esc(g.key)}" ${pool && !scanning ? '' : 'disabled'}>Add random member</button>
                 <button class="btn btn-ghost btn-sm" type="button" data-later="${esc(g.key)}">Later</button>${pool ? '' : '<small class="faint">No unassigned students left.</small>'}</div></div>` : ''}
           <div class="gp-row"><div class="gp-seg" role="group" aria-label="How to choose ${esc(g.title)}'s idea">
@@ -582,7 +582,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
           const doc = await readDocText(e.url);
           plan.scans[e.id] = 'error' in doc
             ? { updatedAt: e.updated_at, v: SCAN_VERSION, ids: [], ideas: [], error: doc.error }
-            : { updatedAt: e.updated_at, v: SCAN_VERSION, ids: findStudents(doc.lines.join('\n'), roster).slice(0, 20), ideas: extractIdeas(doc.lines) };
+            : { updatedAt: e.updated_at, v: SCAN_VERSION, members: documentStudents(doc.lines), ids: [...new Set([...findStudents(doc.lines.join('\n'), roster), ...documentStudents(doc.lines).map((s) => s.id)])].slice(0, 20), ideas: extractIdeas(doc.lines) };
           progress.value = ++done;
           text.textContent = `Reading ${done} of ${plural(todo.length, 'file')}…`;
           render();
@@ -674,7 +674,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       const n = placed.reduce((a, [, s]) => a + s.length, 0);
       say(n
         ? `Added ${plural(n, 'student')}: ${placed.map(([k, s]) => `${titleOf(k)} ← ${s.map((x) => x.name).join(', ')}`).join(' · ')}.${r.short ? ` ${plural(r.short, 'seat')} could not be filled: no unassigned students left.` : ''}`
-        : 'No one was added: there are no unassigned students left.', !n, el);
+        : (groups.some((g) => openSeats(g)) ? 'No unassigned students remain. Groups below three need more students or a manual regrouping; existing groups were not changed.' : 'All groups already have at least three members. No assignment is needed.'), !n, el);
       render();
       save();
       // The draw is made and saved; now show it: groups thrown in a box, shaken, students drawn out.
@@ -841,7 +841,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
       const shortGroups = groups.filter((g) => openSeats(g)).length;
-      say(`Sheet downloaded: ${plural(groups.length, 'group')}.${missing ? ` ${plural(missing, 'group')} still ${missing === 1 ? 'has' : 'have'} no idea selected.` : ''}${shortGroups ? ` ${plural(shortGroups, 'group')} ${shortGroups === 1 ? 'has' : 'have'} fewer than ${TEAM_SIZE} members.` : ''}`);
+      say(`Sheet downloaded: ${plural(groups.length, 'group')}.${missing ? ` ${plural(missing, 'group')} still ${missing === 1 ? 'has' : 'have'} no idea selected.` : ''}${shortGroups ? ` ${plural(shortGroups, 'group')} ${shortGroups === 1 ? 'has' : 'have'} fewer than ${MIN_TEAM_SIZE} members.` : ''}`);
     }
 
     /* ------------------------------------------------------------ sorting */

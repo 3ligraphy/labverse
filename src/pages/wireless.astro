@@ -1,0 +1,328 @@
+---
+import Base from '@/layouts/Base.astro';
+import { conversions, formulas, questions } from '@/lib/wireless/sheet3';
+
+Astro.response.headers.set('cache-control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=600');
+const nav = questions.map((q) => ({ href: `#q${q.id}`, label: `Q${q.id} · ${q.topic}` }));
+---
+<Base title="Wireless Networks · Open Study Session" description="A no-login, interactive Sheet 3 session for antennas, propagation, Doppler, path loss, formulas and conversions.">
+  <header class="wn-hero">
+    <div class="wn-air" aria-hidden="true"><i></i><i></i><i></i><span></span></div>
+    <div class="container wn-hero-in">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><span aria-current="page">wireless</span></nav>
+      <div class="wn-hero-grid">
+        <div>
+          <p class="wn-k mono"><span></span> OPEN SESSION · NO SIGN-IN · SHEET 3</p>
+          <h1><span class="wn-title-word">Wireless</span> <span class="wn-title-word">Networks</span><br /><em>Antennas &amp; propagation</em></h1>
+          <p class="wn-lead">Solve every question with the numbers in front of you. Try an answer, check it instantly, then reveal the reasoning one small step at a time.</p>
+          <div class="wn-actions"><a class="btn btn-primary" href="#q1">Start question 1 ↓</a><a class="btn btn-ghost" href="#toolbox">Open formula toolbox</a></div>
+          <p class="wn-private"><span aria-hidden="true">◉</span> Progress stays in this browser. No account, attendance session, or database record.</p>
+        </div>
+        <aside class="wn-signal" aria-label="Session overview">
+          <div class="wn-dial"><span data-progress-ring></span><b data-progress>0%</b><small>complete</small></div>
+          <dl><div><dt>Questions</dt><dd>10</dd></div><div><dt>Formulas</dt><dd>21</dd></div><div><dt>Mode</dt><dd>Guided</dd></div></dl>
+          <button type="button" class="wn-reset" data-reset>Reset my progress</button>
+        </aside>
+      </div>
+      <ol class="wn-route" aria-label="Session route">
+        <li><span>01</span><b>Convert</b><small>Put every value in the right unit</small></li>
+        <li><span>02</span><b>Choose</b><small>Pick the formula from the target</small></li>
+        <li><span>03</span><b>Substitute</b><small>Keep units visible beside numbers</small></li>
+        <li><span>04</span><b>Sense-check</b><small>Verify sign, scale, and reference</small></li>
+      </ol>
+    </div>
+  </header>
+
+  <div class="container wn-layout" data-wireless>
+    <main class="wn-main">
+      <section class="wn-start" aria-labelledby="how-title">
+        <p class="wn-eyebrow mono">HOW TO USE THIS SESSION</p>
+        <h2 id="how-title">Attempt first. Reveal only what you need.</h2>
+        <div class="wn-how"><div><b>1</b><span>Read the given values and target.</span></div><div><b>2</b><span>Enter your numerical answer with the displayed unit.</span></div><div><b>3</b><span>Open one solution step when you get stuck.</span></div></div>
+      </section>
+
+      {questions.map((q) => (
+        <article class="wn-question" id={`q${q.id}`} data-question={q.id} data-topic={q.topic}>
+          <header class="wn-q-head">
+            <div><p class="wn-eyebrow mono">QUESTION {String(q.id).padStart(2, '0')} · {q.topic}</p><h2>{q.title}</h2></div>
+            <span class="wn-status" data-q-status>Not started</span>
+          </header>
+
+          {q.given && <div class="wn-given"><p class="mono">GIVEN</p><ul>{q.given.map((v) => <li>{v}</li>)}</ul></div>}
+
+          {q.id === 3 && (
+            <div class="wn-concept" data-concept data-answer="fast">
+              <p>Which type changes rapidly because multipath components add and cancel?</p>
+              <div><button type="button" data-choice="slow">Slow fading</button><button type="button" data-choice="fast">Fast fading</button></div><span data-concept-msg></span>
+            </div>
+          )}
+          {q.id === 5 && (
+            <div class="wn-concept" data-concept data-answer="smaller">
+              <p>If Doppler shift increases, what happens to coherence time?</p>
+              <div><button type="button" data-choice="larger">It becomes larger</button><button type="button" data-choice="smaller">It becomes smaller</button></div><span data-concept-msg></span>
+            </div>
+          )}
+
+          {q.practice && <section class="wn-practice" aria-label="Check your answers">
+            <div class="wn-practice-title"><p class="mono">TRY THE NUMBERS</p><span>Scientific notation works: <code>4.52e-11</code></span></div>
+            <div class="wn-answer-grid">
+              {q.practice.map((p) => (
+                <label class="wn-answer" data-check data-answer={p.answer} data-tolerance={p.tolerance ?? .02}>
+                  <span>{p.label}</span>
+                  <span class="wn-input"><input type="number" step="any" inputmode="decimal" aria-label={`${p.label} in ${p.unit}`} /><b>{p.unit}</b><button type="button">Check</button></span>
+                  <small data-feedback>{p.hint}</small>
+                </label>
+              ))}
+            </div>
+          </section>}
+
+          <section class="wn-solution">
+            <div class="wn-solution-head"><div><p class="mono">GUIDED SOLUTION</p><span>Reveal the reasoning yourself or play it as a guided walkthrough.</span></div><button type="button" class="btn btn-ghost btn-sm" data-show-all>Show full solution</button></div>
+            <div class="wn-playback" data-playback>
+              <div class="wn-playback-controls">
+                <button type="button" class="wn-play" data-play aria-label={`Play solution for question ${q.id}`}><span aria-hidden="true" data-play-icon>▶</span><b data-play-label>Play solution</b></button>
+                <button type="button" class="wn-restart" data-restart aria-label="Restart solution playback"><span aria-hidden="true">↺</span> Restart</button>
+                <label class="wn-speed"><span>Speed</span><select data-speed aria-label="Playback speed"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+                <label class="wn-narrate"><input type="checkbox" data-narrate /><span>Read aloud</span></label>
+              </div>
+              <div class="wn-timeline" aria-live="polite"><span><i data-play-progress></i></span><small data-play-count>Step 1 of {q.steps.length}</small></div>
+            </div>
+            <ol>
+              {q.steps.map((step, i) => (
+                <li class:list={['wn-step', { shown: i === 0 }]} data-step>
+                  <span>{i + 1}</span><div><h3>{step.title}</h3><p set:html={step.body} /></div>
+                </li>
+              ))}
+            </ol>
+            <button type="button" class="wn-next-step" data-next-step>{q.steps.length > 1 ? 'Reveal next step ↓' : 'Solution shown'}</button>
+          </section>
+
+          <footer class="wn-take"><span aria-hidden="true">→</span><p><b>Remember:</b> {q.takeaway}</p><label><input type="checkbox" data-done /> I can solve this</label></footer>
+        </article>
+      ))}
+
+      <section class="wn-finish" data-finish>
+        <p class="wn-eyebrow mono">SESSION CHECKPOINT</p><h2>Ten questions. One repeatable method.</h2>
+        <p>Convert → choose → substitute → sense-check. Mark each question when you can reproduce it without opening the solution.</p>
+        <a class="btn btn-primary" href="#q1">Review from question 1 ↑</a>
+      </section>
+    </main>
+
+    <aside class="wn-aside">
+      <nav class="wn-nav" aria-label="Questions"><p class="mono">QUESTIONS</p>{nav.map((n) => <a href={n.href}>{n.label}</a>)}</nav>
+      <a class="wn-tool-link" href="#toolbox">Formula toolbox <span>21 formulas →</span></a>
+    </aside>
+  </div>
+
+  <section class="wn-tools" id="toolbox">
+    <div class="container">
+      <header class="wn-tools-head"><div><p class="wn-eyebrow mono">FORMULA TOOLBOX</p><h2>Units first. Formula second.</h2></div><p>Use these tools to check arithmetic, not to skip the reasoning.</p></header>
+      <div class="wn-calc-grid">
+        <form class="wn-calc" data-converter>
+          <p class="mono">UNIT CONVERTER</p><h3>Convert without losing the reference</h3>
+          <label><span>Conversion</span><select>
+            <option value="w-dbm">W → dBm</option><option value="dbm-w">dBm → W</option><option value="mw-dbm">mW → dBm</option><option value="dbm-mw">dBm → mW</option><option value="db-linear">dB gain → linear</option><option value="kmh-ms">km/h → m/s</option><option value="mph-ms">mph → m/s</option><option value="ghz-hz">GHz → Hz</option><option value="mhz-hz">MHz → Hz</option><option value="cm-m">cm → m</option>
+          </select></label>
+          <label><span>Value</span><input type="number" step="any" value="40" /></label>
+          <output data-convert-out>46.0206 dBm</output>
+        </form>
+        <form class="wn-calc" data-friis>
+          <p class="mono">LIVE LINK BUDGET</p><h3>Free-space Friis calculator</h3>
+          <div class="wn-mini-grid">
+            <label><span>Pₜ (W)</span><input name="power" type="number" step="any" value="40" /></label>
+            <label><span>f (MHz)</span><input name="frequency" type="number" step="any" value="900" /></label>
+            <label><span>d (m)</span><input name="distance" type="number" step="any" value="1000" /></label>
+            <label><span>Gₜ (dB)</span><input name="gt" type="number" step="any" value="0" /></label>
+            <label><span>Gᵣ (dB)</span><input name="gr" type="number" step="any" value="0" /></label>
+          </div>
+          <output data-friis-out><span>λ <b>0.3333 m</b></span><span>FSPL <b>91.53 dB</b></span><span>Pᵣ <b>28.14 nW</b></span></output>
+        </form>
+      </div>
+
+      <details class="wn-reference" open><summary><span>Conversion rules</span><small>{conversions.length} essentials</small></summary><div class="table-wrap"><table><thead><tr><th>Category</th><th>Rule</th><th>Example</th></tr></thead><tbody>{conversions.map((r) => <tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td></tr>)}</tbody></table></div></details>
+      <details class="wn-reference"><summary><span>All Sheet 3 formulas</span><small>{formulas.length} formulas</small></summary><div class="table-wrap"><table><thead><tr><th>Formula</th><th>Expression</th><th>Use</th><th>Units / warning</th></tr></thead><tbody>{formulas.map((r) => <tr><td>{r[0]}</td><td><code>{r[1]}</code></td><td>{r[2]}</td><td>{r[3]}</td></tr>)}</tbody></table></div></details>
+      <div class="wn-rule"><b>Golden rule</b><span>Linear formula → linear values. Logarithmic link budget → dB/dBm/dBW values. Do not mix the two columns.</span></div>
+    </div>
+  </section>
+</Base>
+
+<style is:global>
+  .wn-hero { --wn:#63e6ff; --wn2:#8b7cff; position:relative; padding:calc(var(--nav-h) + 54px) 0 0; overflow:hidden; background:#07111f; color:#f4f8ff; isolation:isolate; }
+  .wn-hero::before { content:''; position:absolute; inset:0; z-index:-2; background:radial-gradient(circle at 78% 15%,rgb(65 114 255/.27),transparent 38%),radial-gradient(circle at 5% 85%,rgb(36 222 204/.14),transparent 34%),linear-gradient(145deg,#07111f,#0a1528 60%,#091126); }
+  .wn-air { position:absolute; inset:0; z-index:-1; opacity:.6; overflow:hidden; }
+  .wn-air i { position:absolute; right:-12vw; top:7%; width:55vw; aspect-ratio:1; border:1px solid rgb(99 230 255/.24); border-radius:50%; }
+  .wn-air i:nth-child(2){inset:auto -3vw 1% auto;width:38vw}.wn-air i:nth-child(3){inset:31% 20% auto auto;width:19vw}.wn-air span{position:absolute;inset:0;background-image:radial-gradient(rgb(255 255 255/.12) 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(to bottom,#000,transparent 90%)}
+  .wn-hero .crumbs { color:#9eabc2; }.wn-hero .crumbs a:hover{color:white}.wn-hero-grid{display:grid;gap:34px;align-items:end;padding-bottom:42px}.wn-k{font-size:12px;letter-spacing:.1em;color:#b7c6df}.wn-k span{display:inline-block;width:8px;height:8px;margin-right:7px;border-radius:50%;background:var(--wn);box-shadow:0 0 16px var(--wn)}
+  .wn-hero h1{margin-top:16px;font-size:clamp(3rem,1.6rem + 5vw,6.5rem);line-height:.91;letter-spacing:-.06em}.wn-hero h1 em{color:var(--wn);font-style:normal}.wn-lead{max-width:62ch;margin-top:24px;color:#b7c6df;font-size:clamp(1rem,.9rem + .5vw,1.28rem);line-height:1.65}.wn-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}.wn-hero .btn-ghost{color:#eef5ff;border-color:#34445e}.wn-private{display:flex;gap:9px;align-items:center;margin-top:18px;color:#8f9db3;font-size:12.5px}.wn-private span{color:var(--wn)}
+  @media(min-width:940px){.wn-hero-grid{grid-template-columns:minmax(0,1fr) 330px;gap:70px}}
+  .wn-signal{padding:24px;border:1px solid rgb(154 188 230/.2);border-radius:24px;background:rgb(8 20 38/.7);backdrop-filter:blur(18px);box-shadow:0 32px 80px -40px #000}.wn-dial{position:relative;display:grid;place-items:center;width:148px;height:148px;margin:auto;border-radius:50%;background:conic-gradient(var(--wn) var(--p,0%),rgb(255 255 255/.08) 0)}.wn-dial::before{content:'';position:absolute;inset:9px;border-radius:50%;background:#0a1628}.wn-dial b,.wn-dial small{position:absolute;z-index:1;left:0;right:0;text-align:center}.wn-dial b{top:47px;font:650 34px var(--font-display)}.wn-dial small{bottom:34px;color:#93a1b7;font-size:11px;text-transform:uppercase;letter-spacing:.08em}.wn-signal dl{display:grid;grid-template-columns:repeat(3,1fr);margin-top:20px;border-top:1px solid rgb(255 255 255/.1);padding-top:18px}.wn-signal dl div{display:grid;text-align:center}.wn-signal dt{color:#8796ad;font-size:11px;text-transform:uppercase}.wn-signal dd{order:-1;font:650 20px var(--font-display)}.wn-reset{display:block;margin:18px auto 0;color:#8f9db3;font-size:12px;text-decoration:underline;text-underline-offset:3px}.wn-route{list-style:none;display:grid;margin:0;padding:0;border-top:1px solid rgb(255 255 255/.1)}.wn-route li{display:grid;grid-template-columns:auto 1fr;gap:2px 13px;padding:18px 0;border-bottom:1px solid rgb(255 255 255/.08)}.wn-route span{grid-row:1/3;color:var(--wn);font:12px var(--font-mono)}.wn-route b{font-size:14px}.wn-route small{color:#8f9db3}@media(min-width:720px){.wn-route{grid-template-columns:repeat(4,1fr)}.wn-route li{padding:20px;border-right:1px solid rgb(255 255 255/.08)}}
+  .wn-layout{display:grid;gap:48px;padding-block:56px 100px}.wn-main{min-width:0}.wn-start{padding:26px;border:1px solid var(--line);border-radius:24px;background:var(--surface)}.wn-eyebrow{font-size:11px;letter-spacing:.12em;color:var(--accent-text)}.wn-start h2,.wn-tools-head h2,.wn-finish h2{margin-top:5px;font-size:clamp(1.8rem,1.2rem + 2vw,3rem);letter-spacing:-.04em}.wn-how{display:grid;gap:12px;margin-top:20px}.wn-how div{display:flex;align-items:center;gap:12px;color:var(--text-2)}.wn-how b{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent-text);font:12px var(--font-mono)}
+  @media(min-width:1100px){.wn-layout{grid-template-columns:minmax(0,1fr) 240px;gap:64px}.wn-aside{display:block}.wn-how{grid-template-columns:repeat(3,1fr)}.wn-how div{align-items:flex-start}}@media(max-width:1099px){.wn-aside{display:none}}
+  .wn-question{scroll-margin-top:calc(var(--nav-h) + 20px);margin-top:30px;border:1px solid var(--line);border-radius:26px;background:var(--surface);overflow:hidden;box-shadow:var(--shadow-sm)}.wn-q-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding:26px;border-bottom:1px solid var(--line);background:linear-gradient(125deg,var(--surface-2),var(--surface))}.wn-q-head h2{margin-top:5px;font-size:clamp(1.55rem,1.2rem + 1vw,2.2rem);letter-spacing:-.035em}.wn-status{flex:none;padding:5px 10px;border:1px solid var(--line-2);border-radius:999px;color:var(--text-3);font:11px var(--font-mono);text-transform:uppercase}.wn-status.done{border-color:color-mix(in oklab,var(--ok) 45%,var(--line));background:var(--ok-soft);color:var(--ok)}
+  .wn-given{display:grid;grid-template-columns:auto 1fr;gap:18px;padding:18px 26px;border-bottom:1px solid var(--line);background:color-mix(in oklab,var(--info-soft) 50%,var(--surface))}.wn-given>p{font-size:11px;color:var(--info)}.wn-given ul{list-style:none;display:flex;gap:8px;flex-wrap:wrap;padding:0}.wn-given li{padding:5px 9px;border-radius:7px;background:var(--surface);border:1px solid var(--line);font:12px var(--font-mono)}
+  .wn-practice{padding:24px 26px;border-bottom:1px solid var(--line)}.wn-practice-title{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}.wn-practice-title p{font-size:11px;color:var(--text-3)}.wn-practice-title span{font-size:11px;color:var(--text-3)}.wn-answer-grid{display:grid;gap:12px;margin-top:14px}.wn-answer{display:grid;gap:7px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}.wn-answer>span:first-child{font-weight:600}.wn-input{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center}.wn-input input{min-width:0;height:42px;padding:0 12px;border:1px solid var(--line-2);border-radius:9px 0 0 9px;background:var(--surface);color:var(--text);font:15px var(--font-mono)}.wn-input b{height:42px;display:grid;place-items:center;padding:0 10px;border-block:1px solid var(--line-2);background:var(--surface);font:11px var(--font-mono);color:var(--text-3)}.wn-input button{height:42px;padding:0 13px;border-radius:0 9px 9px 0;background:var(--text);color:var(--bg);font-weight:650}.wn-answer small{min-height:18px;color:var(--text-3);line-height:1.4}.wn-answer.ok{border-color:color-mix(in oklab,var(--ok) 55%,var(--line));background:var(--ok-soft)}.wn-answer.ok small{color:var(--ok)}.wn-answer.bad{border-color:color-mix(in oklab,var(--warn) 55%,var(--line));background:var(--warn-soft)}.wn-answer.bad small{color:var(--warn)}@media(min-width:720px){.wn-answer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .wn-concept{margin:22px 26px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}.wn-concept p{font-weight:600}.wn-concept>div{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.wn-concept button{padding:9px 13px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--text)}.wn-concept button.on{border-color:var(--accent-text);background:var(--accent-soft);color:var(--accent-text)}.wn-concept>span{display:block;min-height:18px;margin-top:10px;font-size:13px}.wn-concept.ok>span{color:var(--ok)}.wn-concept.bad>span{color:var(--warn)}
+  .wn-solution{padding:24px 26px}.wn-solution-head{display:flex;align-items:center;justify-content:space-between;gap:16px}.wn-solution-head p{font-size:11px;color:var(--text-3)}.wn-solution-head span{font-size:13px;color:var(--text-3)}
+  .wn-playback{margin-top:18px;padding:13px;border:1px solid color-mix(in oklab,var(--accent-text) 24%,var(--line));border-radius:15px;background:linear-gradient(120deg,var(--accent-soft),var(--surface-2))}.wn-playback-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.wn-play,.wn-restart{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 13px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--text);font-size:12px}.wn-play{min-width:137px;border-color:var(--accent-text);background:var(--accent-text);color:var(--bg)}.wn-play>span{font-size:10px}.wn-playback.playing .wn-play>span{font-size:12px}.wn-speed{display:flex;align-items:center;gap:7px;margin-left:auto;color:var(--text-3);font-size:11px}.wn-speed select{height:38px;padding:0 8px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--text);font:12px var(--font-mono)}.wn-narrate{display:flex;align-items:center;gap:7px;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:11px;color:var(--text-2)}.wn-narrate input{width:16px;height:16px;accent-color:var(--accent-text)}.wn-timeline{display:grid;grid-template-columns:1fr auto;align-items:center;gap:11px;margin-top:11px}.wn-timeline>span{height:4px;border-radius:999px;background:var(--line);overflow:hidden}.wn-timeline i{display:block;width:var(--play-progress,0%);height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent-text),var(--info));transition:width .4s var(--ease-out)}.wn-timeline small{min-width:74px;color:var(--text-3);font:10px var(--font-mono);text-align:right}
+  .wn-solution ol{list-style:none;padding:0;margin-top:18px}.wn-step{display:none;grid-template-columns:34px 1fr;gap:13px;padding:15px 10px;margin-inline:-10px;border-top:1px solid var(--line);border-radius:10px}.wn-step.shown{display:grid;animation:wn-in .42s var(--ease-out)}.wn-step.current{background:color-mix(in oklab,var(--accent-soft) 74%,transparent);box-shadow:inset 3px 0 var(--accent-text);animation:wn-focus .55s var(--ease-out)}@keyframes wn-in{from{opacity:0;transform:translateY(8px)}}@keyframes wn-focus{from{background:color-mix(in oklab,var(--accent-text) 25%,transparent);transform:translateX(-4px)}}.wn-step.current>span{animation:wn-pulse 1.4s ease-in-out infinite}@keyframes wn-pulse{50%{box-shadow:0 0 0 7px color-mix(in oklab,var(--accent-text) 13%,transparent)}}.wn-step>span{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--accent-soft);color:var(--accent-text);font:12px var(--font-mono)}.wn-step h3{font-size:15px}.wn-step p{margin-top:5px;color:var(--text-2);line-height:1.65}.wn-step p b{color:var(--text)}.wn-next-step{width:100%;margin-top:8px;padding:12px;border:1px dashed var(--line-2);border-radius:10px;color:var(--text-2);font-size:13px}.wn-next-step:disabled{opacity:.55}
+  .wn-take{display:grid;grid-template-columns:auto 1fr;gap:12px;padding:18px 26px;border-top:1px solid var(--line);background:var(--surface-2)}.wn-take>span{color:var(--accent-text)}.wn-take p{color:var(--text-2);font-size:13.5px}.wn-take label{grid-column:2;justify-self:start;display:flex;gap:8px;align-items:center;font-size:13px;font-weight:600}.wn-take input{width:18px;height:18px;accent-color:var(--ok)}
+  .wn-nav{position:sticky;top:calc(var(--nav-h) + 24px);display:grid;border-left:1px solid var(--line)}.wn-nav p{padding:0 0 9px 14px;color:var(--text-3);font-size:11px}.wn-nav a{padding:6px 0 6px 14px;margin-left:-1px;border-left:2px solid transparent;color:var(--text-3);font-size:12.5px}.wn-nav a:hover,.wn-nav a.active{border-left-color:var(--accent-text);color:var(--text)}.wn-tool-link{position:sticky;top:calc(var(--nav-h) + 390px);display:grid;margin-top:20px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-weight:600}.wn-tool-link span{color:var(--accent-text);font:11px var(--font-mono)}
+  .wn-finish{margin-top:30px;padding:32px;border-radius:24px;background:linear-gradient(135deg,var(--accent-soft),var(--surface));border:1px solid color-mix(in oklab,var(--accent-text) 35%,var(--line))}.wn-finish p:not(.wn-eyebrow){margin:12px 0 20px;color:var(--text-2);max-width:58ch}
+  .wn-tools{scroll-margin-top:var(--nav-h);padding:80px 0 100px;border-top:1px solid var(--line);background:var(--surface-2)}.wn-tools-head{display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap}.wn-tools-head>p{max-width:42ch;color:var(--text-2)}.wn-calc-grid{display:grid;gap:16px;margin-top:28px}.wn-calc{display:grid;gap:14px;padding:24px;border:1px solid var(--line);border-radius:20px;background:var(--surface)}.wn-calc>p{font-size:11px;color:var(--accent-text)}.wn-calc h3{font-size:1.3rem}.wn-calc label{display:grid;gap:5px}.wn-calc label span{font-size:12px;color:var(--text-3)}.wn-calc input,.wn-calc select{height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface-2);color:var(--text)}.wn-calc>output{padding:16px;border-radius:12px;background:#07111f;color:#63e6ff;font:600 20px var(--font-mono)}.wn-mini-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.wn-calc[data-friis]>output{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font:12px var(--font-body)}.wn-calc[data-friis]>output span{display:grid;color:#91a1b8}.wn-calc[data-friis]>output b{color:#63e6ff;font:600 13px var(--font-mono)}@media(min-width:820px){.wn-calc-grid{grid-template-columns:.8fr 1.2fr}}
+  .wn-reference{margin-top:18px;border:1px solid var(--line);border-radius:18px;background:var(--surface);overflow:hidden}.wn-reference summary{display:flex;justify-content:space-between;gap:12px;padding:19px 22px;cursor:pointer;font-weight:650}.wn-reference summary small{color:var(--text-3);font:11px var(--font-mono)}.wn-reference .table-wrap{border:0;border-top:1px solid var(--line);border-radius:0}.wn-reference table{width:100%;border-collapse:collapse;font-size:13px;min-width:650px}.wn-reference th,.wn-reference td{padding:11px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.wn-reference th{background:var(--surface-2);color:var(--text-3);font:11px var(--font-mono);text-transform:uppercase}.wn-reference code{white-space:nowrap;color:var(--accent-text)}.wn-rule{display:grid;grid-template-columns:auto 1fr;gap:14px;margin-top:18px;padding:18px 20px;border-radius:14px;background:var(--warn-soft);color:var(--text-2)}.wn-rule b{color:var(--warn)}
+  @media(max-width:640px){.wn-hero h1{font-size:clamp(2.35rem,12vw,3rem)}.wn-title-word{display:block}.wn-lead{font-size:1rem}.wn-q-head{display:grid}.wn-status{justify-self:start}.wn-given{grid-template-columns:1fr}.wn-solution-head{align-items:flex-start;flex-direction:column}.wn-playback-controls{display:grid;grid-template-columns:1fr 1fr}.wn-play,.wn-restart{width:100%}.wn-speed{margin-left:0}.wn-narrate{justify-content:center}.wn-take{grid-template-columns:auto 1fr}.wn-mini-grid{grid-template-columns:1fr}.wn-calc[data-friis]>output{grid-template-columns:1fr}.wn-rule{grid-template-columns:1fr}.wn-question{border-radius:18px}.wn-q-head,.wn-practice,.wn-solution{padding-inline:18px}}
+  @media(prefers-reduced-motion:reduce){.wn-step.shown,.wn-step.current,.wn-step.current>span{animation:none}.wn-timeline i{transition:none}}
+  @media print{.wn-hero{padding-top:20px}.wn-air,.wn-actions,.wn-signal,.wn-route,.wn-practice,.wn-concept,.wn-playback,.wn-next-step,.wn-solution-head button,.wn-aside,.wn-tools,.wn-take label{display:none!important}.wn-step{display:grid!important}.wn-question{break-inside:auto;box-shadow:none}.wn-q-head{break-after:avoid}.wn-finish{display:none}}
+</style>
+
+<script>
+  import { convert, dbToLinear, freeSpacePathLossDb, friisWatts, wavelength, wattsToDbm, type Conversion } from '@/lib/wireless/core';
+  import { onPageLoad } from '@/scripts/page-load';
+
+  const KEY = 'buenova:wireless-sheet3';
+  const format = (n: number) => Math.abs(n) >= 1e6 || (Math.abs(n) > 0 && Math.abs(n) < .001) ? n.toExponential(4) : Number(n.toPrecision(7)).toString();
+  onPageLoad(() => {
+    const root = document.querySelector<HTMLElement>('[data-wireless]');
+    if (!root || root.dataset.wired) return;
+    root.dataset.wired = '1';
+    let done = new Set<number>();
+    try { done = new Set(JSON.parse(localStorage.getItem(KEY) ?? '[]')); } catch {}
+    const questions = [...root.querySelectorAll<HTMLElement>('[data-question]')];
+    type PlaybackState = { index: number; playing: boolean; timer?: number };
+    const playback = new Map<HTMLElement, PlaybackState>();
+    let activePlayback: HTMLElement | undefined;
+    const syncStepButton = (q: HTMLElement) => {
+      const steps = [...q.querySelectorAll<HTMLElement>('[data-step]')];
+      const next = q.querySelector<HTMLButtonElement>('[data-next-step]')!;
+      const left = steps.filter((s) => !s.classList.contains('shown')).length;
+      next.textContent = left ? `Reveal next step ↓ · ${left} left` : 'Full solution shown';
+      next.disabled = left === 0;
+    };
+    const paintPlayback = (q: HTMLElement, completed = false) => {
+      const state = playback.get(q)!;
+      const steps = [...q.querySelectorAll<HTMLElement>('[data-step]')];
+      const panel = q.querySelector<HTMLElement>('[data-playback]')!;
+      steps.forEach((step, index) => step.classList.toggle('current', state.playing && index === state.index));
+      panel.classList.toggle('playing', state.playing);
+      panel.style.setProperty('--play-progress', `${((state.index + 1) / steps.length) * 100}%`);
+      panel.querySelector<HTMLElement>('[data-play-count]')!.textContent = `${completed ? 'Complete' : `Step ${state.index + 1}`} of ${steps.length}`;
+      panel.querySelector<HTMLElement>('[data-play-icon]')!.textContent = state.playing ? 'Ⅱ' : '▶';
+      panel.querySelector<HTMLElement>('[data-play-label]')!.textContent = state.playing ? 'Pause' : completed ? 'Replay solution' : state.index ? 'Resume solution' : 'Play solution';
+      syncStepButton(q);
+    };
+    const pausePlayback = (q: HTMLElement, completed = false) => {
+      const state = playback.get(q)!;
+      if (state.timer) window.clearTimeout(state.timer);
+      state.timer = undefined; state.playing = false;
+      if (activePlayback === q) activePlayback = undefined;
+      window.speechSynthesis?.cancel();
+      paintPlayback(q, completed);
+    };
+    const showPlaybackStep = (q: HTMLElement) => {
+      const state = playback.get(q)!;
+      const steps = [...q.querySelectorAll<HTMLElement>('[data-step]')];
+      const step = steps[state.index];
+      step.classList.add('shown');
+      paintPlayback(q);
+      if (q.querySelector<HTMLInputElement>('[data-narrate]')?.checked && 'speechSynthesis' in window) {
+        const speech = new SpeechSynthesisUtterance(`Step ${state.index + 1}. ${step.innerText}`);
+        speech.rate = Math.min(1.8, Number(q.querySelector<HTMLSelectElement>('[data-speed]')!.value));
+        window.speechSynthesis.cancel(); window.speechSynthesis.speak(speech);
+      }
+      const words = step.innerText.trim().split(/\s+/).length;
+      const speed = Number(q.querySelector<HTMLSelectElement>('[data-speed]')!.value);
+      const delay = Math.max(1800, Math.min(6500, 1700 + words * 135)) / speed;
+      state.timer = window.setTimeout(() => {
+        if (!state.playing) return;
+        if (state.index === steps.length - 1) { pausePlayback(q, true); return; }
+        state.index += 1; showPlaybackStep(q);
+      }, delay);
+    };
+    const startPlayback = (q: HTMLElement) => {
+      const state = playback.get(q)!;
+      const steps = [...q.querySelectorAll<HTMLElement>('[data-step]')];
+      if (state.playing) { pausePlayback(q); return; }
+      if (activePlayback && activePlayback !== q) pausePlayback(activePlayback);
+      if (state.index >= steps.length - 1 && steps.every((step) => step.classList.contains('shown'))) {
+        steps.forEach((step, index) => step.classList.toggle('shown', index === 0)); state.index = 0;
+      }
+      activePlayback = q; state.playing = true; showPlaybackStep(q);
+    };
+    const restartPlayback = (q: HTMLElement) => {
+      pausePlayback(q);
+      const steps = [...q.querySelectorAll<HTMLElement>('[data-step]')];
+      steps.forEach((step, index) => step.classList.toggle('shown', index === 0));
+      playback.get(q)!.index = 0; paintPlayback(q);
+    };
+    for (const q of questions) {
+      playback.set(q, { index: 0, playing: false });
+      if (!('speechSynthesis' in window)) q.querySelector<HTMLInputElement>('[data-narrate]')?.setAttribute('disabled', '');
+      paintPlayback(q);
+    }
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify([...done])); } catch {} update(); };
+    const update = () => {
+      const pct = Math.round((done.size / questions.length) * 100);
+      document.querySelectorAll<HTMLElement>('[data-progress]').forEach((el) => el.textContent = `${pct}%`);
+      document.querySelectorAll<HTMLElement>('.wn-dial').forEach((el) => el.style.setProperty('--p', `${pct}%`));
+      for (const q of questions) {
+        const id = Number(q.dataset.question), checked = done.has(id);
+        const box = q.querySelector<HTMLInputElement>('[data-done]')!; box.checked = checked;
+        const status = q.querySelector<HTMLElement>('[data-q-status]')!; status.textContent = checked ? 'Complete' : 'Not started'; status.classList.toggle('done', checked);
+      }
+    };
+    root.addEventListener('change', (e) => {
+      const box = (e.target as HTMLElement).closest<HTMLInputElement>('[data-done]'); if (!box) return;
+      const id = Number(box.closest<HTMLElement>('[data-question]')?.dataset.question); if (box.checked) done.add(id); else done.delete(id); save();
+    });
+    document.querySelector('[data-reset]')?.addEventListener('click', () => { if (confirm('Reset all Wireless Sheet 3 progress in this browser?')) { done.clear(); save(); } });
+
+    root.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const check = target.closest<HTMLButtonElement>('[data-check] button');
+      if (check) {
+        const wrap = check.closest<HTMLElement>('[data-check]')!, input = wrap.querySelector<HTMLInputElement>('input')!, feedback = wrap.querySelector<HTMLElement>('[data-feedback]')!;
+        const actual = Number(input.value), expected = Number(wrap.dataset.answer), tolerance = Number(wrap.dataset.tolerance || .02);
+        const ok = input.value !== '' && Number.isFinite(actual) && Math.abs(actual - expected) <= Math.max(Math.abs(expected) * tolerance, 1e-12);
+        wrap.classList.toggle('ok', ok); wrap.classList.toggle('bad', !ok);
+        feedback.textContent = ok ? `Correct — ${format(expected)} ${input.getAttribute('aria-label')?.split(' in ')[1] ?? ''}.` : `Not yet. ${feedback.textContent?.startsWith('Not yet.') ? 'Check the revealed step and the unit.' : feedback.textContent}`;
+        return;
+      }
+      const choice = target.closest<HTMLButtonElement>('[data-choice]');
+      if (choice) {
+        const box = choice.closest<HTMLElement>('[data-concept]')!; box.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === choice));
+        const ok = choice.dataset.choice === box.dataset.answer; box.classList.toggle('ok', ok); box.classList.toggle('bad', !ok); box.querySelector('[data-concept-msg]')!.textContent = ok ? 'Correct — now reveal the explanation.' : 'Try again: focus on how quickly the channel changes.'; return;
+      }
+      const q = target.closest<HTMLElement>('[data-question]'); if (!q) return;
+      const steps = [...q.querySelectorAll<HTMLElement>('[data-step]')];
+      if (target.closest('[data-play]')) { startPlayback(q); return; }
+      if (target.closest('[data-restart]')) { restartPlayback(q); return; }
+      if (target.closest('[data-show-all]')) {
+        pausePlayback(q, true); steps.forEach((s) => s.classList.add('shown'));
+        playback.get(q)!.index = steps.length - 1; paintPlayback(q, true); return;
+      }
+      if (target.closest('[data-next-step]')) {
+        pausePlayback(q);
+        const nextIndex = steps.findIndex((s) => !s.classList.contains('shown'));
+        if (nextIndex >= 0) { steps[nextIndex].classList.add('shown'); playback.get(q)!.index = nextIndex; }
+        paintPlayback(q, nextIndex === steps.length - 1); return;
+      }
+    });
+    update();
+
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('.wn-nav a')];
+    const observer = new IntersectionObserver((entries) => { for (const entry of entries) if (entry.isIntersecting) links.forEach((a) => a.classList.toggle('active', a.hash === `#${entry.target.id}`)); }, { rootMargin: '-25% 0px -65%' });
+    questions.forEach((q) => observer.observe(q));
+
+    const converter = document.querySelector<HTMLFormElement>('[data-converter]');
+    const runConvert = () => { if (!converter) return; const kind = converter.querySelector('select')!.value as Conversion, value = Number(converter.querySelector('input')!.value); const r = convert(value, kind); converter.querySelector('output')!.textContent = Number.isFinite(r.value) ? `${format(r.value)} ${r.unit}` : 'Enter a valid value'; };
+    converter?.addEventListener('input', runConvert); runConvert();
+
+    const friis = document.querySelector<HTMLFormElement>('[data-friis]');
+    const runFriis = () => {
+      if (!friis) return; const fd = new FormData(friis); const p = Number(fd.get('power')), f = Number(fd.get('frequency')) * 1e6, d = Number(fd.get('distance')), gt = dbToLinear(Number(fd.get('gt'))), gr = dbToLinear(Number(fd.get('gr')));
+      const pr = friisWatts(p, gt, gr, f, d), fspl = freeSpacePathLossDb(d, f), l = wavelength(f), scaled = pr >= 1e-6 ? `${format(pr * 1e6)} µW` : pr >= 1e-9 ? `${format(pr * 1e9)} nW` : `${format(pr)} W`;
+      friis.querySelector('output')!.innerHTML = `<span>λ <b>${format(l)} m</b></span><span>FSPL <b>${format(fspl)} dB</b></span><span>Pᵣ <b>${scaled} · ${format(wattsToDbm(pr))} dBm</b></span>`;
+    };
+    friis?.addEventListener('input', runFriis); runFriis();
+  });
+</script>

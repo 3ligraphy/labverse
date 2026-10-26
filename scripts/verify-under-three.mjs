@@ -1,0 +1,13 @@
+﻿import {neon} from '@neondatabase/serverless';
+import {readFileSync} from 'node:fs';
+import {buildGroups,cleanPlan,unassigned,openSeats} from '../src/lib/project-files/groups.ts';
+const sql=neon(process.env.DATABASE_URL);
+const backup=JSON.parse(readFileSync('output/proposal-audit/before.json'));
+const expected=backup.groupData.find(x=>x.key.startsWith('plan:'));
+const rows=await sql.query('select key,data from project_groups');
+const plan=cleanPlan(rows.find(x=>x.key===expected.key).data);
+if(JSON.stringify(plan.added)!==JSON.stringify(expected.data.added))throw Error('Restored membership has changed');
+const entries=await sql.query('select id,student_id,name,group_name,note from project_entries where file_id=$1',[expected.key.slice(5)]);
+const roster=rows.find(x=>x.key==='roster').data;
+const groups=buildGroups(entries,roster,plan);
+console.log(JSON.stringify({restored:true,unassigned:unassigned(groups,roster).length,groupsUnderThree:groups.filter(g=>openSeats(g)>0).length,groupsOfThreeSelectable:groups.filter(g=>g.members.length===3&&openSeats(g)>0).length,scans: Object.keys(plan.scans).length}));

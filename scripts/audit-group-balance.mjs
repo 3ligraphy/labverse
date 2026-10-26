@@ -1,0 +1,11 @@
+﻿import {neon} from '@neondatabase/serverless';
+import {writeFileSync} from 'node:fs';
+import {buildGroups,cleanPlan,unassigned,conflicts} from '../src/lib/project-files/groups.ts';
+const sql=neon(process.env.DATABASE_URL);
+const entries=await sql.query("select id,file_id,student_id,name,group_name,note,updated_at from project_entries where file_id='dc7d4226-89f6-4edc-9b19-7605bb537bdb'");
+const data=await sql.query("select key,data,updated_at::text from project_groups");
+const roster=data.find(x=>x.key==='roster').data;
+const plan=cleanPlan(data.find(x=>x.key==='plan:'+entries[0].file_id).data);
+const groups=buildGroups(entries,roster,plan);
+writeFileSync('output/proposal-audit/balance-before.json',JSON.stringify({entries,data,roster,plan,groups},null,2));
+console.log(JSON.stringify({groups:groups.length,unique:new Set(groups.flatMap(g=>g.members.map(m=>m.id))).size,pool:unassigned(groups,roster).length,conflicts:conflicts(groups),sizes:groups.map(g=>({key:g.key,size:g.members.length,members:g.members.map(m=>({id:m.id,source:m.source}))}))},null,2));

@@ -83,6 +83,8 @@ export type ReportRow = {
   idea: string;
   ideaMode: 'manual' | 'auto' | null;
   feedback: string;
+  feedbackBy: string;
+  feedbackAt: string;
 };
 
 /** The rows of the feedback report, in group order. Groups without a number are left out unless `all`. */
@@ -95,6 +97,8 @@ export function reportRows(groups: readonly Group[], plan: Pick<Plan, 'choices'>
       idea: choice?.idea ?? '',
       ideaMode: choice?.idea ? choice.mode : null,
       feedback: notes.get(g.key)?.text ?? '',
+      feedbackBy: notes.get(g.key)?.by ?? '',
+      feedbackAt: notes.get(g.key)?.updatedAt ?? '',
     };
   });
 }

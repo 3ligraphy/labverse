@@ -1,13 +1,62 @@
 // Run with: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { pdfTextRows } from '../src/lib/project-files/pdf-text.ts';
 import {
   assignRandom, autoNumber, buildGroups, lastHandIn, sortGroups, cleanTeam, entryKeys, numberGroup, cleanPlan, cleanRoster, conflicts, emptyPlan, extractIdeas, findStudents, groupKey, groupsCsv,
-  parseRoster, randomIdea, unassigned, type Plan,
+  parseRoster, randomIdea, unassigned, documentStudents, type Plan,
 } from '../src/lib/project-files/groups.ts';
 
 /** A seeded generator, so random picks are repeatable in tests. */
 const seeded = (seed = 1) => (n: number) => { seed = (seed * 16807) % 2147483647; return seed % n; };
+
+test('document members absent from the roster survive saving and appear in the group', () => {
+  const members = documentStudents(['Name | ID | Contribution', 'Farida Ehab | 241831 | UI', 'Jana Ahmed | 241533 | API']);
+  assert.deepEqual(members.map((m) => m.id), ['241831', '241533']);
+  const plan = cleanPlan({ scans: { a: { updatedAt: 'today', ids: members.map((m) => m.id), members, ideas: [] } } });
+  const groups = buildGroups([{ id: 'a', student_id: '248986', name: 'George Hani', group_name: '1', note: '' }], [], plan);
+  assert.deepEqual(groups[0].members.map((m) => m.name), ['George Hani', 'Farida Ehab', 'Jana Ahmed']);
+  assert.deepEqual(documentStudents(['Name: Sara Ali | Student ID: 240001 | Group: A1']), [{ id: '240001', name: 'Sara Ali' }]);
+  assert.deepEqual(documentStudents(['Sara Ali | 240001 | Sara240001@bue.edu.eg']), [{ id: '240001', name: 'Sara Ali' }]);
+  assert.deepEqual(documentStudents(['Names: Hassan236184, Mazen235577']).map((m) => m.id), ['236184', '235577']);
+  assert.deepEqual(documentStudents(['Name\u0001 | ID\u0001', 'Mohamed\u0001Amr\u0001 | 242231\u0001']), [{ id: '242231', name: 'Mohamed Amr' }]);
+  assert.deepEqual(documentStudents(['ID | Student Name | BUE Email', 'Mohamed Rizk | Mohamed249214@bue.edu.eg', '249214']), [{ id: '249214', name: 'Mohamed Rizk' }]);
+});
+
+test('live proposal heading variants retain second ideas without feature headings or duplicate labels', () => {
+  assert.deepEqual(extractIdeas(['Idea (1): Help Nearby', 'Overview', 'Description.', 'Idea (2): Wear Again', 'Overview']), ['Help Nearby', 'Wear Again']);
+  assert.deepEqual(extractIdeas(['st', '1 | idea:', 'Help Nearby', 'nd', '2 | idea:', 'Wear Again']), ['Help Nearby', 'Wear Again']);
+  assert.deepEqual(extractIdeas(['Project Ideas:', '1- Mobile Transaction App :', 'A mobile application for securely sending money with a QR code.', '2- Installment Tracker App', 'Mobile application that helps users manage purchases.']), ['Mobile Transaction App', 'Installment Tracker App']);
+  assert.deepEqual(extractIdeas(['Idea 1: Gym Connect', '3. Admin Panel Features (Web Dashboard)', 'A dashboard for managing users and workout activities.']), ['Gym Connect']);
+  assert.deepEqual(extractIdeas(['Proposed Ideas:', '1. | Property Finder', 'Brief Description: an application for locating homes.', '2. | Clinic Finder', 'Brief Description: an application for finding doctors.']), ['Property Finder', 'Clinic Finder']);
+});
+
+test('contribution tables match unique shortened names, spaced IDs and Arabic digits', () => {
+  const students = [
+    { id: '240001', name: 'Sara Ahmed Ali' },
+    { id: '240002', name: 'Omar Mohamed Hassan' },
+    { id: '23CS0003', name: 'Mona Adel' },
+  ];
+  assert.deepEqual(findStudents('Name | ID | Contribution\nSara Ali | — | UI\nOmar | ٢٤٠٠٠٢ | API\nMona | 23 CS 0003 | Tests', students), students.map((s) => s.id));
+  assert.deepEqual(findStudents('Sara Ali | UI', [...students, { id: '240004', name: 'Sara Mahmoud Ali' }]), []);
+  assert.deepEqual(findStudents('Sara | UI\nOmar | API', students), []);
+});
+
+test('PDF table rows use visual positions even when the stream stores columns separately', () => {
+  const item = (str: string, x: number, y: number, width = 60) => ({ str, transform: [10, 0, 0, 10, x, y], width, hasEOL: true });
+  const lines = pdfTextRows([item('Sara Ali', 10, 100), item('Omar Hassan', 10, 80), item('240001', 160, 100), item('240002', 160, 80)]);
+  assert.deepEqual(lines, ['Sara Ali | 240001', 'Omar Hassan | 240002']);
+  assert.deepEqual(findStudents(lines.join('\n'), [{ id: '240001', name: 'Sara Ahmed Ali' }, { id: '240002', name: 'Omar Hassan' }]), ['240001', '240002']);
+});
+
+test('all idea heading styles are collected when mixed within one proposal', () => {
+  assert.deepEqual(extractIdeas([
+    'Idea 1: Campus Companion',
+    '2. TripWise App', 'TripWise is a travel planner for students and their friends.',
+    'SkillSwap', 'Overview', 'Swap skills with classmates.',
+    'Features', '1. Login screen', '2. Profile screen',
+  ]), ['Campus Companion', 'TripWise App', 'SkillSwap']);
+});
 
 const roster = parseRoster([
   'Name\tStudent ID',
@@ -85,10 +134,10 @@ test('conflicts lists a student who appears in two groups', () => {
 test('assignRandom fills only open seats and never reuses a student', () => {
   const groups = buildGroups(entries, roster.students, plan);
   const r = assignRandom(groups, roster.students, plan, { G1: 5, G2: 1 }, seeded(7));
-  assert.equal(r.added.G1.length, 2); // G1 already has 2 of 4
+  assert.equal(r.added.G1.length, 1); // G1 already has 2; stop at the minimum of 3
   assert.equal(r.added.G2.length, 1);
   const all = [...r.added.G1, ...r.added.G2];
-  assert.equal(new Set(all).size, 3);
+  assert.equal(new Set(all).size, 2);
   for (const id of all) assert.ok(['23CS0003', '23CS0005', '23CS0006'].includes(id));
   assert.equal(r.short, 0);
 });
@@ -289,6 +338,21 @@ test('extractIdeas reads "Idea 1 Description: X" and "Project Proposal: X" title
   assert.deepEqual(extractIdeas(['App Proposal - StudyBuddy']), ['StudyBuddy']);
   // a description sentence after "Idea description:" is not taken as the idea's name
   assert.deepEqual(extractIdeas(['Idea description: This app helps students find study partners in their classes.']), []);
+});
+
+test('random assignment ignores teams of three or four and caps a smaller team at three', () => {
+  const es = [entry('a', '23CS0001', 'Sara Ali', '1'), entry('b', '23CS0002', 'Omar Hassan', '2'), entry('c', '23CS0003', 'Mona Adel', '3')];
+  const p = emptyPlan();
+  p.scans.a = { updatedAt: 'x', ids: ['31', '32'], ideas: [] };
+  p.scans.b = { updatedAt: 'x', ids: ['41', '42', '43'], ideas: [] };
+  const students = [...roster.students, ...['31', '32', '41', '42', '43'].map((id) => ({ id, name: `Member ${id}` }))];
+  const groups = buildGroups(es, students, p);
+  const result = assignRandom(groups, students, p, { G1: 3, G2: 3, G3: 3 }, seeded(5));
+  assert.equal(result.placed.G1, undefined);
+  assert.equal(result.placed.G2, undefined);
+  assert.equal(result.placed.G3.length, 2);
+  assert.deepEqual(buildGroups(es, students, { ...p, added: result.added }).map((g) => g.members.length), [3, 4, 3]);
+  assert.deepEqual(p.added, {}, 'the original plan remains available for undo');
 });
 
 test('extractIdeas reads a title above "Overview" / "Brief description:" and numbered titles with a paragraph', () => {

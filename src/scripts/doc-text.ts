@@ -1,3 +1,5 @@
+import { pdfTextRows } from '../lib/project-files/pdf-text.ts';
+
 /**
  * Reads the text of a student's hand-in in the admin's browser, line by line, so the groups page can find the
  * contribution table and the proposed ideas. Files come straight from Vercel Blob (public, CORS-enabled), like
@@ -7,8 +9,6 @@
  * Word list paragraphs start with "• " so numbered ideas are still recognisable.
  */
 
-const MAX_PDF_PAGES = 15;
-const MAX_FILES_IN_ZIP = 6;
 const READABLE = ['pdf', 'docx', 'pptx'];
 
 export type DocText = { lines: string[] } | { error: string };
@@ -22,8 +22,7 @@ export async function readDocText(url: string): Promise<DocText> {
     // extract first: read only the documents inside, not the whole (often large) project ZIP
     let inside: Map<string, Uint8Array> | null = null;
     try {
-      let n = 0;
-      inside = await unzipRemote(url, (f) => readableInZip(f) && n++ < MAX_FILES_IN_ZIP);
+      inside = await unzipRemote(url, readableInZip);
     } catch (error) {
       console.warn('[doc-text] ranged ZIP read failed, downloading it whole', url, error);
     }
@@ -51,7 +50,10 @@ export async function readDocText(url: string): Promise<DocText> {
   }
 }
 
-const clean = (lines: string[]): DocText => ({ lines: lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean) });
+const clean = (lines: string[]): DocText => {
+  const cleaned = lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  return cleaned.length ? { lines: cleaned } : { error: 'No readable text found. Image-only documents need OCR; check the members and ideas manually.' };
+};
 const failed = (kind: string, error: unknown): DocText => {
   const why = error instanceof Error && error.message ? ` (${error.message.slice(0, 120)})` : '';
   return { error: `The ${kind} file could not be read${why}.` };
@@ -74,8 +76,10 @@ async function zipLines(bytes: Uint8Array): Promise<string[]> {
 async function zipDocLines(inside: Map<string, Uint8Array>): Promise<string[]> {
   if (!inside.size) throw new Error('no PDF, Word or PowerPoint file inside');
   const lines: string[] = [];
-  for (const [name, data] of [...inside].slice(0, MAX_FILES_IN_ZIP)) {
-    lines.push(...await linesOf(name.split('.').pop()!.toLowerCase(), data).catch(() => []));
+  for (const [name, data] of inside) {
+    const result = clean(await linesOf(name.split('.').pop()!.toLowerCase(), data));
+    if ('error' in result) throw new Error(`${name}: ${result.error}`);
+    lines.push(...result.lines);
   }
   return lines;
 }
@@ -165,29 +169,10 @@ async function pdfLines(bytes: Uint8Array): Promise<string[]> {
   const doc = await task.promise;
   const lines: string[] = [];
   try {
-    for (let p = 1; p <= Math.min(doc.numPages, MAX_PDF_PAGES); p++) {
+    for (let p = 1; p <= doc.numPages; p++) {
       const page = await doc.getPage(p);
       const content = await page.getTextContent();
-      // Items on one visual row share a y position; a gap wider than about half a letter is a table cell
-      // boundary (a space between words is about a quarter). Space-only items are skipped when measuring:
-      // Word and browsers put one wide "space" between cells that would hide the gap.
-      let line = '';
-      let lastY: number | null = null;
-      let lastEnd = 0;
-      for (const item of content.items) {
-        if (!('str' in item)) continue;
-        if (!item.str.trim()) { if (item.hasEOL) { if (line) lines.push(line); line = ''; lastY = null; } continue; }
-        const [size, , , , x, y] = item.transform as number[];
-        const gap = x - lastEnd;
-        if (lastY !== null && Math.abs(y - lastY) > 2) { lines.push(line); line = ''; }
-        else if (line && gap > Math.max(5, Math.abs(size) * 0.6)) line += ' | ';
-        else if (line && gap > 0.5 && !line.endsWith(' ') && !item.str.startsWith(' ')) line += ' ';
-        line += item.str;
-        lastY = y;
-        lastEnd = x + (item.width ?? 0);
-        if (item.hasEOL) { lines.push(line); line = ''; lastY = null; }
-      }
-      if (line) lines.push(line);
+      lines.push(...pdfTextRows(content.items.filter((item) => 'str' in item)));
       page.cleanup();
     }
   } finally {

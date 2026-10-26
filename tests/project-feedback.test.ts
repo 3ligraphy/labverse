@@ -73,6 +73,10 @@ test('reportRows lists numbered groups with members, the approved idea and the f
   assert.equal(rows[1].idea, '');
   assert.equal(rows[1].ideaMode, null);
   assert.equal(rows[1].feedback, 'Pick one idea');
+  assert.equal(rows[1].feedbackBy, 'A');
+  assert.match(rows[1].feedbackAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(rows[0].feedbackBy, '');
+  assert.equal(rows[0].feedbackAt, '');
   assert.equal(reportRows(groups, plan, notes, true).length, 3);
 });
 

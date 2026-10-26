@@ -171,7 +171,10 @@ export async function buildFeedbackPdf(assets: ReportAssets, { title, rows, gene
     const ideaLines = row.idea ? wrap(clean(row.idea), f.semi, 10.5, inner - 28 - 70) : [];
     const ideaH = row.idea ? 18 + ideaLines.length * 14 : 34;
     const fbLines = row.feedback ? wrap(clean(row.feedback), f.regular, FB_SIZE, inner) : [];
-    const headH = 30 + 22 + memberRows * 17 + 12 + 18 + ideaH + 16 + 18;
+    const byline = row.feedbackBy
+      ? `Written by ${clean(row.feedbackBy)}${row.feedbackAt ? ` · ${new Date(row.feedbackAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}`
+      : '';
+    const headH = 30 + 22 + memberRows * 17 + 12 + 18 + ideaH + 16 + 18 + (byline ? 16 : 0);
     const minFirst = headH + Math.min(3, Math.max(1, fbLines.length)) * FB_LEAD + PAD;
     if (room() < minFirst) newPage();
 
@@ -222,6 +225,10 @@ export async function buildFeedbackPdf(assets: ReportAssets, { title, rows, gene
     // feedback (may continue on the next pages)
     label(page, 'Feedback', x, y - 8, f);
     y -= 18;
+    if (byline) {
+      page.drawText(ellipsis(byline, f.semi, 8.2, inner), { x, y: y - 9, size: 8.2, font: f.semi, color: C.muted });
+      y -= 16;
+    }
     if (!fbLines.length) {
       page.drawText('No feedback written.', { x, y: y - 10, size: FB_SIZE, font: f.regular, color: C.faint });
       y -= FB_LEAD;

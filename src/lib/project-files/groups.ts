@@ -8,6 +8,7 @@ import { ID_RE, notATeamNumber, type Entry } from './core.ts';
 
 /** The largest team size. */
 export const TEAM_SIZE = 4;
+export const MIN_TEAM_SIZE = 3;
 export const MAX_ROSTER = 2000;
 export const MAX_IDEAS = 12;
 const MAX_IDEA_LEN = 200;
@@ -18,7 +19,7 @@ export type Source = 'submitted' | 'document' | 'added';
 export type Member = Student & { source: Source };
 
 /** Bump when reading files changes (e.g. better idea finding), so saved results are refreshed automatically. */
-export const SCAN_VERSION = 6;
+export const SCAN_VERSION = 9;
 
 /** What the browser read out of one hand-in's file. Kept so files are only read again when re-submitted. */
 export type Scan = {
@@ -27,6 +28,8 @@ export type Scan = {
   v?: number;
   /** Roster student IDs found in the file (by ID or by full name). */
   ids: string[];
+  /** Named students with IDs in the document, including those absent from the class list. */
+  members?: Student[];
   ideas: string[];
   /** Why the file could not be read (unsupported type, download failed…). */
   error?: string;
@@ -145,17 +148,70 @@ export function cleanRoster(input: unknown): Result<Student[]> {
 
 /** Roster students named in a file: by student ID (as a whole word) or by full name (two words or more). */
 export function findStudents(text: string, roster: readonly Student[]): string[] {
+  text = text.normalize('NFKC').replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
+    .replace(/[٠-٩۰-۹]/g, (c) => String(c.charCodeAt(0) - (c <= '٩' ? 0x660 : 0x6f0)));
   const tokens = new Set(text.toUpperCase().match(/[A-Z0-9-]{3,20}/g) ?? []);
   // an ID typed against the name: "Hassan236184"
   for (const digits of text.match(/\d{4,20}/g) ?? []) tokens.add(digits);
+  // IDs wrapped within a table cell or spaced by PDF text runs.
+  for (const cell of text.split(/[|\t]/)) {
+    const compact = cell.trim().replace(/\s+/g, '').toUpperCase();
+    if (/^[A-Z0-9-]{3,20}$/.test(compact)) tokens.add(compact);
+  }
   const words = ` ${normName(text)} `;
+  // A table often uses just first + family name, while the roster includes middle names.
+  // Only accept a whole name cell and a unique roster match; never guess from one word.
+  const names = roster.map((s) => normName(s.name).split(' '));
+  const matched = new Set<string>();
+  for (const line of text.split(/\r?\n/)) {
+    if (!/[|\t]/.test(line)) continue;
+    for (const cell of line.split(/[|\t]/)) {
+      const parts = normName(cell.replace(/^\s*\d+[.)]?\s+/, '')).split(' ');
+      if (parts.length < 2 || parts.some((p) => !/^\p{L}+$/u.test(p))) continue;
+      const candidates = names.flatMap((name, i) => {
+        let at = -1;
+        const fits = parts.every((part) => { at = name.indexOf(part, at + 1); return at >= 0; });
+        return fits && parts[0] === name[0] ? [i] : [];
+      });
+      if (candidates.length === 1) matched.add(roster[candidates[0]].id);
+    }
+  }
   return roster
-    .filter((s) => tokens.has(s.id) || (normName(s.name).includes(' ') && words.includes(` ${normName(s.name)} `)))
+    .filter((s) => tokens.has(normId(s.id)) || matched.has(s.id) || (normName(s.name).includes(' ') && words.includes(` ${normName(s.name)} `)))
     .map((s) => s.id);
 }
 
+/** Preserve explicit name/ID pairs even when a student is missing from the roster. */
+export function documentStudents(lines: readonly string[]): Student[] {
+  const found = new Map<string, Student>();
+  let table = false;
+  for (const raw of lines) {
+    const line = raw.normalize('NFKC').replace(/[\u200b-\u200f\ufeff]/g, '').replace(/[\u0000-\u001f]/g, ' ');
+    if (/\b(?:name|member|student)\b/i.test(line) && /\b(?:id|contribution)\b/i.test(line)) { table = true; }
+    if (/^(?:idea|proposed idea|project idea|overview|description)\b/i.test(line)) table = false;
+    const cells = line.split(/\s*\|\s*|\t/);
+    const explicit = /(?:student\s*)?id\s*:/i.test(line);
+    if (!table && !explicit && !/^Names?:/i.test(line) && !/@bue\.edu\.eg/i.test(line)) continue;
+    for (const [i, cell] of cells.entries()) {
+      const id = /^(?:(?:student\s*)?id\s*:\s*)?([A-Z0-9-]{4,20})$/i.exec(cell.trim())?.[1]
+        ?? /^[a-z._-]+(\d{6})@bue\.edu\.eg$/i.exec(cell.trim())?.[1];
+      if (!id || !/\d{4}/.test(id)) continue;
+      const name = cells.slice(0, i).reverse().concat(cells.slice(i + 1)).map((c) => c.replace(/^name\s*:\s*/i, '').trim())
+        .find((c) => /^[\p{L}][\p{L} .'-]+$/u.test(c) && c.split(/\s+/).length >= 2 && !/contribution|all contributed|student name/i.test(c));
+      if (name) found.set(normId(id), { id: normId(id), name: cleanName(name) });
+    }
+    if (/^Names?:/i.test(line)) {
+      for (const pair of line.replace(/^Names?:\s*/i, '').split(/[,;]/)) {
+        const match = /^\s*([\p{L}][\p{L} .'-]*?)\s*(\d{4,20})\s*$/u.exec(pair);
+        if (match) found.set(match[2], { id: match[2], name: cleanName(match[1]) });
+      }
+    }
+  }
+  return [...found.values()];
+}
+
 /* How proposals name their ideas. ORD: "1", "B", "two", "second"…; LEAD: "1. ", "a) ", "First ", "2nd "… */
-const ORD = String.raw`(?:\d{1,2}|[a-e]|one|two|three|four|five)`;
+const ORD = String.raw`(?:\(?\d{1,2}\)?|[a-e]|one|two|three|four|five)`;
 const LEAD = String.raw`(?:(?:\d{1,2}|[a-z])[.)]\s*)?(?:(?:first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\s+)?`;
 const KIND = String.raw`(?:(?:the|our|my|proposed|suggested|selected|chosen|main|project|app|application|mobile\s+app)\s+)*(?:idea|option|suggestion)s?`;
 const SEP = String.raw`\s*[:.)\-–—|]\s*`;
@@ -176,14 +232,14 @@ const TITLE_HEADING = /^(?:\d+[.)]\s*)?(?:(?:project|app|application|mobile\s+ap
 /** "CookBook Project Proposal", "StudyBuddy – App Proposal": the app's name in the document title (used when nothing else is found). */
 const PROPOSAL_TITLE = /^(.{3,60}?)\s*[-–—:]?\s*(?:(?:mobile\s+)?app(?:lication)?\s+)?(?:project\s+)?proposal$/i;
 /** A numbered heading: "1. KinoLog App (Movie Tracking and Social Networking Application)". */
-const NUMBERED_TITLE = /^(?:\d{1,2}|[a-e])[.)]\s+(\p{Lu}.{2,119})$/u;
+const NUMBERED_TITLE = /^(?:\d{1,2}|[a-e])[.)-]\s*(?:\|\s*)?(\p{Lu}.{2,119})$/u;
 const APP_WORD = /\b(?:app|application|platform|system)\b/i;
 /** Numbered lines that read like sentences, not names: "The app will…", "Users can…". */
 const SENTENCE_START = /^(?:the|this|our|it|we|they|users?|students?|a|an|each|every|when|if|in|for|to)\b/i;
 const GENERIC_TITLE = /^(?:the|our|my|a|an)?\s*(?:mobile|project|app|application|course|module|coursework|cw|final|group|team)\b/i;
 /** A table column that holds ideas. */
 const IDEA_COLUMN = /^(?:proposed\s+|project\s+|app\s+)?(?:ideas?|idea\s+(?:title|name)|(?:project|app|application)\s+(?:title|name)|title|name\s+of\s+(?:the\s+)?(?:app|idea|project))$/i;
-const NUMBERED = /^\(?(?:\d{1,2}|[a-e])[.)]\s*(.{3,})$/i;
+const NUMBERED = /^\(?(?:\d{1,2}|[a-e])[.)-]\s*(?:\|\s*)?(.{3,})$/i;
 const BULLET = /^[•\-*▪◦●○■□➢►–✓✔]\s*(.{3,})$/;
 const OTHER_SECTION = /^(?:\d+[.)]?\s*)?(?:contribution|team|group|members?|student|names?|signature|declaration|introduction|problem|objectives?|features?|requirements?|references?|conclusion|description|overview|target|users?|scope|technolog|tools?|timeline|plan)\b/i;
 /** Lines that are the document's own title, not an idea. */
@@ -199,7 +255,7 @@ const looksLikeTitle = (s: string) => s.length >= 3 && s.length <= 60 && s.split
 
 const tidyIdea = (s: string) => {
   // control characters some PDFs use as spaces, table-of-contents dots ("RoadSense ........ 4"), stray table bars
-  const t = s.replace(/[\u0000-\u001f]+/g, ' ').replace(/\s*\.{4,}\s*\d*\s*$/, '').replace(/\s+/g, ' ').replace(/^\|\s*/, '')
+  const t = s.replace(/^(?:The\s+)(.+?)\s+app to help\b.*$/i, '$1').replace(/\s*[:\u2013\u2014-]\s*(?:A mobile app|Users will|users can)\b.*$/i, '').replace(/\s*:\s*$/, '').replace(/[\u0000-\u001f]+/g, ' ').replace(/\s*\.{4,}\s*\d*\s*$/, '').replace(/\s+/g, ' ').replace(/^\|\s*/, '')
     .replace(/^["“”']+|["“”']+$/g, '').replace(/\s*\|\s*$/, '').trim();
   return t.length > MAX_IDEA_LEN ? `${t.slice(0, MAX_IDEA_LEN - 1).trimEnd()}…` : t;
 };
@@ -218,7 +274,7 @@ export function extractIdeas(lines: readonly string[]): string[] {
   let style: RegExp | null = null;
   let column = -1;
   for (const raw of lines) {
-    const line = raw.replace(/\s+/g, ' ').trim();
+    const line = raw.replace(/\s+/g, ' ').trim().replace(/^\d+\s*\|\s*(idea\s*:)/i, '$1');
     if (!line) continue;
     const cells = line.includes(' | ') ? line.split(' | ').map((c) => c.trim()) : null;
     if (cells) {
@@ -233,7 +289,8 @@ export function extractIdeas(lines: readonly string[]): string[] {
       state = 'none';
       continue;
     }
-    const found = labelled?.[2] ?? (TITLE_LINE.exec(line) ?? IDEA_IS.exec(line))?.[1];
+    const narrative = /^(?:With our team['\u2019]s selection,\s*)(.+?\bApp)\s+is\b/i.exec(line)?.[1];
+    const found = narrative ?? labelled?.[2] ?? (TITLE_LINE.exec(line) ?? (/^The main idea is to (?:make|help)\b/i.test(line) ? null : IDEA_IS.exec(line)))?.[1];
     if (found) {
       // "The ideas : restaurant app ,Fitness Challenge App": several ideas on one line
       const plural = /\b(?:ideas|options|suggestions)\b/i.test(line.slice(0, line.length - found.length));
@@ -248,8 +305,8 @@ export function extractIdeas(lines: readonly string[]): string[] {
     const item = numbered ?? bullet;
     if (state === 'await') {
       if (item) { ideas.push(item[1]); style = numbered ? NUMBERED : BULLET; state = 'list'; }
-      else if (OTHER_SECTION.test(line)) state = 'none';
-      else { ideas.push(line); state = 'none'; } // the title under the heading; its description follows
+      else if (OTHER_SECTION.test(line) || /^(?:academic year|semester|students will be divided)\b/i.test(line)) state = 'none';
+      else { if (!line.includes(' | ')) ideas.push(line); state = 'none'; } // the title under the heading; its description follows
       continue;
     }
     // state === 'list': only items of the list's own kind count (sub-bullets are features, not ideas)
@@ -257,13 +314,13 @@ export function extractIdeas(lines: readonly string[]): string[] {
     if (same) ideas.push(same[1]);
     else if (!item && (OTHER_SECTION.test(line) || line.length < 60)) state = 'none';
   }
-  // Nothing labelled as an idea: numbered app headings, each followed by its description —
+  // Also collect numbered app headings in documents that mix heading styles —
   // "1. KinoLog App (Movie Tracking …)" then "KinoLog is a social application …".
-  if (!ideas.length) {
+  {
     const clean = lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
     clean.forEach((line, i) => {
       const m = NUMBERED_TITLE.exec(line);
-      if (!m || /[.!?;,]$/.test(m[1]) || SENTENCE_START.test(m[1])) return;
+      if (!m || /[.!?;,]$/.test(m[1]) || SENTENCE_START.test(m[1]) || labelledIdea(line) || /\b(?:features?|screens?|functionality)\b|^why\b/i.test(m[1])) return;
       const name = m[1].split(/[\s(:–—-]/)[0].toLowerCase();
       const next = (clean[i + 1] ?? '').toLowerCase();
       const describedNext = name.length >= 3 && next.length > 30 && (next.startsWith(`${name} is `) || next.startsWith(`${name} will `) || next.startsWith(`${name} lets `) || next.startsWith(`${name} helps `));
@@ -272,12 +329,12 @@ export function extractIdeas(lines: readonly string[]): string[] {
       if (APP_WORD.test(m[1]) || describedNext || titled) ideas.push(m[1]);
     });
   }
-  // Still nothing: a short title right above "Overview", "Brief description:", "Idea and purpose".
-  if (!ideas.length) {
+  // Also collect short titles right above "Overview", "Brief description:", "Idea and purpose".
+  {
     const clean = lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
     clean.forEach((line, i) => {
       const title = line.replace(/^(?:\d{1,2}|[a-e])[.)]\s+/i, '');
-      if (ABOUT_HEADING.test(clean[i + 1] ?? '') && looksLikeTitle(title)) ideas.push(title);
+      if (ABOUT_HEADING.test(clean[i + 1] ?? '') && looksLikeTitle(title) && !labelledIdea(line) && !/\b(?:features?|why|idea)\b/i.test(title)) ideas.push(title);
     });
   }
   // Still nothing: fall back to the app name in the document title ("CookBook Project Proposal").
@@ -298,8 +355,7 @@ export function extractIdeas(lines: readonly string[]): string[] {
   return tidy
     // "FixIt 4" (a contents line with its page number) when "FixIt" is there too
     .filter((i) => !(/\s\d{1,3}$/.test(i) && lower.has(i.replace(/\s\d{1,3}$/, '').toLowerCase())))
-    .filter((i) => i.length >= 3 && /\p{L}{2}/u.test(i) && !NOT_AN_IDEA.test(i) && !seen.has(i.toLowerCase()) && seen.add(i.toLowerCase()))
-    .slice(0, MAX_IDEAS);
+    .filter((i) => i.length >= 3 && /\p{L}{2}/u.test(i) && !NOT_AN_IDEA.test(i) && !seen.has(i.toLowerCase()) && seen.add(i.toLowerCase()));
 }
 
 /** The idea one labelled line names ("Idea 2: X", "Project Proposal: X", "App name: X"), or null. */
@@ -383,6 +439,9 @@ export function entryKeys(entries: readonly EntryLike[], plan: Plan): Map<string
  */
 export function buildGroups(entries: readonly EntryLike[], roster: readonly Student[], plan: Plan): Group[] {
   const byId = new Map(roster.map((s) => [s.id, s]));
+  for (const scan of Object.values(plan.scans)) for (const s of scan.members ?? []) {
+    if (!byId.has(s.id) || s.name.split(' ').length > byId.get(s.id)!.name.split(' ').length) byId.set(s.id, s);
+  }
   const keys = entryKeys(entries, plan);
   const groups = new Map<string, Group>();
   const get = (key: string) => {
@@ -465,8 +524,8 @@ export function unassigned(groups: readonly Group[], roster: readonly Student[])
   return roster.filter((s) => !taken.has(s.id));
 }
 
-/** How many more members a group can take. */
-export const openSeats = (g: Pick<Group, 'members'>) => Math.max(0, TEAM_SIZE - g.members.length);
+/** Random assignment fills only the minimum; three- and four-person teams are complete. */
+export const openSeats = (g: Pick<Group, 'members'>) => Math.max(0, MIN_TEAM_SIZE - g.members.length);
 
 /** A random whole number in [0, n). Pass a seeded one in tests. */
 export type Rand = (n: number) => number;
@@ -513,7 +572,7 @@ const strList = (v: unknown, max: number, len: number) =>
 const record = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.entries(v as Record<string, unknown>).slice(0, 1000) : []);
 const keyOk = (k: string) => k.length > 0 && k.length <= 40;
 
-/** Server-side check of a saved plan: drops anything malformed, caps every list. */
+/** Server-side check of a saved plan: drops malformed values and caps manual lists; preserves every extracted idea. */
 export function cleanPlan(input: unknown): Plan {
   const p = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
   const plan = emptyPlan();
@@ -529,7 +588,7 @@ export function cleanPlan(input: unknown): Plan {
   for (const [k, v] of record(p.scans)) {
     const s = v as Partial<Scan> | null;
     if (!keyOk(k) || !s || typeof s.updatedAt !== 'string') continue;
-    plan.scans[k] = { updatedAt: s.updatedAt.slice(0, 40), ...(Number.isInteger(s.v) ? { v: s.v } : {}), ids: strList(s.ids, 20, 20).map(normId), ideas: strList(s.ideas, MAX_IDEAS, MAX_IDEA_LEN), ...(s.error ? { error: String(s.error).slice(0, 200) } : {}) };
+    plan.scans[k] = { updatedAt: s.updatedAt.slice(0, 40), ...(Number.isInteger(s.v) ? { v: s.v } : {}), ids: strList(s.ids, 20, 20).map(normId), ...(Array.isArray(s.members) ? { members: s.members.filter((m) => m && ID_RE.test(m.id) && typeof m.name === 'string').slice(0, 20).map((m) => ({ id: normId(m.id), name: cleanName(m.name).slice(0, 80) })) } : {}), ideas: strList(s.ideas, Infinity, MAX_IDEA_LEN), ...(s.error ? { error: String(s.error).slice(0, 200) } : {}) };
   }
   for (const [k, v] of record(p.teams)) { const team = cleanTeam(v); if (keyOk(k) && team) plan.teams[k] = team; }
   return plan;

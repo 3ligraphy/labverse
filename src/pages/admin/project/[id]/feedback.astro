@@ -448,8 +448,8 @@ if (!file) return Astro.redirect('/admin/project', 303);
         : `<p class="muted">${groups.length ? 'No groups match.' : 'No groups yet. Groups appear here once students hand in; manage them on the Groups & ideas page.'}</p>`;
     };
 
-    const save = async (g: Group, el: HTMLElement) => {
-      const status = el.querySelector<HTMLElement>('[data-status]');
+    const save = async (g: Group, el?: HTMLElement) => {
+      const status = el?.querySelector<HTMLElement>('[data-status]');
       const text = texts.get(g.key) ?? '';
       try {
         const res = await fetch(`/api/admin/project/feedback?file=${encodeURIComponent(fileId)}`, {
@@ -460,8 +460,10 @@ if (!file) return Astro.redirect('/admin/project', 303);
         if (!res.ok) throw new Error(data.error ?? 'Could not save.');
         if (data.note) saved.set(g.key, data.note); else saved.delete(g.key);
         if (status && !pending.has(g.key)) { status.className = 'ok'; status.innerHTML = savedLine(g.key); }
+        return true;
       } catch (error) {
         if (status) { status.className = 'err'; status.textContent = `${error instanceof Error ? error.message : 'Could not save.'} Keep this tab open and try again.`; }
+        return false;
       }
     };
 
@@ -503,8 +505,20 @@ if (!file) return Astro.redirect('/admin/project', 303);
       const label = pdfBtn.textContent;
       pdfBtn.textContent = 'Generating…';
       try {
+        // The report must contain the latest text and its server-recorded staff attribution.
+        const dirty = [...pending.keys()];
+        for (const key of dirty) { clearTimeout(pending.get(key)); pending.delete(key); }
+        const savedLatest = await Promise.all(dirty.map((key) => {
+          const g = groups.find((candidate) => candidate.key === key);
+          return g ? save(g, cards.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`) ?? undefined) : true;
+        }));
+        if (savedLatest.some((ok) => !ok)) throw new Error('Some feedback could not be saved. Check the notes and try again');
         const unnumbered = groups.filter((g) => !g.numbered).length;
-        const rows = reportRows(groups, plan, new Map(groups.map((g) => [g.key, { text: texts.get(g.key) ?? '' } as Note])));
+        const reportNotes = new Map(groups.map((g) => {
+          const note = saved.get(g.key);
+          return [g.key, { text: texts.get(g.key) ?? '', entries: g.entries, updatedAt: note?.updatedAt ?? '', by: note?.by ?? '' } as Note];
+        }));
+        const rows = reportRows(groups, plan, reportNotes);
         const { feedbackPdf } = await import('@/scripts/feedback-pdf');
         const bytes = await feedbackPdf({ title, rows, generatedAt: new Date() });
         const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
