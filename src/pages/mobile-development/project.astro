@@ -1,0 +1,382 @@
+---
+import { render } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import Icon from '@/components/Icon.astro';
+import Rubric from '@/components/Rubric.astro';
+import Faq from '@/components/Faq.astro';
+import EmptyState from '@/components/EmptyState.astro';
+import { getProject, inline, formatDeadline, pad } from '@/lib/content';
+const project = await getProject();
+const d = project?.data;
+const rendered = project ? await render(project) : null;
+const Content = rendered?.Content;
+const required = d?.features.filter((f) => f.required) ?? [];
+const stretch = d?.features.filter((f) => !f.required) ?? [];
+const nav = d ? [
+  ['overview', 'Overview'],
+  ['results', 'Your result'],
+  ['files', 'Submissions'],
+  ['journey', 'Milestones'],
+  ['requirements', 'Requirements'],
+  ['features', 'Features'],
+  ['technical', 'Technical & UI'],
+  ['deliverables', 'Deliverables'],
+  ['evaluation', 'Evaluation'],
+  d.faq.length ? ['faq', 'FAQ'] : null,
+].filter(Boolean) as [string, string][] : [];
+---
+<Base title="Course Project" description={d?.description}>
+  {!d ? (
+    <div class="container" style="padding-block: 160px 120px">
+      <EmptyState title="The project brief is coming soon." body="It will be published here once the term begins." path="project/" />
+    </div>
+  ) : (
+    <>
+      <header class="pjh">
+        <div class="pjh-bg" aria-hidden="true"><div class="pjh-orb"></div></div>
+        <div class="container pjh-inner">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><span aria-current="page">project</span></nav>
+          <div class="pjh-top" data-reveal>
+            <span class="pjh-badge mono"><span class="live"></span> CAPSTONE · COURSE PROJECT</span>
+            <span class="mono pjh-due">Final due <b>{formatDeadline(d.deadline)}</b></span>
+          </div>
+          <h1 class="pjh-title" data-reveal style="--d:80ms">{d.tagline}</h1>
+          <p class="pjh-lead" data-reveal style="--d:160ms">{d.description}</p>
+          <dl class="pjh-stats" data-reveal style="--d:240ms">
+            <div><dt>Milestones</dt><dd>{pad(d.milestones.length)}</dd></div>
+            <div><dt>Required features</dt><dd>{pad(required.length)}</dd></div>
+            <div><dt>Not counted</dt><dd>{pad(stretch.length)}</dd></div>
+            <div><dt>Deliverables</dt><dd>{pad(d.deliverables.length)}</dd></div>
+          </dl>
+        </div>
+      </header>
+
+      <nav class="pj-subnav" aria-label="Project sections" data-subnav>
+        <div class="container"><ul>{nav.map(([id, label]) => <li><a href={`#${id}`} data-sub={id}>{label}</a></li>)}</ul></div>
+      </nav>
+
+      <div class="container pj-body">
+        <section id="overview" class="pj-sec pj-split">
+          <div>
+            <h2 class="h-2">Overview</h2>
+          </div>
+          <div class="stack" style="--stack:20px">
+            <p class="lead">{d.description}</p>
+            <div class="problem">
+              <p class="mono problem-k">The problem</p>
+              <p set:html={inline(d.problem)} />
+            </div>
+            {d.objectives.length > 0 && <ul class="dash-list">{d.objectives.map((o) => <li set:html={inline(o)} />)}</ul>}
+          </div>
+        </section>
+
+        <section id="results" class="pj-sec pj-split" data-pj-results hidden>
+          <div>
+            <h2 class="h-2">Your proposal result</h2>
+            <p class="muted pjr-intro">Type your student ID to see your group, the idea approved for it and your feedback. Only your own group is shown.</p>
+          </div>
+          <div class="pjr">
+            <form class="pjr-form" data-pjr-form novalidate>
+              <label for="pjr-id">Student ID</label>
+              <div class="pjr-row">
+                <input id="pjr-id" class="input mono" name="studentId" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="e.g. 241995" required />
+                <button class="btn btn-primary" type="submit">Show my result</button>
+              </div>
+              <p class="pjr-msg" role="status" data-pjr-msg></p>
+            </form>
+            <div class="pjr-out" data-pjr-out aria-live="polite"></div>
+          </div>
+        </section>
+
+        <section id="files" class="pj-sec pj-split" data-pj-files hidden>
+          <div><h2 class="h-2">Submissions</h2></div>
+          <div class="pjf-list" data-pj-file-list></div>
+        </section>
+
+        <section id="journey" class="pj-sec">
+          <h2 class="h-2">Milestones</h2>
+          <ol class="mj">
+            {d.milestones.map((m, i) => (
+              <li class="mj-item" data-reveal style={`--d:${i * 70}ms`}>
+                <div class="mj-head"><span class="mj-n mono">M{i + 1}</span><span class="mj-line" aria-hidden="true"></span></div>
+                <h3 class="mj-t">{m.name}</h3>
+                <p class="muted mj-d" set:html={inline(m.detail)} />
+                {m.due && <p class="mono mj-due">{m.due}</p>}
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section id="requirements" class="pj-sec pj-split">
+          <div><h2 class="h-2">Requirements</h2></div>
+          <ul class="check-list big">{d.requirements.map((r) => <li set:html={inline(r)} />)}</ul>
+        </section>
+
+        <section id="features" class="pj-sec">
+          <h2 class="h-2">Features</h2>
+          <div class="feat">
+            <div class="feat-col">
+              <p class="feat-k mono"><span class="badge badge-accent"><span class="dot"></span>Required</span></p>
+              {required.map((f, i) => <div class="feat-row"><span class="mono faint">{pad(i + 1)}</span><div><h3>{f.name}</h3><p class="muted" set:html={inline(f.detail)} /></div></div>)}
+            </div>
+            {stretch.length > 0 && (
+              <div class="feat-col stretch">
+                <p class="feat-k mono"><span class="badge badge-optional"><span class="dot"></span>Allowed · not counted</span></p>
+                {stretch.map((f) => <div class="feat-row"><span class="mono faint">+</span><div><h3>{f.name}</h3><p class="muted" set:html={inline(f.detail)} /></div></div>)}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section id="technical" class="pj-sec">
+          <div class="tu">
+            <div class="panel panel-pad">
+              <p class="mono tu-k"><Icon name="terminal" size={16} /> Technical requirements</p>
+              <ul class="dash-list mt-4">{d.technicalRequirements.map((r) => <li set:html={inline(r)} />)}</ul>
+            </div>
+            <div class="panel panel-pad">
+              <p class="mono tu-k"><Icon name="phone" size={16} /> UI requirements</p>
+              <ul class="dash-list mt-4">{d.uiRequirements.map((r) => <li set:html={inline(r)} />)}</ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="deliverables" class="pj-sec pj-split">
+          <div><h2 class="h-2">Deliverables</h2></div>
+          <ol class="dlv">{d.deliverables.map((x, i) => <li><span class="mono">{pad(i + 1)}</span><span set:html={inline(x)} /></li>)}</ol>
+        </section>
+
+        <section id="evaluation" class="pj-sec pj-split">
+          <div><h2 class="h-2">Evaluation</h2></div>
+          <Rubric items={d.evaluation} />
+        </section>
+
+        {Content && (
+          <section class="pj-sec pj-split">
+            <div><h2 class="h-2">Notes</h2></div>
+            <div class="prose"><Content /></div>
+          </section>
+        )}
+
+        {d.resources.length > 0 && (
+          <section id="resources" class="pj-sec pj-split">
+            <div><h2 class="h-2">Resources</h2></div>
+            <div class="row-list">{d.resources.map((r) => <a href={r.href} class="row" style="grid-template-columns:1fr 36px"><span>{r.label}</span><span class="go"><Icon name="arrow-up-right" /></span></a>)}</div>
+          </section>
+        )}
+
+        {d.faq.length > 0 && (
+          <section id="faq" class="pj-sec pj-split">
+            <div><h2 class="h-2">FAQ</h2></div>
+            <Faq items={d.faq} />
+          </section>
+        )}
+      </div>
+    </>
+  )}
+</Base>
+
+<style>
+  .pjh { position: relative; overflow: hidden; isolation: isolate; background: var(--hero-bg); color: var(--hero-text); padding-top: calc(var(--nav-h) + 64px); padding-bottom: 72px; }
+  .pjh .crumbs { color: var(--hero-dim); }
+  .pjh-bg { position: absolute; inset: 0; z-index: -1; }
+    .pjh-orb { position: absolute; width: 720px; height: 720px; right: -160px; top: -260px; border-radius: 50%; background: radial-gradient(circle, var(--hero-glow), transparent 62%); filter: blur(20px); }
+  .pjh-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+  .pjh-badge { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: 0.12em; color: var(--hero-accent); }
+  .pjh-badge .live { width: 8px; height: 8px; border-radius: 50%; background: var(--hero-accent); animation: pulse-ring 2s infinite; }
+  .pjh-due { font-size: 12px; color: var(--hero-muted); }
+  .pjh-due b { color: var(--hero-warn); font-weight: 500; }
+  .pjh-title { margin-top: 32px; font-size: clamp(3rem, 1.4rem + 6vw, 7.5rem); line-height: 0.92; letter-spacing: -0.05em; font-weight: 700; max-width: 13ch; }
+  .pjh-lead { margin-top: 28px; font-size: var(--fs-md); color: var(--hero-lead); max-width: 58ch; }
+  .pjh-stats { margin-top: 56px; display: grid; grid-template-columns: repeat(2, 1fr); border-top: 1px solid var(--hero-line); }
+  @media (min-width: 720px) { .pjh-stats { grid-template-columns: repeat(4, 1fr); } }
+  .pjh-stats > div { padding: 20px 20px 0 0; }
+  .pjh-stats dt { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--hero-dim); }
+  .pjh-stats dd { font-family: var(--font-display); font-size: 48px; font-weight: 600; letter-spacing: -0.04em; margin-top: 6px; line-height: 1; }
+
+  .pj-subnav { position: sticky; top: 56px; z-index: 50; background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+  .pj-subnav ul { list-style: none; padding: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .pj-subnav a { position: relative; display: block; padding: 14px 12px; font-size: 13.5px; color: var(--text-3); white-space: nowrap; transition: color var(--t-fast); }
+  .pj-subnav a:hover, .pj-subnav a.active { color: var(--text); }
+  .pj-subnav a.active::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 2px; background: var(--accent); }
+
+  .pj-body { padding-bottom: var(--section-y); }
+  .pj-sec { padding-block: clamp(56px, 7vw, 104px); border-bottom: 1px solid var(--line); scroll-margin-top: calc(var(--nav-h) + 56px); }
+  .pj-sec:last-child { border-bottom: 0; }
+  .pj-split { display: grid; gap: 32px; }
+  @media (min-width: 960px) { .pj-split { grid-template-columns: 340px 1fr; gap: 64px; } }
+  .problem { padding: 24px; border-radius: var(--r-lg); background: color-mix(in oklab, var(--warn) 7%, var(--surface)); border: 1px solid color-mix(in oklab, var(--warn) 40%, var(--line)); color: var(--text); font-size: 1.05rem; }
+  .problem-k { font-size: 12px; color: var(--warn); margin-bottom: 8px; }
+
+  .mj { list-style: none; padding: 0; margin-top: 48px; display: grid; gap: 32px; }
+  @media (min-width: 900px) { .mj { grid-template-columns: repeat(var(--n, 5), 1fr); gap: 0; } }
+  .mj-item { display: grid; gap: 10px; align-content: start; padding-right: 24px; }
+  .mj-head { display: flex; align-items: center; gap: 0; }
+  .mj-n { flex: none; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 13px; background: var(--surface); border: 1px solid var(--line-2); }
+  .mj-item:last-child .mj-n { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .mj-line { flex: 1; height: 1px; background: repeating-linear-gradient(90deg, var(--line-2) 0 6px, transparent 6px 12px); margin-left: 8px; }
+  .mj-item:last-child .mj-line { display: none; }
+  @media (max-width: 899px) { .mj-line { display: none; } }
+  .mj-t { font-size: var(--fs-lg); margin-top: 12px; }
+  .mj-d { font-size: 14.5px; }
+  .mj-due { font-size: 12px; color: var(--accent-text); }
+
+  .check-list.big li { font-size: 1.05rem; color: var(--text); padding-block: 4px; }
+  .feat { margin-top: 40px; display: grid; gap: 24px; }
+  @media (min-width: 900px) { .feat { grid-template-columns: 1.4fr 1fr; gap: 40px; } }
+  .feat-col { border-top: 1px solid var(--line-2); }
+  .feat-k { padding: 16px 0; }
+  .feat-row { display: grid; grid-template-columns: 36px 1fr; gap: 12px; padding: 18px 0; border-top: 1px solid var(--line); }
+  .feat-row h3 { font-family: var(--font-body); font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+  .feat-row p { font-size: 14.5px; margin-top: 2px; }
+  .feat-col.stretch { border-top-style: dashed; border-top-color: color-mix(in oklab, var(--info) 50%, var(--line)); }
+  .tu { display: grid; gap: 16px; }
+  @media (min-width: 900px) { .tu { grid-template-columns: 1fr 1fr; } }
+  .tu-k { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--accent-text); }
+  .dlv { list-style: none; padding: 0; counter-reset: d; border-top: 1px solid var(--line); }
+  .dlv li { display: grid; grid-template-columns: 48px 1fr; gap: 12px; padding: 18px 0; border-bottom: 1px solid var(--line); font-size: 1.05rem; }
+  .dlv .mono { color: var(--accent-text); font-size: 13px; padding-top: 3px; }
+  .pjf-list { display: grid; gap: 12px; }
+  :global(.pjf) { display: grid; gap: 14px; padding: 20px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); }
+  @media (min-width: 720px) { :global(.pjf) { grid-template-columns: 1fr auto; align-items: center; } }
+  :global(.pjf.is-new) { border-color: color-mix(in oklab, var(--accent-text) 55%, var(--line-2)); box-shadow: 0 0 0 4px var(--accent-soft); }
+  :global(.pjf-t) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; }
+  :global(.pjf-t a) { display: inline-block; padding-block: 3px; }
+  :global(.pjf-t a:hover) { color: var(--accent-text); }
+  :global(.pjf-new) { padding: 2px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 700 12px/1.5 var(--font-mono); letter-spacing: .08em; }
+  :global(.pjf-closed) { padding: 2px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text-3); font: 600 12px/1.5 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+  :global(.pjf-d) { margin-top: 6px; font-size: 14.5px; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  :global(.pjf small) { display: block; margin-top: 8px; font-size: 12px; color: var(--text-3); }
+  :global(.pjf-due) { color: var(--warn); }
+  :global(.pjf-act) { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .pjr { display: grid; gap: 16px; min-width: 0; }
+  .pjr-form { display: grid; gap: 8px; }
+  .pjr-form label { font-weight: 600; font-size: 14px; }
+  .pjr-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .pjr-row .input { flex: 1 1 200px; max-width: 280px; }
+  .pjr-msg { min-height: 20px; font-size: 14px; color: var(--text-2); margin: 0 !important; }
+  .pjr-msg.err { color: var(--danger); }
+  :global(.pjr-card) { display: grid; gap: 12px; padding: 20px; border: 1px solid color-mix(in oklab, var(--accent-text) 40%, var(--line)); border-radius: var(--r-lg); background: var(--surface); }
+  :global(.pjr-card + .pjr-card) { margin-top: 4px; }
+  :global(.pjr-item) { font-size: 12px; color: var(--text-3); margin: 0 !important; }
+  :global(.pjr-group) { margin: 0 !important; font-size: var(--fs-xl); letter-spacing: -0.03em; }
+  :global(.pjr-team) { border-top: 0; padding-top: 0; }
+  :global(.pjr-members) { list-style: none; margin: 0 !important; padding: 0; display: grid; gap: 4px; }
+  :global(.pjr-members li) { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); color: var(--text); }
+  :global(.pjr-members .mono) { font-size: 13px; color: var(--text-2); }
+  :global(.pjr-block) { display: grid; gap: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+  :global(.pjr-label) { font: 600 12px var(--font-mono); color: var(--text-3); }
+  :global(.pjr-idea) { margin: 0 !important; font-size: 1.15rem; font-weight: 600; color: var(--text); }
+  :global(.pjr-fb) { margin: 0 !important; white-space: pre-wrap; color: var(--text); line-height: 1.6; }
+  :global(.pjr-none) { margin: 0 !important; color: var(--text-3); }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  import { enablePreviewButtons } from '@/scripts/file-preview';
+  type ProjectFile = { id: string; title: string; description: string; kind: string; due_at: string | null; cutoff_at: string | null; url: string | null; size: number | null; accepting: boolean; created_at: string };
+  const NEW_FOR_MS = 14 * 24 * 60 * 60 * 1000; // keep in sync with lib/project-files/core.ts
+  // Mirror canSubmit / isNew in lib/project-files/core.ts.
+  const canSubmit = (f: ProjectFile) => f.accepting && !(f.cutoff_at && Date.parse(f.cutoff_at) < Date.now());
+  const isNew = (f: ProjectFile) => canSubmit(f) && Date.now() - Date.parse(f.created_at) < NEW_FOR_MS && !(f.due_at && Date.parse(f.due_at) < Date.now());
+  const kb = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+  const KIND: Record<string, string> = { proposal: 'Proposal submission', brief: 'Brief', template: 'Template', other: 'Document' };
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const day = (s: string) => new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+  /** Published items come from the admin (/admin/project), so they load at runtime, not at build time. */
+  async function loadFiles() {
+    const sec = document.querySelector<HTMLElement>('[data-pj-files]');
+    const list = sec?.querySelector<HTMLElement>('[data-pj-file-list]');
+    const link = document.querySelector<HTMLElement>('[data-sub="files"]')?.parentElement;
+    if (!sec || !list) return;
+    if (link) link.hidden = true;
+    const data = await fetch('/api/project/files').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const files: ProjectFile[] = data?.files ?? [];
+    if (!files.length) return;
+    list.innerHTML = files.map((f) => {
+      const submit = `/mobile-development/submit/${encodeURIComponent(f.id)}`;
+      const title = f.accepting ? `<a href="${submit}">${esc(f.title)}</a>` : esc(f.title);
+      const closed = (f.accepting || f.kind === 'proposal') && !canSubmit(f);
+      const meta = [esc(KIND[f.kind] ?? 'Document'), f.url && f.size ? `PDF · ${kb(f.size)}` : '', f.due_at ? `<span class="pjf-due">due ${day(f.due_at)}</span>` : ''].filter(Boolean).join(' · ');
+      return `
+      <article class="pjf${isNew(f) ? ' is-new' : ''}">
+        <div>
+          <h3 class="pjf-t">${title}${isNew(f) ? '<span class="pjf-new">NEW</span>' : ''}${closed ? '<span class="pjf-closed">Closed</span>' : ''}</h3>
+          ${f.description ? `<p class="pjf-d">${esc(f.description)}</p>` : ''}
+          <small class="mono">${meta}</small>
+        </div>
+        <div class="pjf-act">
+          ${f.url ? `<button class="btn btn-ghost btn-sm" type="button" data-preview-url="${esc(f.url)}" data-preview-title="${esc(f.title)}" data-preview-meta="${esc(KIND[f.kind] ?? 'Document')}" data-preview-group="project-files">Preview</button><a class="btn btn-ghost btn-sm" href="${esc(f.url)}" target="_blank" rel="noopener">Download PDF ↓</a>` : ''}
+          ${canSubmit(f) ? `<a class="btn btn-primary btn-sm" href="${submit}">Submit →</a>` : ''}
+        </div>
+      </article>`;
+    }).join('');
+    sec.hidden = false;
+    if (link) link.hidden = false;
+  }
+
+  /** Proposal results: shown only once staff publish them; a student sees their own group by typing their ID. */
+  async function loadResults() {
+    const sec = document.querySelector<HTMLElement>('[data-pj-results]');
+    const link = document.querySelector<HTMLElement>('[data-sub="results"]')?.parentElement;
+    if (link) link.hidden = true;
+    if (!sec || sec.dataset.wired) return;
+    const data = await fetch('/api/project/result').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!data?.items?.length) return;
+    sec.dataset.wired = '1';
+    sec.hidden = false;
+    if (link) link.hidden = false;
+    const form = sec.querySelector<HTMLFormElement>('[data-pjr-form]')!;
+    const input = form.querySelector<HTMLInputElement>('input')!;
+    const msg = sec.querySelector<HTMLElement>('[data-pjr-msg]')!;
+    const out = sec.querySelector<HTMLElement>('[data-pjr-out]')!;
+    type Result = { item: string; group: string; members: { name: string; id: string }[]; idea: string; feedback: string | null };
+    const card = (r: Result) => `
+      <article class="pjr-card">
+        <p class="pjr-item mono">${esc(r.item)}</p>
+        <h3 class="pjr-group">${esc(r.group)}</h3>
+        <div class="pjr-block pjr-team"><span class="pjr-label">Members</span><ul class="pjr-members">${r.members.map((m) => `<li><span>${esc(m.name)}</span><span class="mono">${esc(m.id)}</span></li>`).join('')}</ul></div>
+        <div class="pjr-block"><span class="pjr-label">Approved idea</span>${r.idea ? `<p class="pjr-idea">${esc(r.idea)}</p>` : '<p class="pjr-none">No idea approved yet. Check again later or ask your TA.</p>'}</div>
+        <div class="pjr-block"><span class="pjr-label">Feedback</span>${r.feedback ? `<p class="pjr-fb">${esc(r.feedback)}</p>` : '<p class="pjr-none">No feedback.</p>'}</div>
+      </article>`;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = input.value.trim().toUpperCase();
+      out.innerHTML = '';
+      if (!/^[A-Z0-9]{3,20}$/.test(id)) { input.setAttribute('aria-invalid', 'true'); msg.className = 'pjr-msg err'; msg.textContent = 'Type your student ID (letters and numbers only).'; input.focus(); return; }
+      input.removeAttribute('aria-invalid');
+      msg.className = 'pjr-msg'; msg.textContent = 'Looking up your group…';
+      const res = await fetch(`/api/project/result?studentId=${encodeURIComponent(id)}`, { cache: 'no-store' }).catch(() => null);
+      const body = res ? await res.json().catch(() => ({})) : {};
+      if (!res || !res.ok) { msg.className = 'pjr-msg err'; msg.textContent = body.error ?? 'Could not load your result. Check your connection and try again.'; return; }
+      const results: Result[] = body.results ?? [];
+      if (!results.length) { msg.className = 'pjr-msg err'; msg.textContent = `No group found for ${id}. Check the ID, or ask your TA if you think you should be in a group.`; return; }
+      msg.textContent = '';
+      out.innerHTML = results.map(card).join('');
+    });
+  }
+
+  onPageLoad( () => {
+    enablePreviewButtons();
+    loadResults();
+    loadFiles();
+    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-sub]'));
+    if (!links.length) return;
+    const n = document.querySelectorAll('.mj-item').length;
+    document.querySelector<HTMLElement>('.mj')?.style.setProperty('--n', String(n));
+    const io = new IntersectionObserver((es) => {
+      es.forEach((e) => {
+        if (!e.isIntersecting) return;
+        links.forEach((l) => {
+          const on = l.dataset.sub === e.target.id;
+          l.classList.toggle('active', on);
+          if (on) { const ul = l.closest('ul')!; ul.scrollTo({ left: l.offsetLeft - ul.clientWidth / 2 + l.offsetWidth / 2, behavior: 'smooth' }); }
+        });
+      });
+    }, { rootMargin: '-30% 0px -60% 0px' });
+    links.forEach((l) => { const t = document.getElementById(l.dataset.sub!); if (t) io.observe(t); });
+    document.addEventListener('astro:before-swap', () => io.disconnect(), { once: true });
+  });
+</script>

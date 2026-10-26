@@ -8,9 +8,10 @@
 import { getSecret } from 'astro:env/server';
 import { getCollection } from 'astro:content';
 import { getPlayground } from '@/lib/playgrounds';
-import { EXERCISES as LAB02_EXERCISES } from '@/lab/exercises/lab-02/meta';
+import { exerciseMeta } from '@/lab/exercises/registry';
+import { claimedByFileLab } from '@/lib/lab/claimed';
 import { noStore } from '@/lib/attendance/server';
-import { exerciseStats, labStructure, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
+import { exerciseStats, labStructure, liveClass, moduleStats, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
 import { NeonStore, type ProgressStore } from './store';
 import { publishedLabSources } from '@/lib/platform/server';
 import { splitLabKey } from '@/lib/platform/core';
@@ -51,7 +52,8 @@ export async function getStructures(): Promise<LabStructure[]> {
     builderLabs = {
       at: Date.now(),
       labs: publishedLabSources()
-        .then((sources) => sources.map((l) => labStructure(l.key, l.title, l.outline, (id) => {
+        // a builder lab rewritten as a file lab is counted once, as the file lab
+        .then((sources) => sources.filter((l) => !claimedByFileLab(l.key)).map((l) => labStructure(l.key, l.title, l.outline, (id) => {
           const ex = l.exercises[id];
           return ex ? { title: ex.title, checks: ex.checks.length } : null;
         })))
@@ -67,12 +69,12 @@ function fileStructures(): Promise<LabStructure[]> {
   structures = (async () => {
     const labs = (await getCollection('labs', (e) => !e.data.draft)).sort((a, b) => a.data.number - b.data.number);
     return labs.map((lab) =>
-      labStructure(lab.id, `Lab ${String(lab.data.number).padStart(2, '0')}: ${lab.data.title}`, lab.body ?? '', (id) => {
+      labStructure(lab.data.trackingKey ?? lab.id, `Lab ${String(lab.data.number).padStart(2, '0')}: ${lab.data.title}`, lab.body ?? '', (id) => {
         try {
           const p = getPlayground(id);
           return { title: p.title, checks: p.checks.length };
         } catch {
-          const exercise = lab.id === 'lab-02' ? LAB02_EXERCISES.find((item) => item.id === id) : null;
+          const exercise = exerciseMeta(id);
           return exercise ? { title: exercise.title, checks: 1, task: String(exercise.block) } : null;
         }
       }),
@@ -120,7 +122,7 @@ export async function studentWrite<V extends Identity>(
     }
     if ((await s.hit(`w:${v.value.deviceKey}`, WINDOW_SEC)) > WRITES_PER_WINDOW) return json({ error: 'slow-down' }, 429);
     if ((await s.touchStudent(v.value)) === 'conflict') {
-      return json({ error: 'device', message: 'This browser is linked to another student, or this student ID is linked to another device. Ask your TA to use “Allow new device”.' }, 409);
+      return json({ error: 'device', message: 'This student ID was already used with a different name. Type your name exactly as you did before, or ask your TA to fix it.' }, 409);
     }
     const out = await act(s, { ...v.value, sessionId });
     return out instanceof Response ? out : json({ ok: true, ...(out ?? {}) });
@@ -173,9 +175,20 @@ async function labChoices(labs: LabStructure[]) {
       title: key && l.title.startsWith(`${moduleTitle}: `) ? l.title.slice(moduleTitle.length + 2) : l.title,
       module, moduleTitle, faculty,
       facultyName: faculty === ANY_FACULTY ? 'All faculties' : facultyName.get(faculty) ?? faculty,
-      href: key ? `/m/${key.module}/${key.lab}` : `/labs/${l.lab}`,
+      href: claimedByFileLab(l.lab) ? `/mobile-development/labs/${claimedByFileLab(l.lab)}` : key ? `/${key.module}/${key.lab}` : `/mobile-development/labs/${l.lab}`,
     };
   });
+}
+
+/** The statistics page for one module: every lab the person may see, across all sessions. */
+export async function buildStats(moduleSlug: string, allow: (lab: string) => boolean) {
+  const s = getProgressStore();
+  if (!s) return null;
+  const labs = (await getStructures()).filter((l) => allow(l.lab) && (splitLabKey(l.lab)?.module ?? 'mobile-development') === moduleSlug);
+  const titles = new Map((await labChoices(labs)).map((c) => [c.id, c.title]));
+  const raw = labs.length ? await s.statsRaw(labs.map((l) => l.lab)) : { sessions: [], best: [], tasks: [], subs: [], members: [], heat: [] };
+  const stats = moduleStats(labs.map((l) => ({ ...l, title: titles.get(l.lab) ?? l.title })), raw);
+  return { ...stats, updatedAt: new Date().toISOString() };
 }
 
 /** Everything /admin/progress shows for one lab. */
@@ -189,9 +202,9 @@ export async function buildDashboard(labParam: string | null, sessionParam?: str
   if (!structure || !s) return null;
   const sessions = await s.listSessions(structure.lab);
   const selected = sessions.find((session) => session.id === sessionParam) ?? sessions[0] ?? null;
-  const data = selected
-    ? await s.labData(structure.lab, selected.id)
-    : { students: [], best: [], tasks: [], submissions: [], checkins: [], views: [] };
+  const [data, activity] = selected
+    ? await Promise.all([s.labData(structure.lab, selected.id), s.activity(selected.id)])
+    : [{ students: [], best: [], tasks: [], submissions: [], checkins: [], views: [] }, { last: [], active: [], events: [] }];
   const students: DashboardStudent[] = data.students.map((st) => {
     const best = data.best.filter((b) => b.student_key === st.student_key);
     const tasksDone = data.tasks.find((t) => t.student_key === st.student_key)?.done ?? 0;
@@ -219,7 +232,10 @@ export async function buildDashboard(labParam: string | null, sessionParam?: str
   });
   students.sort((a, b) => b.percent - a.percent || a.name.localeCompare(b.name));
   const exercises = exerciseStats(structure, data.students.map((st) => data.best.filter((b) => b.student_key === st.student_key)));
+  const live = liveClass(structure, students, activity, Date.now());
+  const names = new Map(students.map((st) => [st.key, st.name]));
   return {
+    live: { ...live, events: activity.events.filter((e) => names.has(e.student_key)).map((e) => ({ ...e, name: names.get(e.student_key)! })) },
     labs: await labChoices(labs),
     structure,
     students,

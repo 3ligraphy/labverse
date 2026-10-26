@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const page = fs.readFileSync(new URL('../src/pages/labs/[id].astro', import.meta.url), 'utf8');
+const page = fs.readFileSync(new URL('../src/pages/mobile-development/labs/[id].astro', import.meta.url), 'utf8');
 const lab02 = fs.readFileSync(new URL('../src/content/labs/lab-02.mdx', import.meta.url), 'utf8');
 const interactiveCss = fs.readFileSync(new URL('../src/styles/lab-interactive.css', import.meta.url), 'utf8');
 const admin = fs.readFileSync(new URL('../src/pages/admin/sessions.astro', import.meta.url), 'utf8');
@@ -14,9 +14,11 @@ test('every mission lab asks for identity but keeps lesson content visible in re
   assert.ok(start > 0 && content > start, 'the required identity card must precede the lesson');
   assert.doesNotMatch(interactiveCss, /\.ls:not\(\.is-signed\)\s*~\s*\*\s*\{\s*display:\s*none/);
   assert.match(interactiveCss, /data-session-access='readonly'/);
-  assert.match(labStart, /dataset\.sessionAccess = current \? 'active' : practice \? 'practice' : 'readonly'/);
-  // practice mode still keeps attendance and submissions behind a running session
-  assert.ok(labStart.includes("sessionAccess === 'practice' && !target.closest('[data-repo-submit],[data-checkin]')"));
+  assert.match(labStart, /dataset\.sessionAccess = current \? 'active' : staff \? 'staff' : practice \? 'practice' : 'readonly'/);
+  // practice mode and the staff preview still keep attendance and submissions behind a running session
+  assert.ok(labStart.includes("/^(practice|staff)$/.test(labRoot.dataset.sessionAccess ?? '') && !target.closest('[data-repo-submit],[data-checkin]')"));
+  // staff (anyone signed in who is not a student) try the lab without a session
+  assert.match(labStart, /u\.role !== 'student'\) \{\s*\/\/[^\n]*\n\s*staff = true;/);
 });
 
 test('attendance is the final lab card before previous/next navigation', () => {
@@ -41,6 +43,6 @@ test('admin attendance comes from verified lab identities, not the legacy attend
   assert.match(admin, /student\.checkedInAt/);
   assert.doesNotMatch(admin, /getStore\(\)\?\.list/);
   assert.doesNotMatch(admin, /\/api\/admin\/entries/);
-  assert.match(labStart, /Verifying this student and device/);
-  assert.ok(labStart.indexOf("fetch('/api/lab/progress'") < labStart.indexOf('setStudent({ name, id })'));
+  // the identity is saved only after the server accepted it
+  assert.ok(labStart.indexOf("fetch('/api/lab/progress'") < labStart.indexOf('setStudent({ name, id,'));
 });

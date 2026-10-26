@@ -31,7 +31,7 @@
 .ls .ls-session { grid-column: 1 / -1; }
 /* outside a session the content stays fully readable; only the blocked controls look unavailable */
 [data-lab][data-session-access='readonly'] :is([data-exercise] button, [data-playground] button, [data-repo-submit] :is(input, button), [data-checkin] button, .task-done),
-[data-lab][data-session-access='practice'] :is([data-repo-submit] :is(input, button), [data-checkin] button) { opacity: 0.55; cursor: not-allowed !important; }
+[data-lab]:is([data-session-access='practice'], [data-session-access='staff']) :is([data-repo-submit] :is(input, button), [data-checkin] button) { opacity: 0.55; cursor: not-allowed !important; }
 [data-lab][data-session-access='readonly'] .cm-editor { cursor: not-allowed; }
 .lab-gate-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 10px 0 0; padding: 12px 14px; border-radius: var(--r-md); border: 1px solid color-mix(in oklab, var(--warn) 45%, var(--line)); background: color-mix(in oklab, var(--warn) 9%, var(--surface)); font-size: var(--fs-sm); color: var(--text); }
 .lab-gate-note:empty { display: none; }

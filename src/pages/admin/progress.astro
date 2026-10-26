@@ -64,6 +64,23 @@ import AdminShell from '@/components/admin/AdminShell.astro';
           <div class="pa-stat stg" style="--i:4"><span class="mono">Repos submitted</span><b><i data-pa-stat="submitted">0</i><small data-pa-of></small></b></div>
         </div>
 
+        <section class="pa-card lc" data-lc aria-labelledby="lc-title">
+          <div class="lc-head">
+            <div>
+              <h2 class="pa-t" id="lc-title">Live class</h2>
+              <p class="lc-sum" data-lc-sum>Waiting for the first update…</p>
+            </div>
+            <div class="lc-filter" role="group" aria-label="Show students" data-lc-filter></div>
+          </div>
+          <div class="lc-body">
+            <div class="lc-tiles" data-lc-tiles></div>
+            <aside class="lc-feed" aria-label="Latest activity">
+              <h3>Latest activity</h3>
+              <ol data-lc-feed></ol>
+            </aside>
+          </div>
+        </section>
+
         <div class="pa-grid">
           <section class="pa-card pa-ex" data-reveal>
             <h2 class="pa-t">Exercises</h2>
@@ -164,6 +181,50 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .pa-stat b i { font-style: normal; }
   .pa-stat small { font-size: 1rem; color: var(--text-3); margin-left: 4px; font-weight: 500; }
 
+  /* live class */
+  .lc { display: grid; gap: 16px; margin-bottom: 16px; }
+  .lc-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 20px; }
+  .lc-sum { margin-top: 4px; font-size: 14px; color: var(--text-2); }
+  .lc-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+  .lc-filter :global(.chip) { display: inline-flex; align-items: center; gap: 6px; }
+  .lc-filter :global(.chip b) { font: 600 12px var(--font-mono); font-variant-numeric: tabular-nums; }
+  .lc-body { display: grid; gap: 16px; }
+  @media (min-width: 1100px) { .lc-body { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; } }
+  .lc-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; align-content: start; }
+  .lc-tiles :global(.lc-empty) { grid-column: 1 / -1; padding: 22px 8px; text-align: center; color: var(--text-3); }
+  .lc-tiles :global(.lc-tile) { --st: var(--ok); display: grid; gap: 8px; padding: 12px 14px; text-align: left; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); min-width: 0; transition: border-color var(--t-fast), background var(--t-fast); }
+  .lc-tiles :global(.lc-tile:hover) { border-color: var(--text-3); }
+  .lc-tiles :global(.lc-tile:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .lc-tiles :global(.lc-tile.help) { --st: var(--danger); border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); background: color-mix(in oklab, var(--danger) 7%, var(--surface)); }
+  .lc-tiles :global(.lc-tile.idle) { --st: var(--warn); }
+  .lc-tiles :global(.lc-tile.away) { --st: var(--text-3); opacity: .78; }
+  .lc-tiles :global(.lc-tile.done) { --st: var(--accent-text); }
+  .lc-tiles :global(.lc-tile.new) { animation: lc-new 2.4s var(--ease-out); }
+  @keyframes lc-new { 0%, 30% { box-shadow: 0 0 0 3px color-mix(in oklab, var(--st) 45%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .lc-tiles :global(.lc-top) { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .lc-tiles :global(.lc-dot) { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--st); }
+  .lc-tiles :global(.lc-tile.active .lc-dot) { animation: pa-pulse 2s var(--ease-out) infinite; }
+  .lc-tiles :global(.lc-name) { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lc-tiles :global(.lc-pct) { font: 600 12.5px var(--font-mono); color: var(--text-2); }
+  .lc-tiles :global(.lc-id) { font: 12px var(--font-mono); color: var(--text-3); }
+  .lc-tiles :global(.lc-on) { font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lc-tiles :global(.lc-on b) { font: 600 12px var(--font-mono); color: var(--text); margin-right: 4px; }
+  .lc-tiles :global(.lc-why) { font-size: 12.5px; font-weight: 600; color: var(--st); }
+  .lc-tiles :global(.lc-tile.active .lc-why), .lc-tiles :global(.lc-tile.away .lc-why) { font-weight: 500; }
+  .lc-feed { border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface-2); padding: 12px 14px; min-width: 0; }
+  .lc-feed h3 { font: 600 12px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .lc-feed ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; max-height: 420px; overflow-y: auto; }
+  .lc-feed :global(li) { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: 13px; }
+  .lc-feed :global(li i) { font-style: normal; font-weight: 700; text-align: center; }
+  .lc-feed :global(li.ok i) { color: var(--ok); }
+  .lc-feed :global(li.fail i) { color: var(--danger); }
+  .lc-feed :global(li.task i) { color: var(--accent-text); }
+  .lc-feed :global(li span) { min-width: 0; overflow-wrap: anywhere; color: var(--text-2); }
+  .lc-feed :global(li span b) { color: var(--text); font-weight: 600; }
+  .lc-feed :global(li time) { font: 11.5px var(--font-mono); color: var(--text-3); white-space: nowrap; }
+  .lc-feed :global(.lc-none) { display: block; color: var(--text-3); }
+  @media (prefers-reduced-motion: reduce) { .lc-tiles :global(.lc-tile.new), .lc-tiles :global(.lc-tile.active .lc-dot) { animation: none; } }
+
   .pa-grid { display: grid; gap: 16px; }
   @media (min-width: 1100px) { .pa-grid { grid-template-columns: 340px minmax(0, 1fr); align-items: start; } .pa-ex { position: sticky; top: calc(var(--nav-h) + 16px); } }
 
@@ -262,7 +323,13 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     totals: { active: number; avgPercent: number; solved: number; submitted: number; checkedIn: number };
     session: (Session & { open: boolean; closesAt: string | null }) | { open: false; closesAt: null };
     sessions: Session[];
+    live: {
+      rows: { key: string; status: Live; working: string | null; fails: number; lastActive: string | null; why: string }[];
+      counts: Record<Live, number>;
+      events: { student_key: string; name: string; kind: 'check' | 'task'; ref: string; passed: number; total: number; at: string }[];
+    };
   };
+  type Live = 'help' | 'active' | 'idle' | 'away' | 'done';
   type Attempt = { id: number; exercise: string; passed: number; total: number; code: string; created_at: string };
   type Detail = { attempts: Attempt[]; tasks: { task: string; done: boolean }[]; submission: { url: string; reviewed: boolean; note: string } | null; checkin: string | null; views: { seen: string[]; active_sec: number } | null };
 
@@ -279,9 +346,15 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     for (const kid of kids) if (kid != null && kid !== false) el.append(kid);
     return el;
   }
-  const short = (id: string) => (id.match(/^e0*(\d+)/i) ? `E${id.match(/^e0*(\d+)/i)![1]}` : id);
+  let exOrder: string[] = []; // the current lab's exercise ids, so long builder ids read as E1, E2…
+  const short = (id: string) => {
+    const m = id.match(/^e0*(\d+)/i);
+    if (m) return `E${m[1]}`;
+    const i = exOrder.indexOf(id);
+    return i >= 0 ? `E${i + 1}` : id;
+  };
   const tone = (p: number) => (p >= 80 ? 'ok' : p >= 40 ? 'mid' : p > 0 ? 'low' : '');
-  const bar = (p: number) => h('div', { class: `pa-bar ${tone(p)}`, role: 'progressbar', 'aria-valuenow': p, 'aria-valuemin': 0, 'aria-valuemax': 100 }, h('i', { style: `--p:${p / 100}` }));
+  const bar = (p: number, toned = true) => h('div', { class: `pa-bar ${toned ? tone(p) : ''}`, role: 'progressbar', 'aria-valuenow': p, 'aria-valuemin': 0, 'aria-valuemax': 100 }, h('i', { style: `--p:${p / 100}` }));
   const ago = (iso: string) => {
     const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
     if (s < 45) return 'just now';
@@ -316,6 +389,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     let sort: 'percent' | 'name' | 'lastSeen' = 'percent';
     let query = '';
     let openKey: string | null = null;
+    let liveFilter: Live | 'all' = 'all';
+    const liveWas = new Map<string, Live>(); // key → last status, to flash students who just changed
     const seen = new Map<string, string>(); // key → signature, to flash changed rows
     let timer = 0;
 
@@ -350,6 +425,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     function render() {
       if (!data) return;
       const d = data;
+      exOrder = d.structure.exercises.map((e) => e.id);
       // lab picker + csv
       renderLabPicker(picker(), d.labs, d.structure.lab);
       $<HTMLAnchorElement>('[data-pa-csv]').href = `/api/admin/progress/export?lab=${encodeURIComponent(d.structure.lab)}${sessionId ? `&session=${encodeURIComponent(sessionId)}` : ''}`;
@@ -358,6 +434,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       $('[data-pa-of]').textContent = d.structure.hasSubmission ? ` / ${d.totals.active}` : ' · none asked';
       $('[data-pa-of-ci]').textContent = ` / ${d.totals.active}`;
       renderCheckinControl(d);
+      renderLive(d);
 
       // exercise overview
       const hardest = d.exercises.length && d.totals.active ? d.exercises.reduce((a, b) => (b.solvedPct < a.solvedPct ? b : a)).id : '';
@@ -427,6 +504,58 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       $('[data-pa-empty]').hidden = d.students.length > 0;
     }
 
+    /* ------- live class ------- */
+    const LIVE_ORDER: Live[] = ['help', 'idle', 'away', 'active', 'done'];
+    const LIVE_LABEL: Record<Live, string> = { help: 'Need help', idle: 'Quiet', away: 'Away', active: 'Working', done: 'Done' };
+    const baseTitle = document.title;
+    function renderLive(d: Data) {
+      const { rows, counts, events } = d.live;
+      const byKey = new Map(d.students.map((s) => [s.key, s]));
+      const title = (id: string | null) => d.structure.exercises.find((e) => e.id === id)?.title ?? '';
+      const open = 'id' in d.session && d.session.open;
+      $('[data-lc-sum]').textContent = !rows.length
+        ? 'No one has joined this session yet.'
+        : `${open ? 'Live now' : 'Session closed, last known state'} · ${counts.active} working · ${counts.help} need help · ${counts.idle} quiet · ${counts.away} away · ${counts.done} done`;
+      document.title = counts.help && open ? `(${counts.help}) need help · ${baseTitle}` : baseTitle;
+
+      $('[data-lc-filter]').replaceChildren(
+        ...(['all', ...LIVE_ORDER] as const).map((f) =>
+          h('button', { type: 'button', class: 'chip', 'aria-pressed': String(liveFilter === f), onclick: () => { liveFilter = f; renderLive(d); } },
+            f === 'all' ? 'All' : LIVE_LABEL[f], h('b', {}, String(f === 'all' ? rows.length : counts[f])))),
+      );
+
+      const first = liveWas.size === 0;
+      const shown = rows
+        .filter((r) => liveFilter === 'all' || r.status === liveFilter)
+        .sort((a, b) => LIVE_ORDER.indexOf(a.status) - LIVE_ORDER.indexOf(b.status) || b.fails - a.fails || (byKey.get(a.key)?.name ?? '').localeCompare(byKey.get(b.key)?.name ?? ''));
+      $('[data-lc-tiles]').replaceChildren(
+        ...(shown.length ? shown.map((r) => {
+          const s = byKey.get(r.key)!;
+          const changed = !first && liveWas.get(r.key) !== r.status && (r.status === 'help' || r.status === 'done');
+          return h('button', { type: 'button', class: `lc-tile ${r.status}${changed ? ' new' : ''}`, 'data-key': r.key, onclick: () => openStudent(r.key), 'aria-label': `${s.name}, ${LIVE_LABEL[r.status]}: ${r.why}` },
+            h('span', { class: 'lc-top' }, h('i', { class: 'lc-dot', 'aria-hidden': 'true' }), h('span', { class: 'lc-name' }, s.name), h('span', { class: 'lc-pct' }, `${s.percent}%`)),
+            h('span', { class: 'lc-id' }, `${s.id} · ${s.group}`),
+            bar(s.percent, false), // the status colour carries the meaning here
+            r.status === 'done' ? null : h('span', { class: 'lc-on', title: title(r.working) }, r.working ? h('b', {}, short(r.working)) : null, r.working ? title(r.working) : d.structure.exercises.length ? 'All exercises solved · tasks left' : 'Reading the tasks'),
+            h('span', { class: 'lc-why' }, r.status === 'active' && r.lastActive ? `${r.why} · ${ago(r.lastActive)}` : r.why));
+        }) : [h('p', { class: 'lc-empty' }, rows.length ? `No one is in “${LIVE_LABEL[liveFilter as Live]}” right now.` : 'Students appear here as soon as they join the session.')]),
+      );
+      for (const r of rows) liveWas.set(r.key, r.status);
+
+      $('[data-lc-feed]').replaceChildren(
+        ...(events.length ? events.slice(0, 30).map((e) => {
+          const ok = e.kind === 'task' || e.passed >= e.total;
+          const what = e.kind === 'task'
+            ? `ticked task ${e.ref} Done`
+            : ok ? `solved ${short(e.ref)}` : e.total === 1 ? `tried ${short(e.ref)}, not right yet` : `checked ${short(e.ref)} · ${e.passed}/${e.total} passing`;
+          return h('li', { class: e.kind === 'task' ? 'task' : ok ? 'ok' : 'fail' },
+            h('i', { 'aria-hidden': 'true' }, e.kind === 'task' ? '✓' : ok ? '★' : '×'),
+            h('span', {}, h('b', {}, e.name), ` ${what}`),
+            h('time', { datetime: e.at, title: new Date(e.at).toLocaleString('en-GB') }, ago(e.at)));
+        }) : [h('li', {}, h('span', { class: 'lc-none' }, 'Checks and Done ticks show up here as they happen.'))]),
+      );
+    }
+
     /* ------- check-in control ------- */
     function countdown() {
       const left = root!.querySelector<HTMLElement>('[data-ci-left]');
@@ -449,6 +578,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             sessionId = (event.target as HTMLSelectElement).value;
             history.replaceState(null, '', `?lab=${encodeURIComponent(d.structure.lab)}&session=${encodeURIComponent(sessionId)}`);
             seen.clear();
+            liveWas.clear();
             load();
           }}, ...d.sessions.map((session) => h('option', { value: session.id, selected: 'id' in d.session && session.id === d.session.id }, `${session.time_slot} - ${session.ta_name}${session.open ? ' - LIVE' : ''}`))) as HTMLSelectElement);
           const active = 'id' in d.session && d.session.open ? d.session : null;
@@ -573,6 +703,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       lab = (e.target as HTMLSelectElement).value;
       sessionId = '';
       seen.clear();
+      liveWas.clear();
       history.replaceState(null, '', `?lab=${encodeURIComponent(lab)}`);
       load();
     });

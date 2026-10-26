@@ -20,11 +20,11 @@ const [labs, { settings }] = await Promise.all([store!.listLabs(mod.slug), hubDa
 <Base title={`Builder · ${mod.title}`} noindex>
   <Canvas
     heading={mod.title}
-    kicker={`Module canvas · /m/${mod.slug}`}
+    kicker={`Module canvas · /${mod.slug}`}
     back={{ href: '/admin/builder', label: 'Modules' }}
     config={{
       kind: 'module', flow: mod.flow, saveUrl: `/api/admin/platform/modules?slug=${encodeURIComponent(mod.slug)}`,
-      published: mod.published, previewHref: `/m/${mod.slug}?preview`, module: mod.slug,
+      published: mod.published, previewHref: `/${mod.slug}?preview`, module: mod.slug,
       labs: labs.map((l) => ({ slug: l.slug, title: l.title, published: l.published })),
       audienceOptions: { years: settings.years, specializations: settings.specializations, faculties: settings.faculties },
       componentsHref: who.can('platform.settings') ? `/admin/components#m-${mod.slug}` : undefined,

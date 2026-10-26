@@ -62,7 +62,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
           <h2>New module</h2>
           <label><span>Title</span><input class="input" name="title" required maxlength="120" placeholder="e.g. Web Development" /></label>
           {multi && <label><span>Faculty</span><select class="input" name="faculty">{settings.faculties.map((f) => <option value={f.slug}>{f.name}</option>)}<option value={ANY_FACULTY}>All faculties</option></select></label>}
-          <label><span>Address <small>(optional)</small></span><span class="bh-slug mono">/m/<input class="input mono" name="slug" maxlength="50" placeholder="web-development" /></span></label>
+          <label><span>Address <small>(optional)</small></span><span class="bh-slug mono">/<input class="input mono" name="slug" maxlength="50" placeholder="web-development" /></span></label>
           <p class="bh-msg" data-bh-msg role="status"></p>
           <button class="btn btn-primary" type="submit">Create and open canvas →</button>
         </form> : <div class="bh-card"><h2>Your modules</h2><p class="muted">You can build the modules you're on the teaching team for. Ask a doctor or the super admin to create a new module.</p></div>}
@@ -73,7 +73,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
           {inSection(sec.slug, builtInFaculty) && <article class="bh-mod" style="--c:#c8ff4d">
             <div><p class="mono bh-code">{BUILT_IN_MODULE.code} · built-in</p><h3>{BUILT_IN_MODULE.title}</h3>
               <p class="muted small">{builtInLabs.length} visual-builder lab{builtInLabs.length === 1 ? '' : 's'} · the original source labs remain available.</p></div>
-            <div class="bh-act">{me.can('module.build', BUILT_IN_MODULE.slug) && <a class="btn btn-primary btn-sm" href="/admin/builder/mobile-development">Open canvas →</a>}<a class="btn btn-ghost btn-sm" href="/admin/assessment/mobile-development">Assessment</a><a class="btn btn-ghost btn-sm" href="/course" target="_blank" rel="noopener">View course ↗</a></div>
+            <div class="bh-act">{me.can('module.build', BUILT_IN_MODULE.slug) && <a class="btn btn-primary btn-sm" href="/admin/builder/mobile-development">Open canvas →</a>}<a class="btn btn-ghost btn-sm" href="/admin/assessment/mobile-development">Assessment</a><a class="btn btn-ghost btn-sm" href="/mobile-development" target="_blank" rel="noopener">View course ↗</a></div>
           </article>}
           {modules.filter((m) => inSection(sec.slug, facultyOf(m))).map((m) => {
             const c = compileModule(m.flow);
@@ -81,14 +81,14 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             return (
               <article class="bh-mod" style={`--c:${c.meta.color || '#7cb1ff'}`}>
                 <div>
-                  <p class="mono bh-code">{c.meta.code || 'MODULE'} · /m/{m.slug} · <span class:list={['bh-pub', { on: m.published }]}>{m.published ? 'published' : 'draft'}</span></p>
+                  <p class="mono bh-code">{c.meta.code || 'MODULE'} · /{m.slug} · <span class:list={['bh-pub', { on: m.published }]}>{m.published ? 'published' : 'draft'}</span></p>
                   <h3>{c.meta.title || m.title}</h3>
                   <p class="muted small">{mine.length} lab{mine.length === 1 ? '' : 's'} ({mine.filter((l) => l.published).length} published) · updated {when(m.updated_at)}</p>
                 </div>
                 <div class="bh-act">
                   <a class="btn btn-primary btn-sm" href={`/admin/builder/${m.slug}`}>Open canvas →</a>
                   <a class="btn btn-ghost btn-sm" href={`/admin/assessment/${m.slug}`}>Assessment</a>
-                  <a class="btn btn-ghost btn-sm" href={`/m/${m.slug}?preview`} target="_blank" rel="noopener">Preview ↗</a>
+                  <a class="btn btn-ghost btn-sm" href={`/${m.slug}?preview`} target="_blank" rel="noopener">Preview ↗</a>
                   <button class="btn btn-ghost btn-sm bh-del" type="button" data-del={m.slug} data-title={c.meta.title || m.title}>Delete</button>
                 </div>
               </article>
@@ -122,7 +122,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .bh-fh { font-size: 12px; font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin-top: 12px; }
   .bh-fh:first-child { margin-top: 0; }
   .bh-mod { display: grid; gap: 12px; padding: 18px 20px; border: 1px solid color-mix(in oklab, var(--c) 35%, var(--line-2)); border-radius: var(--r-lg); background: var(--surface); }
-  @media (min-width: 720px) { .bh-mod { grid-template-columns: 1fr auto; align-items: center; } }
+  @media (min-width: 720px) { .bh-mod { grid-template-columns: minmax(260px, 1fr) auto; align-items: center; } }
+  @media (min-width: 720px) and (max-width: 1399px) { .bh-mod { grid-template-columns: minmax(0, 1fr); } }
   .bh-code { font-size: 12px; color: var(--text-3); }
   .bh-mod h3 { font-size: 1.2rem; margin-top: 2px; }
   .bh-pub { color: var(--warn); }

@@ -10,7 +10,7 @@
   <div class="ann-inner">
     <span class="ann-new mono">NEW</span>
     <p class="ann-text"><b data-ann-title></b> <span data-ann-sub></span></p>
-    <a class="ann-cta" data-ann-cta href="/project#files">Submit now <span aria-hidden="true">→</span></a>
+    <a class="ann-cta" data-ann-cta href="/mobile-development/project#files">Submit now <span aria-hidden="true">→</span></a>
     <button class="ann-x" type="button" data-ann-close aria-label="Dismiss announcement">✕</button>
   </div>
 </div>
@@ -96,7 +96,7 @@
 
     // NEW badge until the student has opened that submission's page.
     const unseen = fresh.some((f) => !ls.get(`submit:seen:${f.id}`));
-    document.querySelectorAll<HTMLAnchorElement>('a[href="/project"]').forEach((a) => {
+    document.querySelectorAll<HTMLAnchorElement>('a[href="/mobile-development/project"]').forEach((a) => {
       const badge = a.querySelector('.nav-new');
       if (unseen && !badge && a.closest('.nav, .mm-body, [data-nav]')) a.insertAdjacentHTML('beforeend', '<span class="nav-new" aria-label="new">NEW</span>');
       if (!unseen) badge?.remove();
@@ -104,10 +104,10 @@
 
     // Banner: newest unseen-and-undismissed item, never on admin or submit pages.
     const item = fresh.find((f) => !ls.get(`ann:dismissed:${f.id}`) && !ls.get(`submit:seen:${f.id}`));
-    if (!item || path.startsWith('/admin') || path.startsWith('/submit/')) { bar.hidden = true; return; }
+    if (!item || path.startsWith('/admin') || path.startsWith('/mobile-development/submit/')) { bar.hidden = true; return; }
     bar.querySelector('[data-ann-title]')!.textContent = item.title;
     bar.querySelector('[data-ann-sub]')!.textContent = item.due_at ? `is open · ${left(item.due_at)}` : 'is open for submissions';
-    bar.querySelector<HTMLAnchorElement>('[data-ann-cta]')!.href = `/submit/${encodeURIComponent(item.id)}`;
+    bar.querySelector<HTMLAnchorElement>('[data-ann-cta]')!.href = `/mobile-development/submit/${encodeURIComponent(item.id)}`;
     bar.dataset.id = item.id;
     bar.classList.remove('out');
     bar.hidden = false;

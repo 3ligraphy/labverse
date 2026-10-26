@@ -4,6 +4,7 @@
  * directly under `node --test` (see tests/progress.test.ts).
  */
 import { parseLabOutline } from '../lab.ts';
+import { cleanName, cleanStudentId, nameError, studentIdError } from '../identity.ts';
 
 /* ---------------------------------------------------------------- types */
 
@@ -24,9 +25,7 @@ export type Best = { exercise: string; passed: number; total: number; attempts: 
 
 /* ----------------------------------------------------------- validation */
 
-// same rules as attendance: letters (any language) + spaces, apostrophes, dots and hyphens
-const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}'’. -]*[\p{L}\p{M}.]$/u;
-const ID_RE = /^[A-Za-z0-9-]{3,20}$/;
+// name and student ID rules are shared with every form that identifies a student (src/lib/identity.ts)
 const DEVICE_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const REPO_RE = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/;
 export const MAX_CODE = 20_000;
@@ -36,11 +35,13 @@ const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isInt
 
 export function validateStudentIdentity(input: unknown): Valid<Pick<Identity, 'name' | 'studentId'>> {
   const o = obj(input);
-  const name = String(o.name ?? '').normalize('NFC').trim().replace(/\s+/g, ' ');
-  const studentId = String(o.studentId ?? '').trim();
+  const name = cleanName(o.name);
+  const studentId = cleanStudentId(o.studentId);
   const errors: Record<string, string> = {};
-  if (name.length < 2 || name.length > 60 || !NAME_RE.test(name)) errors.name = 'Please type your full name (letters only).';
-  if (!ID_RE.test(studentId)) errors.studentId = 'Your student ID should be 3–20 letters or numbers.';
+  const badName = nameError(name);
+  const badId = studentIdError(studentId);
+  if (badName) errors.name = badName;
+  if (badId) errors.studentId = badId;
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, value: { name, studentId, studentKey: studentId.toLowerCase() } };
 }
 
@@ -194,6 +195,141 @@ export function exerciseStats(s: LabStructure, bestByStudent: Best[][]) {
       medianSolveMs: median(solvers.map((b) => Date.parse(b.solvedAt!) - Date.parse(b.firstAt))),
     };
   });
+}
+
+/* ------------------------------------------------------------- live class */
+
+/** What happened in a session lately (from ProgressStore.activity). */
+export type Activity = {
+  /** each student's latest Check, with how many failed Checks on that exercise since it last passed */
+  last: { student_key: string; exercise: string; passed: number; total: number; at: string; fails: number }[];
+  /** the last moment each student did anything (Check, Done tick, page heartbeat, joining) */
+  active: { student_key: string; at: string }[];
+  /** newest first */
+  events: { student_key: string; kind: 'check' | 'task'; ref: string; passed: number; total: number; at: string }[];
+};
+export type LiveStatus = 'help' | 'active' | 'idle' | 'away' | 'done';
+export type LiveRow = { key: string; status: LiveStatus; working: string | null; fails: number; lastActive: string | null; why: string };
+
+export const LIVE = { IDLE_MIN: 4, AWAY_MIN: 10, HELP_FAILS: 3, HELP_WINDOW_MIN: 20 };
+
+/**
+ * The TA's live class view: who is working, who is stuck, who went quiet.
+ *   done   every point earned
+ *   away   nothing for 10+ min
+ *   help   3+ failed Checks in a row on one exercise in the last 20 min
+ *   idle   nothing for 4–10 min
+ *   active otherwise
+ */
+export function liveClass(
+  s: LabStructure,
+  students: { key: string; percent: number; cells: Record<string, { passed: number; total: number }>; startedAt?: string }[],
+  activity: Activity,
+  now: number,
+): { rows: LiveRow[]; counts: Record<LiveStatus, number> } {
+  const last = new Map(activity.last.map((l) => [l.student_key, l]));
+  const active = new Map(activity.active.map((a) => [a.student_key, a.at]));
+  const counts: Record<LiveStatus, number> = { help: 0, active: 0, idle: 0, away: 0, done: 0 };
+  const rows = students.map((st): LiveRow => {
+    const l = last.get(st.key);
+    const solved = (id: string) => { const c = st.cells[id]; return Boolean(c && c.total > 0 && c.passed >= c.total); };
+    const working = l && !solved(l.exercise) ? l.exercise : (s.exercises.find((e) => !solved(e.id))?.id ?? null);
+    const lastActive = active.get(st.key) ?? st.startedAt ?? null;
+    const quietMin = lastActive ? (now - Date.parse(lastActive)) / 60_000 : Infinity;
+    const fails = l && !solved(l.exercise) ? l.fails : 0;
+    const recentFail = l ? (now - Date.parse(l.at)) / 60_000 <= LIVE.HELP_WINDOW_MIN : false;
+    let status: LiveStatus;
+    let why: string;
+    if (st.percent >= 100) { status = 'done'; why = 'Finished the lab'; }
+    else if (quietMin >= LIVE.AWAY_MIN) { status = 'away'; why = lastActive ? `Nothing for ${Math.round(quietMin)} min` : 'Joined, no activity yet'; }
+    else if (fails >= LIVE.HELP_FAILS && recentFail) { status = 'help'; why = `${fails} failed Checks in a row`; }
+    else if (quietMin >= LIVE.IDLE_MIN) { status = 'idle'; why = `Quiet for ${Math.round(quietMin)} min`; }
+    else { status = 'active'; why = 'Working now'; }
+    counts[status]++;
+    return { key: st.key, status, working, fails, lastActive, why };
+  });
+  return { rows, counts };
+}
+
+/* ------------------------------------------------------------- statistics */
+
+/** Raw rows for a module's statistics page, across every session of its labs (from ProgressStore.statsRaw). */
+export type StatsRaw = {
+  sessions: { id: string; lab: string; ta_name: string; time_slot: string; opens_at: string; joined: number; attended: number }[];
+  /** per lab, student and exercise: best result, tries, and whether the first try passed */
+  best: { lab: string; student_key: string; exercise: string; passed: number; total: number; attempts: number; first_ok: boolean }[];
+  tasks: { lab: string; student_key: string; done: number }[];
+  subs: { lab: string; student_key: string }[];
+  /** the group a student last joined each lab with */
+  members: { lab: string; student_key: string; group_name: string }[];
+  /** Checks by weekday (0 = Sunday) and hour, Cairo time */
+  heat: { dow: number; hour: number; n: number }[];
+};
+
+const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0);
+
+export function moduleStats(labs: LabStructure[], raw: StatsRaw) {
+  const known = new Set(labs.map((l) => l.lab));
+  const percents = new Map<string, number>(); // `${lab}|${student}` → score
+  const perLab = labs.map((l) => {
+    const students = [...new Set(raw.members.filter((m) => m.lab === l.lab).map((m) => m.student_key))];
+    const scores = students.map((key) => {
+      const best = raw.best.filter((b) => b.lab === l.lab && b.student_key === key)
+        .map((b) => ({ exercise: b.exercise, passed: b.passed, total: b.total, attempts: b.attempts, firstAt: '', solvedAt: null }));
+      const done = raw.tasks.find((t) => t.lab === l.lab && t.student_key === key)?.done ?? 0;
+      const sub = raw.subs.some((x) => x.lab === l.lab && x.student_key === key);
+      const p = scoreStudent(l, best, done, sub).percent;
+      percents.set(`${l.lab}|${key}`, p);
+      return p;
+    });
+    const spread = Array.from({ length: 10 }, () => 0);
+    for (const p of scores) spread[Math.min(9, Math.floor(p / 10))]++;
+    const exercises = l.exercises.map((e) => {
+      const rows = raw.best.filter((b) => b.lab === l.lab && b.exercise === e.id && students.includes(b.student_key));
+      const solved = rows.filter((b) => b.total > 0 && b.passed >= b.total);
+      return {
+        id: e.id, title: e.title, tried: rows.length,
+        solvedPct: students.length ? Math.round((100 * solved.length) / students.length) : 0,
+        avgTries: rows.length ? Math.round((rows.reduce((a, b) => a + b.attempts, 0) / rows.length) * 10) / 10 : 0,
+        firstTryPct: rows.length ? Math.round((100 * rows.filter((b) => b.first_ok).length) / rows.length) : 0,
+      };
+    });
+    const sessions = raw.sessions.filter((s) => s.lab === l.lab);
+    return {
+      lab: l.lab, title: l.title, students: students.length, sessions: sessions.length,
+      avgPercent: avg(scores), finished: scores.filter((p) => p >= 80).length, spread, exercises,
+    };
+  });
+
+  const groupScores = new Map<string, number[]>();
+  for (const m of raw.members) {
+    if (!known.has(m.lab)) continue;
+    const g = m.group_name && m.group_name !== '—' ? m.group_name : 'No group';
+    groupScores.set(g, [...(groupScores.get(g) ?? []), percents.get(`${m.lab}|${m.student_key}`) ?? 0]);
+  }
+  const groups = [...groupScores].map(([group, xs]) => ({ group, entries: xs.length, avgPercent: avg(xs) }))
+    .sort((a, b) => (a.group === 'No group' ? 1 : b.group === 'No group' ? -1 : a.group.localeCompare(b.group, undefined, { numeric: true })));
+
+  const sessions = raw.sessions.filter((s) => known.has(s.lab)).sort((a, b) => a.opens_at.localeCompare(b.opens_at));
+  const joined = sessions.reduce((a, s) => a + s.joined, 0);
+  const attended = sessions.reduce((a, s) => a + s.attended, 0);
+  const heat = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+  for (const h of raw.heat) if (h.dow >= 0 && h.dow < 7 && h.hour >= 0 && h.hour < 24) heat[h.dow][h.hour] += h.n;
+  const inLabs = raw.best.filter((b) => known.has(b.lab));
+  return {
+    totals: {
+      students: new Set(raw.members.filter((m) => known.has(m.lab)).map((m) => m.student_key)).size,
+      sessions: sessions.length,
+      attendancePct: joined ? Math.round((100 * attended) / joined) : 0,
+      checks: inLabs.reduce((a, b) => a + b.attempts, 0),
+      solved: inLabs.filter((b) => b.total > 0 && b.passed >= b.total).length,
+      firstTryPct: inLabs.length ? Math.round((100 * inLabs.filter((b) => b.first_ok).length) / inLabs.length) : 0,
+    },
+    sessions: sessions.map((s) => ({ id: s.id, lab: s.lab, ta: s.ta_name, slot: s.time_slot, at: s.opens_at, joined: s.joined, attended: s.attended })),
+    labs: perLab,
+    groups,
+    heat,
+  };
 }
 
 /* -------------------------------------------------------------------- CSV */

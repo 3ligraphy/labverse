@@ -12,8 +12,8 @@ const { id, lab = 'this lab' } = Astro.props;
     <form novalidate>
       <label class="ls-session" data-ls-session hidden>Teaching session<select class="input" name="sessionId" aria-label="Choose your teaching session"></select></label>
       <label>Full name<input class="input" name="name" autocomplete="name" placeholder="e.g. Mariam Ahmed" required maxlength="60" /></label>
-      <label>Student ID<input class="input mono" name="studentId" autocomplete="off" placeholder="e.g. 236541" required maxlength="20" /></label>
-      <label>Group<input class="input" name="group" autocomplete="off" placeholder="e.g. G1" required maxlength="30" /></label>
+      <label>Student ID<input class="input mono" name="studentId" autocomplete="off" inputmode="numeric" pattern="[0-9 ]{5,11}" placeholder="e.g. 236541" required maxlength="11" title="5–9 digits, numbers only" /></label>
+      <label>Group<input class="input" name="group" autocomplete="off" autocapitalize="characters" placeholder="e.g. G12" required maxlength="12" /></label>
       <button class="btn btn-primary btn-lg" type="submit">Start →</button>
     </form>
     <p class="ls-err" data-ls-error role="alert"></p>

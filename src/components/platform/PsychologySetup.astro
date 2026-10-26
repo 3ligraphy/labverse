@@ -7,7 +7,7 @@ import { PLAYGROUND_FALLBACK } from '@/lib/platform/playground';
 <div class="psg">
   <header><p class="mono">SET UP ONCE · KEEP YOUR WORK SAFE</p><h2>Your first steps,<br /><span>with a picture at every turn.</span></h2><p>Allow about 20 minutes. You need a laptop, an internet connection and somewhere to store your backups. The screenshots are official WordPress reference images; labels and layout can vary by version. Select any image to enlarge it.</p></header>
   <nav aria-label="Setup steps">{psychologySetup.map((s, i) => <a href={`#setup-${i + 1}`}>{String(i + 1).padStart(2, '0')} · {s.title}</a>)}</nav>
-  <div class="psg-launch"><a class="btn btn-primary" href={PLAYGROUND_URL} target="_blank" rel="noopener noreferrer">Open prepared Playground ↗</a><a class="btn btn-ghost" href="/m/technology-for-psychology?tab=labs">Go to all three sessions →</a></div>
+  <div class="psg-launch"><a class="btn btn-primary" href={PLAYGROUND_URL} target="_blank" rel="noopener noreferrer">Open prepared Playground ↗</a><a class="btn btn-ghost" href="/technology-for-psychology?tab=labs">Go to all three sessions →</a></div>
   <details class="psg-recovery"><summary>Playground says “had a hiccup”?</summary>
     <p><strong>If the Console says sw.js returned 403:</strong> Playground’s required startup script was refused. Open the link in a normal Chrome or Edge window outside an embedded/in-app browser. If it still fails, share the sw.js Network response with your instructor or network administrator. Switching to a temporary site will not fix a blocked script.</p>
     <p><strong>If only OPFS / browser-storage errors remain:</strong> try a different browser profile while keeping the original saved data. A <a href="https://playground.wordpress.net/?storage=temp" target="_blank" rel="noopener noreferrer">temporary diagnostic site</a> can help test startup, but all its work is lost on reload or closing the tab.</p>
@@ -24,7 +24,7 @@ import { PLAYGROUND_FALLBACK } from '@/lib/platform/playground';
       <div class="psg-content"><div><ol>{step.steps.map((instruction) => <li>{instruction}</li>)}</ol><p class="psg-check"><strong>You are ready when</strong>{step.check}</p><details><summary>Need a hand?</summary><p>{step.help}</p></details></div><div><MediaImage src={visual.src} alt={visual.alt} caption={visual.caption} />{visual.source && <a class="psg-source" href={visual.source} target="_blank" rel="noopener noreferrer">Screenshot: official WordPress documentation ↗</a>}</div></div>
     </section>;
   })}
-  <footer><h3>Ready to begin?</h3><p>You can open the Dashboard, edit a draft, export a backup and restore it. Open Lab 01 and begin with the website plan.</p><a class="btn btn-primary" href="/m/technology-for-psychology/lab-01">Start Session 1 →</a></footer>
+  <footer><h3>Ready to begin?</h3><p>You can open the Dashboard, edit a draft, export a backup and restore it. Open Lab 01 and begin with the website plan.</p><a class="btn btn-primary" href="/technology-for-psychology/lab-01">Start Session 1 →</a></footer>
 </div>
 <style>
   .psg { padding-block: 44px 70px; }

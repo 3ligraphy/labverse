@@ -5,13 +5,13 @@
   title: Getting Started
   summary: Teaching team, coursework, why React Native + Expo, your first app and the team Git workflow.
   topics: [React Native vs native vs Flutter, Expo, UI basics, Git branches]
-  links: [{ label: Teaching team, href: '/#team' }, { label: Coursework, href: /coursework }]
+  links: [{ label: Teaching team, href: '/mobile-development#team' }, { label: Coursework, href: /mobile-development/coursework }]
 - id: environment
   order: 2
   title: Development Environment
   summary: Editor, SDK, emulator and Git — a setup you can trust for the rest of the term.
   topics: [Editor, SDK & emulator, Git & GitHub]
-  links: [{ label: Setup center, href: /setup }, { label: Tools, href: /tools }]
+  links: [{ label: Setup center, href: /mobile-development/setup }, { label: Tools, href: /mobile-development/tools }]
 - id: mobile-ui
   order: 3
   title: Mobile UI
@@ -32,13 +32,13 @@
   title: Data & APIs
   summary: Fetching from REST APIs, loading and error states, and storing data on the device.
   topics: [fetch & async, REST, Local storage]
-  links: [{ label: Networking commands, href: '/commands?c=Networking' }]
+  links: [{ label: Networking commands, href: '/mobile-development/commands?c=Networking' }]
 - id: debugging
   order: 7
   title: Debugging & Testing
   summary: Reading errors, using dev tools, logging and writing your first tests.
   topics: [Dev tools, Logs, Unit tests]
-  links: [{ label: Troubleshooting, href: /troubleshooting }]
+  links: [{ label: Troubleshooting, href: /mobile-development/troubleshooting }]
 - id: advanced
   order: 8
   title: Advanced Concepts
@@ -49,4 +49,4 @@
   title: Course Project
   summary: Plan, build and present a complete mobile application.
   topics: [Planning, Build, Presentation]
-  links: [{ label: Project brief, href: /project }]
+  links: [{ label: Project brief, href: /mobile-development/project }]

@@ -1,0 +1,108 @@
+---
+/**
+ * One codebase, three builds: pick development, staging or production and see the app name, bundle id, API,
+ * EAS profile and the public values that ship inside the app. <EnvSwitcher />
+ */
+const ENVS = [
+  { id: 'development', badge: 'DEV', name: 'Project (Dev)', bundle: 'com.team.project.development', api: 'http://192.168.1.10:3000', eas: 'development', who: 'You, with Metro and a dev client', color: '#64748b' },
+  { id: 'staging', badge: 'STAGING', name: 'Project (Staging)', bundle: 'com.team.project.staging', api: 'https://staging-api.example.com', eas: 'staging', who: 'Your TA and testers', color: '#d97706' },
+  { id: 'production', badge: 'LIVE', name: 'Project', bundle: 'com.team.project', api: 'https://api.example.com', eas: 'production', who: 'Real users, from the store', color: '#059669' },
+];
+---
+<figure class="es" data-es data-reveal data-free>
+  <div class="es-switch" role="radiogroup" aria-label="Build variant">
+    {ENVS.map((e, i) => (
+      <button type="button" role="radio" aria-checked={i === 1 ? 'true' : 'false'} data-es-env={e.id} style={`--c:${e.color}`}>
+        <span class="es-dot" aria-hidden="true"></span>{e.id}
+      </button>
+    ))}
+  </div>
+
+  <div class="es-grid">
+    <div class="es-home" aria-label="Home screen with all three builds installed side by side">
+      {ENVS.map((e) => (
+        <span class="es-app" data-es-app={e.id} style={`--c:${e.color}`}>
+          <i aria-hidden="true">{e.badge === 'LIVE' ? '★' : e.badge[0]}</i>
+          <small>{e.name}</small>
+        </span>
+      ))}
+      <p class="es-cap mono">3 bundle ids → 3 apps on one phone</p>
+    </div>
+
+    <dl class="es-facts">
+      {ENVS.map((e, i) => (
+        <div class="es-set" data-es-set={e.id} hidden={i !== 1} style={`--c:${e.color}`}>
+          <div><dt>APP_VARIANT</dt><dd class="mono">{e.id}</dd></div>
+          <div><dt>App name</dt><dd>{e.name} <span class="es-badge">{e.badge}</span></dd></div>
+          <div><dt>Bundle id / package</dt><dd class="mono">{e.bundle}</dd></div>
+          <div><dt>EXPO_PUBLIC_API_URL</dt><dd class="mono">{e.api}</dd></div>
+          <div><dt>eas build --profile</dt><dd class="mono">{e.eas}</dd></div>
+          <div><dt>Who uses it</dt><dd>{e.who}</dd></div>
+        </div>
+      ))}
+    </dl>
+  </div>
+
+  <div class="es-ship">
+    <div class="es-col ok">
+      <p class="mono">Ships inside the app (anyone can read it)</p>
+      <code>EXPO_PUBLIC_APP_ENV</code><code>EXPO_PUBLIC_API_URL</code>
+    </div>
+    <div class="es-col no">
+      <p class="mono">Never in the app: server only</p>
+      <code>DATABASE_URL</code><code>STRIPE_SECRET_KEY</code><code>SERVICE_ROLE_KEY</code>
+    </div>
+  </div>
+  <figcaption>Same code, different <b>identity</b> and <b>public settings</b>. Separating environments never makes client code a safe place for a secret.</figcaption>
+</figure>
+
+<script>
+  const wire = () => document.querySelectorAll<HTMLElement>('[data-es]:not([data-wired])').forEach((root) => {
+    root.dataset.wired = '1';
+    const pick = (id: string) => {
+      root.querySelectorAll<HTMLElement>('[data-es-env]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.esEnv === id)));
+      root.querySelectorAll<HTMLElement>('[data-es-set]').forEach((s) => (s.hidden = s.dataset.esSet !== id));
+      root.querySelectorAll<HTMLElement>('[data-es-app]').forEach((a) => a.classList.toggle('on', a.dataset.esApp === id));
+    };
+    root.querySelectorAll<HTMLElement>('[data-es-env]').forEach((b) => b.addEventListener('click', () => pick(b.dataset.esEnv!)));
+    root.querySelectorAll<HTMLElement>('[data-es-app]').forEach((a) => a.addEventListener('click', () => pick(a.dataset.esApp!)));
+    pick('staging');
+  });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .es { margin: 24px 0 32px; display: grid; gap: 16px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .es-switch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .es-switch button { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text-2); font: 600 14px var(--font-mono); cursor: pointer; transition: border-color .2s var(--ease-out), background .2s var(--ease-out); }
+  .es-switch button[aria-checked='true'] { border-color: var(--c); color: var(--text); background: color-mix(in oklab, var(--c) 16%, transparent); }
+  .es-switch button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .es-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+  .es-grid { display: grid; gap: 16px; align-items: center; }
+  @media (min-width: 760px) { .es-grid { grid-template-columns: 220px 1fr; } }
+  .es-home { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 18px 14px 12px; border-radius: 26px; background: linear-gradient(160deg, #1e293b, #0f172a); box-shadow: 0 0 0 6px #15181d; }
+  .es-app { display: grid; justify-items: center; gap: 5px; cursor: pointer; opacity: .55; transition: opacity .2s var(--ease-out), transform .2s var(--ease-out); }
+  .es-app i { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-style: normal; font-weight: 800; color: #fff; background: var(--c); box-shadow: 0 6px 14px rgb(0 0 0 / .35); }
+  .es-app small { font-size: 10.5px; color: #e2e8f0; text-align: center; line-height: 1.2; }
+  .es-app.on { opacity: 1; transform: translateY(-3px); }
+  .es-cap { grid-column: 1 / -1; margin: 6px 0 0 !important; font-size: 11px; color: #94a3b8; text-align: center; }
+  .es-facts { margin: 0; }
+  .es-set { display: grid; gap: 6px; }
+  .es-set > div { display: grid; grid-template-columns: 170px 1fr; gap: 10px; padding: 8px 12px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); }
+  @media (max-width: 520px) { .es-set > div { grid-template-columns: 1fr; gap: 2px; } }
+  .es-set dt { font: 500 12px var(--font-mono); color: var(--text-3); }
+  .es-set dd { margin: 0; font-size: 14px; color: var(--text); overflow-wrap: anywhere; }
+  .es-set dd.mono { font-size: 13px; color: var(--accent-text); }
+  .es-badge { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--c); color: #fff; font: 700 11px var(--font-mono); }
+  .es-ship { display: grid; gap: 10px; }
+  @media (min-width: 760px) { .es-ship { grid-template-columns: 1fr 1fr; } }
+  .es-col { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); }
+  .es-col p { flex-basis: 100%; margin: 0 0 4px !important; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  .es-col.ok p { color: var(--accent-text); }
+  .es-col.no { border-color: color-mix(in oklab, var(--danger) 45%, var(--line-2)); }
+  .es-col.no p { color: var(--danger); }
+  .es-col.no code { text-decoration: line-through; text-decoration-color: var(--danger); }
+  .es figcaption { font-size: 14px; color: var(--text-2); }
+  @media (prefers-reduced-motion: reduce) { .es-app { transition: none; } }
+</style>

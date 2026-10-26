@@ -49,7 +49,7 @@ export function lintFiles(files: Files): Diagnostic[] {
   const out: Diagnostic[] = [];
   const compiled = compileAll(files);
   if (!compiled.ok) {
-    for (const e of compiled.errors) out.push({ file: e.file, line: e.line, column: e.column, message: e.message, severity: 'error' });
+    for (const e of compiled.errors) out.push({ file: e.file, line: e.line, column: e.column, message: e.hint ? `${e.message} ${e.hint}` : e.message, severity: 'error' });
     return out;
   }
   for (const [file, code] of Object.entries(files)) {
@@ -98,7 +98,7 @@ export async function evaluate(exercise: { checks: Check[]; entry: string; frame
       status: 'fail',
       score: 0,
       results: checks.map((c) => ({ id: c.id, label: c.label, pass: false })),
-      blocker: { message: `Syntax error: ${e.message}`, hint: 'Fix the line underlined in red, then check again.', file: e.file, line: e.line },
+      blocker: { message: `Syntax error: ${e.message}`, hint: e.hint ? `${e.hint} Then check again.` : 'Fix the line underlined in red, then check again.', file: e.file, line: e.line },
     };
   }
 

@@ -3,8 +3,10 @@
  * Sticky progress bar for interactive labs (block · exercise n/17 · % · one square per exercise),
  * and the script that brings every <Exercise>, <Demo> and <LabStart> on the page to life.
  */
-import { EXERCISES, BLOCKS } from '@/lab/exercises/lab-02/meta';
+import { INTERACTIVE_LABS } from '@/lab/exercises/registry';
 import '@/styles/lab-interactive.css';
+interface Props { lab?: string }
+const { EXERCISES, BLOCKS } = INTERACTIVE_LABS[Astro.props.lab ?? 'lab-02'];
 ---
 <div class="lp" data-lab-progress role="navigation" aria-label="Lab progress">
   <div class="lp-in container">

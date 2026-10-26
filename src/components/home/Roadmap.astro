@@ -33,7 +33,7 @@ const labs = await getLabs();
                 {(stageLabs.length > 0 || s.data.links.length > 0) && (
                   <div class="rm-links">
                     {stageLabs.map((l) => (
-                      <a href={`/labs/${l.id}`} class="rm-link lab"><span class="mono">LAB {pad(l.data.number)}</span>{l.data.title}</a>
+                      <a href={`/mobile-development/labs/${l.id}`} class="rm-link lab"><span class="mono">LAB {pad(l.data.number)}</span>{l.data.title}</a>
                     ))}
                     {s.data.links.map((l) => <a href={l.href} class="rm-link">{l.label} →</a>)}
                   </div>

@@ -41,7 +41,7 @@ export const POST: APIRoute = async ({ request }) => {
     await backend.record(v.event);
   } catch (error) {
     if (error instanceof Error && error.message === 'identity-conflict') {
-      return json({ ok: false, error: 'identity-conflict', message: 'This browser is already linked to another student, or this student ID is linked to another device. Ask your TA to use “Allow new device”.' }, 409);
+      return json({ ok: false, error: 'identity-conflict', message: 'This student ID was already used with a different name. Type your name exactly as you did before, or ask your TA to fix it.' }, 409);
     }
     console.error('[lab] could not record progress', error);
     return json({ ok: false, error: 'Could not save progress.' }, 500);

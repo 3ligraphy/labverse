@@ -5,7 +5,7 @@
  */
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
-import { type Best, type Identity } from './core.ts';
+import { type Activity, type Best, type Identity, type StatsRaw } from './core.ts';
 
 export type StudentRow = { student_key: string; student_id: string; name: string; device_key: string | null; created_at: string; last_seen: string; group_name?: string; session_started_at?: string };
 export type AttemptRow = { id: number; exercise: string; passed: number; total: number; code: string; created_at: string };
@@ -51,6 +51,10 @@ export interface ProgressStore {
   count(key: string): Promise<number>;
   labData(lab: string, sessionId?: string): Promise<LabData>;
   studentData(lab: string, studentKey: string, sessionId?: string): Promise<StudentData>;
+  /** Live class view: latest Check per student, last activity, and the newest events of one session. */
+  activity(sessionId: string, limit?: number): Promise<Activity>;
+  /** Everything the statistics page needs for these labs, across all their sessions. */
+  statsRaw(labs: string[]): Promise<StatsRaw>;
   unlock(studentKey: string): Promise<void>;
   review(studentKey: string, lab: string, reviewed: boolean, note: string, sessionId?: string): Promise<void>;
   /* per-lab attendance + reading */
@@ -97,6 +101,8 @@ export class MemoryStore implements ProgressStore {
   private checkins = new Map<string, { student_key: string; lab: string; at: string; session_id?: string }>();
   private views = new Map<string, { student_key: string; lab: string; seen: Set<string>; active_sec: number; session_id?: string }>();
   private practice = new Set<string>();
+  private acted = new Map<string, string>(); // `${sessionId}|${studentKey}` → last activity
+  private taskLog: { session_id?: string; student_key: string; task: string; at: string; n: number }[] = [];
   private seq = 0;
   private now: () => number;
   constructor(now: () => number = Date.now) {
@@ -124,9 +130,12 @@ export class MemoryStore implements ProgressStore {
   }
   async addAttempt(a: { studentKey: string; lab: string; exercise: string; passed: number; total: number; code: string; sessionId?: string }) {
     this.attempts.push({ id: ++this.seq, student_key: a.studentKey, lab: a.lab, session_id: a.sessionId, exercise: a.exercise, passed: a.passed, total: a.total, code: a.code, created_at: this.stamp() });
+    this.acted.set(`${a.sessionId ?? ''}|${a.studentKey}`, this.stamp());
   }
   async setTask(t: { studentKey: string; lab: string; task: string; done: boolean; sessionId?: string }) {
     this.tasks.set(`${t.sessionId ?? ''}|${t.studentKey}|${t.lab}|${t.task}`, { student_key: t.studentKey, lab: t.lab, task: t.task, done: t.done, session_id: t.sessionId });
+    this.acted.set(`${t.sessionId ?? ''}|${t.studentKey}`, this.stamp());
+    if (t.done) this.taskLog.push({ session_id: t.sessionId, student_key: t.studentKey, task: t.task, at: this.stamp(), n: this.seq + 0.5 }); // sorts after earlier Checks
   }
   async setSubmission(s: { studentKey: string; lab: string; url: string; sessionId?: string }) {
     const k = `${s.sessionId ?? ''}|${s.studentKey}|${s.lab}`;
@@ -265,6 +274,53 @@ export class MemoryStore implements ProgressStore {
     seen.forEach((n) => v.seen.add(n));
     v.active_sec += activeSec;
     this.views.set(k, v);
+    this.acted.set(`${sessionId ?? ''}|${studentKey}`, this.stamp());
+  }
+  async statsRaw(labs: string[]): Promise<StatsRaw> {
+    const sessions = [...this.sessions.values()].filter((x) => labs.includes(x.lab));
+    const labOf = new Map(sessions.map((x) => [x.id, x.lab]));
+    const members = [...this.memberships.values()].filter((m) => labOf.has(m.session_id));
+    const att = this.attempts.filter((a) => a.session_id && labOf.has(a.session_id));
+    const groups = new Map<string, typeof att>();
+    for (const a of att) groups.set(`${a.lab}|${a.student_key}|${a.exercise}`, [...(groups.get(`${a.lab}|${a.student_key}|${a.exercise}`) ?? []), a]);
+    const done = new Map<string, Set<string>>();
+    for (const t of this.tasks.values()) if (t.done && t.session_id && labOf.has(t.session_id)) done.set(`${t.lab}|${t.student_key}`, (done.get(`${t.lab}|${t.student_key}`) ?? new Set()).add(t.task));
+    const heat = new Map<string, number>();
+    for (const a of att) {
+      const d = new Date(Date.parse(a.created_at) + 3 * 3600_000); // Cairo (UTC+3 in the teaching term)
+      const k = `${d.getUTCDay()}|${d.getUTCHours()}`;
+      heat.set(k, (heat.get(k) ?? 0) + 1);
+    }
+    return {
+      sessions: sessions.map((x) => ({ id: x.id, lab: x.lab, ta_name: x.ta_name, time_slot: x.time_slot, opens_at: x.opens_at,
+        joined: members.filter((m) => m.session_id === x.id).length,
+        attended: [...this.checkins.values()].filter((c) => c.session_id === x.id).length })),
+      best: [...groups.values()].map((g) => {
+        const top = [...g].sort((a, b) => b.passed - a.passed || b.id - a.id)[0];
+        return { lab: top.lab, student_key: top.student_key, exercise: top.exercise, passed: top.passed, total: top.total, attempts: g.length, first_ok: g[0].passed >= g[0].total };
+      }),
+      tasks: [...done].map(([k, set]) => ({ lab: k.split('|')[0], student_key: k.split('|')[1], done: set.size })),
+      subs: [...this.subs.values()].filter((x) => x.session_id && labOf.has(x.session_id)).map((x) => ({ lab: x.lab, student_key: x.student_key })),
+      members: [...new Map([...members].sort((a, b) => a.joined_at.localeCompare(b.joined_at)).map((m) => [`${labOf.get(m.session_id)}|${m.student_key}`, { lab: labOf.get(m.session_id)!, student_key: m.student_key, group_name: m.group_name }])).values()],
+      heat: [...heat].map(([k, n]) => ({ dow: Number(k.split('|')[0]), hour: Number(k.split('|')[1]), n })),
+    };
+  }
+  async activity(sessionId: string, limit = 40): Promise<Activity> {
+    const att = this.attempts.filter((a) => a.session_id === sessionId);
+    const latest = new Map<string, (typeof att)[number]>();
+    for (const a of att) latest.set(a.student_key, a);
+    const last = [...latest.values()].map((l) => {
+      const mine = att.filter((a) => a.student_key === l.student_key && a.exercise === l.exercise);
+      const lastPass = Math.max(0, ...mine.filter((a) => a.passed >= a.total).map((a) => a.id));
+      return { student_key: l.student_key, exercise: l.exercise, passed: l.passed, total: l.total, at: l.created_at, fails: mine.filter((a) => a.id > lastPass && a.passed < a.total).length };
+    });
+    const active = [...this.memberships.values()].filter((m) => m.session_id === sessionId)
+      .map((m) => ({ student_key: m.student_key, at: this.acted.get(`${sessionId}|${m.student_key}`) ?? m.joined_at }));
+    const events = [
+      ...att.map((a) => ({ student_key: a.student_key, kind: 'check' as const, ref: a.exercise, passed: a.passed, total: a.total, at: a.created_at, n: a.id })),
+      ...this.taskLog.filter((t) => t.session_id === sessionId).map((t) => ({ student_key: t.student_key, kind: 'task' as const, ref: t.task, passed: 1, total: 1, at: t.at, n: t.n })),
+    ].sort((a, b) => b.at.localeCompare(a.at) || b.n - a.n).slice(0, limit).map(({ n: _n, ...e }) => e);
+    return { last, active, events };
   }
 }
 
@@ -517,6 +573,60 @@ export class NeonStore implements ProgressStore {
       })),
       tasks: taskRows.map((r) => ({ student_key: r.student_key, done: Number(r.done) })),
       submissions: subRows.map((r) => ({ ...r, updated_at: iso(r.updated_at)! })),
+    };
+  }
+
+  async statsRaw(labs: string[]): Promise<StatsRaw> {
+    const v = this.v2;
+    const [sessions, best, tasks, subs, members, heat] = await Promise.all([
+      this.q(`select s.id, s.lab, s.ta_name, s.time_slot, s.opens_at,
+                (select count(*) from ${v.members} m where m.session_id = s.id)::int as joined,
+                (select count(*) from ${v.checkins} c where c.session_id = s.id)::int as attended
+              from ${v.sessions} s where s.lab = any($1)`, [labs]),
+      this.q(`select lab, student_key, exercise, max(passed) as passed, (array_agg(total order by passed desc, id desc))[1] as total,
+                count(*)::int as attempts, (array_agg(passed >= total order by id))[1] as first_ok
+              from ${v.attempts} where lab = any($1) group by lab, student_key, exercise`, [labs]),
+      this.q(`select lab, student_key, (count(distinct task) filter (where done))::int as done from ${v.tasks} where lab = any($1) group by lab, student_key`, [labs]),
+      this.q(`select distinct lab, student_key from ${v.subs} where lab = any($1)`, [labs]),
+      this.q(`select distinct on (s.lab, m.student_key) s.lab, m.student_key, m.group_name
+              from ${v.members} m join ${v.sessions} s on s.id = m.session_id where s.lab = any($1)
+              order by s.lab, m.student_key, m.joined_at desc`, [labs]),
+      this.q(`select extract(dow from created_at at time zone 'Africa/Cairo')::int as dow, extract(hour from created_at at time zone 'Africa/Cairo')::int as hour, count(*)::int as n
+              from ${v.attempts} where lab = any($1) group by 1, 2`, [labs]),
+    ]);
+    return {
+      sessions: sessions.map((r) => ({ id: r.id, lab: r.lab, ta_name: r.ta_name, time_slot: r.time_slot, opens_at: iso(r.opens_at)!, joined: Number(r.joined), attended: Number(r.attended) })),
+      best: best.map((r) => ({ lab: r.lab, student_key: r.student_key, exercise: r.exercise, passed: Number(r.passed), total: Number(r.total), attempts: Number(r.attempts), first_ok: Boolean(r.first_ok) })),
+      tasks: tasks.map((r) => ({ lab: r.lab, student_key: r.student_key, done: Number(r.done) })),
+      subs: subs.map((r) => ({ lab: r.lab, student_key: r.student_key })),
+      members: members.map((r) => ({ lab: r.lab, student_key: r.student_key, group_name: r.group_name })),
+      heat: heat.map((r) => ({ dow: Number(r.dow), hour: Number(r.hour), n: Number(r.n) })),
+    };
+  }
+
+  async activity(sessionId: string, limit = 40): Promise<Activity> {
+    const v = this.v2;
+    const [last, active, events] = await Promise.all([
+      this.q(`with l as (select distinct on (student_key) id, student_key, exercise, passed, total, created_at from ${v.attempts}
+                where session_id = $1 order by student_key, id desc)
+              select l.student_key, l.exercise, l.passed, l.total, l.created_at,
+                (select count(*) from ${v.attempts} a where a.session_id = $1 and a.student_key = l.student_key and a.exercise = l.exercise and a.passed < a.total
+                   and a.id > coalesce((select max(b.id) from ${v.attempts} b where b.session_id = $1 and b.student_key = l.student_key and b.exercise = l.exercise and b.passed >= b.total), 0))::int as fails
+              from l`, [sessionId]),
+      this.q(`select m.student_key, greatest(m.joined_at,
+                (select max(created_at) from ${v.attempts} a where a.session_id = $1 and a.student_key = m.student_key),
+                (select max(updated_at) from ${v.tasks} t where t.session_id = $1 and t.student_key = m.student_key),
+                (select updated_at from ${v.views} w where w.session_id = $1 and w.student_key = m.student_key)) as at
+              from ${v.members} m where m.session_id = $1`, [sessionId]),
+      this.q(`(select student_key, 'check' as kind, exercise as ref, passed, total, created_at as at from ${v.attempts} where session_id = $1 order by id desc limit $2)
+              union all
+              (select student_key, 'task' as kind, task as ref, 1, 1, updated_at as at from ${v.tasks} where session_id = $1 and done order by updated_at desc limit $2)
+              order by at desc limit $2`, [sessionId, limit]),
+    ]);
+    return {
+      last: last.map((r) => ({ student_key: r.student_key, exercise: r.exercise, passed: Number(r.passed), total: Number(r.total), at: iso(r.created_at)!, fails: Number(r.fails) })),
+      active: active.map((r) => ({ student_key: r.student_key, at: iso(r.at)! })),
+      events: events.map((r) => ({ student_key: r.student_key, kind: r.kind, ref: r.ref, passed: Number(r.passed), total: Number(r.total), at: iso(r.at)! })),
     };
   }
 

@@ -5,7 +5,7 @@ import { aggregate, MemoryLabBackend, validateLabEvent, type LabEvent } from '..
 import { ProgressLabBackend } from '../src/lib/lab/progress-backend.ts';
 import { MemoryStore } from '../src/lib/progress/store.ts';
 
-const base = { lab: 'lab-02', name: 'Mariam Ahmed', studentId: 'ST-001', deviceId: 'dev-aaaaaaaaaaaaaaaa' };
+const base = { lab: 'lab-02', name: 'Mariam Ahmed', studentId: '240001', deviceId: 'dev-aaaaaaaaaaaaaaaa' };
 const ev = (extra: Record<string, unknown>) => {
   const v = validateLabEvent({ ...base, ...extra });
   if (!v.ok) throw new Error(v.error);
@@ -15,7 +15,7 @@ const ev = (extra: Record<string, unknown>) => {
 test('validation: accepts start / check / hint and normalises the student key', () => {
   const start = validateLabEvent({ ...base, event: 'start' });
   assert.ok(start.ok);
-  assert.equal(start.ok && start.event.studentKey, 'st-001');
+  assert.equal(start.ok && start.event.studentKey, '240001');
   const check = validateLabEvent({ ...base, event: 'check', exercise: 'ex05', result: 'partial', score: 0.666 });
   assert.ok(check.ok && check.event.score === 0.666);
   const pass = validateLabEvent({ ...base, event: 'check', exercise: 'ex05', result: 'pass', score: 0.2 });
@@ -62,7 +62,7 @@ test('memory store: attempts, hints, best score; solved stays solved; final chal
 test('memory store: same student on two devices is one row; IDs are case-insensitive', async () => {
   const store = new MemoryLabBackend();
   await store.record(ev({ event: 'start' }));
-  await store.record(ev({ event: 'start', studentId: 'st-001', deviceId: 'dev-bbbbbbbbbbbbbbbb' }));
+  await store.record(ev({ event: 'start', studentId: '240001', deviceId: 'dev-bbbbbbbbbbbbbbbb' }));
   assert.equal((await store.rows('lab-02')).students.length, 1);
 });
 
@@ -98,10 +98,10 @@ test('aggregate: per-exercise attempted / solved / not solved / success rate / h
   let t = t0;
   const store = new MemoryLabBackend(() => new Date(t));
   const students = [
-    { name: 'Mariam Ahmed', studentId: 'ST-1' },
-    { name: 'Ali Hassan', studentId: 'ST-2' },
-    { name: 'Salma Youssef', studentId: 'ST-3' },
-    { name: 'Omar Khaled', studentId: 'ST-4' },
+    { name: 'Mariam Ahmed', studentId: '240011' },
+    { name: 'Ali Hassan', studentId: '240012' },
+    { name: 'Salma Youssef', studentId: '240013' },
+    { name: 'Omar Khaled', studentId: '240014' },
   ];
   const as = (i: number, extra: Record<string, unknown>) => ev({ ...students[i], deviceId: `device-${i}-aaaaaaaaaaaa`, ...extra }) as LabEvent;
   for (let i = 0; i < 4; i++) await store.record(as(i, { event: 'start' }));

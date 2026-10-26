@@ -9,5 +9,5 @@ export function moduleSectionHref(slug: string, section: string, preview = false
   const query = new URLSearchParams();
   if (section.toLowerCase() !== 'overview') query.set('tab', section.toLowerCase());
   if (preview) query.set('preview', '');
-  return `/m/${encodeURIComponent(slug)}${query.size ? `?${query}` : ''}`;
+  return `/${encodeURIComponent(slug)}${query.size ? `?${query}` : ''}`;
 }

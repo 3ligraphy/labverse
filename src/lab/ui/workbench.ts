@@ -194,7 +194,7 @@ export class Workbench {
     const compiled = compileAll(this.files);
     if (!compiled.ok) {
       const e = compiled.errors[0];
-      this.showError({ message: e.message, file: e.file, line: e.line }, 'Fix it to update the preview.');
+      this.showError({ message: e.message, file: e.file, line: e.line, ...(e.hint ? { hint: e.hint } : null) }, 'Fix it to update the preview.');
       return;
     }
     this.consoleList.replaceChildren();

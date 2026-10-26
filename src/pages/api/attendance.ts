@@ -23,7 +23,10 @@ export const POST: APIRoute = async ({ request }) => {
   if (!store) return json({ error: 'closed', message: 'Attendance is not open yet. Please tell your TA.' }, 503);
 
   try {
-    const r = await store.checkIn({ name: v.name, studentId: v.studentId, deviceId: v.deviceId, at: new Date().toISOString() });
+    // Students may share a lab PC: the device is paired with the student ID, so the "once per device" rule of
+    // both stores never blocks a classmate. "Once per student ID" still applies.
+    const deviceId = `${v.deviceId.slice(0, 40)}.${v.studentId.toLowerCase()}`;
+    const r = await store.checkIn({ name: v.name, studentId: v.studentId, deviceId, at: new Date().toISOString() });
     switch (r.status) {
       case 'ok':
         return json({ ok: true, entry: r.entry }, 201);

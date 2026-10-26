@@ -50,10 +50,10 @@ evaluation:
   - { criterion: 'Phase 2 — Implementation, testing & AI log', weight: 50, detail: 'Architecture 5 · Storage 10 · APIs & errors 11 · Tests 9 · AI log 15.' }
   - { criterion: Presentation & demo, weight: 20, detail: 'Individual questions on functionality, architecture (group) and AI decisions. Marks can differ between members.' }
 resources:
-  - { label: Phase 1 brief, href: /coursework/cw-01 }
-  - { label: Phase 2 brief, href: /coursework/cw-02 }
-  - { label: Lab 01 — Git & GitHub basics, href: /labs/lab-01 }
-  - { label: Command Handbook, href: /commands }
+  - { label: Phase 1 brief, href: /mobile-development/coursework/cw-01 }
+  - { label: Phase 2 brief, href: /mobile-development/coursework/cw-02 }
+  - { label: Lab 01 — Git & GitHub basics, href: /mobile-development/labs/lab-01 }
+  - { label: Command Handbook, href: /mobile-development/commands }
 faq:
   - { q: How many students per team?, a: Maximum 4. }
   - { q: Can we use AI?, a: 'Yes, as a development aid. Log every significant interaction (prompt → output → your changes → rationale). Reports must be written by you, not AI. Paraphrasing is limited to 20%.' }

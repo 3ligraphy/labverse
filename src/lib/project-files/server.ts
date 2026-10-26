@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { del, head } from '@vercel/blob';
+import type { View } from './results';
 import { TYPE_KEYS, matchesSignature, mimesFor, typeForName, type Entry, type EntryInput, type FileType, type ProjectFile, type Settings } from './core';
 
 const env = (key: string) => getSecret(key) || undefined;
@@ -53,6 +54,7 @@ class FilesStore {
   private files: string;
   private entries: string;
   private groups: string;
+  private views: string;
 
   constructor(url: string, prefix: string, driver: 'neon' | 'postgres') {
     if (driver === 'postgres') {
@@ -65,6 +67,7 @@ class FilesStore {
     this.files = `${prefix}_files`;
     this.entries = `${prefix}_entries`;
     this.groups = `${prefix}_groups`;
+    this.views = `${prefix}_views`;
   }
 
   /** Tables are created and migrated on first use (idempotent). */
@@ -91,6 +94,11 @@ class FilesStore {
         unique (file_id, student_id))`,
       // v4: the class list and each item's group plan (/admin/project/[id]/groups), stored as JSON
       `create table if not exists ${this.groups} (key text primary key, data jsonb not null, updated_at timestamptz not null default now())`,
+      // v5: which students looked up their published result on /mobile-development/project
+      `create table if not exists ${this.views} (
+        file_id text not null references ${this.files}(id) on delete cascade, student_id text not null,
+        first_at timestamptz not null default now(), last_at timestamptz not null default now(), count int not null default 1,
+        primary key (file_id, student_id))`,
     ];
     for (const s of statements) await this.run(s);
   }
@@ -201,6 +209,39 @@ class FilesStore {
        on conflict (key) do update set data = excluded.data, updated_at = now()`,
       [key, JSON.stringify(data)],
     );
+  }
+
+  /**
+   * Read-change-write of one value without losing a write made at the same moment (two feedback cards saving
+   * together, or two staff on one page): the write only lands if nobody wrote since the read, otherwise it reads
+   * again and retries.
+   */
+  async updateGroupData<T>(key: string, change: (current: unknown) => T, tries = 8): Promise<T> {
+    for (let i = 0; i < tries; i++) {
+      // the stamp is compared as text: a JS Date would round away the microseconds and never match
+      const [row] = await this.q(`select data, updated_at::text as stamp from ${this.groups} where key = $1`, [key]);
+      const next = change(row ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : null);
+      const done = row
+        ? await this.q(`update ${this.groups} set data = $2::jsonb, updated_at = clock_timestamp() where key = $1 and updated_at::text = $3 returning key`, [key, JSON.stringify(next), row.stamp])
+        : await this.q(`insert into ${this.groups} (key, data) values ($1, $2::jsonb) on conflict (key) do nothing returning key`, [key, JSON.stringify(next)]);
+      if (done.length) return next;
+      await new Promise((r) => setTimeout(r, 20 + Math.random() * 60));
+    }
+    throw new Error('The data is busy. Try again.');
+  }
+
+  /** A student looked up their result for this item (one row per student; repeat looks bump the count). */
+  async recordView(fileId: string, studentId: string): Promise<void> {
+    await this.q(
+      `insert into ${this.views} (file_id, student_id) values ($1, $2)
+       on conflict (file_id, student_id) do update set last_at = now(), count = ${this.views}.count + 1`,
+      [fileId, studentId],
+    );
+  }
+
+  async listViews(fileId: string): Promise<View[]> {
+    const rows = await this.q(`select student_id, first_at, last_at, count from ${this.views} where file_id = $1`, [fileId]);
+    return rows.map((r) => ({ studentId: r.student_id, firstAt: iso(r.first_at) ?? '', lastAt: iso(r.last_at) ?? '', count: Number(r.count) }));
   }
 
   async removeEntry(id: string): Promise<Entry | null> {

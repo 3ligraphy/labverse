@@ -5,11 +5,11 @@ import { markPresent } from '../src/lib/progress/manual-attendance.ts';
 import { validateStudentIdentity } from '../src/lib/progress/core.ts';
 
 test('manual identity accepts name and ID without a browser and validates both fields', () => {
-  assert.deepEqual(validateStudentIdentity({ name: '  Mariam   Ahmed ', studentId: ' AB123 ' }), {
-    ok: true, value: { name: 'Mariam Ahmed', studentId: 'AB123', studentKey: 'ab123' },
+  assert.deepEqual(validateStudentIdentity({ name: '  Mariam   Ahmed ', studentId: ' 231234 ' }), {
+    ok: true, value: { name: 'Mariam Ahmed', studentId: '231234', studentKey: '231234' },
   });
-  assert.equal(validateStudentIdentity({ name: '', studentId: 'AB123' }).ok, false);
-  assert.equal(validateStudentIdentity({ name: '<script>', studentId: 'AB123' }).ok, false);
+  assert.equal(validateStudentIdentity({ name: '', studentId: '231234' }).ok, false);
+  assert.equal(validateStudentIdentity({ name: '<script>', studentId: '231234' }).ok, false);
   assert.equal(validateStudentIdentity({ name: 'Mariam Ahmed', studentId: '1' }).ok, false);
 });
 
@@ -17,7 +17,7 @@ test('manual entry creates an unbound student in just the selected session and i
   const store = new MemoryStore();
   const session = await store.createSession('lab-02', 'TA', 'Monday');
   const other = await store.createSession('lab-02', 'TA', 'Tuesday');
-  const student = { studentKey: 'ab123', studentId: 'AB123', name: 'Mariam Ahmed' };
+  const student = { studentKey: '231234', studentId: '231234', name: 'Mariam Ahmed' };
   const at = await store.addManualAttendance('lab-02', session.id, student);
   assert.ok(at);
   const data = await store.studentData('lab-02', student.studentKey, session.id);
@@ -34,7 +34,7 @@ test('manual entry creates an unbound student in just the selected session and i
 test('manual entry trusts the ID and preserves existing identity, group and device', async () => {
   const store = new MemoryStore();
   const session = await store.createSession('lab-02', 'TA', 'Monday');
-  const student = { studentKey: 'ab123', studentId: 'AB123', name: 'Mariam Ahmed' };
+  const student = { studentKey: '231234', studentId: '231234', name: 'Mariam Ahmed' };
   await store.touchStudent({ ...student, deviceKey: 'student-device-123456' });
   await store.joinSession(session.id, student.studentKey, 'Group A');
   const before = await store.labData('lab-02', session.id);

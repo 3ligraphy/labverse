@@ -78,6 +78,7 @@ const json = JSON.stringify({ optional, study, next: safeNext }).replace(/</g, '
             <form class="auth-form" data-form="in" method="post" action={`/api/auth/login${safeNext ? `?next=${encodeURIComponent(safeNext)}` : ''}`} data-astro-reload novalidate>
               <label><span>BUE email or username</span><input class="input" name="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="name.surname@bue.edu.eg" required /></label>
               <label><span>Password</span><input class="input" type="password" name="password" autocomplete="current-password" required /></label>
+              <button type="button" class="auth-link" data-show-forgot>Forgot your password?</button>
               <p class="auth-msg" id="in-msg" data-msg role="alert"></p>
               <button class="btn btn-primary btn-lg" type="submit">Sign in →</button>
               <p class="auth-fine">Staff accounts come from an invitation or from the super admin in <b>Admin → Accounts</b>.</p>
@@ -98,6 +99,33 @@ const json = JSON.stringify({ optional, study, next: safeNext }).replace(/</g, '
               <fieldset class="auth-opts"><legend>Optional modules you chose</legend><div data-up-opts><p class="auth-fine">Choose your year first.</p></div></fieldset>
               <p class="auth-msg" id="up-msg" data-msg role="alert"></p>
               <button class="btn btn-primary btn-lg" type="submit">Create account →</button>
+            </form>
+
+            {/* forgot password: ask → a TA approves → choose a new password, all on this page */}
+            <form class="auth-form" data-form="forgot" hidden novalidate>
+              <div><h2>Reset your password</h2><p class="auth-fine">Type your account’s email and student ID. Your TA gets a notification, and once they approve you choose a new password right here.</p></div>
+              <label><span>University email</span><input class="input" type="email" name="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="name.surname@bue.edu.eg" required /></label>
+              <label><span>Student ID</span><input class="input mono" name="studentId" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="e.g. 241995" required /></label>
+              <p class="auth-msg" id="fg-msg" data-msg role="alert"></p>
+              <button class="btn btn-primary btn-lg" type="submit">Send to my TA →</button>
+              <button type="button" class="auth-link" data-back-in>← Back to sign in</button>
+            </form>
+            <div class="auth-form" data-form="wait" hidden aria-live="polite">
+              <div><h2>Waiting for your TA</h2><p class="auth-fine" data-wait-who></p></div>
+              <ol class="auth-steps">
+                <li class="done"><span aria-hidden="true">✓</span>Request sent</li>
+                <li class="now" data-step="approve"><span aria-hidden="true">2</span>A TA approves it</li>
+                <li data-step="new"><span aria-hidden="true">3</span>You choose a new password</li>
+              </ol>
+              <p class="auth-fine">Your TA sees it in <b>Admin → Password requests</b>. Keep this page open, or come back later on this same device: it checks every 10 seconds.</p>
+              <button type="button" class="btn btn-ghost" data-cancel-reset>Cancel this request</button>
+            </div>
+            <form class="auth-form" data-form="newpw" hidden novalidate>
+              <div><h2>Choose a new password</h2><p class="auth-fine" data-newpw-note>Your request was approved.</p></div>
+              <label><span>New password <small>(10+ characters, letters and numbers)</small></span><input class="input" type="password" name="password" autocomplete="new-password" required /></label>
+              <label><span>Type it again</span><input class="input" type="password" name="confirm" autocomplete="new-password" required /></label>
+              <p class="auth-msg" id="np-msg" data-msg role="alert"></p>
+              <button class="btn btn-primary btn-lg" type="submit">Save and sign in →</button>
             </form>
           </>
         )}
@@ -155,6 +183,18 @@ const json = JSON.stringify({ optional, study, next: safeNext }).replace(/</g, '
   .auth-as p { color: var(--hero-lead); line-height: 1.5; }
   .auth-as p b { color: var(--hero-text); }
   .auth-as-more { display: flex; flex-wrap: wrap; gap: 8px; }
+  .auth-link { justify-self: start; margin-top: -6px; padding: 2px 0; border: 0; background: none; color: var(--hero-accent); font: 600 13px var(--font-body); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .auth-form h2 { font-size: 1.4rem; letter-spacing: -.02em; }
+  .auth-form h2 + .auth-fine { margin-top: 6px; }
+  .auth-steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .auth-steps li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--hero-line); color: var(--hero-dim); font-size: 14px; }
+  .auth-steps li span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: color-mix(in oklab, var(--hero-text) 10%, transparent); font: 700 12px var(--font-mono); flex: none; }
+  .auth-steps li.done { color: var(--hero-text); }
+  .auth-steps li.done span { background: var(--hero-accent); color: var(--hero-bg); }
+  .auth-steps li.now { color: var(--hero-text); border-color: var(--hero-accent); }
+  .auth-steps li.now span { animation: auth-pulse 1.6s ease-in-out infinite; }
+  @keyframes auth-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in oklab, var(--hero-accent) 25%, transparent); } }
+  @media (prefers-reduced-motion: reduce) { .auth-steps li.now span { animation: none; } }
 </style>
 
 <script>
@@ -184,6 +224,8 @@ const json = JSON.stringify({ optional, study, next: safeNext }).replace(/</g, '
     const show = (t: string) => {
       tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
       root.querySelectorAll<HTMLElement>('[data-form]').forEach((f) => (f.hidden = f.dataset.form !== t));
+      const tablist = root.querySelector<HTMLElement>('.auth-tabs');
+      if (tablist) tablist.hidden = !['in', 'up'].includes(t);
     };
     tabs.forEach((b) => b.addEventListener('click', () => show(b.dataset.tab!)));
     root.querySelector('[data-auth-out]')?.addEventListener('click', async () => {
@@ -209,6 +251,96 @@ const json = JSON.stringify({ optional, study, next: safeNext }).replace(/</g, '
       if (!r.ok) { msg.textContent = d.error ?? 'Could not sign in.'; return; }
       done(d.user.role);
     });
+
+    /* ---------- forgot password: ask → a TA approves → a new password, on this device ---------- */
+    const RESET_KEY = 'buenova:reset';
+    type Req = { id: string; secret: string; name?: string };
+    const savedReq = (): Req | null => { try { return JSON.parse(localStorage.getItem(RESET_KEY) ?? 'null'); } catch { return null; } };
+    const saveReq = (r: Req | null) => { try { if (r) localStorage.setItem(RESET_KEY, JSON.stringify(r)); else localStorage.removeItem(RESET_KEY); } catch { /* storage off */ } };
+    const forgot = root.querySelector<HTMLFormElement>('[data-form="forgot"]');
+    const newpw = root.querySelector<HTMLFormElement>('[data-form="newpw"]');
+    const params = new URLSearchParams(location.search);
+    const linkToken = params.get('reset') ?? '';
+    let poll = 0;
+    const toForgot = (message = '') => {
+      clearInterval(poll);
+      show('forgot');
+      forgot!.querySelector<HTMLElement>('[data-msg]')!.textContent = message;
+    };
+    const check = async () => {
+      const req = savedReq();
+      if (!req) return toForgot();
+      const r = await fetch(`/api/auth/forgot?id=${encodeURIComponent(req.id)}&secret=${encodeURIComponent(req.secret)}`, { cache: 'no-store' }).catch(() => null);
+      if (!r) return; // offline: try again on the next tick
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { saveReq(null); return toForgot('That request is no longer open. Send a new one.'); }
+      if (d.status === 'approved') {
+        clearInterval(poll);
+        show('newpw');
+        newpw!.querySelector('[data-newpw-note]')!.textContent = `Approved${d.decidedBy ? ` by ${d.decidedBy}` : ''}. Choose a new password now (the approval lasts 24 hours).`;
+        newpw!.querySelector<HTMLInputElement>('[name="password"]')!.focus();
+      } else if (d.status === 'rejected') {
+        saveReq(null);
+        toForgot(`Your TA${d.decidedBy ? ` (${d.decidedBy})` : ''} declined the request. Talk to them in the lab, then try again.`);
+      } else if (d.status !== 'pending') {
+        saveReq(null);
+        toForgot(d.status === 'expired' ? 'The approval expired after 24 hours. Send a new request.' : 'That request is closed. Send a new one if you still need it.');
+      }
+    };
+    const waitFor = (req: Req) => {
+      show('wait');
+      root.querySelector('[data-wait-who]')!.textContent = req.name ? `Request for ${req.name}’s account.` : '';
+      clearInterval(poll);
+      void check();
+      poll = window.setInterval(() => { if (!root.isConnected) clearInterval(poll); else if (document.visibilityState === 'visible') void check(); }, 10_000);
+    };
+    root.querySelector('[data-show-forgot]')?.addEventListener('click', () => {
+      const req = savedReq();
+      if (req) waitFor(req);
+      else {
+        toForgot();
+        const typed = signin?.querySelector<HTMLInputElement>('[name="email"]')?.value ?? '';
+        if (typed.includes('@')) forgot!.querySelector<HTMLInputElement>('[name="email"]')!.value = typed;
+        forgot!.querySelector<HTMLInputElement>('[name="email"]')!.focus();
+      }
+    });
+    root.querySelector('[data-back-in]')?.addEventListener('click', () => show('in'));
+    root.querySelector('[data-cancel-reset]')?.addEventListener('click', () => { saveReq(null); clearInterval(poll); show('in'); });
+    forgot?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = forgot.querySelector<HTMLElement>('[data-msg]')!;
+      msg.textContent = '';
+      if (!filled(forgot, msg)) return;
+      const fd = new FormData(forgot);
+      const r = await fetch('/api/auth/forgot', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: fd.get('email'), studentId: fd.get('studentId') }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { msg.textContent = d.error ?? 'Could not send the request.'; return; }
+      const req = { id: d.id, secret: d.secret, name: d.name };
+      saveReq(req);
+      waitFor(req);
+    });
+    newpw?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = newpw.querySelector<HTMLElement>('[data-msg]')!;
+      msg.textContent = '';
+      if (!filled(newpw, msg)) return;
+      const fd = new FormData(newpw);
+      if (fd.get('password') !== fd.get('confirm')) { msg.textContent = 'The two passwords are different. Type the same one twice.'; return; }
+      const req = savedReq();
+      const body = linkToken ? { token: linkToken, password: fd.get('password') } : { id: req?.id, secret: req?.secret, password: fd.get('password') };
+      const r = await fetch('/api/auth/reset', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { msg.textContent = d.error ?? 'Could not save the new password.'; return; }
+      saveReq(null);
+      done(d.user.role);
+    });
+    // a one-time link from the TA, an open request on this device, or ?forgot
+    if (linkToken && newpw) {
+      history.replaceState(history.state, '', location.pathname); // keep the one-time token out of history
+      show('newpw');
+      newpw.querySelector('[data-newpw-note]')!.textContent = 'Your TA approved your request. Choose a new password (this link works once, for 24 hours).';
+    } else if (savedReq() && forgot) waitFor(savedReq()!);
+    else if (params.has('forgot') && forgot) toForgot();
 
     const signup = root.querySelector<HTMLFormElement>('[data-form="up"]');
     if (!signup) return;

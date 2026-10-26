@@ -8,7 +8,7 @@ export function moduleSearchItems(slug: string, title: string, labs: { slug: str
     k: 'Page', t: section, d: title, u: moduleSectionHref(slug, section, preview),
   }));
   for (const lab of labs) {
-    const href = `/m/${encodeURIComponent(slug)}/${encodeURIComponent(lab.slug)}${preview ? '?preview' : ''}`;
+    const href = `/${encodeURIComponent(slug)}/${encodeURIComponent(lab.slug)}${preview ? '?preview' : ''}`;
     items.push({ k: 'Lab', t: lab.compiled.meta.title, d: lab.compiled.meta.description, u: href, s: lab.compiled.meta.objectives.join(' ') });
     for (const block of lab.compiled.blocks) if (block.kind === 'task') {
       items.push({ k: 'Lab', t: `Task ${block.n} · ${block.title}`, d: lab.compiled.meta.title,

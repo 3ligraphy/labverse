@@ -26,7 +26,7 @@ export const BUILT_IN_MODULE = {
   term: course.term ?? '',
   description: course.tagline ?? '',
   color: '#c8ff4d',
-  href: '/course',
+  href: '/mobile-development',
 };
 
 /** labNodes: the lab components the admin allows in this module's lab canvas (null = every component). */
@@ -282,7 +282,7 @@ export async function moduleCards(builtInAudience: { category: string; years: st
       const published = new Set(labs.filter((l) => l.module === m.slug && l.published).map((l) => l.slug));
       return {
         slug: m.slug, code: c.meta.code ?? '', title: c.meta.title || m.title, term: c.meta.term ?? '', description: c.meta.description ?? '',
-        color: c.meta.color || '#7cb1ff', href: `/m/${m.slug}`, builtIn: false,
+        color: c.meta.color || '#7cb1ff', href: `/${m.slug}`, builtIn: false,
         labs: c.items.filter((i) => i.kind === 'lab' && published.has(i.slug)).length,
         category: cat(c.meta.category), kind: kindOf(categories, cat(c.meta.category)), open: c.meta.open === 'Yes',
         years: listOf(c.meta.years), specializations: listOf(c.meta.specializations), semester: sem(c.meta.semester), faculty: moduleFaculty(c.meta.faculty),

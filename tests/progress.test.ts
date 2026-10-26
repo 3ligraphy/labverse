@@ -32,12 +32,12 @@ const LAB: LabStructure = {
 /* ---------------- validation ---------------- */
 
 test('identity: valid input is normalised, student key is lower-case', () => {
-  const r = validateIdentity({ name: '  Mariam   Ahmed ', studentId: ' ab-12C ', deviceKey: DEVICE });
+  const r = validateIdentity({ name: '  Mariam   Ahmed ', studentId: ' 24 0012 ', deviceKey: DEVICE });
   assert.equal(r.ok, true);
   if (r.ok) {
     assert.equal(r.value.name, 'Mariam Ahmed');
-    assert.equal(r.value.studentId, 'ab-12C');
-    assert.equal(r.value.studentKey, 'ab-12c');
+    assert.equal(r.value.studentId, '240012');
+    assert.equal(r.value.studentKey, '240012');
   }
 });
 

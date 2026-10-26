@@ -1,6 +1,7 @@
 /** POST /api/progress/start — join the currently active lab session with name, ID and group. */
 import type { APIRoute } from 'astro';
 import { sessionState, validateIdentity } from '@/lib/progress/core';
+import { cleanGroup, groupError } from '@/lib/identity';
 import { getProgressStore, getStructures, json } from '@/lib/progress/server';
 
 export const prerender = false;
@@ -11,9 +12,9 @@ export const POST: APIRoute = async ({ request }) => {
   if (!identity.ok) return json({ error: 'invalid', errors: identity.errors }, 400);
   const lab = String(body?.lab ?? '');
   const sessionId = String(body?.sessionId ?? '');
-  const group = String(body?.group ?? '').normalize('NFC').trim().replace(/\s+/g, ' ');
-  if (!(await getStructures()).some((item) => item.lab === lab) || !group || group.length > 30 || !/^[\p{L}\p{M}\p{N} ._/-]+$/u.test(group)) {
-    return json({ error: 'invalid', message: 'Enter a valid group (for example, G1).' }, 400);
+  const group = cleanGroup(body?.group);
+  if (!(await getStructures()).some((item) => item.lab === lab) || groupError(group) !== null) {
+    return json({ error: 'invalid', message: groupError(group) ?? 'Unknown lab.' }, 400);
   }
   const store = getProgressStore();
   if (!store) return json({ error: 'closed', message: 'Progress tracking is not set up.' }, 503);
@@ -23,7 +24,7 @@ export const POST: APIRoute = async ({ request }) => {
       return json({ error: 'session-closed', message: 'Your TA has not started this lab session yet. You can still read the content.' }, 403);
     }
     if ((await store.touchStudent(identity.value)) === 'conflict') {
-      return json({ error: 'device', message: 'This browser is linked to another student, or this student ID is linked to another device. Ask your TA to allow a new device.' }, 409);
+      return json({ error: 'device', message: 'This student ID was already used with a different name. Type your name exactly as you did before, or ask your TA to fix it.' }, 409);
     }
     await store.joinSession(sessionId, identity.value.studentKey, group);
     return json({ ok: true, session });

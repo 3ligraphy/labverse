@@ -16,7 +16,7 @@ const mod = builtIn ? null : await getPlatformStore()?.getModule(slug);
 if (!builtIn && !mod) return Astro.redirect('/admin/builder', 303);
 const meta = mod ? compileModule(mod.flow).meta : { title: BUILT_IN_MODULE.title, code: BUILT_IN_MODULE.code, color: BUILT_IN_MODULE.color };
 const [current, perm] = await Promise.all([moduleAssessment(slug), canSetAssessment(Astro.cookies, slug)]);
-const view = builtIn ? '/course#assessment' : `/m/${slug}#assessment`;
+const view = builtIn ? '/mobile-development#assessment' : `/${slug}#assessment`;
 const json = JSON.stringify({ items: current.items }).replace(/</g, '\\u003c');
 const when = current.updated_at ? new Date(current.updated_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo' }) : '';
 import AdminShell from '@/components/admin/AdminShell.astro';

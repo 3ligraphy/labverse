@@ -182,3 +182,10 @@ const json = JSON.stringify({ id: ex, files: def.files, checks: def.checks }).re
     .pg.is-passed .pg-pass { animation: none; opacity: 1; transform: none; }
   }
 </style>
+
+<script>
+  // the playground controller: runner iframe, editor, Run / Check, and the walkthrough's file tabs
+  import { onPageLoad } from '@/scripts/page-load';
+  import { initPlaygrounds } from '@/scripts/playground/controller';
+  onPageLoad(initPlaygrounds);
+</script>

@@ -10,7 +10,7 @@ import type { APIRoute } from 'astro';
 import { access } from '@/lib/accounts/access';
 import type { Permission } from '@/lib/accounts/permissions';
 import { json } from '@/lib/progress/server';
-import { SLUG_RE, leaderChanged, sanitizeFlow, slugify } from '@/lib/platform/core';
+import { RESERVED_MODULE_SLUGS, SLUG_RE, leaderChanged, sanitizeFlow, slugify } from '@/lib/platform/core';
 import { BUILT_IN_MODULE, getPlatformStore } from '@/lib/platform/server';
 import { ANY_FACULTY, DEFAULT_FACULTY, DEFAULT_SETTINGS } from '@/lib/accounts/core';
 import { getAccountStore } from '@/lib/accounts/server';
@@ -50,6 +50,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const slug = body.slug ? String(body.slug).trim() : slugify(title);
   if (!SLUG_RE.test(slug)) return json({ error: 'The address may only use lowercase letters, numbers and dashes.' }, 400);
   if (slug === BUILT_IN_MODULE.slug) return json({ error: 'That address belongs to the built-in course.' }, 409);
+  if (RESERVED_MODULE_SLUGS.has(slug)) return json({ error: `/${slug} is already a page on the site. Choose another address.` }, 409);
   const faculty = String(body.faculty ?? '').trim() || DEFAULT_FACULTY;
   try {
     if (faculty !== ANY_FACULTY) {
@@ -57,7 +58,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       if (!faculties.some((f) => f.slug === faculty)) return json({ error: 'Choose one of the catalogue’s faculties.' }, 400);
     }
     let mod = await g.store.createModule(slug, title);
-    if (!mod) return json({ error: `A module at /m/${slug} already exists.` }, 409);
+    if (!mod) return json({ error: `A module at /${slug} already exists.` }, 409);
     // the module node starts in the default faculty
     const root = mod.flow.nodes.find((n) => n.type === 'module');
     if (root && faculty !== root.data.faculty) {

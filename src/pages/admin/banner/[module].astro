@@ -19,7 +19,7 @@ if (slug !== BUILT_IN_MODULE.slug && !row) return Astro.redirect('/admin', 303);
 const meta = row ? compileModule(row.flow).meta : BUILT_IN_MODULE;
 const banners = await store.listBanners(slug);
 const data = JSON.stringify({ banners }).replace(/</g, '\\u003c');
-const view = slug === BUILT_IN_MODULE.slug ? '/course' : `/m/${slug}`;
+const view = slug === BUILT_IN_MODULE.slug ? '/mobile-development' : `/${slug}`;
 ---
 <Base title={`Banners · ${meta.title}`} noindex>
   <AdminShell active="banner">
@@ -37,7 +37,7 @@ const view = slug === BUILT_IN_MODULE.slug ? '/course' : `/m/${slug}`;
         <label><span>Message</span><textarea class="input" name="message" maxlength="240" rows="3" required placeholder="Open the new lab and complete it before your next session."></textarea></label>
         <div class="bn-cta">
           <label><span>Button label <small>(optional)</small></span><input class="input" name="ctaLabel" maxlength="30" placeholder="Open Lab 03" /></label>
-          <label><span>Button link <small>(site path)</small></span><input class="input mono" name="ctaHref" maxlength="300" placeholder={`/m/${slug}`} /></label>
+          <label><span>Button link <small>(site path)</small></span><input class="input mono" name="ctaHref" maxlength="300" placeholder={`/${slug}`} /></label>
         </div>
         <p class="bn-msg" data-bn-msg role="status"></p>
         <button class="btn btn-primary" type="submit" data-bn-submit>Save banner</button>

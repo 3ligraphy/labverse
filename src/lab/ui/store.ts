@@ -62,8 +62,8 @@ export function loadAll(lab: string, ids: string[]): Record<string, ExerciseStat
 /* ----------------------------------------------------------- student */
 
 const STUDENT = 'lab:student';
-export const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}'’. -]*[\p{L}\p{M}.]$/u;
-export const ID_RE = /^[A-Za-z0-9-]{3,20}$/;
+import { NAME_RE, STUDENT_ID_RE as ID_RE } from '../../lib/identity.ts';
+export { NAME_RE, ID_RE };
 
 export function getStudent(): Student | null {
   try {

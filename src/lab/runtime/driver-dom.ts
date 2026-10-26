@@ -83,7 +83,7 @@ export function createDomDriver(getRoot: () => Element, settle: () => Promise<vo
     const root = getRoot();
     let list = q.rn || q.tag || q.testID
       ? candidates({ rn: q.rn, tag: q.tag, testID: q.testID })
-      : [...root.querySelectorAll(PRESSABLE_RN.map((n) => `[data-rn="${n}"]`).concat('button', '[role="button"]').join(','))];
+      : [...root.querySelectorAll(PRESSABLE_RN.map((n) => `[data-rn="${n}"]`).concat('button', '[role="button"]', '[role="tab"]', '[role="menuitem"]', '[role="link"]', 'a[href]').join(','))];
     if (q.text !== undefined) list = list.filter((el) => matches(textOf(el) || (el.getAttribute('aria-label') ?? ''), q.text));
     return pick(innermost(list), q.index);
   }
