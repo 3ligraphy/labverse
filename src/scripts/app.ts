@@ -292,7 +292,47 @@ function initTop() {
   document.body.append(b);
 }
 
+/* ---------- smooth in-page anchor scroll (same --ease-out curve as every other motion on the site) ---------- */
+function easeOut(p: number) {
+  // cubic-bezier(0.16, 1, 0.3, 1) approximated as a cheap, visually matching power-out curve
+  return 1 - Math.pow(1 - p, 3.2);
+}
+function smoothScrollTo(target: HTMLElement) {
+  const navH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-h')) || 64;
+  const from = scrollY;
+  const to = Math.max(0, Math.round(target.getBoundingClientRect().top + from - navH - 24));
+  const delta = to - from;
+  // behavior:'auto' on every frame — CSS scroll-behavior:smooth would otherwise re-smooth each of these
+  // JS-driven jumps on top of the easing already applied here, compounding into stutter.
+  if (reduced() || Math.abs(delta) < 2) { scrollTo({ top: to, behavior: 'auto' }); return; }
+  const dur = Math.min(900, Math.max(280, Math.abs(delta) * 0.5));
+  const t0 = performance.now();
+  const tick = (now: number) => {
+    const p = Math.min(1, (now - t0) / dur);
+    scrollTo({ top: Math.round(from + delta * easeOut(p)), behavior: 'auto' });
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 /* ---------- one-time global listeners ---------- */
+// capture phase + stopPropagation: Astro's ClientRouter also listens for anchor clicks on `document`
+// in the bubble phase and otherwise races this handler, sometimes winning and skipping the custom easing.
+// Running in capture guarantees this fires first and the router never sees the event.
+document.addEventListener(
+  'click',
+  (e) => {
+    const anchor = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="#"]');
+    if (!anchor || anchor.hash.length < 2) return;
+    const dest = document.getElementById(decodeURIComponent(anchor.hash.slice(1)));
+    if (!dest) return;
+    e.preventDefault();
+    e.stopPropagation();
+    smoothScrollTo(dest);
+    history.pushState(null, '', anchor.hash);
+  },
+  true,
+);
 document.addEventListener('click', (e) => {
   const t = e.target as HTMLElement;
   if (t.closest('[data-theme-toggle]')) return toggleTheme();

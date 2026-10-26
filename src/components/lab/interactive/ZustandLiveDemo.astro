@@ -1,0 +1,173 @@
+---
+/**
+ * A real, running mini cart store — not canned. The `create` helper below mirrors Zustand's real
+ * `create((set, get) => ({...}))` shape line for line, so what you click is what you read.
+ * Same code+phone-preview layout as the Lab 02/03 live demos.
+ * <ZustandLiveDemo />
+ */
+import { Code } from 'astro:components';
+import Device from '@/components/Device.astro';
+
+const CODE = `// this is the exact create((set) => ({...})) shape
+// your real store.ts will use — try the buttons →
+export const useCartStore = create((set) => ({
+  items: [],
+  add: (p) => set((s) => {
+    const found = s.items.find(i => i.product.id === p.id);
+    return { items: found
+      ? s.items.map(i => i.product.id === p.id ? {...i, qty: i.qty + 1} : i)
+      : [...s.items, { product: p, qty: 1 }] };
+  }),
+  remove: (id) => set((s) => ({
+    items: s.items.filter(i => i.product.id !== id),
+  })),
+  clear: () => set({ items: [] }),
+}));`;
+
+const PRODUCTS = [
+  { id: 1, name: 'Sneakers', price: 59 },
+  { id: 2, name: 'Mug', price: 12 },
+];
+const themes = { light: 'github-light', dark: 'github-dark-default' } as const;
+---
+<section class="zd" data-zd data-reveal aria-label="Live demo: Zustand cart">
+  <header class="zd-head">
+    <span class="zd-kind mono"><span class="zd-live-dot" aria-hidden="true"></span> Live demo</span>
+    <h4 class="zd-title">A real Zustand-shaped store, running on this page</h4>
+  </header>
+
+  <div class="zd-body">
+    <div class="zd-code">
+      <div class="zd-tabs"><span class="zd-tab mono">store.ts</span></div>
+      <div class="zd-editor"><Code code={CODE} lang="ts" themes={themes} defaultColor={false} /></div>
+    </div>
+    <div class="zd-phone">
+      <Device light interactive label="Mini cart preview">
+        <div class="zd-screen" data-zd-screen>
+          <div class="zd-shop">
+            {PRODUCTS.map((p) => (
+              <button type="button" class="zd-buy" data-zd-add={p.id}>+ {p.name} · ${p.price}</button>
+            ))}
+          </div>
+          <div class="zd-cart" data-zd-cart>
+            <p class="zd-empty" data-zd-empty>Cart is empty.<br />Add a product above.</p>
+          </div>
+          <div class="zd-foot">
+            <span class="zd-total mono" data-zd-total>Total: $0</span>
+            <button type="button" class="zd-clear" data-zd-clear>clear()</button>
+          </div>
+        </div>
+      </Device>
+    </div>
+  </div>
+  <p class="zd-note">Every tap calls <code>add()</code> or <code>remove()</code> in the code above — the same functions, running for real. Nothing here is faked.</p>
+</section>
+
+<script>
+  type Product = { id: number; name: string; price: number };
+  type Item = { product: Product; qty: number };
+  type State = { items: Item[] };
+
+  /** The same create(set => ({...})) shape as real Zustand — a minimal, honest stand-in for this page. */
+  function create<T extends object>(init: (set: (partial: Partial<T> | ((s: T) => Partial<T>)) => void, get: () => T) => T) {
+    let state: T;
+    const listeners = new Set<(s: T) => void>();
+    const set = (partial: Partial<T> | ((s: T) => Partial<T>)) => {
+      state = { ...state, ...(typeof partial === 'function' ? (partial as (s: T) => Partial<T>)(state) : partial) };
+      listeners.forEach((l) => l(state));
+    };
+    const get = () => state;
+    state = init(set, get);
+    return { getState: get, subscribe: (fn: (s: T) => void) => (listeners.add(fn), () => listeners.delete(fn)) };
+  }
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-zd]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const products: Product[] = [
+        { id: 1, name: 'Sneakers', price: 59 },
+        { id: 2, name: 'Mug', price: 12 },
+      ];
+
+      const store = create<State & { add: (p: Product) => void; remove: (id: number) => void; clear: () => void }>((set) => ({
+        items: [],
+        add: (p) =>
+          set((s) => {
+            const found = s.items.find((i) => i.product.id === p.id);
+            return {
+              items: found
+                ? s.items.map((i) => (i.product.id === p.id ? { ...i, qty: i.qty + 1 } : i))
+                : [...s.items, { product: p, qty: 1 }],
+            };
+          }),
+        remove: (id) => set((s) => ({ items: s.items.filter((i) => i.product.id !== id) })),
+        clear: () => set({ items: [] }),
+      }));
+
+      const cart = root.querySelector<HTMLElement>('[data-zd-cart]')!;
+      const empty = root.querySelector<HTMLElement>('[data-zd-empty]')!;
+      const total = root.querySelector<HTMLElement>('[data-zd-total]')!;
+
+      const paint = (s: State) => {
+        empty.hidden = s.items.length > 0;
+        cart.querySelectorAll('[data-zd-row]').forEach((n) => n.remove());
+        for (const i of s.items) {
+          const row = document.createElement('div');
+          row.className = 'zd-row';
+          row.dataset.zdRow = '1';
+          row.innerHTML = `<span>${i.product.name} × ${i.qty}</span><button type="button" data-zd-rm="${i.product.id}">✕</button>`;
+          cart.appendChild(row);
+        }
+        const sum = s.items.reduce((a, i) => a + i.product.price * i.qty, 0);
+        total.textContent = `Total: $${sum}`;
+        cart.querySelectorAll<HTMLButtonElement>('[data-zd-rm]').forEach((b) =>
+          b.addEventListener('click', () => store.getState().remove(Number(b.dataset.zdRm))),
+        );
+      };
+
+      store.subscribe(paint);
+      paint(store.getState());
+
+      root.querySelectorAll<HTMLButtonElement>('[data-zd-add]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const p = products.find((p) => p.id === Number(b.dataset.zdAdd))!;
+          store.getState().add(p);
+        }),
+      );
+      root.querySelector('[data-zd-clear]')!.addEventListener('click', () => store.getState().clear());
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .zd { margin: 24px 0 32px; container-type: inline-size; }
+  .zd-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-bottom: 10px; }
+  .zd-kind { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-text); font-weight: 600; }
+  .zd-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: zd-live 1.6s ease-in-out infinite; }
+  @keyframes zd-live { 50% { opacity: 0.25; } }
+  .zd-title { margin: 0 !important; font-family: var(--font-display); font-size: 1.05rem; letter-spacing: -0.01em; color: var(--text); }
+  .zd-body { display: grid; gap: 1px; grid-template-columns: minmax(0, 1fr); background: var(--line); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
+  @container (min-width: 640px) { .zd-body { grid-template-columns: minmax(0, 1fr) 260px; } }
+  .zd-code { display: flex; flex-direction: column; min-width: 0; background: var(--surface); }
+  .zd-tabs { padding: 8px 12px 0; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+  .zd-tab { display: inline-block; padding: 6px 10px; font-size: 12px; color: var(--text); background: var(--code-bg); border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; margin-bottom: -1px; }
+  .zd-editor { height: 320px; overflow: auto; background: var(--code-bg); }
+  .zd-editor :global(.astro-code) { margin: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; padding: 14px !important; font-size: 12.5px !important; }
+  .zd-phone { display: grid; place-items: center; padding: 20px 12px; background: radial-gradient(circle at 50% 40%, var(--accent-soft), transparent 62%), var(--bg-2); }
+  .zd-phone :global(.device) { --w: 220px; }
+  .zd-screen { position: absolute; inset: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 12px; }
+  .zd-shop { display: flex; flex-direction: column; gap: 6px; }
+  .zd-buy { padding: 8px 10px; border-radius: 10px; border: 1px solid #e2e8f0; background: #f8fafc; color: #0f172a; font-size: 12.5px; font-weight: 600; text-align: left; }
+  .zd-cart { flex: 1; min-height: 56px; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 10px; border: 1px dashed #cbd5e1; }
+  .zd-empty { margin: auto !important; text-align: center; color: #94a3b8; font-size: 12px; }
+  .zd-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; background: #f1f5f9; font-size: 12px; color: #0f172a; }
+  .zd-row button { color: #dc2626; font-weight: 700; border: 0; background: none; padding: 2px 4px; }
+  .zd-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; border-top: 1px solid #e2e8f0; }
+  .zd-total { font-size: 12.5px; font-weight: 700; color: #0f172a; }
+  .zd-clear { font-size: 11.5px; color: #64748b; text-decoration: underline; background: none; border: 0; padding: 0; }
+  .zd-note { margin: 10px 0 0 !important; font-size: 13px; color: var(--text-3); }
+  .zd-note code { font-size: 12.5px; }
+  @media (prefers-reduced-motion: reduce) { .zd-live-dot { animation: none; } }
+</style>

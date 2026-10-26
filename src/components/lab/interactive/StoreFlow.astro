@@ -1,0 +1,160 @@
+---
+/**
+ * Unidirectional data flow, animated with GSAP: UI event -> action -> store update -> re-render.
+ * A Zustand / Redux Toolkit toggle swaps the action + store-update code for the same flow.
+ * <StoreFlow />
+ */
+const NODES = ['UI event', 'Action', 'Store update', 'Re-render'];
+
+const VARIANTS = {
+  zustand: {
+    label: 'Zustand',
+    action: "const add = useCartStore(s => s.add);\nadd(product);",
+    update: "set((s) => ({\n  items: [...s.items, item],\n}));",
+    note: 'One hook, one function call. No provider, no dispatch.',
+  },
+  redux: {
+    label: 'Redux Toolkit',
+    action: 'dispatch(add(product));',
+    update: "// cartSlice.ts (Immer lets this read like a mutation)\nstate.items.push(item);",
+    note: 'An action object is dispatched; the slice reducer updates the store.',
+  },
+} as const;
+---
+<figure class="sf" data-sf data-reveal data-free>
+  <div class="sf-head">
+    <p class="sf-k mono">Unidirectional flow</p>
+    <div class="sf-toggle" role="tablist" aria-label="State library">
+      <button type="button" class="sf-pill" data-sf-variant="zustand" aria-selected="true">Zustand</button>
+      <button type="button" class="sf-pill" data-sf-variant="redux" aria-selected="false">Redux Toolkit</button>
+    </div>
+  </div>
+
+  <div class="sf-lane" data-sf-lane>
+    {NODES.map((label, i) => (
+      <div class="sf-node" data-sf-node={i}>
+        <span class="sf-dot" aria-hidden="true">{i + 1}</span>
+        <span class="sf-label">{label}</span>
+      </div>
+    ))}
+    <span class="sf-pulse" data-sf-pulse aria-hidden="true"></span>
+  </div>
+
+  <div class="sf-code">
+    <div class="sf-code-col">
+      <p class="sf-code-k mono">action</p>
+      <pre class="sf-pre" data-sf-action></pre>
+    </div>
+    <div class="sf-code-col">
+      <p class="sf-code-k mono">store update</p>
+      <pre class="sf-pre" data-sf-update></pre>
+    </div>
+  </div>
+  <p class="sf-note" data-sf-note></p>
+
+  <button type="button" class="btn btn-primary btn-sm sf-play" data-sf-play>▶ Play the flow</button>
+
+  <script type="application/json" data-sf-variants set:html={JSON.stringify(VARIANTS)} />
+</figure>
+
+<script>
+  import { gsap } from 'gsap';
+
+  type Variant = { label: string; action: string; update: string; note: string };
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-sf]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const variants = JSON.parse(root.querySelector('[data-sf-variants]')!.textContent!) as Record<'zustand' | 'redux', Variant>;
+      const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+      const nodes = Array.from(root.querySelectorAll<HTMLElement>('[data-sf-node]'));
+      const pulse = $('[data-sf-pulse]');
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let current: 'zustand' | 'redux' = 'zustand';
+      let playing = false;
+
+      const paintVariant = () => {
+        const v = variants[current];
+        $('[data-sf-action]').textContent = v.action;
+        $('[data-sf-update]').textContent = v.update;
+        $('[data-sf-note]').textContent = v.note;
+        root.querySelectorAll<HTMLButtonElement>('[data-sf-variant]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.sfVariant === current)));
+      };
+
+      const play = () => {
+        if (playing) return;
+        playing = true;
+        nodes.forEach((n) => n.classList.remove('on'));
+        const btn = $('[data-sf-play]') as HTMLButtonElement;
+        btn.disabled = true;
+        const done = () => {
+          playing = false;
+          btn.disabled = false;
+          btn.textContent = '↺ Replay the flow';
+        };
+        if (reduced) {
+          nodes.forEach((n) => n.classList.add('on'));
+          gsap.set(pulse, { autoAlpha: 1, x: '100%' });
+          done();
+          return;
+        }
+        gsap.set(nodes, { autoAlpha: 0, y: 8 });
+        gsap.set(pulse, { autoAlpha: 0, x: 0 });
+        const tl = gsap.timeline({ onComplete: done });
+        tl.to(nodes, { autoAlpha: 1, y: 0, duration: 0.32, ease: 'power2.out', stagger: 0.09 });
+        nodes.forEach((n, i) => {
+          tl.add(() => n.classList.add('on'));
+          if (i < nodes.length - 1) {
+            const from = n.getBoundingClientRect();
+            const to = nodes[i + 1].getBoundingClientRect();
+            const laneLeft = root.querySelector('[data-sf-lane]')!.getBoundingClientRect().left;
+            tl.set(pulse, { autoAlpha: 1, x: from.left - laneLeft + from.width / 2 });
+            tl.to(pulse, { x: to.left - laneLeft + to.width / 2, duration: 0.45, ease: 'power1.inOut' });
+          }
+        });
+        tl.to(pulse, { autoAlpha: 0, duration: 0.2 });
+      };
+
+      root.querySelectorAll<HTMLButtonElement>('[data-sf-variant]').forEach((b) =>
+        b.addEventListener('click', () => {
+          current = b.dataset.sfVariant as 'zustand' | 'redux';
+          paintVariant();
+        }),
+      );
+      $('[data-sf-play]').addEventListener('click', play);
+      paintVariant();
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .sf { margin: 24px 0 32px; display: grid; gap: 16px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .sf-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .sf-k { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 !important; }
+  .sf-toggle { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--r-full); background: var(--bg-2); border: 1px solid var(--line); }
+  .sf-pill { padding: 5px 12px; border-radius: var(--r-full); border: 0; background: transparent; font-size: 12.5px; font-weight: 600; color: var(--text-2); cursor: pointer; transition: background .2s var(--ease-out), color .2s; }
+  .sf-pill[aria-selected='true'] { background: var(--accent); color: var(--accent-ink); }
+
+  .sf-lane { position: relative; display: flex; gap: 10px; flex-wrap: wrap; }
+  .sf-node { flex: 1; min-width: 110px; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); transition: border-color .25s var(--ease-out), background .25s var(--ease-out); }
+  .sf-node.on { border-color: var(--accent-text); background: var(--accent-soft); }
+  .sf-dot { width: 20px; height: 20px; flex: none; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--font-mono); background: var(--surface-3); color: var(--text-2); }
+  .sf-node.on .sf-dot { background: var(--accent); color: var(--accent-ink); }
+  .sf-label { font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; }
+  .sf-pulse { position: absolute; top: 50%; left: 0; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--accent); opacity: 0; box-shadow: 0 0 0 4px var(--accent-soft); pointer-events: none; }
+
+  .sf-code { display: grid; gap: 12px; }
+  @media (min-width: 640px) { .sf-code { grid-template-columns: 1fr 1fr; } }
+  .sf-code-col { display: grid; gap: 6px; }
+  .sf-code-k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 !important; }
+  .sf-pre { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); font: 12px/1.5 var(--font-mono); color: var(--accent-text); white-space: pre-wrap; overflow-wrap: anywhere; min-height: 44px; }
+  .sf-note { margin: 0 !important; font-size: 13px; color: var(--text-3); }
+  .sf-play { justify-self: start; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sf-node { transition: none; }
+    .sf-pulse { transition: none; }
+  }
+</style>

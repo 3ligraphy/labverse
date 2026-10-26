@@ -1,0 +1,861 @@
+---
+number: 4
+title: 'E-Commerce App — Expo Router, Zustand & Redux Toolkit'
+description: 'Revise components, hooks, NativeWind and typed navigation from labs 1–3, then build a small shop app and learn global state management with Zustand and Redux Toolkit.'
+difficulty: Intermediate
+estimatedTime: '4 hours'
+skills: [Hooks, Expo Router, Zustand, Redux Toolkit, REST APIs, NativeWind, Component Design]
+roadmapStage: data
+objectives:
+  - Use `useState` and `useEffect` to fetch and display remote data
+  - Build tab and stack navigation with Expo Router
+  - Implement global state with a Zustand store
+  - Rebuild the same feature with a Redux Toolkit slice and compare the two
+  - Build a complete reusable component from a written spec
+prerequisites:
+  - 'Lab 03 completed: NativeWind, feature-first architecture and typed navigation'
+  - 'A **new, empty folder** for this lab — this is a standalone project, not the semester app you have been growing since Lab 03'
+  - 'Node.js, VS Code and Git installed ([Setup](/mobile-development/setup))'
+  - 'Expo Go on your phone, or the Android emulator'
+troubleshooting:
+  - problem: 'Endless fetch loop, the screen flickers'
+    cause: 'The `useEffect` that fetches products is missing its dependency array.'
+    solution: 'Add `[]` as the second argument so it runs once.'
+  - problem: 'The cart UI does not update after `add`/`inc`/`dec`'
+    cause: 'A Zustand action mutated the array in place (`items.push(...)`) instead of returning a new one.'
+    solution: 'Always return a **new** array/object from `set((s) => ({ ... }))`.'
+  - problem: '"Route … missing the required default export"'
+    cause: 'A file under `app/` forgot `export default`.'
+    solution: 'Every screen file under `app/` must have exactly one `export default`.'
+  - problem: 'An extra unwanted tab appears, or a tab has no icon'
+    cause: 'The `name` on `<Tabs.Screen>` does not match the route file name exactly.'
+    solution: 'Check the spelling — `index`, `cart`, `profile` must match the files in `app/(tabs)/`.'
+  - problem: 'A product image is invisible'
+    cause: '`<Image>` has no explicit width/height (or NativeWind `className` sizing).'
+    solution: 'Always size remote images, e.g. `className="h-32 w-full"`.'
+  - problem: 'The app cannot reach the API from a phone'
+    cause: 'FakeStore API is a public HTTPS endpoint, so this is almost always a Wi-Fi/firewall issue, not a `localhost` issue — but if you later point this at your own machine, `localhost` means the phone itself.'
+    solution: 'Use your computer''s LAN IP, or test on the emulator first.'
+    commands: ['ipconfig']
+  - problem: 'Phone can''t connect to the Expo dev server'
+    cause: 'Phone and laptop are on different networks, or campus Wi-Fi blocks them from reaching each other.'
+    solution: 'Start the server in tunnel mode.'
+    commands: ['npx expo start --tunnel']
+extraChallenge: 'Persist the cart across app restarts with `zustand/middleware`''s `persist` and `@react-native-async-storage/async-storage` — or build your own: a favorites list with its own store, or a checkout screen with an order summary.'
+resources:
+  - { label: 'FakeStore API', href: 'https://fakestoreapi.com/docs' }
+  - { label: 'Zustand', href: 'https://zustand.docs.pmnd.rs/getting-started/introduction' }
+  - { label: 'Redux Toolkit', href: 'https://redux-toolkit.js.org/introduction/getting-started' }
+  - { label: 'Expo Router', href: 'https://docs.expo.dev/router/introduction/' }
+  - { label: '@expo/vector-icons (Ionicons)', href: 'https://icons.expo.fyi' }
+  - { label: 'NativeWind installation (Expo)', href: 'https://www.nativewind.dev/docs/getting-started/installation' }
+draft: false
+---
+
+<Part n="0" title="Revision — labs 1–3" time="20 min" />
+
+### What you already know
+
+<Cards cols={3} items={[
+  { icon: 'layers', title: 'Components & props', text: 'Data goes in as props, UI comes out. A component never reaches outside itself for data.' },
+  { icon: 'book', title: 'State = memory', text: 'A component "remembers" something between renders only through `useState`. Calling the setter is the only way to repaint.' },
+  { icon: 'map', title: 'Hooks run in order', text: 'Never call a hook inside an `if` or a loop — React tracks hooks by call order, not by name.' },
+]} />
+
+<Cards cols={3} items={[
+  { icon: 'sparkle', title: 'NativeWind', text: 'Tailwind-style utilities on `className` compile to real native styles — not browser CSS.' },
+  { icon: 'folder', title: 'Feature-first', text: 'Code is grouped by feature (`features/cart/`), not by type. Routes in `app/` stay thin.' },
+  { icon: 'arrow-up-right', title: 'Typed navigation', text: 'Screens receive `navigation` and `route`; params flow through `navigate(name, params)`.' },
+]} />
+
+<FileTree title="Feature-first, a reminder" lines={[
+  'features/',
+  '  <feature>/',
+  '    types.ts # the shape of its data',
+  '    api.ts # fetch calls for this feature only',
+  '    components/ # presentational pieces *',
+  '    screens/ # what app/ imports and renders -',
+]} />
+
+<Timeline items={[
+  { when: 'Lab 01', title: 'First app on GitHub', text: 'Expo basics, the 5 UI primitives, Git & GitHub.' },
+  { when: 'Lab 02', title: 'Components, hooks, navigation', text: 'Props, state, `useEffect`, Expo Router stacks and tabs.' },
+  { when: 'Lab 03', title: 'Architecture at scale', text: 'NativeWind, feature-first folders, typed navigation, environments.' },
+  { when: 'Lab 04', title: 'You are here', text: 'A small shop app, revising all of the above, plus global state with Zustand and Redux Toolkit.' },
+]} />
+
+### Rewind: Stack vs Tabs, with an example
+
+Labs 2 and 3 already covered this — here's the short version, with the exact example this lab uses.
+
+<Cards cols={2} items={[
+  { icon: 'branch', title: 'Stack', text: 'Screens pile up, like a deck of cards. Opening a new one **pushes** it on top; the back button **pops** it off. There is history: Home → Details → (back) → Home.' },
+  { icon: 'grid', title: 'Tabs', text: 'Screens sit **side by side**. Switching tabs doesn\'t push anything — there is no "back" to a tab, each one just keeps its own state while hidden.' },
+]} />
+
+**The example this app uses:** tapping a product card is a **Stack** push (Shop → Details, with a back arrow); switching between Shop / Cart / Profile is **Tabs** (no history, no back arrow, instant switch).
+
+<FileTree title="Who owns which navigator" lines={[
+  'app/',
+  '  _layout.tsx # <Stack> — Shop/Cart/Profile vs Details *',
+  '  (tabs)/',
+  '    _layout.tsx # <Tabs> — Shop vs Cart vs Profile *',
+  '    index.tsx',
+  '    cart.tsx',
+  '    profile.tsx',
+  '  product/',
+  '    [id].tsx # pushed on top of the Stack, never a tab',
+]} />
+
+```tsx title="the example: tapping a product card"
+// inside ProductCard.tsx — this is a Stack push, not a tab switch
+onPress={() => router.push(`/product/${product.id}`)}
+```
+
+Notice the **Tabs navigator is nested inside the Stack**, as one of its screens (`name="(tabs)"`). That's why switching tabs never shows a back arrow — you're moving sideways inside one Stack screen — but tapping a product does, because it pushes a brand new screen on top of that same Stack.
+
+### Reading a real `className`
+
+<Explain parts={[
+  ['flex-1', 'fill all available space'],
+  ['bg-primary', 'background colour, from your `tailwind.config.js` palette'],
+  ['px-6', 'horizontal padding, 24px (the `6` step on the spacing scale)'],
+]} />
+
+<Part n="1" title="Create the project" time="15 min" />
+
+`app/` is special — every file in it becomes a screen (file-based routing). Everything else is ours.
+
+<Terminal title="Terminal — create" lines={[
+  '$ npx create-expo-app@latest ecommerce-app',
+  '$ cd ecommerce-app',
+  '$ npm run reset-project',
+]} />
+
+<Terminal title="Terminal — install dependencies" lines={[
+  '$ npm install zustand @reduxjs/toolkit react-redux',
+  '$ npx expo install nativewind react-native-reanimated react-native-safe-area-context',
+  '# then follow the NativeWind install guide for your installed version (tailwind.config.js, global.css, babel/metro)',
+  '$ npx expo start --clear',
+]} />
+
+```js title="tailwind.config.js"
+module.exports = {
+  content: ['./app/**/*.{js,jsx,ts,tsx}', './features/**/*.{js,jsx,ts,tsx}', './shared/**/*.{js,jsx,ts,tsx}'],
+  presets: [require('nativewind/preset')],
+  theme: {
+    extend: {
+      colors: {
+        primary: '#4f46e5',
+        bg: '#f8fafc',
+        card: '#ffffff',
+        text: '#0f172a',
+        muted: '#64748b',
+        danger: '#dc2626',
+        border: '#e2e8f0',
+      },
+    },
+  },
+  plugins: [],
+};
+```
+
+> [!IMPORTANT]
+> Keep this palette and `shared/theme.ts` (next part) **identical by hand** — seven colours is too few to need any generator, but a drift between them means `className="bg-primary"` and `colors.primary` stop matching.
+
+<Checkpoint>
+
+Before styling the whole app, prove the setup works: put `className="bg-emerald-300"` on one `View`. If it turns green, continue.
+
+</Checkpoint>
+
+<Part n="2" title="Folder structure (feature-first)" time="15 min" />
+
+Group code by **feature** (what it does), not by type. When you work on "cart", everything is in one folder.
+
+<FileTree title="ecommerce-app" lines={[
+  'app/ # ROUTES ONLY — thin files that render a screen',
+  '  _layout.tsx # root stack * STUB',
+  '  (tabs)/',
+  '    _layout.tsx # tab navigator * STUB',
+  '    index.tsx # Home tab -> ProductListScreen',
+  '    cart.tsx # Cart tab -> CartScreen',
+  '    profile.tsx',
+  '  product/',
+  '    [id].tsx # Details screen',
+  'features/',
+  '  products/',
+  '    types.ts -',
+  '    api.ts -',
+  '    useProducts.ts * STUB',
+  '    components/',
+  '      ProductCard.tsx',
+  '    screens/',
+  '      ProductListScreen.tsx',
+  '      ProductDetailScreen.tsx',
+  '  cart/',
+  '    store.ts * STUB',
+  '    cartSlice.ts # Part 6, Redux version',
+  '    components/',
+  '      CartItem.tsx * STUB',
+  '    screens/',
+  '      CartScreen.tsx',
+  'shared/',
+  '  theme.ts',
+  '  reduxStore.ts # Part 6',
+  '  components/',
+  '    Button.tsx',
+]} />
+
+Quick folders (Git Bash / macOS / Linux):
+
+<Terminal lines={[
+  '$ mkdir -p "app/(tabs)" app/product features/products/components features/products/screens features/cart/components features/cart/screens shared/components',
+]} />
+
+On Windows PowerShell:
+
+```powershell
+"app/(tabs)","app/product","features/products/components","features/products/screens","features/cart/components","features/cart/screens","shared/components" | ForEach-Object { New-Item -ItemType Directory -Force $_ }
+```
+
+The `@/` import alias (project root) is already set up by the template, so you can write `import { x } from "@/features/cart/store"`.
+
+<Part n="3" title="Adding the Code" time="35 min" />
+
+Files marked **STUB** are intentionally incomplete — you finish the navigation ones in Part 5 and the state-management ones in Part 6. Stubs are written so the app still compiles and runs: the gaps are comments and placeholder return values, never a type error.
+
+### `shared/theme.ts`
+
+```ts title="shared/theme.ts"
+export const colors = {
+  primary: '#4f46e5',
+  bg: '#f8fafc',
+  card: '#ffffff',
+  text: '#0f172a',
+  muted: '#64748b',
+  danger: '#dc2626',
+  border: '#e2e8f0',
+};
+```
+
+Kept as a plain object for the places a `className` can't reach — icon `color` props, `tabBarActiveTintColor`.
+
+### `shared/components/Button.tsx`
+
+```tsx title="shared/components/Button.tsx"
+import { Pressable, Text } from 'react-native';
+
+type Props = { title: string; onPress: () => void; variant?: 'primary' | 'danger' };
+
+export function Button({ title, onPress, variant = 'primary' }: Props) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`items-center rounded-xl px-4 py-3 active:opacity-70 ${variant === 'danger' ? 'bg-danger' : 'bg-primary'}`}
+    >
+      <Text className="font-semibold text-white">{title}</Text>
+    </Pressable>
+  );
+}
+```
+
+### `features/products/types.ts`
+
+```ts title="features/products/types.ts"
+export type Product = {
+  id: number;
+  title: string;
+  price: number;
+  description: string;
+  category: string;
+  image: string;
+  rating: { rate: number; count: number };
+};
+```
+
+### `features/products/api.ts`
+
+```ts title="features/products/api.ts"
+import { Product } from './types';
+
+const BASE_URL = 'https://fakestoreapi.com';
+
+export async function getProducts(): Promise<Product[]> {
+  const res = await fetch(`${BASE_URL}/products`);
+  if (!res.ok) throw new Error(`Failed to load products (${res.status})`);
+  return res.json();
+}
+
+export async function getProduct(id: number): Promise<Product> {
+  const res = await fetch(`${BASE_URL}/products/${id}`);
+  if (!res.ok) throw new Error(`Failed to load product (${res.status})`);
+  return res.json();
+}
+```
+
+### `features/products/useProducts.ts` — STUB (Exercise 5.1)
+
+```ts title="features/products/useProducts.ts"
+import { Product } from './types';
+// TODO (Exercise 5.1): import useState, useEffect and getProducts
+
+export function useProducts(): { products: Product[]; loading: boolean; error: string | null } {
+  // TODO: replace this with real state + a fetch inside useEffect
+  return { products: [], loading: false, error: null };
+}
+```
+
+### `features/products/components/ProductCard.tsx`
+
+```tsx title="features/products/components/ProductCard.tsx"
+import { Image, Pressable, Text } from 'react-native';
+import { router } from 'expo-router';
+import { Product } from '../types';
+
+export function ProductCard({ product }: { product: Product }) {
+  return (
+    <Pressable
+      className="m-1.5 flex-1 rounded-xl border border-border bg-card p-2.5"
+      onPress={() => router.push(`/product/${product.id}`)}
+    >
+      <Image source={{ uri: product.image }} className="mb-2 h-28 w-full" resizeMode="contain" />
+      <Text className="min-h-[34px] text-[13px] text-text" numberOfLines={2}>{product.title}</Text>
+      <Text className="mt-1 font-bold text-primary">${product.price.toFixed(2)}</Text>
+    </Pressable>
+  );
+}
+```
+
+### `features/products/screens/ProductListScreen.tsx`
+
+```tsx title="features/products/screens/ProductListScreen.tsx"
+import { useState } from 'react';
+import { ActivityIndicator, FlatList, Text, TextInput, View } from 'react-native';
+import { useProducts } from '../useProducts';
+import { ProductCard } from '../components/ProductCard';
+import { colors } from '@/shared/theme';
+
+export default function ProductListScreen() {
+  const { products, loading, error } = useProducts();
+  const [query, setQuery] = useState('');
+
+  const filtered = products.filter((p) => p.title.toLowerCase().includes(query.toLowerCase()));
+
+  if (loading) return <ActivityIndicator className="flex-1" size="large" color={colors.primary} />;
+  if (error) return <Text className="p-5 text-danger">{error}</Text>;
+
+  return (
+    <View className="flex-1 bg-bg p-2">
+      <TextInput
+        placeholder="Search products..."
+        value={query}
+        onChangeText={setQuery}
+        className="m-1.5 rounded-xl border border-border bg-card p-2.5"
+      />
+      <FlatList
+        data={filtered}
+        keyExtractor={(p) => String(p.id)}
+        numColumns={2}
+        renderItem={({ item }) => <ProductCard product={item} />}
+        ListEmptyComponent={<Text className="mt-10 text-center text-muted">No products found.</Text>}
+      />
+    </View>
+  );
+}
+```
+
+### `features/products/screens/ProductDetailScreen.tsx`
+
+Uses the same hooks pattern you just revised, and the cart store from Exercise 6.1 (Part 6) — until then, `add` is a safe no-op.
+
+```tsx title="features/products/screens/ProductDetailScreen.tsx"
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, Text } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import { getProduct } from '../api';
+import { Product } from '../types';
+import { useCartStore } from '@/features/cart/store';
+import { Button } from '@/shared/components/Button';
+import { colors } from '@/shared/theme';
+
+export default function ProductDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [product, setProduct] = useState<Product | null>(null);
+  const add = useCartStore((s) => s.add);
+
+  useEffect(() => {
+    getProduct(Number(id)).then(setProduct);
+  }, [id]);
+
+  if (!product) return <ActivityIndicator className="flex-1" size="large" color={colors.primary} />;
+
+  return (
+    <ScrollView className="bg-bg" contentContainerClassName="gap-3 p-4">
+      <Image source={{ uri: product.image }} className="h-64 w-full" resizeMode="contain" />
+      <Text className="text-xl font-bold text-text">{product.title}</Text>
+      <Text className="text-2xl font-extrabold text-primary">${product.price.toFixed(2)}</Text>
+      <Text className="leading-5 text-muted">{product.description}</Text>
+      <Button
+        title="Add to cart"
+        onPress={() => {
+          add(product);
+          router.back();
+        }}
+      />
+    </ScrollView>
+  );
+}
+```
+
+### `features/cart/store.ts` — STUB (Exercise 6.1)
+
+```ts title="features/cart/store.ts"
+import { Product } from '@/features/products/types';
+
+export type CartItemType = { product: Product; qty: number };
+
+// TODO (Exercise 6.1): build this with Zustand's `create`
+// Temporary no-op version so the app compiles:
+type CartState = {
+  items: CartItemType[];
+  add: (p: Product) => void;
+  remove: (id: number) => void;
+  inc: (id: number) => void;
+  dec: (id: number) => void;
+  clear: () => void;
+};
+
+export const useCartStore = <T,>(selector: (s: CartState) => T): T =>
+  selector({ items: [], add: () => {}, remove: () => {}, inc: () => {}, dec: () => {}, clear: () => {} });
+```
+
+### `features/cart/components/CartItem.tsx` — STUB (Exercise 6.2)
+
+```tsx title="features/cart/components/CartItem.tsx"
+import { Text } from 'react-native';
+import { CartItemType } from '../store';
+
+export type CartItemProps = { item: CartItemType; onInc: () => void; onDec: () => void; onRemove: () => void };
+
+export function CartItem(_: CartItemProps) {
+  // TODO (Exercise 6.2): build the full component from the spec
+  return <Text>TODO: CartItem</Text>;
+}
+```
+
+### `features/cart/screens/CartScreen.tsx`
+
+```tsx title="features/cart/screens/CartScreen.tsx"
+import { FlatList, Text, View } from 'react-native';
+import { useCartStore } from '../store';
+import { CartItem } from '../components/CartItem';
+import { Button } from '@/shared/components/Button';
+
+export default function CartScreen() {
+  const items = useCartStore((s) => s.items);
+  const inc = useCartStore((s) => s.inc);
+  const dec = useCartStore((s) => s.dec);
+  const remove = useCartStore((s) => s.remove);
+  const clear = useCartStore((s) => s.clear);
+
+  const total = items.reduce((sum, i) => sum + i.product.price * i.qty, 0);
+
+  return (
+    <View className="flex-1 bg-bg p-3">
+      <FlatList
+        data={items}
+        keyExtractor={(i) => String(i.product.id)}
+        renderItem={({ item }) => (
+          <CartItem item={item} onInc={() => inc(item.product.id)} onDec={() => dec(item.product.id)} onRemove={() => remove(item.product.id)} />
+        )}
+        ListEmptyComponent={<Text className="mt-10 text-center text-muted">Your cart is empty.</Text>}
+      />
+      {items.length > 0 && (
+        <View className="gap-2.5 border-t border-border pt-3">
+          <Text className="text-lg font-extrabold text-text">Total: ${total.toFixed(2)}</Text>
+          <Button title="Clear cart" variant="danger" onPress={clear} />
+        </View>
+      )}
+    </View>
+  );
+}
+```
+
+### Route files in `app/`
+
+**`app/_layout.tsx` — STUB (Exercise 5.3)**
+
+```tsx title="app/_layout.tsx"
+import { Slot } from 'expo-router';
+
+// TODO (Exercise 5.3): replace <Slot /> with a Stack navigator
+export default function RootLayout() {
+  return <Slot />;
+}
+```
+
+**`app/(tabs)/_layout.tsx` — STUB (Exercise 5.2)**
+
+```tsx title="app/(tabs)/_layout.tsx"
+import { Slot } from 'expo-router';
+
+// TODO (Exercise 5.2): replace <Slot /> with a Tabs navigator
+export default function TabsLayout() {
+  return <Slot />;
+}
+```
+
+**`app/(tabs)/index.tsx`**
+
+```tsx title="app/(tabs)/index.tsx"
+import ProductListScreen from '@/features/products/screens/ProductListScreen';
+export default ProductListScreen;
+```
+
+**`app/(tabs)/cart.tsx`**
+
+```tsx title="app/(tabs)/cart.tsx"
+import CartScreen from '@/features/cart/screens/CartScreen';
+export default CartScreen;
+```
+
+**`app/(tabs)/profile.tsx`**
+
+```tsx title="app/(tabs)/profile.tsx"
+import { Text, View } from 'react-native';
+
+export default function Profile() {
+  return (
+    <View className="flex-1 items-center justify-center gap-2">
+      <Text className="text-2xl font-bold">Profile</Text>
+      <Text>Login & orders would live here.</Text>
+    </View>
+  );
+}
+```
+
+**`app/product/[id].tsx`**
+
+```tsx title="app/product/[id].tsx"
+import ProductDetailScreen from '@/features/products/screens/ProductDetailScreen';
+export default ProductDetailScreen;
+```
+
+| File | Concept to revise |
+| --- | --- |
+| `api.ts` | `fetch`, async/await, why we throw on `!res.ok` |
+| `ProductListScreen` | `useState` for search, derived data (`filtered`), `FlatList` + `numColumns`, loading/error/empty states |
+| `ProductCard` | `router.push` — navigation by URL |
+| `ProductDetailScreen` | `useLocalSearchParams` reads `[id]` from the route; the `useEffect` dependency array |
+| `CartScreen` | Selecting slices of a store; `reduce` for the total |
+| `app/` vs `features/` | Routes are thin, features hold logic — the Lab 03 rule, still true here |
+
+<Part n="4" title="Run the app" time="15 min" />
+
+<Cards cols={2} items={[
+  { icon: 'phone', title: 'Physical phone (fastest)', text: 'Install Expo Go. Phone and computer on the same Wi-Fi. Run `npx expo start`, scan the QR code.' },
+  { icon: 'laptop', title: 'Android Studio emulator', text: 'Virtual Device Manager → create a device → start it. With it running, `npx expo start`, then press `a`.' },
+]} />
+
+<Terminal title="Terminal — run" lines={[
+  '$ npx expo start',
+]} />
+
+<Checkpoint>
+
+You should see a blank-ish app — no products, no tabs yet. That's expected: the files above are stubs. Now you build the rest.
+
+</Checkpoint>
+
+<Part n="5" title="Hooks and navigation exercises" time="40 min" />
+
+Tip: after each exercise, you should see a visible change in the running app (hot reload on save) — that's your feedback loop.
+
+<Task n="5.1" title="Hooks: useState + useEffect" time="15 min">
+
+**File:** `features/products/useProducts.ts`
+**Goal:** fetch products when the screen first loads.
+
+Requirements:
+- State: `products` (array), `loading` (starts `true`), `error` (string or `null`).
+- Call `getProducts()` inside a `useEffect` that runs **once** (empty dependency array).
+- On success store the products; on failure store `error.message`; always set `loading` to `false` at the end.
+- Return `{ products, loading, error }`.
+
+**Done when:** the product grid appears; turning off Wi-Fi shows the error text.
+
+> [!TIP]
+> Bonus: avoid setting state if the component unmounted — a `cancelled` flag returned from the effect's cleanup function.
+
+</Task>
+
+<Task n="5.2" title="Navigation — Tabs" time="15 min">
+
+**File:** `app/(tabs)/_layout.tsx`
+**Goal:** a bottom tab bar with 3 tabs.
+
+Requirements:
+- Replace `<Slot />` with `<Tabs>` from `expo-router`.
+- Three `<Tabs.Screen>`: `index` (title "Shop", icon `storefront`), `cart` (title "Cart", icon `cart`), `profile` (title "Profile", icon `person`).
+- Icons from `Ionicons` (`@expo/vector-icons`) via `tabBarIcon`.
+- Active tint = `colors.primary`.
+
+**Done when:** you can tap between Shop / Cart / Profile.
+
+> [!TIP]
+> Bonus: show a badge on the Cart tab with the number of items (`tabBarBadge`) — use the cart store after Exercise 6.1 in Part 6.
+
+</Task>
+
+<Task n="5.3" title="Navigation — Stack" time="10 min">
+
+**File:** `app/_layout.tsx`
+**Goal:** tapping a product pushes a Details screen with a back button.
+
+Requirements:
+- Replace `<Slot />` with `<Stack>` from `expo-router`.
+- `<Stack.Screen name="(tabs)">` with `headerShown: false` (tabs have their own look).
+- `<Stack.Screen name="product/[id]">` with title "Details".
+
+**Done when:** tapping a card opens details; the back arrow returns to the list.
+
+</Task>
+
+<Part n="6" title="State management, explained" time="2 hours" />
+
+Every screen so far has used `useState` — memory that belongs to **one component**. The cart is different: the detail screen adds to it, the cart screen reads it, and the tab bar needs to show a badge count. Three unrelated screens, one shared piece of memory. This part explains *why* that needs a new tool, and *how* Zustand and Redux Toolkit each solve it — slowly, with live demos you can click before you touch real code.
+
+### The problem: local state doesn't reach far enough
+
+<Cards items={[
+  { icon: 'layers', title: 'Prop drilling', text: 'To share `useState` between distant screens you would pass it down as props through every component in between, even ones that don’t care about it.' },
+  { icon: 'map', title: 'Navigation makes it worse', text: 'The cart screen and the product screen are not parent/child — they are separate routes. There is no "down" to pass props through.' },
+]} cols={2} />
+
+> [!NOTE]
+> This is the exact gap global state fills: a place to put data that **several unrelated screens** need, that isn't owned by any single component.
+
+### The idea every global store shares
+
+<Cards compact items={[
+  { icon: 'target', title: 'Why global state?', text: 'The cart is needed by 3 unrelated screens. Passing it through navigation params would be painful.' },
+  { icon: 'arrow', title: 'Single source of truth', text: 'UI → action → state update → UI re-renders. One direction, always — never update the screen directly.' },
+  { icon: 'cmd', title: 'Zustand vs Redux', text: 'Zustand: a hook with state and actions in one object. Redux: store + slices + reducers + dispatch.' },
+]} />
+
+<StoreFlow />
+
+### Zustand, from zero
+
+A Zustand store is one function, `create()`, that returns a hook. Call that hook inside any component, anywhere, and you're reading (or changing) the **same** shared state — no wrapper component needed around your app.
+
+<Explain parts={[
+  ['create(', 'makes the store — runs once, when the module first loads'],
+  ['(set) =>', 'the only function allowed to change state'],
+  ['({ items: [], add: ... })', 'the initial state, plus every action, in one object'],
+]} />
+
+The live demo below is not a video or a canned animation — the exact `create((set) => ({ ... }))` code shown is running in your browser right now. Click the buttons and watch the same `add()`/`remove()` functions execute for real.
+
+<ZustandLiveDemo />
+
+**Try this, in order**, before writing any real code:
+1. Add "Sneakers" twice. Notice the quantity goes to 2, not two separate rows — that's the `found ? ... : ...` branch in `add()`.
+2. Open your browser's dev tools, add a `console.log(s)` inside `set((s) => {...})` in your mind — every click re-runs that whole function from scratch with the *previous* state as `s`.
+3. Click `clear()`. The whole store resets to `{ items: [] }` in one call — no loop, no per-item removal.
+
+> [!TIP]
+> The one rule that breaks more carts than anything else: **always return a new array/object** from `set`. `s.items.push(x)` mutates the old array in place — React never notices, so the screen never repaints. `[...s.items, x]` makes a new array, which is why `add()` above is written that way.
+
+<Task n="6.1" title="State management — Zustand cart" time="20 min">
+
+**File:** `features/cart/store.ts`
+**Goal:** a global cart shared by the detail screen, cart screen and tab badge — the same mechanism you just clicked through above, written for real.
+
+Requirements — replace the stub with `create<CartState>()` that has:
+- `items: CartItemType[]` (starts empty)
+- `add(product)` — if already in cart, `qty + 1`; else add with `qty: 1`
+- `inc(id)` / `dec(id)` — change qty; `dec` at qty 1 removes the item
+- `remove(id)` — delete the item
+- `clear()` — empty the cart
+- Keep `export type CartItemType` and the same action names (other files depend on them).
+
+**Done when:** "Add to cart" on a product shows it in the Cart tab with the right total — exactly like the live demo above, just inside your real app.
+
+> [!TIP]
+> Bonus: persist the cart across restarts (see the Extra challenge).
+
+</Task>
+
+<Task n="6.2" title="A complete component — CartItem" time="15 min">
+
+**File:** `features/cart/components/CartItem.tsx`
+**Goal:** build the row UI for one cart item — no code given, only a spec. This only makes sense now that Exercise 6.1 gives it real data to display.
+
+Spec — props are already defined (`item`, `onInc`, `onDec`, `onRemove`). Render a horizontal card:
+
+```text
+┌──────────────────────────────────────────────┐
+│ [img]  Title (max 2 lines)                    │
+│ 60x60  $price each                            │
+│        [ − ]  2  [ + ]              [Remove]  │
+│        Line total: $xx.xx                     │
+└──────────────────────────────────────────────┘
+```
+
+- Use NativeWind `className` (not `StyleSheet.create`) to match the rest of this app.
+- `−` and `+` call `onDec` / `onInc`; `Remove` calls `onRemove` (use `className="text-danger"`).
+- Line total = `price * qty`, 2 decimals.
+
+**Done when:** the cart screen matches the sketch and all buttons work.
+
+> [!TIP]
+> Bonus: make the `−`/`+` buttons a comfortable touch size (≥ 36×36 — try `className="h-9 w-9"`).
+
+</Task>
+
+### Redux Toolkit, from zero
+
+Redux never lets a component change state directly. Instead it describes the change as a plain object — an **action** — and hands it to `dispatch()`. A **reducer** function receives the current state plus that action and calculates the next state. Nothing else is allowed to change it.
+
+<Explain parts={[
+  ['dispatch(', 'the only way to ask for a change — never mutate state yourself'],
+  ['add(product)', 'an action **creator**: a plain function that returns { type: "add", payload: product }'],
+  [')', 'the reducer runs, a new state comes out, every subscribed screen re-renders'],
+]} />
+
+Same idea as the diagram above, running for real: every click below builds a real action object, hands it to a real `dispatch()`, and a real reducer calculates the next state. Watch the action log — it's the same idea as the "Redux DevTools" panel professional teams use to debug state changes.
+
+<ReduxLiveDemo />
+
+**Try this, in order:**
+1. Add "Mug" once, then "Sneakers" twice. Read the action log from the bottom up — that's the literal order `dispatch()` was called in.
+2. Notice every log line names the action **type** and its **payload** — that pairing is the entire vocabulary of "what changed."
+3. Click `dispatch(clear())` — no payload needed, because clearing doesn't need any extra information.
+
+> [!NOTE]
+> Redux Toolkit's `createSlice` uses a library called Immer internally, which is why `state.items.push(...)` is *safe* inside a slice reducer (but still forbidden everywhere else, including Zustand) — Immer intercepts that "mutation" and builds a new object behind the scenes. The reducer above writes it the plain, pre-Immer way so you can see exactly what happens underneath.
+
+### Build the Redux Toolkit version (guided)
+
+Keep Zustand working — Redux is added as a *parallel* implementation, so you can compare them side by side in your real app, not just the demo above.
+
+```ts title="features/cart/cartSlice.ts"
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { Product } from '@/features/products/types';
+import { CartItemType } from './store';
+
+type CartState = { items: CartItemType[] };
+const initialState: CartState = { items: [] };
+
+const cartSlice = createSlice({
+  name: 'cart',
+  initialState,
+  reducers: {
+    add(state, action: PayloadAction<Product>) {
+      const found = state.items.find((i) => i.product.id === action.payload.id);
+      if (found) found.qty += 1; // Immer lets us "mutate" safely
+      else state.items.push({ product: action.payload, qty: 1 });
+    },
+    inc(state, action: PayloadAction<number>) {
+      const found = state.items.find((i) => i.product.id === action.payload);
+      if (found) found.qty += 1;
+    },
+    dec(state, action: PayloadAction<number>) {
+      const found = state.items.find((i) => i.product.id === action.payload);
+      if (!found) return;
+      if (found.qty === 1) state.items = state.items.filter((i) => i.product.id !== action.payload);
+      else found.qty -= 1;
+    },
+    remove(state, action: PayloadAction<number>) {
+      state.items = state.items.filter((i) => i.product.id !== action.payload);
+    },
+    clear(state) {
+      state.items = [];
+    },
+  },
+});
+
+export const { add, inc, dec, remove, clear } = cartSlice.actions;
+export default cartSlice.reducer;
+```
+
+```ts title="shared/reduxStore.ts"
+import { configureStore } from '@reduxjs/toolkit';
+import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
+import cartReducer from '@/features/cart/cartSlice';
+
+export const store = configureStore({ reducer: { cart: cartReducer } });
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;
+export const useAppDispatch = () => useDispatch<AppDispatch>();
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
+```
+
+```tsx title="app/_layout.tsx (Redux variant)"
+import { Stack } from 'expo-router';
+import { Provider } from 'react-redux';
+import { store } from '@/shared/reduxStore';
+
+export default function RootLayout() {
+  return (
+    <Provider store={store}>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="product/[id]" options={{ title: 'Details' }} />
+      </Stack>
+    </Provider>
+  );
+}
+```
+
+```tsx title="features/cart/screens/CartScreen.tsx (Redux variant, excerpt)"
+import { useAppDispatch, useAppSelector } from '@/shared/reduxStore';
+import { inc, dec, remove, clear } from '../cartSlice';
+
+const items = useAppSelector((s) => s.cart.items);
+const dispatch = useAppDispatch();
+// onInc={() => dispatch(inc(item.product.id))}
+// onDec={() => dispatch(dec(item.product.id))}
+// onRemove={() => dispatch(remove(item.product.id))}
+// <Button onPress={() => dispatch(clear())} />
+```
+
+In `ProductDetailScreen.tsx`: `dispatch(add(product))` instead of `useCartStore((s) => s.add)`. In the tab badge: `useAppSelector((s) => s.cart.items.reduce((n, i) => n + i.qty, 0))`. `TabsLayout` sits inside `<Provider>` because it is a child route of `RootLayout`, so `useAppSelector` works there too.
+
+| | Zustand | Redux Toolkit |
+| --- | --- | --- |
+| Setup | 1 file, no Provider | slice + store + Provider + typed hooks |
+| Update state | call a function | `dispatch(action)` |
+| Boilerplate | very low | moderate (much less than old Redux) |
+| DevTools / middleware | available | excellent, built in |
+| Best for | small/medium apps, quick features | large apps, big teams, strict structure |
+
+Discussion:
+1. Which would you choose for this app? For a 50-screen banking app?
+2. Why is it OK to write `state.items.push(...)` inside a Redux Toolkit reducer?
+3. What re-renders when you add an item — only the cart screen, or everything?
+
+Optional take-home ideas: persist the cart with `zustand/middleware`'s `persist` + AsyncStorage; add a favorites list with its own store; add a checkout screen with an order summary. One of these is your Extra challenge below — pick any.
+
+<Task n="6.3" title="Review your work" time="10 min">
+
+This lab is practice, not a hand-in — there's nothing to submit. Before you move on, check it against the live demos earlier in this part:
+
+- Products load, search works (Exercise 5.1)
+- 3 tabs with icons (Exercise 5.2)
+- Card tap → details → back (Exercise 5.3)
+- Add/inc/dec/remove/clear all work, total correct, matching the Zustand live demo (Exercise 6.1)
+- `CartItem` matches the spec (Exercise 6.2)
+- The Redux Toolkit version of the cart works too, matching the Redux live demo
+- You can explain: why is `app/` thin? what's a selector? the Zustand vs Redux trade-off?
+
+</Task>
+
+<Checkpoint title="Lab 04 complete">
+
+🚀 You revised everything from labs 1–3 inside a real app, and built your first global state management feature — twice, two different ways.
+
+</Checkpoint>

@@ -1,0 +1,180 @@
+---
+/**
+ * A real, running mini reducer — dispatch(action) -> reducer -> new state, with a live action log
+ * (same idea as Redux DevTools). The reducer below is the exact logic your cartSlice.ts will use.
+ * Same code+phone-preview layout as the Lab 02/03 live demos.
+ * <ReduxLiveDemo />
+ */
+import { Code } from 'astro:components';
+import Device from '@/components/Device.astro';
+
+const CODE = `// this is the exact reducer logic your cartSlice.ts will use
+function cartReducer(state, action) {
+  switch (action.type) {
+    case 'add': {
+      const found = state.items.find(i => i.product.id === action.payload.id);
+      if (found) found.qty += 1;      // Immer lets this read like a mutation
+      else state.items.push({ product: action.payload, qty: 1 });
+      return state;
+    }
+    case 'remove':
+      return { items: state.items.filter(i => i.product.id !== action.payload) };
+    case 'clear':
+      return { items: [] };
+  }
+}`;
+
+const PRODUCTS = [
+  { id: 1, name: 'Sneakers', price: 59 },
+  { id: 2, name: 'Mug', price: 12 },
+];
+const themes = { light: 'github-light', dark: 'github-dark-default' } as const;
+---
+<section class="rd" data-rd data-reveal aria-label="Live demo: Redux reducer">
+  <header class="rd-head">
+    <span class="rd-kind mono"><span class="rd-live-dot" aria-hidden="true"></span> Live demo</span>
+    <h4 class="rd-title">A real reducer, dispatched on this page</h4>
+  </header>
+
+  <div class="rd-body">
+    <div class="rd-code">
+      <div class="rd-tabs"><span class="rd-tab mono">cartSlice.ts</span></div>
+      <div class="rd-editor"><Code code={CODE} lang="ts" themes={themes} defaultColor={false} /></div>
+      <div class="rd-log-wrap">
+        <p class="rd-code-k mono">Action log (like Redux DevTools)</p>
+        <ol class="rd-log" data-rd-log></ol>
+      </div>
+    </div>
+    <div class="rd-phone">
+      <Device light interactive label="Mini cart preview">
+        <div class="rd-screen" data-rd-screen>
+          <div class="rd-shop">
+            {PRODUCTS.map((p) => (
+              <button type="button" class="rd-buy" data-rd-add={p.id}>+ {p.name} · ${p.price}</button>
+            ))}
+          </div>
+          <div class="rd-cart" data-rd-cart>
+            <p class="rd-empty" data-rd-empty>Cart is empty.<br />Dispatch "add" above.</p>
+          </div>
+          <div class="rd-foot">
+            <span class="rd-total mono" data-rd-total>Total: $0</span>
+            <button type="button" class="rd-clear" data-rd-clear>dispatch(clear())</button>
+          </div>
+        </div>
+      </Device>
+    </div>
+  </div>
+  <p class="rd-note">Every tap <code>dispatch()</code>es a real action object into the reducer above — watch the log grow.</p>
+</section>
+
+<script>
+  type Product = { id: number; name: string; price: number };
+  type Item = { product: Product; qty: number };
+  type State = { items: Item[] };
+  type Action = { type: 'add'; payload: Product } | { type: 'remove'; payload: number } | { type: 'clear' };
+
+  function cartReducer(state: State, action: Action): State {
+    switch (action.type) {
+      case 'add': {
+        const found = state.items.find((i) => i.product.id === action.payload.id);
+        return {
+          items: found
+            ? state.items.map((i) => (i.product.id === action.payload.id ? { ...i, qty: i.qty + 1 } : i))
+            : [...state.items, { product: action.payload, qty: 1 }],
+        };
+      }
+      case 'remove':
+        return { items: state.items.filter((i) => i.product.id !== action.payload) };
+      case 'clear':
+        return { items: [] };
+    }
+  }
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-rd]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const products: Product[] = [
+        { id: 1, name: 'Sneakers', price: 59 },
+        { id: 2, name: 'Mug', price: 12 },
+      ];
+      let state: State = { items: [] };
+
+      const cart = root.querySelector<HTMLElement>('[data-rd-cart]')!;
+      const empty = root.querySelector<HTMLElement>('[data-rd-empty]')!;
+      const total = root.querySelector<HTMLElement>('[data-rd-total]')!;
+      const log = root.querySelector<HTMLElement>('[data-rd-log]')!;
+
+      const paint = () => {
+        empty.hidden = state.items.length > 0;
+        cart.querySelectorAll('[data-rd-row]').forEach((n) => n.remove());
+        for (const i of state.items) {
+          const row = document.createElement('div');
+          row.className = 'rd-row';
+          row.dataset.rdRow = '1';
+          row.innerHTML = `<span>${i.product.name} × ${i.qty}</span><button type="button" data-rd-rm="${i.product.id}">✕</button>`;
+          cart.appendChild(row);
+        }
+        const sum = state.items.reduce((a, i) => a + i.product.price * i.qty, 0);
+        total.textContent = `Total: $${sum}`;
+        cart.querySelectorAll<HTMLButtonElement>('[data-rd-rm]').forEach((b) =>
+          b.addEventListener('click', () => dispatch({ type: 'remove', payload: Number(b.dataset.rdRm) })),
+        );
+      };
+
+      const dispatch = (action: Action) => {
+        state = cartReducer(state, action);
+        const entry = document.createElement('li');
+        const time = new Date().toLocaleTimeString([], { hour12: false });
+        entry.innerHTML = `<span class="rd-log-t mono">${time}</span><code>${action.type}${'payload' in action ? `(${JSON.stringify(action.payload)})` : '()'}</code>`;
+        log.prepend(entry);
+        while (log.children.length > 6) log.lastElementChild?.remove();
+        paint();
+      };
+
+      paint();
+      root.querySelectorAll<HTMLButtonElement>('[data-rd-add]').forEach((b) =>
+        b.addEventListener('click', () => dispatch({ type: 'add', payload: products.find((p) => p.id === Number(b.dataset.rdAdd))! })),
+      );
+      root.querySelector('[data-rd-clear]')!.addEventListener('click', () => dispatch({ type: 'clear' }));
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .rd { margin: 24px 0 32px; container-type: inline-size; }
+  .rd-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-bottom: 10px; }
+  .rd-kind { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-text); font-weight: 600; }
+  .rd-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: rd-live 1.6s ease-in-out infinite; }
+  @keyframes rd-live { 50% { opacity: 0.25; } }
+  .rd-title { margin: 0 !important; font-family: var(--font-display); font-size: 1.05rem; letter-spacing: -0.01em; color: var(--text); }
+  .rd-body { display: grid; gap: 1px; grid-template-columns: minmax(0, 1fr); background: var(--line); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
+  @container (min-width: 640px) { .rd-body { grid-template-columns: minmax(0, 1fr) 260px; } }
+  .rd-code { display: flex; flex-direction: column; min-width: 0; background: var(--surface); }
+  .rd-tabs { padding: 8px 12px 0; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+  .rd-tab { display: inline-block; padding: 6px 10px; font-size: 12px; color: var(--text); background: var(--code-bg); border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; margin-bottom: -1px; }
+  .rd-editor { height: 220px; overflow: auto; background: var(--code-bg); }
+  .rd-editor :global(.astro-code) { margin: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; padding: 14px !important; font-size: 11.5px !important; }
+  .rd-log-wrap { padding: 10px 14px 14px; border-top: 1px solid var(--line); background: var(--surface); }
+  .rd-code-k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 6px !important; }
+  .rd-log { list-style: none; margin: 0 !important; padding: 0; display: grid; gap: 4px; max-height: 120px; overflow-y: auto; }
+  .rd-log li { display: flex; gap: 8px; align-items: baseline; padding: 5px 9px; border-radius: 8px; background: var(--bg-2); font-size: 12px; color: var(--text-2); animation: rd-in 300ms var(--ease-out); }
+  .rd-log-t { color: var(--text-3); font-size: 11px; }
+  .rd-phone { display: grid; place-items: center; padding: 20px 12px; background: radial-gradient(circle at 50% 40%, var(--accent-soft), transparent 62%), var(--bg-2); }
+  .rd-phone :global(.device) { --w: 220px; }
+  .rd-screen { position: absolute; inset: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 12px; }
+  .rd-shop { display: flex; flex-direction: column; gap: 6px; }
+  .rd-buy { padding: 8px 10px; border-radius: 10px; border: 1px solid #e2e8f0; background: #f8fafc; color: #0f172a; font-size: 12.5px; font-weight: 600; text-align: left; }
+  .rd-cart { flex: 1; min-height: 56px; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 10px; border: 1px dashed #cbd5e1; }
+  .rd-empty { margin: auto !important; text-align: center; color: #94a3b8; font-size: 12px; }
+  .rd-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; background: #f1f5f9; font-size: 12px; color: #0f172a; }
+  .rd-row button { color: #dc2626; font-weight: 700; border: 0; background: none; padding: 2px 4px; }
+  .rd-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; border-top: 1px solid #e2e8f0; }
+  .rd-total { font-size: 12.5px; font-weight: 700; color: #0f172a; }
+  .rd-clear { font-size: 11px; color: #64748b; text-decoration: underline; background: none; border: 0; padding: 0; }
+  .rd-note { margin: 10px 0 0 !important; font-size: 13px; color: var(--text-3); }
+  .rd-note code { font-size: 12.5px; }
+  @keyframes rd-in { from { opacity: 0; transform: translateY(-4px); } }
+  @media (prefers-reduced-motion: reduce) { .rd-live-dot { animation: none; } .rd-log li { animation: none; } }
+</style>
