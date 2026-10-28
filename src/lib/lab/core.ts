@@ -3,7 +3,7 @@
  * Students' browsers send events (start / check / hint); /admin reads aggregated stats.
  */
 import { validateCheckIn } from '../attendance/core.ts';
-import { cleanGroup, groupError } from '../identity.ts';
+import { looseGroup } from '../identity.ts';
 import { INTERACTIVE_LABS } from '../../lab/exercises/registry.ts';
 
 export type LabExercise = { id: string; n: number; title: string; block: number };
@@ -41,14 +41,13 @@ export function validateLabEvent(body: unknown, known: (lab: string) => boolean 
   const who = validateCheckIn({ name: o.name, studentId: o.studentId, deviceId: o.deviceId });
   if (!who.ok) return { ok: false, error: Object.values(who.errors)[0] ?? 'Invalid student.' };
   const rawSessionId = String(o.sessionId ?? '').trim();
-  // a signed-in student may start without a group (shown as —); anything typed must be a real group code
-  const rawGroup = o.group == null || String(o.group).trim() === '' || String(o.group).trim() === '—' ? '' : cleanGroup(o.group);
+  // the group is optional and free text ("12" is tidied to "G12"); empty is shown as —
+  const rawGroup = looseGroup(o.group);
   // Legacy defaults keep the pure core/backend usable for old data and unit tests.
   // The HTTP endpoint still requires a real, currently-open session ID.
   const sessionId = rawSessionId || 'legacy';
   const group = rawGroup || '—';
   if (rawSessionId && !/^s_[A-Za-z0-9_]{6,80}$/.test(rawSessionId)) return { ok: false, error: 'This lab session is not available. Refresh the page.' };
-  if (rawGroup && groupError(rawGroup)) return { ok: false, error: groupError(rawGroup)! };
   const event = String(o.event ?? '') as LabEventKind;
   if (!['start', 'check', 'hint'].includes(event)) return { ok: false, error: 'Unknown event.' };
   let exercise: string | null = null;

@@ -31,7 +31,10 @@ test('validation: rejects bad labs, events, exercises, results and students', ()
   assert.equal(bad({ result: 'great' }).ok, false);
   assert.equal(bad({ name: 'x' }).ok, false);
   assert.equal(bad({ studentId: '!' }).ok, false);
-  assert.equal(bad({ deviceId: 'short' }).ok, false);
+  // the device never blocks, and the group is optional free text
+  assert.equal(bad({ deviceId: 'short' }).ok, true);
+  assert.equal(bad({ group: 'Group A' }).ok, true);
+  assert.equal(bad({ group: '' }).ok, true);
   assert.equal(validateLabEvent(null).ok, false);
   const clamped = validateLabEvent({ ...base, event: 'check', exercise: 'ex05', result: 'partial', score: 7 });
   assert.ok(clamped.ok && clamped.event.score === 1);

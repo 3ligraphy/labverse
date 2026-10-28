@@ -59,11 +59,11 @@ test('malformed student IDs are rejected', () => {
   }
 });
 
-test('missing or malformed device id is rejected', () => {
+test('a missing or odd device id never blocks: it is replaced', () => {
   for (const deviceId of [undefined, '', 'short', 'has spaces in it 123456']) {
     const r = validateCheckIn({ name: 'Mariam Ahmed', studentId: '236541', deviceId });
-    assert.equal(r.ok, false);
-    if (!r.ok) assert.ok(r.errors.deviceId);
+    assert.equal(r.ok, true);
+    if (r.ok) assert.equal(r.deviceId, 'unknown-device-0000');
   }
 });
 

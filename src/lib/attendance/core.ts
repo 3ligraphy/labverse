@@ -23,6 +23,7 @@ export type CheckInResult =
 
 // name and student ID rules: src/lib/identity.ts
 const DEVICE_RE = /^[A-Za-z0-9_-]{16,64}$/;
+export const UNKNOWN_DEVICE = 'unknown-device-0000';
 
 /**
  * The caller's IP for rate limits. Vercel's own header comes first because clients cannot set it, then the
@@ -37,14 +38,15 @@ export function validateCheckIn(input: unknown): Validation {
   const o = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
   const name = cleanName(o.name);
   const studentId = cleanStudentId(o.studentId);
-  const deviceId = String(o.deviceId ?? '').trim();
+  // the device never blocks anyone: a missing or odd ID (storage off, old browser) is replaced
+  const rawDevice = String(o.deviceId ?? '').trim();
+  const deviceId = DEVICE_RE.test(rawDevice) ? rawDevice : UNKNOWN_DEVICE;
 
   const errors: Partial<Record<keyof CheckInInput, string>> = {};
   const badName = nameError(name);
   const badId = studentIdError(studentId);
   if (badName) errors.name = badName;
   if (badId) errors.studentId = badId;
-  if (!DEVICE_RE.test(deviceId)) errors.deviceId = 'This device could not be identified. Refresh the page and try again.';
 
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, name, studentId, deviceId };
 }

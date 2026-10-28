@@ -1,15 +1,20 @@
-/** The session-aware Start Lab card: name, student ID and group are required. */
+/**
+ * The session-aware Start Lab card. Guests type a name (letters) and a student ID (digits); the group is optional.
+ * Nothing else is checked: any device, shared lab PCs, the same ID again. Signed-in students never see the form:
+ * they join the open session by themselves.
+ */
 import { clearStudent, deviceId, getStudent, setStudent } from './store.ts';
-import { cleanGroup, cleanName, cleanStudentId, groupError, nameError, studentIdError } from '../../lib/identity.ts';
+import { cleanName, cleanStudentId, looseGroup, nameError, studentIdError } from '../../lib/identity.ts';
 import { clearProgressIdentity, getIdentity, setProgressIdentity } from '@/scripts/progress';
 import { getMe } from '@/scripts/me';
 
 type PublicSession = { id: string; open: boolean; ta_name?: string; time_slot?: string };
 type PublicSessionResponse = PublicSession & { sessions?: PublicSession[]; practice?: boolean };
 
-const GROUP_KEY = 'lab:group';
-const savedGroup = () => { try { return localStorage.getItem(GROUP_KEY) ?? ''; } catch { return ''; } };
-const rememberGroup = (g: string) => { try { localStorage.setItem(GROUP_KEY, g); } catch { /* storage off */ } };
+/** each student's last group, per student ID (a shared lab PC never hands one student's group to the next) */
+const groupKey = (id: string) => `lab:group:${id}`;
+const savedGroup = (id: string) => { try { return localStorage.getItem(groupKey(id)) ?? ''; } catch { return ''; } };
+const rememberGroup = (id: string, g: string) => { try { localStorage.setItem(groupKey(id), g); } catch { /* storage off */ } };
 
 const GATED = '[data-exercise],[data-playground],[data-repo-submit],[data-checkin],[data-task-check]';
 const PASS_KEYS = /^(Tab|Escape|Shift|Control|Alt|Meta|CapsLock|Arrow\w+|Home|End|PageUp|PageDown|F\d{1,2})$/;
@@ -50,7 +55,7 @@ export function mountStart(lab: string) {
       : access === 'practice'
       ? 'Hand-ins and check-in need a live lab session. Exercises and demos work now in practice mode.'
       : sessions.length
-        ? 'Join the session first: enter your name, ID and group in Start lab. Then you can edit, run and check.'
+        ? (account ? 'Choose your time slot in Start lab and press Start. Then you can edit, run and check.' : 'Join the session first: enter your name and student ID in Start lab. Then you can edit, run and check.')
         : 'This opens when your TA starts the lab session. You can read everything until then.';
     if (note && note.previousElementSibling === block && note.dataset.text === text && Date.now() - noteAt < 4000) return;
     noteAt = Date.now();
@@ -181,12 +186,15 @@ export function mountStart(lab: string) {
   const autoJoin = async () => {
     if (!account || !session?.open || sessions.length !== 1 || autoTried.has(session.id)) return;
     const student = getStudent();
-    if (student && student.sessionId === session.id) return;
+    // already in as this account; a classmate's guest identity left on a shared PC is replaced
+    if (student && student.sessionId === session.id && student.id === account.id) return;
     autoTried.add(session.id);
-    const typed = cleanGroup(groupIn.value);
     status.textContent = `Joining ${session.ta_name ? `${session.ta_name}’s` : 'the'} session as ${account.name}…`;
-    const problem = await join(account.name, account.id, typed && !groupError(typed) ? typed : '', session.id);
-    if (problem) err.textContent = problem;
+    const problem = await join(account.name, account.id, looseGroup(groupIn.value), session.id);
+    if (problem) {
+      err.textContent = problem;
+      autoTried.delete(session.id); // try again on the next status check
+    }
   };
 
   sessionIn.addEventListener('change', () => {
@@ -204,15 +212,15 @@ export function mountStart(lab: string) {
         body: JSON.stringify({ lab, name, studentId: id, deviceId: sharedDeviceId, group, sessionId, event: 'start' }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) return data.message ?? data.error ?? 'Could not verify your identity. Ask your TA.';
+      if (!response.ok) return data.message ?? data.error ?? 'Could not start the lab. Try again.';
       // Identity is persisted only after verification
       setStudent({ name, id, group: group || '—', sessionId });
       setProgressIdentity(name, id, group || '—', sessionId, sharedDeviceId);
-      if (group) rememberGroup(group);
+      if (group) rememberGroup(id, group);
       show();
       return null;
     } catch {
-      return 'The server could not verify your identity. Check the connection and try again.';
+      return 'Could not reach the server. Check the connection and try again.';
     }
   };
 
@@ -227,26 +235,19 @@ export function mountStart(lab: string) {
   });
   idIn.addEventListener('blur', () => { const id = cleanStudentId(idIn.value); if (id) hint(studentIdError(id), idIn); });
   nameIn.addEventListener('input', () => hint(/\d/.test(nameIn.value) ? nameError(cleanName(nameIn.value)) : null, nameIn));
-  groupIn.addEventListener('blur', () => {
-    if (!groupIn.value.trim()) return;
-    groupIn.value = cleanGroup(groupIn.value);
-    hint(groupError(groupIn.value), groupIn);
-  });
+  groupIn.addEventListener('blur', () => { groupIn.value = looseGroup(groupIn.value); });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const name = cleanName(nameIn.value);
     const id = cleanStudentId(idIn.value);
-    const rawGroup = groupIn.value.trim();
-    const group = rawGroup ? cleanGroup(rawGroup) : '';
+    const group = looseGroup(groupIn.value);
+    // the only checks: a name made of letters, and an ID made of digits
     const badName = nameError(name);
     if (badName) { hint(badName, nameIn); return nameIn.focus(); }
     const badId = studentIdError(id);
     if (badId) { hint(badId, idIn); return idIn.focus(); }
-    // signed-in students may leave the group empty; guests must give one
-    const badGroup = group || !account ? groupError(group) : null;
-    if (badGroup) { hint(badGroup, groupIn); return groupIn.focus(); }
-    if (group) groupIn.value = group;
+    groupIn.value = group;
     if (!session?.open) {
       err.textContent = 'Your TA has not started this session yet. You can read the lab content for now.';
       return;
@@ -286,12 +287,10 @@ export function mountStart(lab: string) {
     idIn.value = u.studentId;
     nameIn.readOnly = idIn.readOnly = true;
     nameIn.title = idIn.title = 'From your account';
-    groupIn.required = false;
-    groupIn.placeholder = 'e.g. G12 (optional)';
-    if (!groupIn.value) groupIn.value = savedGroup();
+    groupIn.value = savedGroup(cleanStudentId(u.studentId));
     const note = document.createElement('p');
     note.className = 'ls-acct';
-    note.textContent = `Signed in as ${u.name}: you join the lab session automatically when your TA starts it.`;
+    note.textContent = `Signed in as ${u.name}: nothing to type. You join the lab session by yourself when your TA starts it, and your progress is saved.`;
     form.prepend(note);
     // a valid account identity joins the open session by itself (no form to fill)
     if (!nameError(cleanName(u.name)) && !studentIdError(cleanStudentId(u.studentId))) {

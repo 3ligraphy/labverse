@@ -88,11 +88,11 @@ function fileStructures(): Promise<LabStructure[]> {
 export const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', ...noStore } });
 
-const WRITES_PER_WINDOW = 120;
+const WRITES_PER_WINDOW = 300;
 const WINDOW_SEC = 10 * 60;
 
 /**
- * Shared flow of every student write: validate → rate limit → device lock → store.
+ * Shared flow of every student write: validate → session → flood guard → store. No device or network locks.
  * `act` may return a Response (sent as is) or extra fields for the JSON answer.
  */
 export async function studentWrite<V extends Identity>(
@@ -120,10 +120,8 @@ export async function studentWrite<V extends Identity>(
     if (!(await s.isSessionStudent(sessionId, v.value.studentKey))) {
       return json({ error: 'not-started', message: 'Enter your name, ID and group at the top of the lab before starting.' }, 403);
     }
-    if ((await s.hit(`w:${v.value.deviceKey}`, WINDOW_SEC)) > WRITES_PER_WINDOW) return json({ error: 'slow-down' }, 429);
-    if ((await s.touchStudent(v.value)) === 'conflict') {
-      return json({ error: 'device', message: 'This student ID was already used with a different name. Type your name exactly as you did before, or ask your TA to fix it.' }, 409);
-    }
+    if ((await s.hit(`w:${v.value.studentKey}`, WINDOW_SEC)) > WRITES_PER_WINDOW) return json({ error: 'slow-down', message: 'Too many saves at once. Wait a minute.' }, 429);
+    await s.touchStudent(v.value);
     const out = await act(s, { ...v.value, sessionId });
     return out instanceof Response ? out : json({ ok: true, ...(out ?? {}) });
   } catch (err) {

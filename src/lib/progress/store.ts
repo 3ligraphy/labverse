@@ -38,8 +38,8 @@ export type StudentData = {
 
 export interface ProgressStore {
   addManualAttendance(lab: string, sessionId: string, student: { studentKey: string; studentId: string; name: string }): Promise<string | null>;
-  /** Creates the student, or checks the device lock; refreshes name + last_seen. */
-  touchStudent(i: Identity & { studentKey: string }): Promise<'ok' | 'conflict'>;
+  /** Creates the student or updates them: the name and ID last typed win, from any device. */
+  touchStudent(i: Identity & { studentKey: string }): Promise<'ok'>;
   joinSession(sessionId: string, studentKey: string, group: string): Promise<void>;
   isSessionStudent(sessionId: string, studentKey: string): Promise<boolean>;
   addAttempt(a: { studentKey: string; lab: string; exercise: string; passed: number; total: number; code: string; sessionId?: string }): Promise<void>;
@@ -112,7 +112,6 @@ export class MemoryStore implements ProgressStore {
 
   async touchStudent(i: Identity & { studentKey: string }) {
     const row = this.students.get(i.studentKey) ?? null;
-    if (row && row.name.trim().toLocaleLowerCase() !== i.name.trim().toLocaleLowerCase()) return 'conflict' as const;
     const t = this.stamp();
     this.students.set(i.studentKey, {
       student_key: i.studentKey, student_id: i.studentId, name: i.name, device_key: i.deviceKey,
@@ -428,27 +427,13 @@ export class NeonStore implements ProgressStore {
   }
 
   async touchStudent(i: Identity & { studentKey: string }) {
-    const { students } = this.t;
-    // The ID + name is the identity; any device may be used and the latest one is recorded.
-    for (let round = 0; round < 2; round++) {
-      const [row] = await this.q<{ name: string }>(`select name from ${students} where student_key = $1`, [i.studentKey]);
-      if (row && row.name.trim().toLocaleLowerCase() !== i.name.trim().toLocaleLowerCase()) return 'conflict' as const;
-      if (!row) {
-        const made = await this.q(
-          `insert into ${students} (student_key, student_id, name, device_key) values ($1, $2, $3, $4)
-           on conflict (student_key) do nothing returning student_key`,
-          [i.studentKey, i.studentId, i.name, i.deviceKey],
-        );
-        if (made.length) return 'ok' as const;
-        continue; // someone created it at the same moment: decide again
-      }
-      await this.q(
-        `update ${students} set name = $2, student_id = $3, device_key = $4, last_seen = now() where student_key = $1`,
-        [i.studentKey, i.name, i.studentId, i.deviceKey],
-      );
-      return 'ok' as const;
-    }
-    return 'conflict' as const;
+    // No locks: any device, and the name typed last is the one kept (students fix typos by typing again).
+    await this.q(
+      `insert into ${this.t.students} (student_key, student_id, name, device_key) values ($1, $2, $3, $4)
+       on conflict (student_key) do update set name = excluded.name, student_id = excluded.student_id, device_key = excluded.device_key, last_seen = now()`,
+      [i.studentKey, i.studentId, i.name, i.deviceKey],
+    );
+    return 'ok' as const;
   }
 
   async joinSession(sessionId: string, studentKey: string, group: string) {

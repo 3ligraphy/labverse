@@ -11,7 +11,7 @@ import { noStore } from '@/lib/attendance/server';
 
 export const prerender = false;
 
-const MAX_EVENTS = 300; // per device
+const MAX_EVENTS = 600; // per student: a flood guard only (shared lab PCs and campus Wi-Fi are fine)
 const WINDOW_SEC = 10 * 60; // per 10 minutes
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...noStore } });
@@ -34,15 +34,12 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ ok: false, error: 'not-started', message: 'Enter your name, ID and group at the top of the lab first.' }, 403);
   }
 
-  const tries = await backend.hit(`device:${v.event.deviceId}`, WINDOW_SEC).catch(() => 0);
+  const tries = await backend.hit(`student:${v.event.studentKey}`, WINDOW_SEC).catch(() => 0);
   if (tries > MAX_EVENTS) return json({ ok: false, error: 'Too many events — slow down a little.' }, 429);
 
   try {
     await backend.record(v.event);
   } catch (error) {
-    if (error instanceof Error && error.message === 'identity-conflict') {
-      return json({ ok: false, error: 'identity-conflict', message: 'This student ID was already used with a different name. Type your name exactly as you did before, or ask your TA to fix it.' }, 409);
-    }
     console.error('[lab] could not record progress', error);
     return json({ ok: false, error: 'Could not save progress.' }, 500);
   }

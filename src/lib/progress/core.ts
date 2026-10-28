@@ -47,9 +47,10 @@ export function validateStudentIdentity(input: unknown): Valid<Pick<Identity, 'n
 
 export function validateIdentity(input: unknown): Valid<Identity> {
   const identity = validateStudentIdentity(input);
-  const deviceKey = String(obj(input).deviceKey ?? '').trim();
+  // the browser never blocks anyone: a missing or odd key is replaced
+  const rawKey = String(obj(input).deviceKey ?? '').trim();
+  const deviceKey = DEVICE_RE.test(rawKey) ? rawKey : 'unknown-device-0000';
   const errors: Record<string, string> = identity.ok ? {} : { ...identity.errors };
-  if (!DEVICE_RE.test(deviceKey)) errors.deviceKey = 'This browser could not be identified. Refresh the page and try again.';
   if (!identity.ok || Object.keys(errors).length) return { ok: false, errors };
   return { ok: true, value: { ...identity.value, deviceKey } };
 }
@@ -109,8 +110,8 @@ export function attendanceEligibility(input: {
   activeSec: number;
   seen: number;
 }): { ok: true } | { ok: false; reason: 'identity' | 'participation' } {
-  const sameName = input.student?.name.trim().toLocaleLowerCase() === input.name.trim().toLocaleLowerCase();
-  if (!input.student || !sameName) return { ok: false, reason: 'identity' };
+  // only "did they start the lab?": the name may differ (the last one typed is kept), from any device
+  if (!input.student) return { ok: false, reason: 'identity' };
   if (input.activeSec < ATTENDANCE_MIN_ACTIVE_SEC || input.seen < ATTENDANCE_MIN_SEEN) return { ok: false, reason: 'participation' };
   return { ok: true };
 }
