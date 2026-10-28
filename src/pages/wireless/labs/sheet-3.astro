@@ -5,14 +5,14 @@ import { conversions, formulas, questions } from '@/lib/wireless/sheet3';
 Astro.response.headers.set('cache-control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=600');
 const nav = questions.map((q) => ({ href: `#q${q.id}`, label: `Q${q.id} · ${q.topic}` }));
 ---
-<Base title="Wireless Networks · Open Study Session" description="A no-login, interactive Sheet 3 session for antennas, propagation, Doppler, path loss, formulas and conversions.">
+<Base title="Wireless Networks · Week 6 Lab · Sheet 3" description="A no-login, interactive Sheet 3 session for antennas, propagation, Doppler, path loss, formulas and conversions.">
   <header class="wn-hero">
     <div class="wn-air" aria-hidden="true"><i></i><i></i><i></i><span></span></div>
     <div class="container wn-hero-in">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><span aria-current="page">wireless</span></nav>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><a href="/wireless">wireless</a><span aria-hidden="true">/</span><a href="/wireless#labs">labs</a><span aria-hidden="true">/</span><span aria-current="page">sheet-3</span></nav>
       <div class="wn-hero-grid">
         <div>
-          <p class="wn-k mono"><span></span> OPEN SESSION · NO SIGN-IN · SHEET 3</p>
+          <p class="wn-k mono"><span></span> WEEK 6 · LAB · SHEET 3 · NO SIGN-IN</p>
           <h1><span class="wn-title-word">Wireless</span> <span class="wn-title-word">Networks</span><br /><em>Antennas &amp; propagation</em></h1>
           <p class="wn-lead">Solve every question with the numbers in front of you. Try an answer, check it instantly, then reveal the reasoning one small step at a time.</p>
           <div class="wn-actions"><a class="btn btn-primary" href="#q1">Start question 1 ↓</a><a class="btn btn-ghost" href="#toolbox">Open formula toolbox</a></div>

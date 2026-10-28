@@ -220,9 +220,13 @@ The teaching team publishes submissions, such as the **project proposal**, and s
 - **Safety:** admin routes need the admin login. Student uploads are rate-limited per IP and confined to that item's folder. Every PDF must be `application/pdf`, start with `%PDF-` and come from this project's own store, and rejected uploads are deleted. Hand-in PDF links are unguessable but public, and are only shown to admins.
 - **Code:** rules in `src/lib/project-files/core.ts` (unit-tested: `npm test`), storage in `src/lib/project-files/server.ts`, endpoints in `src/pages/api/project/`, `src/pages/api/submissions/` and `src/pages/api/admin/project/`, the banner in `src/components/Announce.astro`, and the ZIP builder in `src/scripts/submissions-zip.ts`.
 
-## Open Wireless Networks session (`/wireless`)
+## Wireless Networks module (`/wireless`)
 
-The module directory includes a public, no-login Sheet 3 session for antennas and free-space propagation. It covers all ten worksheet questions with checked numerical answers and step-by-step reveals, plus 21 formulas, conversion rules, a unit converter, and a live Friis link-budget calculator. Completion is stored only in the current browser under `buenova:wireless-sheet3`; it does not require an account, TA session, attendance record, or database connection. The pure calculation helpers are in `src/lib/wireless/core.ts`, while the teaching content is in `src/lib/wireless/sheet3.ts`.
+A public, no-login module with two tracks, **Lectures** and **Labs**, grouped by teaching week. Its contents are listed in `src/lib/wireless/module.ts`; add a lecture or lab there and it appears on `/wireless`.
+
+- **Week 1 · Lecture 1** (`/wireless/lectures/lecture-01`): an interactive version of `WN_Lecture_1.pdf` (all 25 slides, in 24 sections) with calculators, simulations, mini-checks, a quick-check quiz, a formula sheet, a glossary of every abbreviation and a **Present** mode for the projector. Each section names its slide: **Slide N** opens the slide viewer and **Open PDF at p.N** opens the PDF at that page (`#page=N`). The PDF and the rendered slide images are in `public/wireless/lecture-01/`; the section → page map is in `src/lib/wireless/lecture1.ts`, and the widgets are in `src/scripts/wireless-lecture.ts`. Progress is saved only in the browser under `buenova:wireless-lecture-01`.
+- **Week 6 · Lab, Sheet 3** (`/wireless/labs/sheet-3`): antennas and free-space propagation. It covers all ten worksheet questions with checked numerical answers and step-by-step reveals, plus 21 formulas, conversion rules, a unit converter and a live Friis link-budget calculator. Completion is stored only in the browser under `buenova:wireless-sheet3`. The teaching content is in `src/lib/wireless/sheet3.ts`. Old `/wireless#q3` links forward to the lab.
+- The pure calculation helpers are in `src/lib/wireless/core.ts` (tests in `tests/wireless-session.test.ts`). Nothing needs an account, TA session, attendance record or database connection.
 
 ## BUENOVA platform (modules, builder, accounts)
 
