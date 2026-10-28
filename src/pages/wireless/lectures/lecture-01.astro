@@ -1,0 +1,582 @@
+---
+import Base from '@/layouts/Base.astro';
+import S from '@/components/wireless/LectureSection.astro';
+import { chapters, formulas, glossary, PDF, PDF_PAGES, quickCheck, sections, slideImage } from '@/lib/wireless/lecture1';
+import { pdfAt, wirelessModule as mod } from '@/lib/wireless/module';
+import { BANDS } from '@/lib/wireless/core';
+import '@/styles/wireless-lecture.css';
+
+// page → the section that teaches it (slide viewer "Go to this section")
+const pageToSection = Object.fromEntries(sections.flatMap((s) => s.pages.map((p) => [p, { id: s.id, title: s.title }])));
+const pages = Array.from({ length: PDF_PAGES }, (_, i) => i + 1);
+---
+<Base title="Wireless Networks · Lecture 1 · Wireless communication" description="Interactive Lecture 1 of Wireless Networks: wireless communication, the spectrum, network organization and electromagnetic waves, linked slide by slide to the PDF.">
+  <header class="wl-hero" id="top">
+    <div class="wl-air" aria-hidden="true"><i></i><i></i><i></i><span></span></div>
+    <div class="container">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><a href="/wireless">wireless</a><span aria-hidden="true">/</span><a href="/wireless#lectures">lectures</a><span aria-hidden="true">/</span><span aria-current="page">lecture-01</span></nav>
+      <div class="wl-hero-grid">
+        <div>
+          <p class="wl-k mono"><span></span> WEEK 1 · LECTURE 1 · INTERACTIVE</p>
+          <h1>Wireless <em>communication</em></h1>
+          <p class="wl-lead">Fundamentals of wireless signals and networks. Play with every idea, test yourself as you go, and jump to the exact slide in the PDF from any section.</p>
+          <div class="wl-actions">
+            <a class="btn btn-primary" href="#cover">Start the lecture ↓</a>
+            <button type="button" class="btn btn-ghost" data-open-slide="1">Browse the slides</button>
+            <a class="btn btn-ghost" href={PDF} download="WN_Lecture_1.pdf">Download PDF</a>
+            <button type="button" class="btn btn-ghost" data-present>▶ Present</button>
+          </div>
+          <p class="wl-leader"><span class="mono">MODULE LEADER</span> {mod.leader.name} · <a href={`mailto:${mod.leader.email}`}>{mod.leader.email}</a> · Office {mod.leader.office}</p>
+        </div>
+        <aside class="wl-dialbox" aria-label="Your progress">
+          <div class="wl-dial" data-dial><b data-progress>0/{sections.length}</b><small>understood</small></div>
+          <p>Tick <b>I’ve got this</b> at the end of each section. Saved in this browser only.</p>
+          <button type="button" class="wl-reset" data-reset>Reset my progress</button>
+        </aside>
+      </div>
+      <ol class="wl-route" aria-label="Lecture chapters">
+        {chapters.map((c, i) => (
+          <li><a href={`#${c.sections[0].id}`}><span class="mono">{String(i + 1).padStart(2, '0')}</span><b>{c.title}</b><small>{c.sections.length} sections · slides {c.sections[0].pages[0]}–{c.sections.at(-1)!.pages.at(-1)}</small></a></li>
+        ))}
+      </ol>
+    </div>
+  </header>
+
+  <section class="wl-strip-wrap" aria-label="All slides of the lecture PDF">
+    <div class="container">
+      <div class="wl-strip-head"><p class="mono">THE LECTURE PDF · {PDF_PAGES} SLIDES</p><span>Pick a slide to view it, open the PDF at that page, or jump to where it is taught.</span></div>
+      <ol class="wl-strip">
+        {pages.map((p) => (
+          <li><button type="button" data-open-slide={p} aria-label={`Slide ${p}: ${pageToSection[p].title}`}><img src={slideImage(p)} alt="" width="160" height="90" loading="lazy" decoding="async" /><span class="mono">{String(p).padStart(2, '0')}</span></button></li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <div class="container wl-layout" data-lecture data-sections={sections.map((s) => s.id).join(',')}>
+    <div class="wl-main">
+
+      <!-- ============================================================ CHAPTER 1 -->
+      <S id="cover">
+        <p class="wl-prose">Welcome to <b>Wireless Networks</b>. Lecture 1, <b>Wireless communication</b>, sets out the fundamentals of wireless signals and networks. The module leader is <b>{mod.leader.name}</b> (<a href={`mailto:${mod.leader.email}`}>{mod.leader.email}</a>, Office {mod.leader.office}).</p>
+        <div class="wl-howto">
+          <div><b>1</b><p><strong>Read the idea.</strong> Each section is one slide (or two) of the PDF, explained in plain words.</p></div>
+          <div><b>2</b><p><strong>Play with it.</strong> Move the sliders, toggle the diagrams and answer the mini-checks.</p></div>
+          <div><b>3</b><p><strong>Check the source.</strong> Every section names its slide. Open it here or in the PDF at that page.</p></div>
+        </div>
+        <div class="wl-map" aria-label="What this lecture covers">
+          {chapters.map((c, i) => (
+            <a href={`#${c.sections[0].id}`} class="wl-map-card"><span class="mono">0{i + 1}</span><b>{c.title}</b><small>{c.blurb}</small></a>
+          ))}
+        </div>
+      </S>
+
+      <S id="communication">
+        <p class="wl-prose wl-big">Devices exchange information using <b>electromagnetic signals</b> without a physical cable between them.</p>
+        <div class="wl-chain" data-chain>
+          <div class="wl-chain-row" role="tablist" aria-label="Link stages">
+            <button type="button" role="tab" aria-selected="true" data-stage="tx"><span>📡</span>Transmitter</button>
+            <i aria-hidden="true"><em></em></i>
+            <button type="button" role="tab" aria-selected="false" data-stage="ch"><span>〰</span>Wireless channel</button>
+            <i aria-hidden="true"><em></em></i>
+            <button type="button" role="tab" aria-selected="false" data-stage="rx"><span>💻</span>Receiver</button>
+          </div>
+          <div class="wl-chain-panel" data-stage-panel="tx"><h3>Encodes information</h3><ul><li>Source and channel coding, then modulation</li><li>Power amplifier drives the antenna</li></ul></div>
+          <div class="wl-chain-panel" data-stage-panel="ch" hidden><h3>Carries the signal</h3><ul><li>Attenuation, multipath and noise</li><li>Interference from other transmitters</li></ul></div>
+          <div class="wl-chain-panel" data-stage-panel="rx" hidden><h3>Recovers information</h3><ul><li>Filtering, amplification, demodulation</li><li>Error detection and correction</li></ul></div>
+        </div>
+        <p class="wl-example"><b>Example:</b> a laptop exchanges data with a Wi-Fi access point.</p>
+        <div class="wl-lab" data-snr>
+          <p class="wl-lab-k mono">TRY IT · LINK QUALITY</p>
+          <p class="wl-formula">SNR(dB) = 10·log₁₀(P_signal / P_noise)</p>
+          <div class="wl-controls">
+            <label><span>Signal power P_signal (mW)</span><input type="number" step="any" min="0" value="1" name="s" /></label>
+            <label><span>Noise power P_noise (mW)</span><input type="number" step="any" min="0" value="0.001" name="n" /></label>
+          </div>
+          <output class="wl-out" data-out>—</output>
+          <p class="wl-note">Link quality is set by the signal-to-noise ratio. Each ×10 in the ratio adds 10 dB. <abbr title="decibel">dB</abbr> = decibel.</p>
+        </div>
+      </S>
+
+      <S id="personal">
+        <div class="wl-toggle" data-then-now>
+          <div class="wl-seg" role="group" aria-label="Era"><button type="button" aria-pressed="true" data-era="then">Earlier systems</button><button type="button" aria-pressed="false" data-era="now">Portable devices</button></div>
+          <div class="wl-era" data-era-panel="then">
+            <div class="wl-era-art" aria-hidden="true">🖥️🗄️🗄️</div>
+            <div><h3>Earlier systems</h3><p>Large, fixed equipment served specialist users.</p><ul><li>Mainframes (1960s–70s) were shared, room-sized computers</li><li>Users reached them through wired terminals in one building</li></ul></div>
+          </div>
+          <div class="wl-era" data-era-panel="now" hidden>
+            <div class="wl-era-art" aria-hidden="true">💻📱⌚📟</div>
+            <div><h3>Portable devices</h3><p>People access information while moving.</p><ul><li>Laptops, smartphones, wearables and <abbr title="Internet of Things">IoT</abbr> sensors</li><li>Needs wireless links, long battery life and handover between cells</li></ul></div>
+          </div>
+        </div>
+        <p class="wl-note">IoT: Internet of Things.</p>
+        <div class="wl-think"><b>Think:</b> what does a <em>moving</em> user need that a terminal fixed to one desk never did? Answer: a wireless link, a battery that lasts, and <em>handover</em> as they move between cells.</div>
+      </S>
+
+      <S id="why-wireless">
+        <div class="wl-two">
+          <div class="wl-card"><h3>Access and mobility</h3><p>Users connect while moving and collaborate across a space.</p><ul><li><b>Handover</b> keeps a session alive as a user moves between access points</li><li><b>Roaming</b> extends access across buildings and operator networks</li></ul></div>
+          <div class="wl-card"><h3>Deployment and growth</h3><p>Add users and guest access with less endpoint cabling.</p><ul><li>Coverage grows by adding access points, not new cable runs</li><li>Suits sites where cabling is hard: heritage buildings, events, factories</li></ul></div>
+        </div>
+        <div class="wl-lab" data-handover>
+          <p class="wl-lab-k mono">TRY IT · WALK THROUGH THE BUILDING</p>
+          <p>Drag the student along the corridor. Their device stays on the strongest access point, and the session is <b>handed over</b> without dropping.</p>
+          <div class="wl-hall" aria-hidden="true">
+            <span class="wl-ap" style="--x:12%">AP 1</span><span class="wl-ap" style="--x:50%">AP 2</span><span class="wl-ap" style="--x:88%">AP 3</span>
+            <span class="wl-user" data-user>🚶</span>
+          </div>
+          <label class="wl-range"><span>Position in the corridor</span><input type="range" min="0" max="100" value="5" data-pos aria-label="Student position along the corridor" /></label>
+          <output class="wl-out" data-out>Connected to AP 1</output>
+        </div>
+        <p class="wl-callout">Installation cost (<abbr title="capital expenditure: the cost to install">CAPEX</abbr>) and operating cost (<abbr title="operating expenditure: the cost to run and maintain">OPEX</abbr>) <b>can</b> fall, depending on coverage and maintenance needs.</p>
+      </S>
+
+      <S id="milestones">
+        <ol class="wl-timeline" data-timeline>
+          <li><button type="button" aria-expanded="true"><b>1896</b><span>Marconi’s wireless telegraph patent</span></button><p>Spark-gap transmitter sends Morse code.</p></li>
+          <li><button type="button" aria-expanded="false"><b>1901</b><span>Transatlantic radio signal</span></button><p hidden>Cornwall to Newfoundland, about 3,500 km.</p></li>
+          <li><button type="button" aria-expanded="false"><b>1960s</b><span>Communications satellites</span></button><p hidden>Telstar (1962) relays live <abbr title="television">TV</abbr> across the Atlantic.</p></li>
+          <li><button type="button" aria-expanded="false"><b>Later</b><span>Cellular, WLANs, ad hoc and sensors</span></button><p hidden>1G in 1979 to 5G in 2019; <abbr title="Institute of Electrical and Electronics Engineers">IEEE</abbr> 802.11 Wi-Fi from 1997.</p></li>
+        </ol>
+        <div class="wl-lab" data-order>
+          <p class="wl-lab-k mono">MINI-GAME · PUT THEM IN ORDER</p>
+          <p>Tap the events from oldest to newest.</p>
+          <div class="wl-order" data-order-items>
+            <button type="button" data-rank="3">5G networks launch</button>
+            <button type="button" data-rank="1">Telstar relays live TV</button>
+            <button type="button" data-rank="0">Transatlantic radio signal</button>
+            <button type="button" data-rank="2">IEEE 802.11 Wi-Fi</button>
+          </div>
+          <output class="wl-out" data-out>Pick the oldest event first.</output>
+          <button type="button" class="wl-mini" data-order-reset>Shuffle and retry</button>
+        </div>
+        <p class="wl-note">TV: television · WLAN: wireless local area network · IEEE: Institute of Electrical and Electronics Engineers · 1G–5G: first to fifth generation of cellular.</p>
+      </S>
+
+      <S id="broadband">
+        <div class="wl-two">
+          <div class="wl-card"><h3>Richer information</h3><p>Higher data rates support images, audio and video.</p><ul><li><b>Shannon limit:</b> C = B·log₂(1 + SNR)</li><li>Wider bandwidth B and higher SNR raise the maximum data rate</li></ul></div>
+          <div class="wl-card"><h3>Faster deployment</h3><p>Less endpoint cabling can make access easier to install.</p><ul><li>Fixed wireless access delivers home broadband over 4G/5G</li><li>Microwave point-to-point links replace trenching for backhaul</li></ul></div>
+        </div>
+        <p class="wl-callout">Coverage, power and backhaul are still necessary.</p>
+        <div class="wl-lab" data-shannon>
+          <p class="wl-lab-k mono">TRY IT · SHANNON CAPACITY</p>
+          <p class="wl-formula">C = B · log₂(1 + SNR)</p>
+          <label class="wl-range"><span>Bandwidth B: <b data-b-out>20 MHz</b></span><input type="range" min="1" max="160" value="20" data-b aria-label="Bandwidth in MHz" /></label>
+          <label class="wl-range"><span>SNR: <b data-snr-out>30 dB</b></span><input type="range" min="0" max="50" value="30" data-s aria-label="SNR in dB" /></label>
+          <output class="wl-out wl-out-big" data-out>—</output>
+          <div class="wl-bar"><i data-bar></i></div>
+          <button type="button" class="wl-mini" data-example>Load the slide example</button>
+          <p class="wl-note"><b>Slide example:</b> B = 20 MHz and SNR = 30 dB (× 1000) give C ≈ 20 MHz × 10 ≈ 200 Mbps, because log₂(1001) ≈ 10. The exact value is 199.3 Mbps.</p>
+        </div>
+      </S>
+
+      <!-- ============================================================ CHAPTER 2 -->
+      <S id="bands">
+        <p class="wl-prose">Frequency increases across these radio bands. Move the slider to tune across the spectrum.</p>
+        <div class="wl-lab" data-bands>
+          <div class="wl-bands" role="list">
+            {BANDS.map((b) => (
+              <button type="button" class="wl-band" role="listitem" data-band={b.id} data-from={b.from} data-to={b.to}>
+                <b>{b.id}</b><small>{b.name}</small>
+              </button>
+            ))}
+          </div>
+          <label class="wl-range"><span>Frequency: <b data-f-out>2.4 GHz</b></span><input type="range" min="0" max="1000" value="0" data-f aria-label="Frequency, from 3 MHz to 300 GHz" /></label>
+          <div class="wl-band-info" data-info aria-live="polite"></div>
+        </div>
+        <div class="table-wrap wl-table"><table>
+          <thead><tr><th>Band</th><th>Range</th><th>Example uses</th><th>Wavelength λ</th><th>Behaviour</th></tr></thead>
+          <tbody>
+            <tr><td><b>HF</b> High Frequency</td><td>3–30 MHz</td><td>Shortwave</td><td>100–10 m</td><td>Ionospheric skywave gives global reach</td></tr>
+            <tr><td><b>VHF</b> Very High Frequency</td><td>30–300 MHz</td><td>FM radio, television</td><td>10–1 m</td><td>Line of sight with some diffraction</td></tr>
+            <tr><td><b>UHF</b> Ultra High Frequency</td><td>300 MHz–3 GHz</td><td>Cellular, some sensor links</td><td>1 m–10 cm</td><td>Good building penetration</td></tr>
+            <tr><td><b>SHF</b> Super High Frequency</td><td>3–30 GHz</td><td>Wi-Fi, microwave links</td><td>10–1 cm</td><td>High capacity; walls attenuate</td></tr>
+            <tr><td><b>EHF</b> Extremely High Frequency</td><td>30–300 GHz</td><td>Millimetre-wave links</td><td>10–1 mm</td><td>Wide bandwidth; rain and oxygen absorb</td></tr>
+          </tbody>
+        </table></div>
+        <p class="wl-callout">Infrared and optical links use still higher frequencies.</p>
+        <p class="wl-note">Examples may span several bands. This is not a frequency allocation chart. MHz: megahertz (10⁶ Hz) · GHz: gigahertz (10⁹ Hz) · FM: frequency modulation.</p>
+      </S>
+
+      <S id="evolution">
+        <div class="wl-lab" data-evolution>
+          <div class="wl-seg" role="group" aria-label="Scale"><button type="button" aria-pressed="true" data-scale="log">Log scale</button><button type="button" aria-pressed="false" data-scale="lin">Linear scale</button></div>
+          <ul class="wl-rates">
+            <li data-rate="50e6"><span class="wl-rate-name"><b>4G</b> Cellular</span><span class="wl-rate-bar"><i></i></span><span class="wl-rate-v">50 Mbps average*</span><small>LTE · OFDMA · up to 20 MHz per carrier</small></li>
+            <li data-rate="400e6"><span class="wl-rate-name"><b>5G</b> Cellular</span><span class="wl-rate-bar"><i></i></span><span class="wl-rate-v">400 Mbps average*</span><small>NR · sub-6 GHz and mmWave · massive MIMO</small></li>
+            <li data-rate="300e6" class="wifi"><span class="wl-rate-name"><b>Wi-Fi 4</b></span><span class="wl-rate-bar"><i></i></span><span class="wl-rate-v">300 Mbps*</span><small>802.11n · 2.4/5 GHz · MIMO</small></li>
+            <li data-rate="6.9e9" class="wifi"><span class="wl-rate-name"><b>Wi-Fi 5</b></span><span class="wl-rate-bar"><i></i></span><span class="wl-rate-v">6.9 Gbps*</span><small>802.11ac · 5 GHz · 256-QAM</small></li>
+            <li data-rate="9.6e9" class="wifi"><span class="wl-rate-name"><b>Wi-Fi 6</b></span><span class="wl-rate-bar"><i></i></span><span class="wl-rate-v">9.6 Gbps*</span><small>802.11ax · OFDMA · 1024-QAM</small></li>
+          </ul>
+          <p class="wl-note">Switch scales: on a linear scale 4G almost disappears next to Wi-Fi 6’s theoretical peak, which is why the slide warns that the numbers are not like-for-like.</p>
+        </div>
+        <p class="wl-callout">*Historical lecture examples mix average, configuration-dependent and theoretical rates. Actual throughput varies.</p>
+        <p class="wl-note">LTE: Long Term Evolution · OFDMA: Orthogonal Frequency-Division Multiple Access · NR: New Radio · MIMO: multiple-input multiple-output · QAM: quadrature amplitude modulation · mmWave: millimetre wave · Mbps / Gbps: megabits / gigabits per second.</p>
+      </S>
+
+      <S id="performance">
+        <div class="wl-three">
+          <div class="wl-card"><span class="wl-ico" aria-hidden="true">🔋</span><h3>Hardware</h3><p>Better batteries, circuits and processors.</p><ul><li>CMOS scaling puts a complete radio on one chip (RFIC)</li></ul></div>
+          <div class="wl-card"><span class="wl-ico" aria-hidden="true">📶</span><h3>Radio link</h3><p>Antennas, modulation, coding, DSP and bandwidth.</p><ul><li>MIMO, higher-order QAM and LDPC/polar codes approach the Shannon limit</li></ul></div>
+          <div class="wl-card"><span class="wl-ico" aria-hidden="true">🗼</span><h3>Network</h3><p>More efficient sharing of radio resources.</p><ul><li>Smaller cells, frequency reuse, scheduling and OFDMA</li></ul></div>
+        </div>
+        <div class="wl-lab" data-sort data-choices="Hardware|Radio link|Network">
+          <p class="wl-lab-k mono">MINI-CHECK · WHICH LAYER IMPROVES?</p>
+          <ul class="wl-sort">
+            <li data-answer="Hardware"><span>A complete radio on one chip (RFIC)</span></li>
+            <li data-answer="Radio link"><span>LDPC and polar error-correcting codes</span></li>
+            <li data-answer="Network"><span>Smaller cells with frequency reuse</span></li>
+            <li data-answer="Radio link"><span>MIMO antennas and 1024-QAM</span></li>
+            <li data-answer="Hardware"><span>Better batteries and processors</span></li>
+            <li data-answer="Network"><span>Scheduling users with OFDMA</span></li>
+          </ul>
+        </div>
+        <p class="wl-note">CMOS: complementary metal-oxide-semiconductor · RFIC: radio-frequency integrated circuit · DSP: digital signal processing · LDPC: low-density parity-check.</p>
+      </S>
+
+      <S id="access">
+        <div class="wl-pills"><span>Anytime</span><span>Anywhere</span><span>Any form</span></div>
+        <div class="wl-two">
+          <div class="wl-card"><h3>Ubiquitous computing</h3><p>Makes information available throughout everyday environments.</p><ul><li>Smart homes, campuses and cities embed sensors and connectivity</li><li>Users expect seamless handover between Wi-Fi and cellular</li></ul></div>
+          <div class="wl-card"><h3>A diversity of standards</h3><p>Different applications and coverage needs create a diversity of standards and products.</p><ul><li><b>PAN:</b> Bluetooth, about 10 m</li><li><b>LAN:</b> Wi-Fi, tens of metres</li><li><b>WAN:</b> cellular, several kilometres</li><li>Each trades data rate against range and power consumption</li></ul></div>
+        </div>
+        <div class="wl-lab" data-sort data-choices="PAN|LAN|WAN">
+          <p class="wl-lab-k mono">MINI-CHECK · PICK THE NETWORK SIZE</p>
+          <div class="wl-rings" aria-hidden="true"><span class="r3">WAN · km</span><span class="r2">LAN · tens of m</span><span class="r1">PAN · ~10 m</span></div>
+          <ul class="wl-sort">
+            <li data-answer="PAN"><span>Wireless earbuds playing music from your phone</span></li>
+            <li data-answer="LAN"><span>Your laptop in a lecture hall on campus Wi-Fi</span></li>
+            <li data-answer="WAN"><span>A video call on a phone in a car on the highway</span></li>
+            <li data-answer="PAN"><span>A smartwatch syncing steps over Bluetooth</span></li>
+          </ul>
+        </div>
+        <p class="wl-note">PAN: personal area network · LAN: local area network · WAN: wide area network.</p>
+      </S>
+
+      <S id="challenges">
+        <div class="wl-two">
+          <div class="wl-card"><h3>Variable channel</h3><p>Path loss, multipath fading and Doppler effects change reception.</p><ul><li>Free-space loss grows with distance² and frequency²</li><li>Doppler shift f_d = v·f / c: 100 km/h at 2 GHz gives about 185 Hz</li></ul></div>
+          <div class="wl-card"><h3>Shared radio medium</h3><p>Interference, limited range and security threats need control.</p><ul><li>Users share one channel, so a <abbr title="medium access control">MAC</abbr> protocol must schedule access</li><li>Anyone in range can receive the signal; encryption (<abbr title="Wi-Fi Protected Access 3">WPA3</abbr>) protects it</li></ul></div>
+        </div>
+        <div class="wl-lab" data-doppler>
+          <p class="wl-lab-k mono">TRY IT · DOPPLER SHIFT</p>
+          <p class="wl-formula">f_d = v · f / c</p>
+          <div class="wl-controls">
+            <label><span>Speed v (km/h)</span><input type="number" step="any" value="100" name="v" /></label>
+            <label><span>Carrier f (GHz)</span><input type="number" step="any" value="2" name="f" /></label>
+          </div>
+          <output class="wl-out" data-out>—</output>
+        </div>
+        <div class="wl-lab" data-fspl>
+          <p class="wl-lab-k mono">TRY IT · HOW LOSS SCALES</p>
+          <p>Free-space loss ∝ d² · f². Change both and watch the loss grow.</p>
+          <div class="wl-controls">
+            <label><span>Distance ×</span><select name="d"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>10</option></select></label>
+            <label><span>Frequency ×</span><select name="f"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>10</option></select></label>
+          </div>
+          <output class="wl-out" data-out>—</output>
+        </div>
+        <p class="wl-callout">Data rates vary with conditions and may be lower than a comparable wired connection.</p>
+        <p class="wl-note">MAC: medium access control · WPA3: Wi-Fi Protected Access 3.</p>
+      </S>
+
+      <S id="around">
+        <div class="wl-two">
+          <div class="wl-card"><h3>On the move</h3><p>Cellular, satellite and broadcast services support mobile users.</p></div>
+          <div class="wl-card"><h3>Nearby devices</h3><p>Wi-Fi and Bluetooth connect personal and local devices.</p></div>
+        </div>
+        <p class="wl-prose">Guess first, then flip each card to check the numbers.</p>
+        <div class="wl-flips">
+          <button type="button" class="wl-flip" aria-pressed="false"><span class="front"><b>Macro cells vs small cells</b><small>How far does each reach?</small></span><span class="back">Macro cells cover <b>kilometres</b>; small cells add <b>capacity</b> in busy areas.</span></button>
+          <button type="button" class="wl-flip" aria-pressed="false"><span class="front"><b>GNSS satellites (GPS, Galileo)</b><small>How high do they orbit?</small></span><span class="back">About <b>20,000 km</b>, for positioning.</span></button>
+          <button type="button" class="wl-flip" aria-pressed="false"><span class="front"><b>Bluetooth Low Energy</b><small>Band, range, power?</small></span><span class="back"><b>2.4 GHz</b>, tens of metres, very low power.</span></button>
+          <button type="button" class="wl-flip" aria-pressed="false"><span class="front"><b>NFC</b><small>Frequency and distance?</small></span><span class="back"><b>13.56 MHz</b> over a few centimetres, used for payments.</span></button>
+        </div>
+        <p class="wl-note">GNSS: Global Navigation Satellite System · GPS: Global Positioning System · NFC: near-field communication.</p>
+      </S>
+
+      <!-- ============================================================ CHAPTER 3 -->
+      <S id="classification">
+        <div class="wl-lab" data-topology>
+          <div class="wl-seg" role="group" aria-label="Network type">
+            <button type="button" aria-pressed="true" data-topo="infra">Infrastructure-based</button>
+            <button type="button" aria-pressed="false" data-topo="direct">Direct</button>
+            <button type="button" aria-pressed="false" data-topo="multi">Multihop</button>
+          </div>
+          <svg class="wl-topo" viewBox="0 0 520 220" role="img" aria-label="Network diagram" data-topo-svg></svg>
+          <div class="wl-topo-text" data-topo-text aria-live="polite"></div>
+        </div>
+        <div class="wl-two">
+          <div class="wl-card"><h3>Infrastructure-based</h3><p>Wi-Fi or a cellular base station provides the access infrastructure.</p><ul><li>The network controls access, addressing and handover</li><li>All traffic passes through the access point, even between nearby devices</li></ul></div>
+          <div class="wl-card"><h3>Infrastructure-less</h3><ul><li><b>Direct:</b> Wi-Fi Direct or Bluetooth. Devices link in one hop with no access point.</li><li><b>Multihop:</b> <abbr title="mobile ad hoc network">MANET</abbr>, <abbr title="vehicular ad hoc network">VANET</abbr> or <abbr title="wireless sensor network">WSN</abbr>. Nodes self-organise and relay for each other; no single point of failure.</li></ul></div>
+        </div>
+        <div class="wl-lab" data-sort data-choices="Infrastructure|Direct|Multihop">
+          <p class="wl-lab-k mono">MINI-CHECK · CLASSIFY THE SCENARIO</p>
+          <ul class="wl-sort">
+            <li data-answer="Infrastructure"><span>A phone streams video through a cellular base station</span></li>
+            <li data-answer="Direct"><span>Two phones share a photo with Wi-Fi Direct</span></li>
+            <li data-answer="Multihop"><span>Cars pass a hazard warning car to car (VANET)</span></li>
+            <li data-answer="Multihop"><span>Field sensors relay readings to a gateway (WSN)</span></li>
+            <li data-answer="Infrastructure"><span>Two laptops in one room both talk through the Wi-Fi AP</span></li>
+          </ul>
+        </div>
+        <p class="wl-note">MANET: mobile ad hoc network · VANET: vehicular ad hoc network · WSN: wireless sensor network.</p>
+      </S>
+
+      <S id="hops">
+        <div class="wl-two">
+          <div class="wl-card"><h3>Single hop</h3><p>Device A → Device B. The destination is within direct radio reach.</p><ul><li>Low latency and simple routing</li><li>Range set by transmit power and receiver sensitivity</li></ul></div>
+          <div class="wl-card"><h3>Multiple hops</h3><p>A → Relay → B. An intermediate device forwards the data.</p><ul><li>Extends coverage around obstacles</li><li>Each hop adds delay and routing overhead</li></ul></div>
+        </div>
+        <p class="wl-example"><b>Example:</b> a sensor forwards a measurement through another sensor.</p>
+        <div class="wl-lab" data-hops>
+          <p class="wl-lab-k mono">TRY IT · ONE LONG HOP OR SEVERAL SHORT ONES?</p>
+          <p>Path loss grows as dⁿ (n ≈ 2–4), so two hops of d/2 can need less total transmit power than one hop of d.</p>
+          <div class="wl-hop-track" data-track aria-hidden="true"></div>
+          <label class="wl-range"><span>Path-loss exponent n: <b data-n-out>2</b></span><input type="range" min="2" max="4" step="0.1" value="2" data-n aria-label="Path-loss exponent n" /></label>
+          <label class="wl-range"><span>Number of hops: <b data-k-out>2</b></span><input type="range" min="1" max="5" value="2" data-k aria-label="Number of hops" /></label>
+          <div class="wl-compare">
+            <div><small>Total transmit power vs one hop</small><b data-power>—</b><span class="wl-bar"><i data-power-bar></i></span></div>
+            <div><small>Delay vs one hop</small><b data-delay>—</b><span class="wl-bar warn"><i data-delay-bar></i></span></div>
+          </div>
+          <p class="wl-note">Each hop of length d/k needs power ∝ (d/k)ⁿ, so k hops need k·(1/k)ⁿ of the single-hop power. The trade-off: every hop adds delay and routing overhead.</p>
+        </div>
+      </S>
+
+      <!-- ============================================================ CHAPTER 4 -->
+      <S id="medium">
+        <div class="wl-question"><p>What actually travels between the devices?</p><button type="button" class="wl-mini" data-reveal-next>Reveal the answer</button><p class="wl-answer" hidden><b>Electromagnetic energy carries the information.</b></p></div>
+        <ul class="wl-list">
+          <li>An antenna turns current into a radiating wave</li>
+          <li>No medium is needed: radio crosses air, vacuum and many materials</li>
+          <li>Energy spreads over a sphere, so power density falls as 1/r² in free space</li>
+        </ul>
+        <div class="wl-lab" data-inverse>
+          <p class="wl-lab-k mono">TRY IT · THE INVERSE-SQUARE LAW</p>
+          <canvas class="wl-canvas" data-canvas height="200" aria-label="Energy spreading from an antenna over growing spheres"></canvas>
+          <label class="wl-range"><span>Distance r: <b data-r-out>1 m</b></span><input type="range" min="1" max="10" step="0.5" value="1" data-r aria-label="Distance r in metres" /></label>
+          <output class="wl-out" data-out>—</output>
+        </div>
+      </S>
+
+      <S id="em-waves">
+        <div class="wl-lab" data-em>
+          <canvas class="wl-canvas" data-canvas height="230" aria-label="Animated electric field (vertical) and magnetic field (horizontal) travelling in the same direction"></canvas>
+          <div class="wl-legend"><span class="e">Electric field E</span><span class="b">Magnetic field B</span><span>→ direction of travel</span></div>
+          <button type="button" class="wl-mini" data-pause>Pause</button>
+        </div>
+        <div class="wl-two">
+          <div class="wl-card"><h3>Electric and magnetic fields</h3><p>The fields vary in phase and are perpendicular to each other.</p><ul><li>In free space, E = c × B (E in V/m, B in tesla)</li><li>The direction of E sets the <b>polarization</b>, so antenna orientation matters</li></ul></div>
+          <div class="wl-card"><h3>Propagation</h3><p>Both fields are perpendicular to the direction of travel.</p><ul><li>A <b>transverse</b> wave, so it needs no medium</li><li>Speed in a vacuum: c ≈ 3 × 10⁸ m/s</li></ul></div>
+        </div>
+        <div class="wl-lab" data-polar>
+          <p class="wl-lab-k mono">TRY IT · WHY ANTENNA ORIENTATION MATTERS</p>
+          <p>Rotate the receiving antenna away from the wave’s vertical E field. A tilted antenna picks up only part of the field (received power ∝ cos²θ, a standard result that illustrates the slide’s point).</p>
+          <div class="wl-antenna" aria-hidden="true"><span data-ant></span></div>
+          <label class="wl-range"><span>Antenna tilt θ: <b data-t-out>0°</b></span><input type="range" min="0" max="90" value="0" data-t aria-label="Antenna tilt angle in degrees" /></label>
+          <output class="wl-out" data-out>—</output>
+        </div>
+        <p class="wl-note">Normalized field projections along the same propagation direction.</p>
+      </S>
+
+      <S id="amplitude">
+        <div class="wl-lab" data-amp>
+          <canvas class="wl-canvas" data-canvas height="200" aria-label="A wave showing amplitude A and wavelength lambda"></canvas>
+          <label class="wl-range"><span>Amplitude A: <b data-a-out>1.0</b></span><input type="range" min="0.2" max="1.2" step="0.1" value="1" data-a aria-label="Amplitude" /></label>
+          <label class="wl-range"><span>Wavelength λ: <b data-l-out>1.0 m</b></span><input type="range" min="0.25" max="2" step="0.05" value="1" data-l aria-label="Wavelength in metres" /></label>
+          <output class="wl-out" data-out>—</output>
+        </div>
+        <div class="wl-two">
+          <div class="wl-card"><h3>Amplitude A</h3><p>Maximum displacement from the zero level.</p><ul><li>Signal power is proportional to A²</li><li>Amplitude falls with distance from the transmitter</li></ul></div>
+          <div class="wl-card"><h3>Wavelength λ</h3><p>Distance between successive points in the same phase.</p><ul><li>Measured in metres</li><li>Antenna size scales with λ: a half-wave dipole is λ/2 long</li></ul></div>
+        </div>
+        <p class="wl-note">Spatial wave sketch: the horizontal direction represents distance.</p>
+      </S>
+
+      <S id="frequency">
+        <div class="wl-two">
+          <div class="wl-card"><h3>Frequency f</h3><p>Cycles per second, in hertz (Hz).</p><ul><li>1 kHz = 10³ Hz, 1 MHz = 10⁶ Hz, 1 GHz = 10⁹ Hz</li></ul></div>
+          <div class="wl-card"><h3>Period T</h3><p>Time for one cycle, in seconds.</p><ul><li>At 2.4 GHz, T = 1 / (2.4 × 10⁹) ≈ 0.42 ns</li></ul></div>
+        </div>
+        <div class="wl-lab" data-freq>
+          <p class="wl-lab-k mono">TRY IT · ONE SECOND OF SIGNAL</p>
+          <p class="wl-formula">f = 1 / T</p>
+          <canvas class="wl-canvas" data-canvas height="190" aria-label="One second of a sine wave at the chosen frequency"></canvas>
+          <label class="wl-range"><span>Frequency f: <b data-f-out>2 Hz</b></span><input type="range" min="1" max="10" value="2" data-f aria-label="Frequency in hertz" /></label>
+          <div class="wl-presets"><button type="button" class="wl-mini" data-preset="2">2 Hz (slide 18)</button><button type="button" class="wl-mini" data-preset="4">4 Hz (slide 19)</button></div>
+          <output class="wl-out" data-out>—</output>
+          <p class="wl-note">Same one-second interval and same amplitude. Only the frequency changes. Since T = 1/f, <b>doubling the frequency halves the period</b>. Two cycles in 1 second: f = 2 Hz and T = 0.5 s; four cycles: f = 4 Hz and T = 0.25 s.</p>
+        </div>
+        <div class="wl-lab" data-period>
+          <p class="wl-lab-k mono">TRY IT · REAL RADIO FREQUENCIES</p>
+          <div class="wl-controls"><label><span>Frequency</span><input type="number" step="any" value="2.4" name="v" /></label><label><span>Unit</span><select name="u"><option value="1">Hz</option><option value="1e3">kHz</option><option value="1e6">MHz</option><option value="1e9" selected>GHz</option></select></label></div>
+          <output class="wl-out" data-out>—</output>
+        </div>
+      </S>
+
+      <S id="wavelength">
+        <div class="wl-two">
+          <div class="wl-card wl-formula-card"><p class="wl-formula">λ = c / f</p><p>c ≈ 3 × 10⁸ m/s in air</p><p><b>At 2.4 GHz:</b> λ = (3 × 10⁸) / (2.4 × 10⁹) = 0.125 m = <b>12.5 cm</b></p></div>
+          <div class="wl-card wl-formula-card"><p class="wl-formula">λ (m) = 300 / f (MHz)</p><p>A quick shortcut: 2400 MHz → 300 / 2400 = 0.125 m.</p><p><b>Doubling frequency halves wavelength.</b></p></div>
+        </div>
+        <div class="wl-lab" data-lambda>
+          <p class="wl-lab-k mono">TRY IT · WAVELENGTH AND ANTENNA SIZE</p>
+          <canvas class="wl-canvas" data-canvas height="150" aria-label="The wave over the same 25 cm distance"></canvas>
+          <div class="wl-controls"><label><span>Frequency</span><input type="number" step="any" value="2.4" name="v" /></label><label><span>Unit</span><select name="u"><option value="1e6">MHz</option><option value="1e9" selected>GHz</option></select></label></div>
+          <div class="wl-presets"><button type="button" class="wl-mini" data-preset="2.4">2.4 GHz</button><button type="button" class="wl-mini" data-preset="4.8">4.8 GHz</button><button type="button" class="wl-mini" data-preset="5">5 GHz Wi-Fi</button><button type="button" class="wl-mini" data-preset="0.9">900 MHz</button></div>
+          <output class="wl-out" data-out>—</output>
+          <p class="wl-note">Drawn over the same distance, 25 cm: 2.4 GHz gives λ = 12.5 cm (2 waves) and 4.8 GHz gives λ = 6.25 cm (4 waves). <b>5 GHz Wi-Fi:</b> λ = 6 cm, so a quarter-wave (λ/4) antenna is about 1.5 cm long.</p>
+        </div>
+      </S>
+
+      <S id="modulation">
+        <p class="wl-prose"><b>Modulation</b> changes a carrier wave according to the information being sent. The carrier is a high-frequency sinusoid: <span class="wl-inline-f">s(t) = A·cos(2πft + φ)</span>, with amplitude A, frequency f and phase φ.</p>
+        <div class="wl-lab" data-mod>
+          <p class="wl-lab-k mono">TRY IT · SEND YOUR OWN BITS</p>
+          <div class="wl-bits" data-bits role="group" aria-label="Information bits (tap to flip)">
+            <button type="button" aria-pressed="false">0</button><button type="button" aria-pressed="true">1</button><button type="button" aria-pressed="false">0</button><button type="button" aria-pressed="true">1</button>
+            <button type="button" aria-pressed="true">1</button><button type="button" aria-pressed="false">0</button>
+          </div>
+          <div class="wl-seg" role="group" aria-label="Modulation scheme"><button type="button" aria-pressed="true" data-scheme="ask">ASK · vary A</button><button type="button" aria-pressed="false" data-scheme="fsk">FSK · vary f</button><button type="button" aria-pressed="false" data-scheme="psk">PSK · vary φ</button></div>
+          <canvas class="wl-canvas" data-canvas height="190" aria-label="The modulated carrier for these bits"></canvas>
+          <output class="wl-out" data-out>—</output>
+        </div>
+        <p class="wl-prose">A signal can vary amplitude, frequency or phase to represent information. <b>ASK</b> varies A, <b>FSK</b> varies f, <b>PSK</b> varies φ; <b>QAM</b> changes A and φ together to send several bits per symbol.</p>
+        <p class="wl-note">The slide’s picture (bits 0 1 0 1 with an amplitude change) is illustrative. ASK: amplitude-shift keying · FSK: frequency-shift keying · PSK: phase-shift keying.</p>
+      </S>
+
+      <S id="spectrum">
+        <div class="wl-lab" data-spectrum>
+          <div class="wl-spec" role="group" aria-label="The electromagnetic spectrum, increasing frequency to the right">
+            <button type="button" data-region="0">Radio</button><button type="button" data-region="1">Microwave</button><button type="button" data-region="2">Infrared</button><button type="button" data-region="3" class="vis">Visible</button><button type="button" data-region="4">Ultraviolet</button><button type="button" data-region="5">X-rays</button><button type="button" data-region="6">Gamma</button>
+          </div>
+          <div class="wl-spec-axis mono"><span>← Longer wavelength</span><span>Increasing frequency · shorter wavelength →</span></div>
+          <div class="wl-spec-info" data-info aria-live="polite">Tap a region of the spectrum.</div>
+        </div>
+        <ul class="wl-list">
+          <li>Visible light occupies only a small part of the spectrum.</li>
+          <li>Radio and microwaves (below about 300 GHz) carry most wireless networks; infrared and visible light serve remote controls and <abbr title="light fidelity (data over visible light)">Li-Fi</abbr>.</li>
+          <li>All electromagnetic waves travel at c in a vacuum. 1 Hz = 1 cycle/s.</li>
+        </ul>
+        <p class="wl-note">Li-Fi: light fidelity (data over visible light).</p>
+      </S>
+
+      <S id="examples">
+        <p class="wl-prose">Tap a system to see its wavelength worked out with λ = c / f.</p>
+        <div class="wl-examples" data-examples>
+          <button type="button" data-hz="1e6"><b>AM radio</b><span>About 1 MHz</span><small>λ ≈ 300 m</small></button>
+          <button type="button" data-hz="100e6"><b>FM radio</b><span>About 100 MHz</span><small>λ ≈ 3 m</small></button>
+          <button type="button" data-hz="0.5e9" data-hz2="3.8e9"><b>TV and cellular</b><span>Multiple bands</span><small>About 0.5–3.8 GHz</small></button>
+          <button type="button" data-hz="2.4e9" data-hz2="5e9"><b>Wi-Fi</b><span>2.4 and 5 GHz</span><small>Wi-Fi 6E adds 6 GHz</small></button>
+          <button type="button" data-hz="4e9" data-hz2="40e9"><b>Satellite</b><span>Microwave bands</span><small>C, Ku, Ka: 4–40 GHz</small></button>
+        </div>
+        <output class="wl-out" data-examples-out>—</output>
+        <p class="wl-note">Illustrative examples. Exact bands depend on the service, system and region. AM: amplitude modulation.</p>
+      </S>
+
+      <!-- ============================================================ CHAPTER 5 -->
+      <S id="check">
+        <p class="wl-prose">The lecture’s own quick check. Answer first, then reveal the slide’s answer.</p>
+        <div class="wl-quiz" data-quiz>
+          {quickCheck.map((q) => (
+            <article class="wl-q" data-q>
+              <p class="wl-q-k mono">{q.n} · {q.topic}</p>
+              <h3>{q.q}</h3>
+              {'choices' in q && q.choices && (
+                <div class="wl-q-choices" data-correct={q.correct}>
+                  {q.choices.map((c, i) => <button type="button" data-choice={i}>{c}</button>)}
+                </div>
+              )}
+              {'inputs' in q && q.inputs && (
+                <div class="wl-q-inputs">
+                  {q.inputs.map((inp) => (
+                    <label data-num data-answer={inp.answer} data-tol={'tolerance' in inp ? inp.tolerance : 0.02}>
+                      <span>{inp.label}</span><input type="number" step="any" inputmode="decimal" aria-label={`${inp.label} in ${inp.unit}`} /><b>{inp.unit}</b>
+                    </label>
+                  ))}
+                  <button type="button" class="wl-mini" data-check>Check</button>
+                </div>
+              )}
+              <p class="wl-q-msg" data-msg aria-live="polite"></p>
+              <details class="wl-q-a"><summary>Show the slide’s answer</summary><p><b>Answer:</b> {q.a}</p></details>
+            </article>
+          ))}
+        </div>
+        <output class="wl-out" data-score>Score: 0 / {quickCheck.length}</output>
+      </S>
+
+      <S id="recap">
+        <p class="wl-prose">Say each idea aloud, then flip the card to compare.</p>
+        <div class="wl-flips wl-recap">
+          <button type="button" class="wl-flip" aria-pressed="false"><span class="front"><b>Wireless networks</b><small>What do they enable, and what limits them?</small></span><span class="back">Enable <b>mobility and flexible access</b>, with channel and security challenges. Limits: path loss, fading, Doppler shift and interference.</span></button>
+          <button type="button" class="wl-flip" aria-pressed="false"><span class="front"><b>Network organization</b><small>Three ways to organize, and the trade-off?</small></span><span class="back"><b>Infrastructure-based links, direct links and multihop relaying.</b> Single hop is simpler and faster; multihop extends range at the cost of delay.</span></button>
+          <button type="button" class="wl-flip" aria-pressed="false"><span class="front"><b>Wireless signals</b><small>Describe them with two formulas.</small></span><span class="back">Electromagnetic waves described by <b>amplitude, frequency and wavelength</b>. λ = c / f and f = 1 / T; 2.4 GHz gives λ = 12.5 cm.</span></button>
+          <button type="button" class="wl-flip" aria-pressed="false"><span class="front"><b>Information transfer</b><small>How do waves carry bits, and how fast?</small></span><span class="back"><b>Modulation</b> changes the carrier to represent information. ASK, FSK, PSK and QAM; capacity C = B·log₂(1 + SNR).</span></button>
+        </div>
+        <div class="wl-finish">
+          <p class="mono">LECTURE 1 COMPLETE?</p>
+          <p data-finish-msg>Tick “I’ve got this” on every section to complete the lecture.</p>
+          <div class="wl-actions"><a class="btn btn-primary" href="/wireless">Back to the module</a><a class="btn btn-ghost" href={PDF} download="WN_Lecture_1.pdf">Download the PDF</a></div>
+        </div>
+      </S>
+
+      <section class="wl-ref" id="formulas" aria-labelledby="formulas-h">
+        <p class="wl-eyebrow mono">FORMULA SHEET</p>
+        <h2 id="formulas-h">Every formula in Lecture 1</h2>
+        <div class="table-wrap wl-table"><table>
+          <thead><tr><th>Formula</th><th>Use</th><th>Slide</th></tr></thead>
+          <tbody>{formulas.map(([f, use, p]) => <tr><td><code>{f}</code></td><td>{use}</td><td><button type="button" class="wl-mini" data-open-slide={p}>Slide {p}</button> <a href={pdfAt(PDF, p)} target="_blank" rel="noopener">PDF ↗</a></td></tr>)}</tbody>
+        </table></div>
+      </section>
+
+      <section class="wl-ref" id="glossary" aria-labelledby="glossary-h">
+        <p class="wl-eyebrow mono">GLOSSARY</p>
+        <h2 id="glossary-h">Every abbreviation on the slides</h2>
+        <input class="wl-search" type="search" placeholder="Filter, e.g. MIMO or modulation…" aria-label="Filter the glossary" data-gloss-q />
+        <dl class="wl-gloss" data-gloss>
+          {glossary.map(([t, m, p]) => <div data-text={`${t} ${m}`.toLowerCase()}><dt>{t}</dt><dd>{m}</dd><dd><button type="button" class="wl-mini" data-open-slide={p}>Slide {p}</button></dd></div>)}
+        </dl>
+      </section>
+    </div>
+
+    <aside class="wl-aside" aria-label="Lecture contents">
+      <nav class="wl-nav">
+        {chapters.map((c) => (
+          <div><p class="mono">{c.title}</p>{c.sections.map((s) => <a href={`#${s.id}`} data-nav={s.id}><i aria-hidden="true"></i>{s.title}</a>)}</div>
+        ))}
+        <div><p class="mono">Reference</p><a href="#formulas"><i aria-hidden="true"></i>Formula sheet</a><a href="#glossary"><i aria-hidden="true"></i>Glossary</a></div>
+      </nav>
+    </aside>
+  </div>
+
+  <dialog class="wl-viewer" data-viewer aria-labelledby="viewer-title" data-map={JSON.stringify(pageToSection)}>
+    <div class="wl-viewer-head">
+      <p id="viewer-title"><b data-v-num>Slide 1</b> of {PDF_PAGES} <span data-v-sec></span></p>
+      <button type="button" class="wl-x" data-v-close aria-label="Close the slide viewer">✕</button>
+    </div>
+    <div class="wl-viewer-img"><img data-v-img alt="" width="1707" height="960" /></div>
+    <div class="wl-viewer-foot">
+      <button type="button" class="btn btn-ghost btn-sm" data-v-prev aria-label="Previous slide">← Prev</button>
+      <a class="btn btn-ghost btn-sm" data-v-go href="#">Go to this section</a>
+      <a class="btn btn-primary btn-sm" data-v-pdf href={PDF} target="_blank" rel="noopener">Open PDF at this page ↗</a>
+      <a class="btn btn-ghost btn-sm" href={PDF} download="WN_Lecture_1.pdf">Download</a>
+      <button type="button" class="btn btn-ghost btn-sm" data-v-next aria-label="Next slide">Next →</button>
+    </div>
+  </dialog>
+
+  <div class="wl-presenter" data-presenter hidden>
+    <button type="button" class="btn btn-ghost btn-sm" data-p-prev>← Back</button>
+    <span class="mono" data-p-count>1 / {sections.length}</span>
+    <button type="button" class="btn btn-primary btn-sm" data-p-next>Next →</button>
+    <button type="button" class="btn btn-ghost btn-sm" data-p-exit>Exit (Esc)</button>
+  </div>
+</Base>
+
+<script>
+  import { initLecture } from '@/scripts/wireless-lecture';
+  import { onPageLoad } from '@/scripts/page-load';
+  onPageLoad(initLecture);
+</script>
+
