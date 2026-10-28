@@ -15,6 +15,7 @@ import QuickCheck from './QuickCheck.astro';
 import PromptCard from './PromptCard.astro';
 import WebPreview from './WebPreview.astro';
 import WebSandbox from './WebSandbox.astro';
+import CppBlock from './CppBlock.astro';
 import type { RenderedBlock } from '@/lib/platform/render';
 
 interface Props { block: RenderedBlock; lab: string; label: string }
@@ -41,3 +42,4 @@ const { block: b, lab, label } = Astro.props;
 {b.kind === 'browser' && <WebPreview title={b.title} url={b.url} html={b.html} height={b.height} caption={b.caption} />}
 {b.kind === 'websandbox' && <WebSandbox id={b.id} title={b.title} goalHtml={b.htmlGoal} hint={b.hint} starter={b.starter} />}
 {b.kind === 'clickpath' && <ClickPath steps={b.steps} label={b.title || 'Click'} />}
+{(b.kind === 'cpp' || b.kind === 'cpppredict' || b.kind === 'parsons' || b.kind === 'cppvisual') && <CppBlock block={b} />}

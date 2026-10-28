@@ -1,0 +1,55 @@
+---
+/**
+ * The C++ blocks of a builder lab (kit "C++ programming"): exercise, predict-then-run, order-the-lines and
+ * visuals. The server renders a readable version (the code, the question); src/lab/cpp/ui/mount.ts turns it into
+ * the live widget. Graded blocks carry data-exercise (they need a lab session, like every exercise); visuals are
+ * data-free (always usable).
+ */
+import type { RenderedBlock } from '@/lib/platform/render';
+import { highlightLines } from '@/lab/cpp/highlight';
+import '@/styles/cpp-lab.css';
+
+type CppKinds = Extract<RenderedBlock, { kind: 'cpp' | 'cpppredict' | 'parsons' | 'cppvisual' }>;
+interface Props { block: CppKinds }
+const { block: b } = Astro.props;
+
+const graded = b.kind === 'cpp' ? b.checks.length > 0 : b.kind !== 'cppvisual';
+const cfg = b.kind === 'cpp'
+  ? { kind: b.kind, id: b.id, starter: b.starter, input: b.input, checks: b.checks, hints: b.hints, paste: b.paste }
+  : b.kind === 'cpppredict'
+    ? { kind: b.kind, id: b.id, code: b.code, input: b.input, options: b.options, trace: b.trace }
+    : b.kind === 'parsons'
+      ? { kind: b.kind, id: b.id, code: b.code, input: b.input }
+      : { kind: b.kind, id: b.id, visual: b.visual, text: b.text };
+// </script> inside the JSON would end the tag early
+const json = JSON.stringify(cfg).replace(/</g, '\\u003c');
+const staticCode = b.kind === 'cpp' ? b.starter : b.kind === 'cpppredict' ? b.code : b.kind === 'parsons' ? '' : '';
+const lines = staticCode ? highlightLines(staticCode.replace(/\s+$/, '')) : [];
+const kindLabel = b.kind === 'cpp' ? (graded ? 'C++ exercise' : 'C++ playground') : b.kind === 'cpppredict' ? 'Predict, then run' : b.kind === 'parsons' ? 'Order the lines' : 'Visual';
+const gate = b.kind === 'cppvisual' ? { 'data-free': '' } : graded ? { 'data-exercise': '' } : { 'data-demo': '' };
+---
+<section class={`cx-block cx-k-${b.kind}`} data-cpp data-cpp-id={b.id} data-graded={graded ? '' : undefined} {...gate}>
+  <header class="cx-head">
+    <span class="cx-kind mono"><span class="cx-kind-dot" aria-hidden="true"></span>{kindLabel}</span>
+    {b.kind === 'cpp' && <h4 class="cx-title">{b.title}</h4>}
+    {b.kind === 'parsons' && <h4 class="cx-title">{b.title}</h4>}
+  </header>
+  {(b.kind === 'cpp' || b.kind === 'parsons') && b.htmlGoal && <div class="cx-goal" set:html={b.htmlGoal} />}
+  {b.kind === 'cpppredict' && <div class="cx-q" data-cpp-q set:html={b.htmlQuestion} />}
+  {b.kind === 'cpppredict' && <div hidden data-cpp-x set:html={b.htmlExplain} />}
+  <div class="cx-host" data-cpp-host>
+    {lines.length > 0 && (
+      <pre class="cx-static mono"><code>{lines.map((l, i) => <span class="cx-sl" data-n={String(i + 1)} set:html={l || ' '} />)}</code></pre>
+    )}
+    {b.kind === 'cpppredict' && <ol class="cx-fallback">{b.options.map((o) => <li>{o.text}</li>)}</ol>}
+    <p class="cx-loading mono">{b.kind === 'cppvisual' ? 'Loading the animation…' : 'Loading the C++ machine…'}</p>
+  </div>
+  {b.kind === 'cppvisual' && b.html && <div class="cx-caption" set:html={b.html} />}
+  <script type="application/json" set:html={json} />
+</section>
+
+<script>
+  import { mountCpp } from '@/lab/cpp/ui/mount';
+  import { onPageLoad } from '@/scripts/page-load';
+  onPageLoad(mountCpp);
+</script>

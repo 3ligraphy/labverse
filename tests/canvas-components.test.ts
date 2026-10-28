@@ -7,6 +7,7 @@ test('every lab node type has a kit; mobile and web nodes are in their kits', ()
   assert.ok(!LAB_NODE_TYPES.includes('start' as never), 'the Lab root is never in the palette');
   for (const t of ['exercise', 'terminal', 'repo']) assert.equal(kitOf(t), 'mobile');
   for (const t of ['prompt', 'browser', 'websandbox', 'clickpath']) assert.equal(kitOf(t), 'web');
+  for (const t of ['cpp', 'cpppredict', 'parsons', 'cppvisual']) assert.equal(kitOf(t), 'cpp');
   for (const t of ['part', 'task', 'text', 'image', 'video', 'link', 'quiz', 'checkin']) assert.equal(kitOf(t), 'core');
   assert.equal(kitOf('nonsense'), 'core');
 });
@@ -17,7 +18,9 @@ test('nodesOfKits always includes the core kit', () => {
   assert.ok(!core.includes('exercise') && !core.includes('prompt'));
   const web = nodesOfKits(['web']);
   assert.ok(web.includes('prompt') && web.includes('websandbox') && !web.includes('terminal'));
-  assert.deepEqual(nodesOfKits(['mobile', 'web']), LAB_NODE_TYPES);
+  const cpp = nodesOfKits(['cpp']);
+  assert.ok(cpp.includes('cpp') && cpp.includes('parsons') && cpp.includes('quiz') && !cpp.includes('exercise') && !cpp.includes('prompt'));
+  assert.deepEqual(nodesOfKits(['mobile', 'web', 'cpp']), LAB_NODE_TYPES);
 });
 
 test('presets: everything, mobile, web', () => {

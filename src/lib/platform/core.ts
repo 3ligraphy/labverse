@@ -8,6 +8,7 @@
  */
 import type { Check, Step } from '../../runner/protocol';
 import { DEFAULT_FACULTY } from '../accounts/core.ts';
+import { parseCppChecks, type CppCheck } from '../../lab/cpp/checks.ts';
 
 /* --------------------------------------------------------------- node types */
 
@@ -18,11 +19,28 @@ export type Field = { key: string; label: string; kind: FieldKind; options?: str
  * components its builders see in the palette (mobile: live React Native editor + terminal; web: AI prompts,
  * website previews, a live HTML/CSS sandbox and click paths for no-code website labs).
  */
-export type Kit = 'core' | 'mobile' | 'web';
+export type Kit = 'core' | 'mobile' | 'web' | 'cpp';
 export const KITS: Record<Kit, { label: string; hint: string }> = {
   core: { label: 'Core', hint: 'Parts, tasks, text, media, quizzes and check-in — every module' },
   mobile: { label: 'Mobile development', hint: 'Live React Native editor with phone emulator, terminal, repo link' },
   web: { label: 'No-code web & AI', hint: 'AI prompt cards, website previews, live HTML/CSS sandbox, click paths' },
+  cpp: { label: 'C++ programming', hint: 'Live C++ editor with console and memory view, predict-then-run, order-the-lines puzzles, animated visuals' },
+};
+
+/** The animated C++ visuals a builder can place (label shown in the builder → id used by the page). */
+export const CPP_VISUALS: Record<string, string> = {
+  'Program logic → code': 'logic',
+  'cout & cin: data in and out': 'streams',
+  'Which box fits? (data types)': 'types',
+  'Whole-number division and %': 'division',
+  'floor, ceil and round': 'rounding',
+  'x++ or ++x?': 'increment',
+  'Median: where does num3 go?': 'median',
+  'Characters are numbers (ASCII)': 'ascii',
+  'String explorer': 'string',
+  'cin >> vs getline': 'getline',
+  'Is it an email address?': 'email',
+  'Is it a vector <x, y>?': 'vector',
 };
 export type NodeDef = {
   label: string;
@@ -199,6 +217,54 @@ export const LAB_NODES = {
     ],
     defaults: { title: '', steps: 'Dashboard\nAppearance\nEditor' },
   },
+  cpp: {
+    label: 'C++ exercise', hint: 'Live C++ editor with console and memory view; graded by its checks', color: '#4f8fd6', glyph: 'C++', kit: 'cpp',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'goal', label: 'Goal', kind: 'markdown', max: 3000 },
+      { key: 'starter', label: 'Starter code', kind: 'code', max: 20000 },
+      { key: 'input', label: 'Keyboard input for Run', kind: 'textarea', help: 'Typed for the student when the program asks (one line per Enter). Leave empty to let them type.', max: 2000 },
+      { key: 'checks', label: 'Checks', kind: 'lines', help: 'One per line: name :: in 3 5; expect the product is: 15 — steps: in …, expect …, exact …, not …, code /regex/ message, nocode /regex/ message. No checks = an ungraded playground.', max: 6000 },
+      { key: 'hints', label: 'Hints', kind: 'lines', help: 'One per line; students open them one at a time', max: 3000 },
+      { key: 'paste', label: 'Pasting code', kind: 'select', options: ['Allowed', 'Blocked'], help: 'Blocked: students type the code themselves, as in the lab test' },
+    ],
+    defaults: {
+      title: 'Your program', goal: 'Write a program that …', paste: 'Allowed', input: '', hints: '',
+      starter: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello!\\n";\n    return 0;\n}\n',
+      checks: 'Says hello :: expect Hello!',
+    },
+  },
+  cpppredict: {
+    label: 'Predict, then run', hint: 'Read the code, choose what happens, then step through it in the memory view', color: '#f78c6c', glyph: '?▶', kit: 'cpp',
+    fields: [
+      { key: 'question', label: 'Question', kind: 'textarea', max: 800 },
+      { key: 'code', label: 'C++ code', kind: 'code', help: 'A whole program, or just the lines inside main (they are wrapped for you).', max: 8000 },
+      { key: 'input', label: 'Keyboard input', kind: 'textarea', max: 1000 },
+      { key: 'options', label: 'Options', kind: 'lines', help: 'One per line; start the correct one with *', max: 2000 },
+      { key: 'explain', label: 'Explanation (after answering)', kind: 'markdown', max: 3000 },
+      { key: 'trace', label: 'Step through after answering', kind: 'select', options: ['Yes', 'No'] },
+    ],
+    defaults: { question: 'What does this program print?', code: 'int x = 3;\nx = x + 2;\ncout << x;', input: '', options: '*5\n3\nx + 2', explain: '', trace: 'Yes' },
+  },
+  parsons: {
+    label: 'Order the lines', hint: 'Parsons puzzle: put the code blocks in the right order, then run it', color: '#7ce0a3', glyph: '⇅', kit: 'cpp',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'goal', label: 'Goal', kind: 'markdown', max: 2000 },
+      { key: 'code', label: 'The correct program', kind: 'code', help: 'Blank lines split it into cards. Cards that are only #include / using / int main() { / } / return 0; stay fixed.', max: 8000 },
+      { key: 'input', label: 'Keyboard input for the check', kind: 'textarea', max: 1000 },
+    ],
+    defaults: { title: 'Put it in order', goal: '', code: '', input: '' },
+  },
+  cppvisual: {
+    label: 'Visual', hint: 'An animated, interactive explanation: memory, cout/cin, strings, ASCII, rounding…', color: '#5ee0d2', glyph: '◐', kit: 'cpp',
+    fields: [
+      { key: 'visual', label: 'Visual', kind: 'select', options: Object.keys(CPP_VISUALS) },
+      { key: 'text', label: 'Starting value', kind: 'text', help: 'Optional: e.g. the string to explore, or the email to test', max: 200 },
+      { key: 'caption', label: 'Caption', kind: 'markdown', max: 1000 },
+    ],
+    defaults: { visual: Object.keys(CPP_VISUALS)[0], text: '', caption: '' },
+  },
   checkin: {
     label: 'Check-in', hint: 'End-of-lab attendance card', color: '#c8ff4d', glyph: '⌖', terminal: true,
     fields: [], defaults: {},
@@ -251,6 +317,7 @@ export const NODE_PRESETS: Record<string, { label: string; nodes: LabNodeType[] 
   all: { label: 'Everything', nodes: LAB_NODE_TYPES },
   mobile: { label: 'Mobile development', nodes: nodesOfKits(['mobile']) },
   web: { label: 'No-code web & AI', nodes: nodesOfKits(['web']) },
+  cpp: { label: 'C++ programming', nodes: nodesOfKits(['cpp']) },
 };
 /**
  * A module's allowed lab components, as stored by the admin: known, non-root lab node types in palette order.
@@ -448,7 +515,8 @@ export function parseChecks(text: string): Result<Check[]> {
 
 /* ------------------------------------------------------------- compile a lab */
 
-export type Exercise = { title: string; goal?: string; hint?: string; files: Record<string, string>; solution?: Record<string, string>; checks: Check[] };
+/** A graded item of a lab. RN exercises carry runner checks; C++ items (kind) carry one entry per check, for counting. */
+export type Exercise = { title: string; goal?: string; hint?: string; files: Record<string, string>; solution?: Record<string, string>; checks: Check[]; kind?: 'cpp' | 'cpppredict' | 'parsons' };
 export type Block =
   | { kind: 'part'; n: string; title: string; time: string }
   | { kind: 'task'; n: string; title: string; time: string; body: string; children: Block[] }
@@ -467,7 +535,11 @@ export type Block =
   | { kind: 'prompt'; id: string; title: string; tool: string; prompt: string; expect: string }
   | { kind: 'browser'; id: string; title: string; url: string; html: string; height: 'Short' | 'Medium' | 'Tall'; caption: string }
   | { kind: 'websandbox'; id: string; title: string; goal: string; hint: string; starter: string }
-  | { kind: 'clickpath'; title: string; steps: string[] };
+  | { kind: 'clickpath'; title: string; steps: string[] }
+  | { kind: 'cpp'; id: string; title: string; goal: string; starter: string; input: string; checks: CppCheck[]; hints: string[]; paste: boolean }
+  | { kind: 'cpppredict'; id: string; question: string; code: string; input: string; options: { text: string; correct: boolean }[]; explain: string; trace: boolean }
+  | { kind: 'parsons'; id: string; title: string; goal: string; code: string; input: string }
+  | { kind: 'cppvisual'; id: string; visual: string; text: string; caption: string };
 
 export type CompiledLab = {
   meta: { title: string; description: string; difficulty: string; estimatedTime: string; objectives: string[] };
@@ -595,6 +667,46 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
       case 'clickpath': {
         const steps = (d.steps ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
         if (steps.length) push({ kind: 'clickpath', title: d.title ?? '', steps });
+        break;
+      }
+      case 'cpp': {
+        const id = `${key}--${node.id}`;
+        const parsed = parseCppChecks(d.checks ?? '');
+        if (!parsed.ok) warnings.push(`C++ exercise “${d.title}”: ${parsed.error}`);
+        const checks = parsed.ok ? parsed.value : [];
+        const title = d.title || 'C++ exercise';
+        push({
+          kind: 'cpp', id, title, goal: d.goal ?? '', starter: d.starter ?? '', input: d.input ?? '', checks,
+          hints: (d.hints ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean), paste: d.paste !== 'Blocked',
+        });
+        if (checks.length) {
+          exercises[id] = { kind: 'cpp', title, goal: d.goal || undefined, files: { 'main.cpp': d.starter ?? '' }, checks: checks.map((c) => ({ name: c.name, steps: [] })) };
+          outline.push(`<Playground ex="${id}" />`);
+        }
+        break;
+      }
+      case 'cpppredict': {
+        const id = `${key}--${node.id}`;
+        const options = parseQuizOptions(d.options ?? '');
+        if (options.length < 2 || !options.some((o) => o.correct)) { warnings.push(`Predict “${excerptOf(d.question)}” needs 2+ options and one starting with *.`); break; }
+        push({ kind: 'cpppredict', id, question: d.question ?? '', code: d.code ?? '', input: d.input ?? '', options, explain: d.explain ?? '', trace: d.trace !== 'No' });
+        exercises[id] = { kind: 'cpppredict', title: excerptOf(d.question) || 'Predict', files: { 'main.cpp': d.code ?? '' }, checks: [{ name: 'Right prediction', steps: [] }] };
+        outline.push(`<Playground ex="${id}" />`);
+        break;
+      }
+      case 'parsons': {
+        const id = `${key}--${node.id}`;
+        if (!(d.code ?? '').trim()) { warnings.push(`Order the lines “${d.title}” has no code.`); break; }
+        const title = d.title || 'Put it in order';
+        push({ kind: 'parsons', id, title, goal: d.goal ?? '', code: d.code ?? '', input: d.input ?? '' });
+        exercises[id] = { kind: 'parsons', title, files: { 'main.cpp': d.code ?? '' }, checks: [{ name: 'Right order', steps: [] }] };
+        outline.push(`<Playground ex="${id}" />`);
+        break;
+      }
+      case 'cppvisual': {
+        const visual = CPP_VISUALS[d.visual ?? ''];
+        if (!visual) { warnings.push(`Visual “${d.visual}” is not available.`); break; }
+        push({ kind: 'cppvisual', id: `${key}--${node.id}`, visual, text: d.text ?? '', caption: d.caption ?? '' });
         break;
       }
     }
