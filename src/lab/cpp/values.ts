@@ -78,7 +78,7 @@ export function convert(x: Value, to: VT): Value {
     case 'int': return { t: 'int', v: x.t === 'size_t' ? wrap32(n) : wrap32(n) };
     case 'long': return { t: 'long', v: Math.trunc(Number.isFinite(n) ? n : 0) };
     case 'char': return { t: 'char', v: wrapChar(n) };
-    case 'bool': return { t: 'bool', v: n !== 0 && !Number.isNaN(n) ? 1 : 0 };
+    case 'bool': return { t: 'bool', v: x.t === 'cstr' || (n !== 0 && !Number.isNaN(n)) ? 1 : 0 };
     case 'float': return { t: 'float', v: Math.fround(num(x)) };
     case 'double': return { t: 'double', v: num(x) };
     case 'size_t': return { t: 'size_t', v: wrapSize(n) };

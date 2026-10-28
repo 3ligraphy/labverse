@@ -340,3 +340,15 @@ test('loops run (for Part 2) and an endless loop is stopped', () => {
   assert.equal(out(main('int s = 0; for (int i = 1; i <= 5; i++) s += i; cout << s;')), '15');
   assert.match(String(run(main('int x = 0; while (x < 10) { x = x; }'), '', 5000).error?.message), /never stop/);
 });
+
+test('values that do not fit: a big literal wraps in an int (C4305), any text in a bool is true (C4800)', () => {
+  const prog = (decl: string) => `#include <iostream>\nusing namespace std;\nint main() {\n    ${decl}\n    cout << x;\n    return 0;\n}\n`;
+  const big = run(prog('int x = 3000000000;'));
+  assert.equal(big.output, '-1294967296');
+  assert.ok(big.compiled.warnings.some((w) => w.code === 'C4305'));
+  assert.equal(run(prog('double x = 3000000000;')).output, '3e+09');
+  assert.equal(run(prog('int x = 2147483647;')).output, '2147483647');
+  const text = run(prog('bool x = "Mona";'));
+  assert.equal(text.output, '1');
+  assert.ok(text.compiled.warnings.some((w) => w.code === 'C4800'));
+});

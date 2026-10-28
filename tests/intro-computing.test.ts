@@ -18,12 +18,14 @@ const predicts = blocks.filter((b): b is Extract<Block, { kind: 'cpppredict' }> 
 const exercises = blocks.filter((b): b is Extract<Block, { kind: 'cpp' }> => b.kind === 'cpp');
 const wrap = (code: string) => (/\bmain\s*\(/.test(code) ? code : `#include <iostream>\n#include <string>\n#include <cmath>\n#include <algorithm>\nusing namespace std;\nint main() {\n${code}\nreturn 0;\n}\n`);
 
-test('the lab and module compile cleanly, fit 2–2.5 hours and use the C++ kit', () => {
+test('the lab and module compile cleanly, fit about 3 hours (with the Start here part) and use the C++ kit', () => {
   assert.deepEqual(lab.warnings, []);
   const parts = lab.blocks.filter((b) => b.kind === 'part') as Extract<Block, { kind: 'part' }>[];
-  assert.equal(parts.length, 8);
+  assert.equal(parts.length, 9);
+  assert.equal(parts[0].title, 'Start here: the words of C++');
   const minutes = parts.reduce((a, p) => a + parseInt(p.time), 0);
-  assert.ok(minutes >= 120 && minutes <= 160, `${minutes} minutes`);
+  assert.ok(minutes >= 150 && minutes <= 180, `${minutes} minutes`);
+  assert.equal(lab.meta.estimatedTime, minutes % 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes / 60} h`);
   assert.ok(lab.hasCheckin);
   assert.ok(sanitizeFlow(introComputingRevisionLab(), 'lab').ok);
   const mod = compileModule(introComputingModule());
@@ -209,6 +211,9 @@ test('the order-the-lines puzzle: 7 cards between a fixed top and bottom, and th
 test('the site ships the module itself: one seed, published content, only the C++ components', () => {
   const seeds = shippedSeeds();
   assert.equal(new Set(seeds.map((s) => s.id)).size, seeds.length, 'seed ids are unique');
+  // @1 created the module; @2 only rewrites the live lab (it never creates anything)
+  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update)]), [['intro-to-computing@1', false], ['intro-to-computing@2', true]]);
+  assert.ok(seeds[1].labs[0].flow.nodes.some((n) => n.id === 'p0'), 'the update carries the Start here part');
   const intro = seeds.find((s) => s.module.slug === 'intro-to-computing');
   assert.ok(intro, 'Introduction to Computing is shipped');
   assert.equal(intro.module.title, 'Introduction to Computing');

@@ -95,12 +95,22 @@ class PlatformStore {
 
   /**
    * Creates each shipped module (and its labs) once per database: it never overwrites one that already exists,
-   * and once a seed is recorded it never runs again, so a module staff edit or delete stays that way.
+   * and once a seed is recorded it never runs again, so a module staff edit or delete stays that way. An update
+   * seed rewrites its labs' content once, and only while they still exist.
    */
   private async applySeeds() {
     for (const seed of shippedSeeds()) {
       if ((await this.run(`select 1 from ${this.seeds} where id = $1`, [seed.id])).length) continue;
       const m = seed.module;
+      if (seed.update) {
+        for (const lab of seed.labs) {
+          await this.run(`update ${this.labs} set title = $3, flow = $4::jsonb, updated_at = now() where module = $1 and slug = $2`,
+            [m.slug, lab.slug, lab.title, JSON.stringify(lab.flow)]);
+        }
+        await this.run(`insert into ${this.seeds} (id) values ($1) on conflict (id) do nothing`, [seed.id]);
+        console.info(`[platform] shipped update applied to ${m.slug} (${seed.id})`);
+        continue;
+      }
       await this.run(
         `insert into ${this.modules} (slug, title, published, flow, lab_nodes) values ($1, $2, true, $3::jsonb, $4::jsonb) on conflict (slug) do nothing`,
         [m.slug, m.title, JSON.stringify(m.flow), JSON.stringify(m.labNodes)],

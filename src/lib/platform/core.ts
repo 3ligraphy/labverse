@@ -41,6 +41,12 @@ export const CPP_VISUALS: Record<string, string> = {
   'cin >> vs getline': 'getline',
   'Is it an email address?': 'email',
   'Is it a vector <x, y>?': 'vector',
+  'A program, piece by piece': 'anatomy',
+  'Why int main()?': 'main',
+  'The life of a variable': 'variable',
+  'Data types: what is really stored': 'typebox',
+  'Keyboard → program → screen': 'flow',
+  'The toolbox: every function, operator and symbol': 'toolbox',
 };
 export type NodeDef = {
   label: string;

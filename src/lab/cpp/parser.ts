@@ -92,7 +92,7 @@ export function parse(src: string): Program {
     if (t.k === 'num') {
       next();
       if (t.float) return { ...pos, k: 'float', v: t.num!, single: t.suffix?.includes('f'), text: t.v };
-      return { ...pos, k: 'int', v: t.num!, long: t.suffix?.includes('l'), text: t.v };
+      return { ...pos, k: 'int', v: t.num!, long: t.suffix?.includes('l') || t.num! > 2147483647, text: t.v };
     }
     if (t.k === 'char') {
       next();

@@ -167,6 +167,10 @@ export function check(prog: Program): Diag[] {
       else warn(at, `This stores the character with that code in ${name}, not the digits.`, 'Use to_string(…) to turn a number into text.', 'C4244');
       return;
     }
+    if (to === 'bool' && from === 'cstr') {
+      warn(at, `Any text counts as true, so ${name} becomes true (1).`, 'A bool holds true or false: write bool ' + name + ' = true;', 'C4800');
+      return;
+    }
     if (isNumeric(to) && isText(from)) {
       const text = fromExpr?.k === 'str' ? fromExpr.v : '';
       err(at, `Text can’t be stored in the ${to} ${name}.`, /^-?\d+(\.\d+)?$/.test(text) ? `Remove the quotes: ${text}. To convert text to a number, use stoi(…) or stod(…).` : 'Use stoi(…) or stod(…) to turn text into a number.', 'C2440');
@@ -174,6 +178,9 @@ export function check(prog: Program): Diag[] {
     }
     if (isNumeric(to) && isNumeric(from)) {
       const narrowing = (from === 'double' || from === 'float') && isIntegral(to) && to !== 'bool';
+      if (to === 'int' && fromExpr?.k === 'int' && fromExpr.v > 2147483647) {
+        warn(at, `${fromExpr.text} is too big for an int (the largest is 2147483647), so ${name} wraps around to a different number.`, 'Use double for very big numbers, or long long.', 'C4305');
+      }
       if (narrowing) warn(at, `The decimal part is cut off when it is stored in the ${to} ${name}.`, `${to} keeps whole numbers only (3.9 becomes 3). Use float or double to keep decimals.`, 'C4244');
       return;
     }

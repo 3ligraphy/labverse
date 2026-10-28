@@ -2,13 +2,16 @@
  * Modules that ship with the code. The platform store applies each seed once per database, the first time it is
  * used after a deploy (server.ts → applySeeds), and records it in <prefix>_seeds. So no one has to run a script
  * against the live database, and a module that staff later edit or delete is never overwritten or brought back.
- * A changed seed needs a new id (e.g. "…@2") to run again.
+ * To change a module that is already live, ship a new seed id with update: true — it rewrites the content of its
+ * labs once, only if they still exist (it never creates a module or a lab).
  */
 import { compileLab, compileModule, nodesOfKits, sanitizeFlow, type Flow, type LabNodeType } from '../core.ts';
 import { introComputingModule, introComputingRevisionLab } from './intro-computing-revision.ts';
 
 export type Seed = {
   id: string;
+  /** rewrite the labs' content (once) instead of creating the module */
+  update?: boolean;
   module: { slug: string; title: string; flow: Flow; labNodes: LabNodeType[] };
   labs: { slug: string; title: string; flow: Flow }[];
 };
@@ -31,5 +34,8 @@ export function shippedSeeds(): Seed[] {
   return [
     seed('intro-to-computing@1', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
       [{ slug: 'revision-week-6', flow: introComputingRevisionLab() }]),
+    // adds Part 1 "Start here: the words of C++" to the lab that @1 already created
+    { ...seed('intro-to-computing@2', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
+      [{ slug: 'revision-week-6', flow: introComputingRevisionLab() }]), update: true },
   ];
 }
