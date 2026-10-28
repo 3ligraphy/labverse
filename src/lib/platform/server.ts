@@ -11,6 +11,7 @@ import { course } from '@/site.config';
 import { compileLab, compileModule, emptyFlow, flowLeader, labKey, parseNodeList, type AssessmentItem, type CompiledLab, type Flow, type LabNodeType } from './core';
 import { DEFAULT_FACULTY, DEFAULT_SETTINGS, kindOf, listOf, moduleFaculty, type Audience, type Category } from '@/lib/accounts/core';
 import type { ModuleBannerInput } from './banner';
+import { shippedSeeds } from './seeds/index';
 
 const env = (key: string) => getSecret(key) || undefined;
 const onVercel = () => Boolean(env('VERCEL'));
@@ -48,6 +49,7 @@ class PlatformStore {
   private labs: string;
   private assessment: string;
   private banners: string;
+  private seeds: string;
 
   constructor(url: string, prefix: string, driver: 'neon' | 'postgres') {
     if (driver === 'postgres') {
@@ -61,6 +63,7 @@ class PlatformStore {
     this.labs = `${prefix}_labs`;
     this.assessment = `${prefix}_assessment`;
     this.banners = `${prefix}_banners`;
+    this.seeds = `${prefix}_seeds`;
   }
 
   private async migrate() {
@@ -83,7 +86,34 @@ class PlatformStore {
       `create index if not exists ${this.banners}_module_idx on ${this.banners} (module, updated_at desc)`,
       // the lab components the admin allows per module (Admin → Canvas components); null = every component
       `alter table ${this.modules} add column if not exists lab_nodes jsonb`,
+      // the modules that ship with the code (seeds/index.ts) already applied to this database
+      `create table if not exists ${this.seeds} (id text primary key, applied_at timestamptz not null default now())`,
     ]) await this.run(s);
+    // a seed that fails must never take the platform down with it
+    await this.applySeeds().catch((e) => console.error('[platform] applying the shipped modules failed', e));
+  }
+
+  /**
+   * Creates each shipped module (and its labs) once per database: it never overwrites one that already exists,
+   * and once a seed is recorded it never runs again, so a module staff edit or delete stays that way.
+   */
+  private async applySeeds() {
+    for (const seed of shippedSeeds()) {
+      if ((await this.run(`select 1 from ${this.seeds} where id = $1`, [seed.id])).length) continue;
+      const m = seed.module;
+      await this.run(
+        `insert into ${this.modules} (slug, title, published, flow, lab_nodes) values ($1, $2, true, $3::jsonb, $4::jsonb) on conflict (slug) do nothing`,
+        [m.slug, m.title, JSON.stringify(m.flow), JSON.stringify(m.labNodes)],
+      );
+      for (const lab of seed.labs) {
+        await this.run(
+          `insert into ${this.labs} (module, slug, title, published, flow) values ($1, $2, $3, true, $4::jsonb) on conflict (module, slug) do nothing`,
+          [m.slug, lab.slug, lab.title, JSON.stringify(lab.flow)],
+        );
+      }
+      await this.run(`insert into ${this.seeds} (id) values ($1) on conflict (id) do nothing`, [seed.id]);
+      console.info(`[platform] shipped module ${m.slug} applied (${seed.id})`);
+    }
   }
 
   private async q(text: string, params: unknown[] = []) {

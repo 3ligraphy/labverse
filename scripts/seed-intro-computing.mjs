@@ -4,6 +4,8 @@
 //   node scripts/seed-intro-computing.mjs --confirm-production  writes platform_* (DATABASE_URL_PRODUCTION or DATABASE_URL, Neon)
 // Re-running updates the lab content. On production an existing module canvas is kept (staff may have edited it);
 // pass --replace-module to overwrite it too.
+// The site also creates this module by itself, once, the first time it runs after a deploy (src/lib/platform/seeds),
+// so this script is only needed to push changed lab content into a database that already has the module.
 import { readFileSync } from 'node:fs';
 import { compileLab, compileModule, nodesOfKits, sanitizeFlow } from '../src/lib/platform/core.ts';
 import { introComputingModule, introComputingRevisionLab } from '../src/lib/platform/seeds/intro-computing-revision.ts';

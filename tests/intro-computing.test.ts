@@ -8,6 +8,7 @@ import { introComputingModule, introComputingRevisionLab, OUTPUT_PREDICTS, PRODU
 import { compile, Machine, run } from '../src/lab/cpp/index.ts';
 import { gradeCpp } from '../src/lab/cpp/grade.ts';
 import { labStructure } from '../src/lib/progress/core.ts';
+import { shippedSeeds } from '../src/lib/platform/seeds/index.ts';
 
 const KEY = 'intro-to-computing--revision-week-6';
 const lab = compileLab(introComputingRevisionLab(), KEY);
@@ -203,4 +204,17 @@ test('the order-the-lines puzzle: 7 cards between a fixed top and bottom, and th
   const m = new Machine(c.ok ? c.program : (null as never), { input: '3 5\n' });
   m.run();
   assert.match(m.printed, /the product is: 15/);
+});
+
+test('the site ships the module itself: one seed, published content, only the C++ components', () => {
+  const seeds = shippedSeeds();
+  assert.equal(new Set(seeds.map((s) => s.id)).size, seeds.length, 'seed ids are unique');
+  const intro = seeds.find((s) => s.module.slug === 'intro-to-computing');
+  assert.ok(intro, 'Introduction to Computing is shipped');
+  assert.equal(intro.module.title, 'Introduction to Computing');
+  assert.deepEqual(intro.labs.map((l) => l.slug), ['revision-week-6']);
+  assert.ok(intro.module.labNodes.includes('cpp') && !intro.module.labNodes.includes('exercise'));
+  // the lab on the module canvas is the one that ships
+  assert.ok(compileModule(intro.module.flow).items.some((i) => i.kind === 'lab' && i.slug === 'revision-week-6'));
+  assert.deepEqual(compileLab(intro.labs[0].flow, 'intro-to-computing--revision-week-6').warnings, []);
 });
