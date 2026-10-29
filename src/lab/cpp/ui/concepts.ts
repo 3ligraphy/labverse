@@ -544,9 +544,9 @@ export function toolboxVisual(host: HTMLElement) {
   open(0, 0);
 }
 
-/* =================================================================== the whole idea in one story: a café order */
+/* =================================================================== your first program, line by line */
 
-const STORY_CODE = [
+const FIRST_CODE = [
   '#include <iostream>',
   '#include <string>',
   '#include <cmath>',
@@ -554,165 +554,166 @@ const STORY_CODE = [
   '',
   'int main() {',
   '    string name;',
-  '    int cups;',
+  '    int tickets;',
   '    double price = 25.75;',
-  '    cout << "Welcome! Your name? ";',
+  '    cout << "Your name? ";',
   '    cin >> name;',
-  '    cout << "How many cups? ";',
-  '    cin >> cups;',
-  '    double total = cups * price;',
-  '    cout << name << ", you pay " << round(total) << " pounds\\n";',
+  '    cout << "How many tickets? ";',
+  '    cin >> tickets;',
+  '    double total = tickets * price;',
+  '    cout << name << ", you pay " << round(total) << "\\n";',
   '    return 0;',
   '}',
 ];
 
-/** one step of the story: the code lines it runs, the C++ word it teaches, the café picture and the plain meaning */
-const STORY = [
-  { lines: [0, 1, 2], word: 'library', icon: '🧰', pic: 'the toolbox',
-    say: 'Before the café opens, the cashier brings a **toolbox**. In C++, a toolbox is called a **library**. `#include` means “bring this library”. `<iostream>` has the tools to talk: `cout` (show words on the screen) and `cin` (read what the user types). `<string>` has the tool for text. `<cmath>` has maths tools, like `round`.' },
-  { lines: [3], word: 'namespace std', icon: '👪', pic: 'the family name',
-    say: 'All these tools have the family name **std**. Their full names are `std::cout` and `std::cin`. The line `using namespace std;` lets us use the short names: `cout` and `cin`. Look at the toolbox: the names get shorter.' },
-  { lines: [5], word: 'main', icon: '🚪', pic: 'the café opens',
-    say: 'The café opens. When you press ▶ Run, the computer **always starts at main**. It runs the lines between `{` and `}`, from top to bottom.' },
-  { lines: [6], word: 'variable + declaration', icon: '📦', pic: 'an empty box with a label',
-    say: 'The cashier puts an **empty box** on the shelf. The box has a label: `name`. A box with a label is called a **variable**. Making the box is called a **declaration**. The word `string` means: this box is for **text**. A new string box is empty: `""`.' },
-  { lines: [7], word: 'data type', icon: '🔢', pic: 'what can go in the box',
-    say: 'A second box: `cups`. The word before the name is the **data type**. It says what can go in the box. `int` means **whole numbers only**: 2 cups is OK, 2.5 cups is not. A new int box is not empty. It has a random old value (`?`) until we put a number in it.' },
-  { lines: [8], word: 'initialisation', icon: '🎁', pic: 'a box that is full from the start',
-    say: 'This box gets its value **at the same time** it is made: 25.75 pounds, the price of one cup. Giving a box its first value is called **initialisation**. `double` means a number **with a decimal point**.' },
-  { lines: [9], word: 'cout', icon: '🗣', pic: 'the cashier speaks',
-    say: '`cout` means: **show this on the screen**. The cashier speaks. The words inside the quotes appear on the screen exactly as they are (without the quotes). The arrows `<<` show the way the words go: out, to the screen.' },
-  { lines: [10], word: 'cin', icon: '👂', pic: 'the cashier listens',
-    say: '`cin` means: **read what the user types**. The program **stops and waits**. The customer types a name and presses Enter. The arrows `>>` point **into** the box, so the name goes into the box `name`.' },
-  { lines: [11], word: 'cout', icon: '🗣', pic: 'the cashier speaks again',
-    say: 'The cashier asks the next question. It is the same tool, `cout`, with new words.' },
-  { lines: [12], word: 'cin', icon: '👂', pic: 'the cashier listens again',
-    say: 'The customer types a number. It goes into the box `cups`. The random old value (`?`) is gone.' },
-  { lines: [13], word: '= (put into)', icon: '🧮', pic: 'the calculator',
-    say: 'The computer reads the two boxes, `cups` and `price`, and multiplies them. Then it puts the answer in a new box: `total`. In C++, `=` means **put into the box**. It does not mean “is equal to”.' },
-  { lines: [14], word: 'function', icon: '⚙️', pic: 'a machine: a value goes in, an answer comes out',
-    say: 'Now the receipt. `cout << name` shows what is **inside** the box (the customer’s name), not the word “name”. `round(total)` is a **function**. A function is a ready-made tool: you give it a value, and it gives you an answer. Here 51.5 goes in and 52 comes out (the nearest whole number). `"\\n"` means: go to a new line.' },
-  { lines: [15, 16], word: 'return 0', icon: '🔒', pic: 'closing time: everything is OK',
-    say: 'The café closes. `return 0;` tells the computer: **the program finished with no problems**. Visual Studio shows this as “exited with code 0”. That is a whole program! You have now seen every main word of this lab.' },
+/** one press of Next: the lines it runs, the word it teaches, and what the line does in plain words */
+const FIRST = [
+  { lines: [0, 1, 2], word: 'library',
+    say: '`#include` adds a **library** to the program. A library is ready-made code. `<iostream>` lets us use `cout` (show on the screen) and `cin` (read what the user types). `<string>` lets us use text. `<cmath>` lets us use maths, like `round`.' },
+  { lines: [3], word: 'using namespace std',
+    say: 'This line lets us write the short names `cout` and `cin`. Without it, we must write `std::cout` and `std::cin`.' },
+  { lines: [5], word: 'main',
+    say: 'The program **starts here**. When you press Run, the computer runs the lines inside `main`, from top to bottom.' },
+  { lines: [6], word: 'variable · declaration',
+    say: 'This line makes a **variable** called `name`. A variable is a place in memory that keeps a value. Making a variable is called a **declaration**. `string` means it keeps text. It is empty now.' },
+  { lines: [7], word: 'data type',
+    say: 'This line makes a variable called `tickets`. `int` is its **data type**: it keeps whole numbers only. It has no value yet (`?`).' },
+  { lines: [8], word: 'initialisation',
+    say: 'This line makes a variable called `price` **and** gives it a first value: 25.75. Giving the first value is called **initialisation**. `double` keeps numbers with a decimal point.' },
+  { lines: [9], word: 'cout',
+    say: '`cout` shows text **on the screen**. The text between the quotes appears exactly as it is written.' },
+  { lines: [10], word: 'cin',
+    say: '`cin` **waits** for the user to type. What the user types is saved in the variable `name`.' },
+  { lines: [11], word: 'cout',
+    say: 'Show the next question on the screen.' },
+  { lines: [12], word: 'cin',
+    say: 'The user types a whole number. It is saved in `tickets`. The `?` is gone.' },
+  { lines: [13], word: '= (save into)',
+    say: 'Multiply `tickets` by `price`, then save the answer in a new variable, `total`. `=` means: **save the value on the right into the variable on the left**.' },
+  { lines: [14], word: 'function',
+    say: 'Show the answer. `name` shows the text saved in it. `round(total)` is a **function**: you give it a number and it gives back the nearest whole number. `"\\n"` moves to a new line.' },
+  { lines: [15, 16], word: 'return 0',
+    say: 'The program **ends** here. `return 0` means: it finished with no problems.' },
 ];
 
-export function storyVisual(host: HTMLElement) {
-  const stage = h('div', { class: 'cx-sy' });
-  const nameIn = h('input', { class: 'input mono cx-sy-in', value: 'Mona', 'aria-label': 'The customer’s name' }) as HTMLInputElement;
-  const cupsIn = h('input', { class: 'input mono cx-sy-in', value: '2', inputmode: 'numeric', 'aria-label': 'How many cups the customer orders' }) as HTMLInputElement;
-  const counter = h('span', { class: 'cx-sy-count mono' });
-  const word = h('span', { class: 'cx-sy-word' });
-  const now = h('code', { class: 'cx-inline cx-sy-now' });
-  const say = h('p', { class: 'cx-sy-say' });
-  const scene = h('div', { class: 'cx-sy-scene' });
-  const lines = STORY_CODE.map((l, i) => h('div', { class: 'cx-sy-line', html: `<span class="cx-sy-n">${i + 1}</span>${highlightCpp(l) || ' '}` }));
-  const legend = h('ol', { class: 'cx-sy-legend' }, ...STORY.map((s) => h('li', null, h('span', { class: 'cx-sy-ico', 'aria-hidden': 'true' }, s.icon), h('span', null, s.pic), h('b', { class: 'mono' }, s.word))));
-  let n = 0; // steps done
+const WORDS: [string, string, number][] = [
+  ['library', 'ready-made code you add with #include', 1],
+  ['using namespace std', 'lets you write short names, like cout', 2],
+  ['main', 'the program starts here', 3],
+  ['variable', 'a place in memory that keeps a value', 4],
+  ['declaration', 'making a variable', 4],
+  ['data type', 'what kind of value a variable keeps', 5],
+  ['initialisation', 'giving a variable its first value', 6],
+  ['cout', 'shows on the screen', 7],
+  ['cin', 'reads what the user types', 8],
+  ['=', 'saves a value into a variable', 11],
+  ['function', 'ready-made code that gives back an answer', 12],
+  ['return 0', 'the program ended with no problems', 13],
+];
+
+export function firstProgramVisual(host: HTMLElement) {
+  const stage = h('div', { class: 'cx-fp' });
+  const nameIn = h('input', { class: 'input mono cx-fp-in', value: 'Mona', 'aria-label': 'The name the user will type' }) as HTMLInputElement;
+  const ticketsIn = h('input', { class: 'input mono cx-fp-in', value: '2', inputmode: 'numeric', 'aria-label': 'The number of tickets the user will type' }) as HTMLInputElement;
+  const counter = h('span', { class: 'cx-fp-count mono' });
+  const word = h('span', { class: 'cx-fp-word' });
+  const say = h('p', { class: 'cx-fp-say' });
+  const lines = FIRST_CODE.map((l, i) => h('div', { class: 'cx-fp-line', html: `<span class="cx-fp-n">${i + 1}</span>${highlightCpp(l) || ' '}` }));
+  const mem = h('div', { class: 'cx-mem cx-fp-mem' });
+  const screen = h('pre', { class: 'cx-con mono cx-fp-screen' }, ' ');
+  const words = h('ul', { class: 'cx-fp-words' }, ...WORDS.map(([w, m]) => h('li', null, h('b', { class: 'mono' }, w), h('span', null, m))));
+  let n = 0; // presses of Next done
   let busy = false;
 
-  const order = () => {
+  const input = () => {
     const name = nameIn.value.trim().split(/\s+/)[0] || 'Mona';
-    const m = cupsIn.value.match(/^\s*\d+/);
-    const cups = m ? Number(m[0]) : 0;
-    const total = cups * 25.75;
-    return { name, cups, total, pay: Math.round(total), bad: !m };
+    const m = ticketsIn.value.match(/^\s*\d+/);
+    const tickets = m ? Number(m[0]) : 0;
+    const total = tickets * 25.75;
+    return { name, tickets, total, pay: Math.round(total), bad: !m };
   };
 
-  /** the café after `k` steps */
+  /** memory and screen after `k` presses */
   const draw = (k: number) => {
-    const o = order();
+    const o = input();
     const box = (type: string, nm: string, v: string) => { const b = memBox(type, nm, v); b.dataset.box = nm; return b; };
-    const tools = k >= 1 ? ['cout', 'cin', 'string', 'round'].map((t) => h('span', { class: 'cx-sy-tool mono' }, k >= 2 ? t : `std::${t}`)) : [h('span', { class: 'cx-sy-empty' }, 'no tools yet')];
-    const shelf = [
+    const boxes = [
       k >= 4 ? box('string', 'name', k >= 8 ? `"${o.name}"` : '""') : null,
-      k >= 5 ? box('int', 'cups', k >= 10 ? String(o.cups) : '?') : null,
+      k >= 5 ? box('int', 'tickets', k >= 10 ? String(o.tickets) : '?') : null,
       k >= 6 ? box('double', 'price', '25.75') : null,
       k >= 11 ? box('double', 'total', formatG(o.total)) : null,
     ].filter((b) => b !== null) as HTMLElement[];
-    let screen = '';
-    if (k >= 7) screen += 'Welcome! Your name? ';
-    if (k >= 8) screen += `${o.name}\n`;
-    if (k >= 9) screen += 'How many cups? ';
-    if (k >= 10) screen += `${cupsIn.value.trim() || '0'}\n`;
-    if (k >= 12) screen += `${o.name}, you pay ${o.pay} pounds\n`;
-    if (k >= 13) screen += '\nCafe.exe exited with code 0.';
-    const bubble = k === 7 ? 'Welcome! Your name?' : k === 9 ? 'How many cups?' : k === 12 ? `${o.name}, you pay ${o.pay} pounds` : k === 13 ? 'Goodbye!' : '';
-    const calc = k === 11 ? `${o.cups} × 25.75 = ${formatG(o.total)}` : k === 12 ? `round(${formatG(o.total)}) → ${o.pay}` : '';
-    const sign = k >= 13 ? '🔒 CLOSED · return 0 ✓' : k >= 3 ? '🚪 OPEN · inside main' : '🚪 CLOSED';
-    scene.replaceChildren(
-      h('div', { class: 'cx-sy-row' },
-        h('div', { class: `cx-sy-sign${k >= 3 && k < 13 ? ' is-open' : ''}`, 'data-at': 'sign' }, sign),
-        h('div', { class: 'cx-sy-tools', 'data-at': 'tools' }, h('span', { class: 'cx-vis-k mono' }, '🧰 Toolbox'), ...tools)),
-      h('div', { class: 'cx-sy-row cx-sy-people' },
-        h('div', { class: 'cx-sy-person' }, h('span', { class: 'cx-sy-face', 'aria-hidden': 'true' }, '🧑‍🍳'), h('span', { class: 'cx-vis-k mono' }, 'Cashier = the program'), bubble ? h('span', { class: 'cx-sy-bubble', 'data-at': 'bubble' }, bubble) : null),
-        h('div', { class: 'cx-sy-person is-customer' }, h('span', { class: 'cx-sy-face', 'aria-hidden': 'true' }, '🙋'), h('span', { class: 'cx-vis-k mono' }, 'Customer = the user'),
-          h('label', { class: 'cx-sy-field' }, h('span', null, 'types the name'), nameIn), h('label', { class: 'cx-sy-field' }, h('span', null, 'types the cups'), cupsIn))),
-      h('div', { class: 'cx-sy-shelf', 'data-at': 'shelf' }, h('span', { class: 'cx-vis-k mono' }, '📦 Shelf = memory'), ...(shelf.length ? shelf : [h('span', { class: 'cx-sy-empty' }, 'empty — no variables yet')])),
-      h('div', { class: 'cx-sy-row' },
-        h('div', { class: 'cx-sy-calc mono', 'data-at': 'calc' }, h('span', { class: 'cx-vis-k mono' }, '🧮 Calculator'), calc || ' '),
-        h('div', { class: 'cx-sy-screen' }, h('span', { class: 'cx-vis-k mono' }, '🖥 Screen'), h('pre', { class: 'cx-con mono', 'data-at': 'screen' }, screen || ' '))));
-    const step = STORY[k - 1];
+    mem.replaceChildren(...(boxes.length ? boxes : [h('span', { class: 'cx-fp-empty' }, 'No variables yet.')]));
+    let out = '';
+    if (k >= 7) out += 'Your name? ';
+    if (k >= 8) out += `${o.name}\n`;
+    if (k >= 9) out += 'How many tickets? ';
+    if (k >= 10) out += `${ticketsIn.value.trim() || '0'}\n`;
+    if (k >= 12) out += `${o.name}, you pay ${o.pay}\n`;
+    screen.textContent = out || ' ';
+    const step = FIRST[k - 1];
     lines.forEach((l, i) => l.classList.toggle('is-on', !!step && step.lines.includes(i)));
-    [...legend.children].forEach((li, i) => { li.classList.toggle('is-met', i < k); li.classList.toggle('is-now', i === k - 1); });
-    counter.textContent = `${k} / ${STORY.length}`;
+    [...words.children].forEach((li, i) => li.classList.toggle('is-met', WORDS[i][2] <= k));
+    counter.textContent = `${k} / ${FIRST.length}`;
     if (step) {
-      word.replaceChildren(h('span', { 'aria-hidden': 'true' }, step.icon), ` ${step.word}`);
-      now.innerHTML = highlightCpp(step.lines.map((i) => STORY_CODE[i].trim()).join('  '));
-      now.hidden = false;
-      say.innerHTML = md(step.say + (k === 10 && o.bad ? `\n\nThe box \`cups\` takes whole numbers only. “${cupsIn.value}” is not a whole number, so \`cups\` becomes **0**.` : ''));
+      word.textContent = step.word;
+      word.hidden = false;
+      say.innerHTML = md(step.say + (k === 10 && o.bad ? `\n\n“${ticketsIn.value}” is not a whole number, so \`tickets\` gets **0**.` : ''));
     } else {
-      word.textContent = 'a café order';
-      now.hidden = true;
-      say.innerHTML = md('This is a small café. It works like a computer program. The **cashier** is the program. The **customer** is the user (the person who uses the program). The **shelf** is the computer’s memory. Press **Next ▶** and look at the café and the code **at the same time**. You can change what the customer types.');
+      word.hidden = true;
+      say.innerHTML = md('Press **Next ▶**. The program runs **one line at a time**. For each line you see what it does, what is saved in memory, and what appears on the screen.');
     }
-    next.disabled = k >= STORY.length;
+    next.disabled = k >= FIRST.length;
     back.disabled = k === 0;
   };
 
-  const at = (sel: string) => scene.querySelector(`[data-at="${sel}"]`) ?? scene;
-  const boxEl = (nm: string) => scene.querySelector(`[data-box="${nm}"]`) as HTMLElement | null;
+  const boxEl = (nm: string) => mem.querySelector(`[data-box="${nm}"]`) as HTMLElement | null;
   const go = async () => {
-    if (busy || n >= STORY.length) return;
+    if (busy || n >= FIRST.length) return;
     busy = true;
-    const o = order();
-    const line = lines[STORY[n].lines[0]];
+    const o = input();
+    const line = lines[FIRST[n].lines[0]];
     const k = n + 1;
-    if (k === 11) { // read the two boxes into the calculator before the answer appears
-      const c = boxEl('cups'), p = boxEl('price');
-      if (c) await fly(stage, c, at('calc'), String(o.cups), 'is-out');
-      if (p) await fly(stage, p, at('calc'), '25.75', 'is-out');
+    if (k === 11) { // read the two values before the answer is saved
+      const t = boxEl('tickets'), p = boxEl('price');
+      if (t) await fly(stage, t, line, String(o.tickets), 'is-out');
+      if (p) await fly(stage, p, line, '25.75', 'is-out');
     }
-    if (k === 12) { const t = boxEl('total'); if (t) await fly(stage, t, at('calc'), formatG(o.total), 'is-out'); }
     draw(k);
     n = k;
     switch (k) {
+      case 4: case 5: { const b = mem.lastElementChild as HTMLElement | null; if (b) setVal(b, b.querySelector('.cx-val')!.textContent ?? '?'); break; }
       case 6: { const b = boxEl('price'); if (b) { await fly(stage, line, b, '25.75'); setVal(b, '25.75'); } break; }
-      case 7: case 9: await fly(stage, at('bubble'), at('screen'), k === 7 ? 'Welcome! Your name? ' : 'How many cups? ', 'is-out'); break;
+      case 7: case 9: await fly(stage, line, screen, k === 7 ? 'Your name? ' : 'How many tickets? ', 'is-out'); break;
       case 8: { const b = boxEl('name'); if (b) { await fly(stage, nameIn, b, o.name, 'is-in'); setVal(b, `"${o.name}"`); } break; }
-      case 10: { const b = boxEl('cups'); if (b) { await fly(stage, cupsIn, b, String(o.cups), 'is-in'); setVal(b, String(o.cups)); } break; }
-      case 11: { const b = boxEl('total'); if (b) { await fly(stage, at('calc'), b, formatG(o.total)); setVal(b, formatG(o.total)); } break; }
-      case 12: await fly(stage, at('calc'), at('screen'), String(o.pay), 'is-out'); break;
-      case 13: await fly(stage, line, at('sign'), '0'); break;
-      default: { const t = scene.querySelector(k <= 2 ? '.cx-sy-tools' : k === 3 ? '.cx-sy-sign' : '.cx-sy-shelf .cx-box:last-child'); t?.classList.add('is-pop'); }
+      case 10: { const b = boxEl('tickets'); if (b) { await fly(stage, ticketsIn, b, String(o.tickets), 'is-in'); setVal(b, String(o.tickets)); } break; }
+      case 11: { const b = boxEl('total'); if (b) { await fly(stage, line, b, formatG(o.total)); setVal(b, formatG(o.total)); } break; }
+      case 12: await fly(stage, line, screen, `${o.name}, you pay ${o.pay}`, 'is-out'); break;
+      default: break;
     }
     busy = false;
   };
   const next = btn('Next ▶', () => void go(), 'btn-primary');
   const back = btn('◀ Back', () => { if (!busy && n > 0) { n -= 1; draw(n); } });
-  const playAll = btn('▶ Play the whole story', async () => {
+  const playAll = btn('▶ Play all', async () => {
     if (busy) return;
-    if (n >= STORY.length) { n = 0; draw(0); }
-    while (n < STORY.length) { await go(); await sleep(1400); }
+    if (n >= FIRST.length) { n = 0; draw(0); }
+    while (n < FIRST.length) { await go(); await sleep(1600); }
   });
-  [nameIn, cupsIn].forEach((i) => i.addEventListener('input', () => { if (!busy) draw(n); }));
+  [nameIn, ticketsIn].forEach((i) => i.addEventListener('input', () => { if (!busy) draw(n); }));
 
   stage.append(
-    h('div', { class: 'cx-sy-head' }, counter, word, now),
-    scene,
-    h('div', { class: 'cx-sy-explain' }, say),
+    h('div', { class: 'cx-fp-head' }, counter, word),
+    h('div', { class: 'cx-fp-grid' },
+      h('div', { class: 'cx-fp-lines mono' }, ...lines),
+      h('div', { class: 'cx-fp-side' },
+        h('div', { class: 'cx-fp-typed' }, h('span', { class: 'cx-vis-k mono' }, '⌨ The user will type'),
+          h('label', null, h('span', null, 'name'), nameIn), h('label', null, h('span', null, 'tickets'), ticketsIn)),
+        h('p', { class: 'cx-vis-k mono' }, 'Memory'), mem,
+        h('p', { class: 'cx-vis-k mono' }, '🖥 Screen'), screen)),
+    h('div', { class: 'cx-fp-explain' }, say),
     h('div', { class: 'cx-vis-bar' }, back, next, playAll, btn('⟲ Start again', () => { if (!busy) { n = 0; draw(0); } })),
-    h('details', { class: 'cx-sy-code', open: true }, h('summary', null, 'The whole program (the line that runs now is coloured)'), h('div', { class: 'cx-sy-lines mono' }, ...lines)),
-    h('div', { class: 'cx-sy-met' }, h('p', { class: 'cx-vis-k mono' }, 'In the café → in C++'), legend));
+    h('div', { class: 'cx-fp-glossary' }, h('p', { class: 'cx-vis-k mono' }, 'Words in this program'), words));
   host.replaceChildren(stage);
   draw(0);
 }

@@ -47,7 +47,7 @@ export const CPP_VISUALS: Record<string, string> = {
   'Data types: what is really stored': 'typebox',
   'Keyboard → program → screen': 'flow',
   'The toolbox: every function, operator and symbol': 'toolbox',
-  'The whole idea in one story: a café order': 'story',
+  'Your first program, line by line': 'first',
 };
 export type NodeDef = {
   label: string;

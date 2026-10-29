@@ -7,7 +7,7 @@ import { clearPick, draggable, dropPicked } from '../../ui/dnd.ts';
 import { formatG } from '../values.ts';
 import { highlightCpp } from './syntax.ts';
 import { btn, code, fly, kb, sleep } from './anim.ts';
-import { anatomyVisual, flowVisual, mainVisual, storyVisual, toolboxVisual, typeboxVisual, variableVisual } from './concepts.ts';
+import { anatomyVisual, firstProgramVisual, flowVisual, mainVisual, toolboxVisual, typeboxVisual, variableVisual } from './concepts.ts';
 
 /* =================================================================== logic → code */
 
@@ -557,7 +557,7 @@ export function mountVisual(host: HTMLElement, id: string, text: string) {
     case 'typebox': return typeboxVisual(host);
     case 'flow': return flowVisual(host);
     case 'toolbox': return toolboxVisual(host);
-    case 'story': return storyVisual(host);
+    case 'first': return firstProgramVisual(host);
     case 'logic': return logicVisual(host);
     case 'streams': return streamsVisual(host);
     case 'types': return typesVisual(host);

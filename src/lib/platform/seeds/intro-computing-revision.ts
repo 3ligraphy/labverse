@@ -164,7 +164,7 @@ export function introComputingRevisionLab(): Flow {
   return chain([
     { id: 'root', type: 'start', data: {
       title: 'Revision: from program logic to C++',
-      description: 'Week 6 revision for the class test. First, a café story shows you a whole program. Then you learn the words of C++ with pictures. Then you read code, guess what it does, run it step by step and write your own C++ in the browser: program logic, cout and cin, data types, operators, if / else, characters and strings. At the end you practise the Lecture 4 & 5 quiz.',
+      description: 'Week 6 revision for the class test. First, you go through a whole program line by line. Then you learn the words of C++ with pictures. Then you read code, guess what it does, run it step by step and write your own C++ in the browser: program logic, cout and cin, data types, operators, if / else, characters and strings. At the end you practise the Lecture 4 & 5 quiz.',
       difficulty: 'Beginner',
       estimatedTime: '3 h 5 min',
       objectives: [
@@ -181,11 +181,11 @@ export function introComputingRevisionLab(): Flow {
     /* ---------------------------------- 1. start here: the words of C++ (24) */
     part('p0', 'Start here: the words of C++', '24 min'),
     text('p0-intro', 'In this part you learn the main words of C++: **library, main, variable, declaration, initialisation, data type, cout, cin, string, [ ], find**. Every word has a picture you can play with. Before you press a button, say what you think will happen. If a word is new to you, ask now. (At the end of the lab, **Your toolbox** shows every function again.)'),
-    task('t0-0', 'The whole idea in one story: a café order', '5 min', 'Never written code? **Start here.** A small café works like a program. The **cashier** is the program. The **customer** is the user (the person who uses the program). The **shelf** is the computer’s memory. Press **Next ▶** and look at the café and the code together. Every C++ word in this lab appears once, in the order a real program uses it. Then change what the customer types and play it again.'),
-    visual('c-story', 'The whole idea in one story: a café order', 'TA: play it once with the whole class. Before each **Next ▶**, ask: “What will the café do now?”'),
-    predict('c-story-q', 'In the café story, what does `int cups;` do?', 'int cups;\ncin >> cups;\ncout << cups;',
-      ['*It puts an empty box called cups on the shelf, for whole numbers', 'It shows the number of cups on the screen', 'It waits for the customer to type', 'It multiplies the cups by the price'],
-      '`int cups;` is a **declaration**. It only **makes the box** (for whole numbers). `cin >> cups;` puts what the customer types into the box. `cout << cups;` shows it on the screen.', '2', 'No'),
+    task('t0-0', 'Your first program, line by line', '5 min', 'Never written code? **Start here.** Press **Next ▶** to run a small program **one line at a time**. For each line you see what it does, what is saved in memory, and what appears on the screen. All the main words of C++ are in this program. Then change what the user types and run it again.'),
+    visual('c-story', 'Your first program, line by line', 'TA: go through it with the whole class. Before each **Next ▶**, ask: “What will this line do?”'),
+    predict('c-story-q', 'What does the line `int tickets;` do?', 'int tickets;\ncin >> tickets;\ncout << tickets;',
+      ['*It makes a variable called tickets that keeps whole numbers', 'It shows the number of tickets on the screen', 'It waits for the user to type', 'It multiplies the tickets by the price'],
+      '`int tickets;` is a **declaration**: it only **makes the variable** (for whole numbers). `cin >> tickets;` saves what the user types in it. `cout << tickets;` shows it on the screen.', '2', 'No'),
     task('t0-1', 'A program, piece by piece', '5 min', 'Tap a line of the program (or a word in the list) and read what it is. Then press **✂ Remove it** to see what Visual Studio says when that part is missing. TA: go through it with the class using **Next ▶**.'),
     visual('c-anatomy', 'A program, piece by piece', 'Every program in this module has these parts. The error messages are like the ones you will see in Visual Studio.'),
     task('t0-2', 'Why int main()?', '2 min', 'Press **▶ Run the program** and follow the moving label. Who starts main? What does main give back at the end? Then try **return 1**.'),
