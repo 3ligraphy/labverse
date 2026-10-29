@@ -47,7 +47,7 @@ export function mountPredict(host: HTMLElement, cfg: PredictCfg, track: Track) {
   explain.hidden = true;
   const replay = h('div', { class: 'cx-replay' });
   replay.hidden = true;
-  const lock = h('button', { type: 'button', class: 'btn btn-primary btn-sm' }, 'Lock in my answer') as HTMLButtonElement;
+  const lock = h('button', { type: 'button', class: 'btn btn-primary btn-sm' }, 'Check my answer') as HTMLButtonElement;
   const runBtn = h('button', { type: 'button', class: 'cx-btn' }, cfg.trace ? '⏭ Step through it' : '▶ Run it') as HTMLButtonElement;
   runBtn.hidden = true;
   let runner: CppRunner | null = null;
@@ -69,7 +69,7 @@ export function mountPredict(host: HTMLElement, cfg: PredictCfg, track: Track) {
   };
 
   lock.addEventListener('click', () => {
-    if (pick === null) { result.textContent = 'Choose an answer first — commit to a guess, even if you are not sure.'; return; }
+    if (pick === null) { result.textContent = 'Choose an answer first. Make a guess, even if you are not sure.'; return; }
     tries++;
     const right = cfg.options[pick].correct;
     track(right ? 1 : 0, 1, cfg.code);
@@ -78,12 +78,12 @@ export function mountPredict(host: HTMLElement, cfg: PredictCfg, track: Track) {
       saved.solved = true;
       store.set(cfg.id, { pick, solved: true });
       result.className = 'cx-pred-res is-ok';
-      result.textContent = tries === 1 ? '✓ Right, first time.' : '✓ Right.';
+      result.textContent = tries === 1 ? '✓ Correct, first time!' : '✓ Correct.';
       lock.hidden = true;
       reveal();
     } else {
       result.className = 'cx-pred-res is-bad';
-      result.textContent = tries === 1 ? '✗ Not quite. Run it to see what really happens, then try again.' : '✗ Still not it. Step through it line by line and watch the memory boxes.';
+      result.textContent = tries === 1 ? '✗ Not correct. Run the code to see what really happens, then try again.' : '✗ Still not correct. Go through it line by line and watch the memory boxes.';
       lock.textContent = 'Try again';
       runBtn.hidden = false;
     }
@@ -189,13 +189,13 @@ export function mountParsons(host: HTMLElement, cfg: ParsonsCfg, track: Track) {
     [...list.children].forEach((li, i) => li.setAttribute('data-state', ok ? 'pass' : order[i] === cards[i] ? '' : 'fail'));
     if (ok) {
       store.set(cfg.id, { order, solved: true });
-      say(md(`✓ **It works.** Your program prints exactly what it should.${exact ? '' : ' (Your order is different from ours, and it still works.)'}`), 'ok');
+      say(md(`✓ **It works.** Your program shows exactly what it should.${exact ? '' : ' (Your order is different from ours, and it still works.)'}`), 'ok');
       replay.hidden = false;
       replay.replaceChildren();
       new CppRunner(replay, { id: `${cfg.id}--replay`, starter: src, input: cfg.input, readOnly: true });
     } else {
-      const why = !c.ok ? `It doesn’t build yet: ${c.errors[0].message}` : output === null ? `It crashes when it runs: ${crash}` : 'It runs, but the output is not right yet.';
-      say(md(`${why}\n\nCards in the right place: **${placed} of ${cards.length}** — the red ones are not. Think about the program logic: what must happen first?`), 'warn');
+      const why = !c.ok ? `It does not build yet: ${c.errors[0].message}` : output === null ? `It stops with an error when it runs: ${crash}` : 'It runs, but what it shows is not right yet.';
+      say(md(`${why}\n\nCards in the right place: **${placed} of ${cards.length}**. The red cards are in the wrong place. Think about the plan (program logic): what must happen first?`), 'warn');
     }
   };
 
@@ -203,8 +203,8 @@ export function mountParsons(host: HTMLElement, cfg: ParsonsCfg, track: Track) {
   const checkBtn = h('button', { type: 'button', class: 'btn btn-primary btn-sm' }, '✓ Check my order');
   checkBtn.addEventListener('click', check);
   host.replaceChildren(h('div', { class: 'cx-parsons' },
-    h('p', { class: 'cx-how mono' }, 'Drag a card by ⋮⋮ · or tap ⋮⋮ then tap where it goes · or use ↑ ↓'),
+    h('p', { class: 'cx-how mono' }, 'Drag a card by ⋮⋮, or tap ⋮⋮ and then tap where it goes, or use ↑ ↓'),
     fixedView(head), list, fixedView(tail), inputChip(cfg.input),
     h('div', { class: 'cx-pred-bar' }, checkBtn), result, replay));
-  if (saved.solved) say(md('✓ **Solved** earlier — you can still rearrange and check again.'), 'ok');
+  if (saved.solved) say(md('✓ **Solved** before. You can still move the cards and check again.'), 'ok');
 }

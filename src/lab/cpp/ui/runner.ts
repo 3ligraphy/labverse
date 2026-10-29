@@ -22,7 +22,7 @@ import { cppLanguage, highlightLines } from './syntax.ts';
 const showChar = (c: string) => (c === '\n' ? '⏎' : c === ' ' ? '·' : c === '\t' ? '⇥' : c);
 
 /** memory boxes: one per variable (strings as indexed cells) */
-export function renderMemory(box: HTMLElement, m: Machine | null, emptyText = 'Variables appear here when they are declared.') {
+export function renderMemory(box: HTMLElement, m: Machine | null, emptyText = 'The boxes (variables) appear here when they are made.') {
   const cells = m?.vars() ?? [];
   if (!cells.length) { box.replaceChildren(h('p', { class: 'cx-empty' }, emptyText)); return; }
   box.replaceChildren(...cells.map((c) => cellBox(c, m!)));
@@ -33,7 +33,7 @@ function cellBox(c: Cell, m: Machine) {
   const mark = m.lastStr && m.lastStr.name === c.name ? m.lastStr : null;
   const readMark = m.lastRead && m.lastRead.name === c.name;
   let val: HTMLElement;
-  if (!c.init) val = h('span', { class: 'cx-val cx-unset', title: 'Declared but no value yet — reading it is an error' }, '?');
+  if (!c.init) val = h('span', { class: 'cx-val cx-unset', title: 'Made, but no value yet. Reading it is an error' }, '?');
   else if (c.vt === 'string') {
     const s = String(c.value.v);
     const from = mark?.from ?? -1;
@@ -173,7 +173,7 @@ export class CppRunner {
     ];
     if (opts.paste === false) {
       exts.push(EditorView.domEventHandlers({
-        paste: (e) => { e.preventDefault(); this.say('Type it yourself — in the lab and the lab test, pasting is not allowed. Typing it is how your hands learn C++.', 'warn'); return true; },
+        paste: (e) => { e.preventDefault(); this.say('Type it yourself. In the lab and in the lab test, you cannot paste. Typing is how your hands learn C++.', 'warn'); return true; },
         drop: (e) => { e.preventDefault(); return true; },
       }));
     }
@@ -189,7 +189,7 @@ export class CppRunner {
     this.btn.end!.hidden = true;
     if (graded) this.renderChecks(null);
     if (opts.hints?.length) this.renderHints(saved.hints ?? 0);
-    if (saved.solved) this.say('✓ Solved — every check passes. You can keep experimenting.', 'ok');
+    if (saved.solved) this.say('✓ Solved: every check passes. You can keep trying things.', 'ok');
     this.render();
     if (opts.autoStep) this.step();
   }
@@ -349,7 +349,7 @@ export class CppRunner {
     this.btn.back!.hidden = !(this.mode === 'step' && this.log.some((a) => 'step' in a));
     this.btn.end!.hidden = !stepping;
     this.btn.step!.textContent = stepping ? '⏭ Next line' : '⏭ Step';
-    this.els.status.textContent = !m ? '' : m.status === 'input' ? 'waiting for the keyboard…' : m.status === 'done' ? 'finished' : m.status === 'error' ? 'crashed' : this.mode === 'step' ? `paused before line ${m.line - this.offset()}` : '';
+    this.els.status.textContent = !m ? '' : m.status === 'input' ? 'waiting for the keyboard…' : m.status === 'done' ? 'finished' : m.status === 'error' ? 'stopped with an error' : this.mode === 'step' ? `paused before line ${m.line - this.offset()}` : '';
   }
 
   private renderChecks(outcome: ReturnType<typeof gradeCpp> | null) {
@@ -374,7 +374,7 @@ export class CppRunner {
       this.say(`**Build failed** — Line ${e.line}: ${e.message}`, 'err', e.hint);
     } else if (passed === total) {
       store.set(this.opts.id, { solved: true });
-      this.say(`✓ **All ${total} checks pass.** Well done — run it once more and read your output like a user would.`, 'ok');
+      this.say(`✓ **All ${total} checks pass.** Well done! Run it once more and read what it shows, like a user would.`, 'ok');
     } else this.say(`${passed} of ${total} checks pass. Read the first ✗ below, fix one thing, and check again.`, 'warn');
     this.opts.onCheck?.(passed, total, code);
   }
@@ -385,7 +385,7 @@ export class CppRunner {
     const more = open < hints.length
       ? h('button', { type: 'button', class: 'cx-btn cx-hint-btn', onclick: () => { store.set(this.opts.id, { hints: open + 1 }); this.renderHints(open + 1); } }, open ? `Another hint (${open + 1}/${hints.length})` : `Stuck? Open a hint (1/${hints.length})`)
       : null;
-    this.els.hint.replaceChildren(...shown, more ?? h('p', { class: 'cx-empty' }, 'That’s every hint — the rest is yours. Try a small change and Step through it.'));
+    this.els.hint.replaceChildren(...shown, more ?? h('p', { class: 'cx-empty' }, 'That is the last hint. Now it is your turn: try a small change, then press Step.'));
   }
 
   private reset() {

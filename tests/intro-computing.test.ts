@@ -18,13 +18,17 @@ const predicts = blocks.filter((b): b is Extract<Block, { kind: 'cpppredict' }> 
 const exercises = blocks.filter((b): b is Extract<Block, { kind: 'cpp' }> => b.kind === 'cpp');
 const wrap = (code: string) => (/\bmain\s*\(/.test(code) ? code : `#include <iostream>\n#include <string>\n#include <cmath>\n#include <algorithm>\nusing namespace std;\nint main() {\n${code}\nreturn 0;\n}\n`);
 
-test('the lab and module compile cleanly, fit about 3 hours (with the Start here part) and use the C++ kit', () => {
+test('the lab and module compile cleanly, fit about 3 hours (with the Start here part and the café story) and use the C++ kit', () => {
   assert.deepEqual(lab.warnings, []);
   const parts = lab.blocks.filter((b) => b.kind === 'part') as Extract<Block, { kind: 'part' }>[];
-  assert.equal(parts.length, 9);
-  assert.equal(parts[0].title, 'Start here: the words of C++');
+  // learning order: the words first, then each topic after the ones it needs; the self-check, the toolbox and the quiz come last
+  assert.deepEqual(parts.map((p) => p.title), [
+    'Start here: the words of C++', 'The recipe: program logic → C++', 'Talking to the user: cout, cin and variables',
+    'Calculating: operators, cmath and ++', 'Choosing: if / else (the median)', 'Characters are numbers', 'Strings: boxes in a row',
+    'Quick check: where am I now?', 'Your toolbox: every function and word in one place', 'Class-test practice: the Lecture 4 & 5 quiz',
+  ]);
   const minutes = parts.reduce((a, p) => a + parseInt(p.time), 0);
-  assert.ok(minutes >= 150 && minutes <= 180, `${minutes} minutes`);
+  assert.ok(minutes >= 150 && minutes <= 190, `${minutes} minutes`);
   assert.equal(lab.meta.estimatedTime, minutes % 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes / 60} h`);
   assert.ok(lab.hasCheckin);
   assert.ok(sanitizeFlow(introComputingRevisionLab(), 'lab').ok);
@@ -212,8 +216,8 @@ test('the site ships the module itself: one seed, published content, only the C+
   const seeds = shippedSeeds();
   assert.equal(new Set(seeds.map((s) => s.id)).size, seeds.length, 'seed ids are unique');
   // @1 created the module; @2 only rewrites the live lab (it never creates anything)
-  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update)]), [['intro-to-computing@1', false], ['intro-to-computing@2', true]]);
-  assert.ok(seeds[1].labs[0].flow.nodes.some((n) => n.id === 'p0'), 'the update carries the Start here part');
+  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update)]), [['intro-to-computing@1', false], ['intro-to-computing@2', true], ['intro-to-computing@3', true]]);
+  assert.ok(seeds[2].labs[0].flow.nodes.some((n) => n.id === 'p0') && seeds[2].labs[0].flow.nodes.some((n) => n.id === 'c-story'), 'the latest update carries the Start here part and the café story');
   const intro = seeds.find((s) => s.module.slug === 'intro-to-computing');
   assert.ok(intro, 'Introduction to Computing is shipped');
   assert.equal(intro.module.title, 'Introduction to Computing');

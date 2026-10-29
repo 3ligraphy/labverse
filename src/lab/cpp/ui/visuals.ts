@@ -7,7 +7,7 @@ import { clearPick, draggable, dropPicked } from '../../ui/dnd.ts';
 import { formatG } from '../values.ts';
 import { highlightCpp } from './syntax.ts';
 import { btn, code, fly, kb, sleep } from './anim.ts';
-import { anatomyVisual, flowVisual, mainVisual, toolboxVisual, typeboxVisual, variableVisual } from './concepts.ts';
+import { anatomyVisual, flowVisual, mainVisual, storyVisual, toolboxVisual, typeboxVisual, variableVisual } from './concepts.ts';
 
 /* =================================================================== logic → code */
 
@@ -29,7 +29,7 @@ function logicVisual(host: HTMLElement) {
     h('div', { class: 'cx-lg-fixed' }, code('#include <iostream>\nusing namespace std;\nint main() {')),
     h('div', { class: 'cx-lg-body' }, decl, ...lines),
     h('div', { class: 'cx-lg-fixed' }, code('}')));
-  const caption = h('p', { class: 'cx-vis-say' }, 'Each line of program logic becomes one or two lines of C++. Press Translate, or click a step.');
+  const caption = h('p', { class: 'cx-vis-say' }, 'Each line of the plan (program logic) becomes one or two lines of C++. Press Translate, or click a step.');
   let busy = false;
   const focus = (i: number) => {
     cards.forEach((c, j) => c.classList.toggle('is-on', j === i));
@@ -47,7 +47,7 @@ function logicVisual(host: HTMLElement) {
     for (let i = 0; i < LOGIC.length; i++) { focus(i); await sleep(1100); }
     cards.forEach((c) => c.classList.remove('is-on'));
     lines.forEach((l) => l.classList.remove('is-on'));
-    caption.innerHTML = md('That is the whole program. **Logic first, then code** — line by line, the same order every time.');
+    caption.innerHTML = md('That is the whole program. **First the plan, then the code**, line by line, in the same order every time.');
     busy = false;
   };
   cards.forEach((c, i) => {
@@ -82,7 +82,7 @@ function streamsVisual(host: HTMLElement) {
       const m = text.slice(pos).match(/^[+-]?\d+/);
       if (!m) {
         box.querySelector('.cx-val')!.textContent = '0';
-        say.innerHTML = md(`cin wanted a **whole number** but found “${text.slice(pos).trim() || 'nothing'}” — the variable gets **0** and cin stops reading.`);
+        say.innerHTML = md(`cin wanted a **whole number**, but it found “${text.slice(pos).trim() || 'nothing'}”. So the box gets **0**, and cin stops reading.`);
         return;
       }
       const cells = buf.querySelectorAll('.cx-kb');
@@ -93,12 +93,12 @@ function streamsVisual(host: HTMLElement) {
       pos += m[0].length;
       drawBuf(pos);
     }
-    say.innerHTML = md('`>>` points **into** the variable: cin skips spaces, reads one value per variable, and leaves the rest waiting in the buffer.');
+    say.innerHTML = md('`>>` points **into** the box. cin jumps over spaces and reads one value for each box. The rest waits in the buffer (the waiting line of what the user typed).');
   };
 
   const doCout = async () => {
     const a = Number(box1.querySelector('.cx-val')!.textContent), b = Number(box2.querySelector('.cx-val')!.textContent);
-    if (!Number.isFinite(a) || !Number.isFinite(b)) { say.innerHTML = md('Run **cin** first, so num1 and num2 have values.'); return; }
+    if (!Number.isFinite(a) || !Number.isFinite(b)) { say.innerHTML = md('Press **cin** first, so num1 and num2 have values.'); return; }
     screen.textContent = '';
     const parts = ['the product is: ', String(a * b), '\n'];
     const srcs = stage.querySelectorAll('.cx-st-part');
@@ -106,7 +106,7 @@ function streamsVisual(host: HTMLElement) {
       await fly(stage, srcs[i], screen, kb(parts[i]) === '⏎' ? '\\n' : parts[i], 'is-out');
       screen.textContent += parts[i];
     }
-    say.innerHTML = md('`<<` points **towards** cout: each piece is sent to the screen in order. Text keeps its quotes in the code, not on the screen; `num1 * num2` is calculated first.');
+    say.innerHTML = md('`<<` points **to** cout: each piece goes to the screen, in order. The quotes are in the code, but not on the screen. `num1 * num2` is calculated first.');
   };
 
   stage.append(
@@ -118,7 +118,7 @@ function streamsVisual(host: HTMLElement) {
         h('code', { class: 'cx-inline' }, h('span', { html: highlightCpp('cout << ') }), h('span', { class: 'cx-st-part', html: highlightCpp('"the product is: "') }), h('span', { html: highlightCpp(' << ') }), h('span', { class: 'cx-st-part', html: highlightCpp('num1 * num2') }), h('span', { html: highlightCpp(' << ') }), h('span', { class: 'cx-st-part', html: highlightCpp('"\\n"') }), h('span', { html: highlightCpp(';') }))),
       h('div', { class: 'cx-st-col' }, h('p', { class: 'cx-vis-k mono' }, '🖥 Console'), screen)));
   host.replaceChildren(stage, h('div', { class: 'cx-vis-bar' }, btn('▶ cin >> num1 >> num2', doCin, 'btn-primary'), btn('▶ cout << …', doCout), say));
-  say.innerHTML = md('Change what the user types (try `7 -2`, `10\n3`, or `abc`), then run **cin**, then **cout**.');
+  say.innerHTML = md('Change what the user types (try `7 -2`, `10\n3` or `abc`). Then press **cin**, then **cout**.');
 }
 
 /* =================================================================== data types */
@@ -127,18 +127,18 @@ const TYPE_ITEMS: { v: string; ans: 'int' | 'float' | 'char' | 'string'; why: st
   { v: '7', ans: 'int', why: 'A whole number with no quotes → int.' },
   { v: '3.5', ans: 'float', why: 'It has a decimal point → float (or double).' },
   { v: "'a'", ans: 'char', why: 'ONE character in single quotes → char.' },
-  { v: '"a"', ans: 'string', why: 'Double quotes make text → string, even for one letter.' },
-  { v: "'7'", ans: 'char', why: "Single quotes: it is the character 7 (code 55), not the number 7 → char." },
-  { v: '"7"', ans: 'string', why: 'Double quotes: it is text that looks like a number → string. Use stoi("7") to get the number.' },
+  { v: '"a"', ans: 'string', why: 'Double quotes make text → string, even with one letter.' },
+  { v: "'7'", ans: 'char', why: "Single quotes: it is the character 7 (its code is 55), not the number 7 → char." },
+  { v: '"7"', ans: 'string', why: 'Double quotes: it is text that looks like a number → string. stoi("7") changes it into the number 7.' },
   { v: '-12', ans: 'int', why: 'Negative whole numbers are ints too.' },
-  { v: '7.0', ans: 'float', why: 'The .0 makes it a decimal number → float/double, even though it is “whole”.' },
+  { v: '7.0', ans: 'float', why: 'The .0 makes it a decimal number → float or double, even if it looks whole.' },
   { v: '"Mohamed Salah"', ans: 'string', why: 'Text with a space → string (read it with getline).' },
   { v: "' '", ans: 'char', why: 'A space is a character too → char.' },
 ];
 
 function typesVisual(host: HTMLElement) {
   const placed = new Map<number, string>();
-  const say = h('p', { class: 'cx-vis-say' }, 'Drag each value into the box that can hold it (or tap a value, then a box).');
+  const say = h('p', { class: 'cx-vis-say' }, 'Drag each value into the box that can hold it (or tap a value, then tap a box).');
   const score = h('span', { class: 'cx-score mono' });
   const pool = h('div', { class: 'cx-ty-pool' });
   const bins = (['int', 'float', 'char', 'string'] as const).map((t) => h('div', { class: 'cx-ty-bin', 'data-drop': t, 'data-type': t, tabindex: '0' },
@@ -161,7 +161,7 @@ function typesVisual(host: HTMLElement) {
       say.innerHTML = md(`✗ \`${item.v}\` is not a **${t}**. Look at the quotes and the decimal point.`);
     }
     score.textContent = `${placed.size} / ${TYPE_ITEMS.length}`;
-    if (placed.size === TYPE_ITEMS.length) say.innerHTML = md('🎉 All sorted. Quotes decide: **\'x\'** = char, **"x"** = string. A decimal point = float.');
+    if (placed.size === TYPE_ITEMS.length) say.innerHTML = md('🎉 All done! The quotes tell you: **\'x\'** = char, **"x"** = string. A decimal point means float or double.');
   };
   TYPE_ITEMS.forEach((item, i) => {
     const chip = h('button', { type: 'button', class: 'cx-ty-chip mono', 'data-i': String(i) }, item.v);
@@ -201,7 +201,7 @@ function divisionVisual(host: HTMLElement) {
   draw();
   host.replaceChildren(h('div', { class: 'cx-dv' },
     h('div', { class: 'cx-dv-ctl' }, h('label', null, 'a', a), h('label', null, 'b', b), labels), dots, rows),
-    h('p', { class: 'cx-vis-say', html: md('**int / int gives an int**: C++ cuts off the decimals (it does not round). `%` gives the leftover. Predict first, then move the sliders.') }));
+    h('p', { class: 'cx-vis-say', html: md('**An int divided by an int gives an int**: C++ cuts off the decimals (it does not round). `%` gives what is left over. Guess first, then move the sliders.') }));
 }
 
 /* =================================================================== rounding */
@@ -230,7 +230,7 @@ function roundingVisual(host: HTMLElement) {
   draw();
   host.replaceChildren(h('div', { class: 'cx-rd' }, line, slider, out),
     h('div', { class: 'cx-vis-bar' }, h('span', { class: 'cx-vis-k mono' }, 'Try:'), ...presets,
-      h('p', { class: 'cx-vis-say', html: md('Predict `round(5.5)` and `ceil(4.1)` before you press them — these were quiz questions.') })));
+      h('p', { class: 'cx-vis-say', html: md('Guess `round(5.5)` and `ceil(4.1)` before you press them. These were quiz questions.') })));
 }
 
 /* =================================================================== x++ vs ++x */
@@ -248,7 +248,7 @@ function incrementVisual(host: HTMLElement) {
       set(bx, 6); set(by, 2);
       await sleep(300);
       if (post) {
-        steps.append(h('li', null, 'Use the OLD x (6) …'));
+        steps.append(h('li', null, 'First y gets the OLD x (6) …'));
         await fly(wrap, bx, by, '6');
         set(by, 6);
         await sleep(300);
@@ -258,19 +258,19 @@ function incrementVisual(host: HTMLElement) {
         steps.append(h('li', null, 'First add 1 to x → 7 …'));
         set(bx, 7);
         await sleep(500);
-        steps.append(h('li', null, '… then use the NEW x (7)'));
+        steps.append(h('li', null, '… then y gets the NEW x (7)'));
         await fly(wrap, bx, by, '7');
         set(by, 7);
       }
     };
     return { wrap, play };
   };
-  const p1 = panel('Postfix: use, then add', 'y = x++;', true);
-  const p2 = panel('Prefix: add, then use', 'y = ++x;', false);
+  const p1 = panel('x++ (after): first use x, then add 1', 'y = x++;', true);
+  const p2 = panel('++x (before): first add 1, then use x', 'y = ++x;', false);
   host.replaceChildren(
-    h('p', { class: 'cx-vis-say', html: md('From the quiz: `int x = 4; int y = 2; x += y;` → now **x = 6, y = 2**. What is y after each line? Predict, then play.') }),
+    h('p', { class: 'cx-vis-say', html: md('From the quiz: `int x = 4; int y = 2; x += y;` so now **x = 6 and y = 2**. What is y after each line? Guess, then press play.') }),
     h('div', { class: 'cx-inc-grid' }, p1.wrap, p2.wrap),
-    h('div', { class: 'cx-vis-bar' }, btn('▶ Play x++', () => p1.play(), 'btn-primary'), btn('▶ Play ++x', () => p2.play()), h('p', { class: 'cx-vis-say' }, 'Either way x ends up 7. Only y is different.')));
+    h('div', { class: 'cx-vis-bar' }, btn('▶ Play x++', () => p1.play(), 'btn-primary'), btn('▶ Play ++x', () => p2.play()), h('p', { class: 'cx-vis-say' }, 'In both, x ends as 7. Only y is different.')));
 }
 
 /* =================================================================== median */
@@ -307,8 +307,8 @@ function medianVisual(host: HTMLElement) {
     const src = SRC(lo, hi);
     codeBox.replaceChildren(...src.map((l, i) => h('span', { class: `cx-sl${i === 0 || i === zone ? ' is-on' : ''}`, html: highlightCpp(l) || ' ' })));
     say.innerHTML = a === b || c === a || c === b
-      ? md(`Equal numbers! The nested version still answers **${median}** — but the six-if version from Lecture 3 uses strict \`<\` and prints **nothing** for 2 2 2. Try it in the editor.`)
-      : md(`num3 lands in the **${zone === 1 ? 'right' : zone === 2 ? 'left' : 'middle'}** position → the median is **${median}**. At most 3 tests, never 6.`);
+      ? md(`Equal numbers! This version (with else) still gives **${median}**. But the version with six ifs from Lecture 3 uses \`<\` and shows **nothing** for 2 2 2. Try it in the editor.`)
+      : md(`num3 is in the **${zone === 1 ? 'right' : zone === 2 ? 'left' : 'middle'}** place, so the median (the middle number) is **${median}**. The program needs at most 3 tests, never 6.`);
   };
   [n1, n2, n3].forEach((x) => x.addEventListener('input', draw));
   draw();
@@ -426,15 +426,15 @@ function stringVisual(host: HTMLElement, start: string) {
       h('div', null, h('span', { class: 'mono' }, 's.find('), iFind, h('span', { class: 'mono' }, ')'), btn('▶', () => void ops.find())),
       h('div', null, h('span', { class: 'mono' }, 's.substr('), iPos, h('span', { class: 'mono' }, ','), iLen, h('span', { class: 'mono' }, ')'), btn('▶', ops.substr))),
     result),
-    h('p', { class: 'cx-vis-say', html: md('Positions start at **0**. Before you press, say the answer out loud — then check.') }));
+    h('p', { class: 'cx-vis-say', html: md('Positions start at **0**. Before you press, say the answer out loud. Then check.') }));
 }
 
 /* =================================================================== cin >> vs getline */
 
 const GL_CASES = [
   { label: 'cin >> name;', input: 'Mohamed Salah\n', reads: [{ how: 'cin', name: 'name' }], note: '**cin >>** stops at the first space: name is "Mohamed" and “ Salah⏎” waits in the buffer.' },
-  { label: 'getline(cin, name);', input: 'Mohamed Salah\n', reads: [{ how: 'getline', name: 'name' }], note: '**getline** takes the whole line, spaces included, and throws away the ⏎.' },
-  { label: 'cin >> age; getline(cin, name);', input: '20\nAli\n', reads: [{ how: 'cin', name: 'age' }, { how: 'getline', name: 'name' }], note: 'The trap: cin leaves the ⏎ behind, so getline reads an **empty** line. (Fix: use getline for both, or cin.ignore().)' },
+  { label: 'getline(cin, name);', input: 'Mohamed Salah\n', reads: [{ how: 'getline', name: 'name' }], note: '**getline** takes the whole line, with the spaces, and throws away the ⏎ (Enter).' },
+  { label: 'cin >> age; getline(cin, name);', input: '20\nAli\n', reads: [{ how: 'cin', name: 'age' }, { how: 'getline', name: 'name' }], note: 'Be careful: cin leaves the ⏎ (Enter) behind, so getline reads an **empty** line. (Fix: use getline for both, or cin.ignore().)' },
 ] as const;
 
 function getlineVisual(host: HTMLElement) {
@@ -451,7 +451,7 @@ function getlineVisual(host: HTMLElement) {
     buf.replaceChildren(...[...c.input].map((ch) => h('span', { class: 'cx-kb' }, kb(ch))));
     boxes.replaceChildren(...c.reads.map((r) => h('div', { class: 'cx-box', 'data-type': r.name === 'age' ? 'int' : 'string', 'data-name': r.name },
       h('span', { class: 'cx-box-type mono' }, r.name === 'age' ? 'int' : 'string'), h('span', { class: 'cx-box-name mono' }, r.name), h('span', { class: 'cx-val' }, r.name === 'age' ? '?' : '""'))));
-    say.innerHTML = md(`The user types ${[...c.input].map(kb).join('')} — predict what lands in ${c.reads.map((r) => `**${r.name}**`).join(' and ')}, then press Run.`);
+    say.innerHTML = md(`The user types ${[...c.input].map(kb).join('')}. Guess what goes into ${c.reads.map((r) => `**${r.name}**`).join(' and ')}, then press Run.`);
   };
   const run = async () => {
     const c = GL_CASES[cur];
@@ -536,8 +536,8 @@ function ladderVisual(host: HTMLElement, kind: 'email' | 'vector', start: string
     }
     if (kind === 'email') {
       const tld = ok ? s.slice(s.lastIndexOf('.') + 1) : '';
-      verdict.innerHTML = md(ok ? `✓ **A well-formed email address.** Its top-level domain (TLD) is after the last dot: **.${tld}** → \`s.substr(s.rfind('.') + 1)\`` : '✗ **Not an email address** — the first failed test says why. Every later test is skipped (that is what nested if/else does).');
-    } else verdict.innerHTML = md(ok ? '✓ **correct format**' : '✗ **wrong format** — stop at the first failed test, like the nested if/else in Lecture 5.');
+      verdict.innerHTML = md(ok ? `✓ **A well-formed email address.** Its top-level domain (TLD) is after the last dot: **.${tld}** → \`s.substr(s.rfind('.') + 1)\`` : '✗ **Not an email address.** The first test that failed tells you why. All the tests after it are skipped (that is what if/else inside if/else does).');
+    } else verdict.innerHTML = md(ok ? '✓ **correct format**' : '✗ **wrong format.** The checking stops at the first test that fails, like the if/else inside if/else in Lecture 5.');
     verdict.className = `cx-ld-v ${ok ? 'is-ok' : 'is-bad'}`;
     busy = false;
   };
@@ -557,6 +557,7 @@ export function mountVisual(host: HTMLElement, id: string, text: string) {
     case 'typebox': return typeboxVisual(host);
     case 'flow': return flowVisual(host);
     case 'toolbox': return toolboxVisual(host);
+    case 'story': return storyVisual(host);
     case 'logic': return logicVisual(host);
     case 'streams': return streamsVisual(host);
     case 'types': return typesVisual(host);

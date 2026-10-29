@@ -37,5 +37,8 @@ export function shippedSeeds(): Seed[] {
     // adds Part 1 "Start here: the words of C++" to the lab that @1 already created
     { ...seed('intro-to-computing@2', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
       [{ slug: 'revision-week-6', flow: introComputingRevisionLab() }]), update: true },
+    // adds the café story at the start of Part 1
+    { ...seed('intro-to-computing@3', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
+      [{ slug: 'revision-week-6', flow: introComputingRevisionLab() }]), update: true },
   ];
 }
