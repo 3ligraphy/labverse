@@ -11,8 +11,9 @@ import { getPlayground } from '@/lib/playgrounds';
 import { exerciseMeta } from '@/lab/exercises/registry';
 import { claimedByFileLab } from '@/lib/lab/claimed';
 import { noStore } from '@/lib/attendance/server';
-import { exerciseStats, labStructure, liveClass, moduleStats, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
-import { NeonStore, type ProgressStore } from './store';
+import { ALL_SESSIONS, ALWAYS_OPEN, OPEN_LAB, exerciseStats, labStructure, liveClass, moduleStats, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
+import { NeonStore, type ProgressStore, type Session } from './store';
+import { looseGroup } from '@/lib/identity';
 import { publishedLabSources } from '@/lib/platform/server';
 import { splitLabKey } from '@/lib/platform/core';
 import { ANY_FACULTY, DEFAULT_FACULTY } from '@/lib/accounts/core';
@@ -88,8 +89,43 @@ function fileStructures(): Promise<LabStructure[]> {
 export const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', ...noStore } });
 
-const WRITES_PER_WINDOW = 300;
+const WRITES_PER_WINDOW = 600;
 const WINDOW_SEC = 10 * 60;
+
+/* ---------------------------------------------------- sessions off (ALWAYS_OPEN) */
+
+const permanent = new Map<string, { at: number; session: Promise<Session> }>();
+const PERMANENT_TTL_MS = 60_000;
+
+/** The lab's permanent session, remembered for a minute per server (it never closes, so this is safe). */
+export function permanentSession(store: ProgressStore, lab: string): Promise<Session> {
+  const hit = permanent.get(lab);
+  if (hit && Date.now() - hit.at < PERMANENT_TTL_MS) return hit.session;
+  const session = store.permanentSession(lab);
+  permanent.set(lab, { at: Date.now(), session });
+  session.catch(() => permanent.delete(lab)); // a failed lookup is tried again on the next request
+  return session;
+}
+
+/** Whether this is a lab's permanent session (it is always open, whatever the clocks say). */
+export const isPermanent = (s: Pick<Session, 'ta_name' | 'closes_at'>) => s.ta_name === OPEN_LAB.ta && s.closes_at === null;
+
+/**
+ * The session a student's request belongs to. With sessions off, a missing, ended or other lab's session falls back
+ * to the lab's permanent session, so a student's work is never turned away. With sessions on: null when it is not
+ * open.
+ */
+export async function liveSession(store: ProgressStore, lab: string, sessionId: string): Promise<Session | null> {
+  const s = sessionId ? await store.getSessionById(sessionId) : null;
+  if (s && s.lab === lab && (sessionState(s, Date.now()).open || (ALWAYS_OPEN && isPermanent(s)))) return s;
+  return ALWAYS_OPEN ? permanentSession(store, lab) : null;
+}
+
+/** The sessions the TA pages read: the chosen one, or — with sessions off — every session of the lab, added up. */
+export async function sessionScope(store: ProgressStore, lab: string, sessionParam: string | null | undefined): Promise<string | string[] | undefined> {
+  if (ALWAYS_OPEN && (!sessionParam || sessionParam === ALL_SESSIONS)) return (await store.listSessions(lab)).map((s) => s.id);
+  return sessionParam || undefined;
+}
 
 /**
  * Shared flow of every student write: validate → session → flood guard → store. No device or network locks.
@@ -112,17 +148,20 @@ export async function studentWrite<V extends Identity>(
   const s = getProgressStore();
   if (!s) return json({ error: 'closed', message: 'Progress tracking is not set up yet.' }, 503);
   try {
-    const sessionId = String((body as Record<string, unknown>)?.sessionId ?? '');
-    const session = sessionId ? await s.getSessionById(sessionId) : null;
-    if (!session || session.lab !== (v.value as any).lab || !sessionState(session, Date.now()).open) {
+    const lab = String((v.value as any).lab ?? '');
+    let session = await liveSession(s, lab, String((body as Record<string, unknown>)?.sessionId ?? ''));
+    if (!session) {
       return json({ error: 'session-closed', message: 'This lab session has not been started, or it has already ended. You can still read the lab content.' }, 403);
     }
-    if (!(await s.isSessionStudent(sessionId, v.value.studentKey))) {
-      return json({ error: 'not-started', message: 'Enter your name, ID and group at the top of the lab before starting.' }, 403);
-    }
     if ((await s.hit(`w:${v.value.studentKey}`, WINDOW_SEC)) > WRITES_PER_WINDOW) return json({ error: 'slow-down', message: 'Too many saves at once. Wait a minute.' }, 429);
-    await s.touchStudent(v.value);
-    const out = await act(s, { ...v.value, sessionId });
+    if (!(await s.isSessionStudent(session.id, v.value.studentKey))) {
+      if (!ALWAYS_OPEN) return json({ error: 'not-started', message: 'Enter your name, ID and group at the top of the lab before starting.' }, 403);
+      // sessions are off: a student who is not in that session joins the lab's permanent one, and the work is saved
+      if (!isPermanent(session)) session = await permanentSession(s, lab);
+      await s.touchStudent(v.value);
+      if (!(await s.isSessionStudent(session.id, v.value.studentKey))) await s.joinSession(session.id, v.value.studentKey, looseGroup((body as Record<string, unknown>)?.group) || '—');
+    } else await s.touchStudent(v.value);
+    const out = await act(s, { ...v.value, sessionId: session.id });
     return out instanceof Response ? out : json({ ok: true, ...(out ?? {}) });
   } catch (err) {
     console.error('[progress] write failed', err);
@@ -198,11 +237,18 @@ export async function buildDashboard(labParam: string | null, sessionParam?: str
   const structure = labs.find((l) => l.lab === labParam) ?? inModule ?? labs.find((l) => l.exercises.length) ?? labs[0];
   const s = getProgressStore();
   if (!structure || !s) return null;
-  const sessions = await s.listSessions(structure.lab);
+  const listed = await s.listSessions(structure.lab);
+  // sessions off: the default view adds up every session of the lab (everyone who ever started it, all their work)
+  const all: (Session & { all: true }) | null = ALWAYS_OPEN
+    ? { id: ALL_SESSIONS, lab: structure.lab, ta_name: 'All students', time_slot: 'Always open', opens_at: listed.at(-1)?.opens_at ?? new Date().toISOString(), closes_at: null, duration_minutes: null, all: true }
+    : null;
+  const sessions: Session[] = all ? [all, ...listed] : listed;
   const selected = sessions.find((session) => session.id === sessionParam) ?? sessions[0] ?? null;
-  const [data, activity] = selected
-    ? await Promise.all([s.labData(structure.lab, selected.id), s.activity(selected.id)])
+  const scope = selected && 'all' in selected ? listed.map((x) => x.id) : selected?.id;
+  const [data, activity] = selected && scope?.length
+    ? await Promise.all([s.labData(structure.lab, scope), s.activity(scope)])
     : [{ students: [], best: [], tasks: [], submissions: [], checkins: [], views: [] }, { last: [], active: [], events: [] }];
+  const stateOf = (x: Session) => ('all' in x || (ALWAYS_OPEN && isPermanent(x)) ? { open: true, closesAt: null } : sessionState(x, Date.now()));
   const students: DashboardStudent[] = data.students.map((st) => {
     const best = data.best.filter((b) => b.student_key === st.student_key);
     const tasksDone = data.tasks.find((t) => t.student_key === st.student_key)?.done ?? 0;
@@ -245,9 +291,10 @@ export async function buildDashboard(labParam: string | null, sessionParam?: str
       submitted: students.filter((x) => x.submission).length,
       checkedIn: students.filter((x) => x.attended).length,
     },
-    session: selected ? { ...selected, ...sessionState(selected, Date.now()) } : { open: false, closesAt: null },
+    session: selected ? { ...selected, ...stateOf(selected) } : { open: false, closesAt: null },
     practice: await s.getPractice(structure.lab),
-    sessions: sessions.map((session) => ({ ...session, ...sessionState(session, Date.now()) })),
+    sessions: sessions.map((session) => ({ ...session, ...stateOf(session) })),
+    alwaysOpen: ALWAYS_OPEN,
     updatedAt: new Date().toISOString(),
   };
 }

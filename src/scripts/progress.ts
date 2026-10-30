@@ -83,6 +83,14 @@ function setState(next: ChipState) {
 /* --------------------------------------------------------------- queue */
 
 let flushing = false;
+// a save that failed (no network, a busy or waking server) is sent again by itself: after 2 s, then 4, 8 … 30 s
+let retryTimer = 0;
+let retryDelay = 2000;
+function retrySoon() {
+  window.clearTimeout(retryTimer);
+  retryTimer = window.setTimeout(() => void flush(), retryDelay);
+  retryDelay = Math.min(retryDelay * 2, 30_000);
+}
 async function flush() {
   if (flushing) return;
   if (!read<Item[]>(QUEUE, []).length) {
@@ -99,6 +107,7 @@ async function flush() {
         res = await fetch(item.path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(item.body) });
       } catch {
         setState('offline'); // network down: keep everything for later
+        retrySoon();
         return;
       }
       if (res.status === 409) {
@@ -112,10 +121,12 @@ async function flush() {
       }
       if (res.status === 429 || res.status >= 500) {
         setState('offline');
+        retrySoon();
         return;
       }
       write(QUEUE, read<Item[]>(QUEUE, []).slice(1)); // 2xx, or 400 (invalid: retrying would not help)
     }
+    retryDelay = 2000;
     if (state !== 'conflict') setState('synced');
   } finally {
     flushing = false;

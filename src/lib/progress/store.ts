@@ -5,7 +5,7 @@
  */
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
-import { TIME_GAP_CAP, type Activity, type Best, type Identity, type StatsRaw } from './core.ts';
+import { OPEN_LAB, TIME_GAP_CAP, type Activity, type Best, type Identity, type StatsRaw } from './core.ts';
 
 export type StudentRow = { student_key: string; student_id: string; name: string; device_key: string | null; created_at: string; last_seen: string; group_name?: string; session_started_at?: string };
 export type AttemptRow = { id: number; exercise: string; passed: number; total: number; code: string; created_at: string };
@@ -49,14 +49,15 @@ export interface ProgressStore {
   hit(key: string, windowSec: number): Promise<number>;
   /** The current count for a key without adding to it (0 once its window has passed). */
   count(key: string): Promise<number>;
-  labData(lab: string, sessionId?: string): Promise<LabData>;
-  studentData(lab: string, studentKey: string, sessionId?: string): Promise<StudentData>;
-  /** Live class view: latest Check per student, last activity, and the newest events of one session. */
-  activity(sessionId: string, limit?: number): Promise<Activity>;
+  /** One session, or several added up (each student once: every exercise's best, every task done in any of them). */
+  labData(lab: string, sessionId?: string | string[]): Promise<LabData>;
+  studentData(lab: string, studentKey: string, sessionId?: string | string[]): Promise<StudentData>;
+  /** Live class view: latest Check per student, last activity, and the newest events of one session (or several). */
+  activity(sessionId: string | string[], limit?: number): Promise<Activity>;
   /** Everything the statistics page needs for these labs, across all their sessions. */
   statsRaw(labs: string[]): Promise<StatsRaw>;
   unlock(studentKey: string): Promise<void>;
-  review(studentKey: string, lab: string, reviewed: boolean, note: string, sessionId?: string): Promise<void>;
+  review(studentKey: string, lab: string, reviewed: boolean, note: string, sessionId?: string | string[]): Promise<void>;
   /* per-lab attendance + reading */
   getSession(lab: string): Promise<Session | null>;
   getSessionById(id: string): Promise<Session | null>;
@@ -67,6 +68,11 @@ export interface ProgressStore {
   deleteSession(lab: string, sessionId: string): Promise<boolean>;
   openSession(lab: string, minutes: number | null, taName?: string, timeSlot?: string): Promise<Session>;
   closeSession(lab: string, sessionId?: string): Promise<void>;
+  /**
+   * The lab's permanent session (sessions off, see ALWAYS_OPEN): never closes. The oldest one that is still open is
+   * reused, so students who already joined it stay in it; otherwise it is created with one id per lab.
+   */
+  permanentSession(lab: string): Promise<Session>;
   /** Returns the check-in time; the first check-in is kept. */
   checkIn(studentKey: string, lab: string, sessionId?: string): Promise<string>;
   addViews(studentKey: string, lab: string, seen: string[], activeSec: number, sessionId?: string): Promise<void>;
@@ -152,14 +158,16 @@ export class MemoryStore implements ProgressStore {
     const h = this.hits.get(key);
     return h && h.until >= this.now() ? h.n : 0;
   }
-  async labData(lab: string, sessionId?: string): Promise<LabData> {
-    const inSession = (row: { session_id?: string }) => sessionId === undefined || row.session_id === sessionId;
+  async labData(lab: string, sessionId?: string | string[]): Promise<LabData> {
+    const ids = sessionId === undefined ? null : new Set(Array.isArray(sessionId) ? sessionId : [sessionId]);
+    const inSession = (row: { session_id?: string }) => ids === null || ids.has(row.session_id ?? '');
     const att = this.attempts.filter((a) => a.lab === lab && inSession(a));
     const tasks = [...this.tasks.values()].filter((t) => t.lab === lab && inSession(t));
     const subs = [...this.subs.values()].filter((s) => s.lab === lab && inSession(s));
     const checkins = [...this.checkins.values()].filter((c) => c.lab === lab && inSession(c));
     const views = [...this.views.values()].filter((v) => v.lab === lab && inSession(v));
-    const keys = new Set([...(sessionId ? [...this.memberships.values()].filter((m) => m.session_id === sessionId) : []), ...att, ...tasks, ...subs, ...checkins, ...views].map((r) => r.student_key));
+    const members = ids ? [...this.memberships.values()].filter((m) => ids.has(m.session_id)).sort((a, b) => a.joined_at.localeCompare(b.joined_at)) : [];
+    const keys = new Set([...members, ...att, ...tasks, ...subs, ...checkins, ...views].map((r) => r.student_key));
     const groups = new Map<string, typeof att>();
     for (const a of att) groups.set(`${a.student_key}|${a.exercise}`, [...(groups.get(`${a.student_key}|${a.exercise}`) ?? []), a]);
     const best = [...groups.values()].map((g) => {
@@ -167,22 +175,55 @@ export class MemoryStore implements ProgressStore {
       const solved = g.filter((a) => a.passed === a.total).map((a) => a.created_at).sort()[0] ?? null;
       return { student_key: top.student_key, exercise: top.exercise, passed: top.passed, total: top.total, attempts: g.length, firstAt: g.map((a) => a.created_at).sort()[0], solvedAt: solved };
     });
-    const done = new Map<string, number>();
-    for (const t of tasks) done.set(t.student_key, (done.get(t.student_key) ?? 0) + (t.done ? 1 : 0));
+    // a task counts once, when it is done in any of the sessions
+    const done = new Map<string, Set<string>>();
+    for (const t of tasks) if (t.done) done.set(t.student_key, (done.get(t.student_key) ?? new Set()).add(t.task));
+    // the newest hand-in, the first check-in, and all the reading of each student
+    const sub = new Map<string, (typeof subs)[number]>();
+    for (const s of [...subs].sort((a, b) => a.updated_at.localeCompare(b.updated_at))) sub.set(s.student_key, s);
+    const checkin = new Map<string, string>();
+    for (const c of checkins) if (!checkin.has(c.student_key) || c.at < checkin.get(c.student_key)!) checkin.set(c.student_key, c.at);
+    const read = new Map<string, { seen: Set<string>; active_sec: number }>();
+    for (const v of views) {
+      const r = read.get(v.student_key) ?? { seen: new Set<string>(), active_sec: 0 };
+      v.seen.forEach((n) => r.seen.add(n));
+      r.active_sec += v.active_sec;
+      read.set(v.student_key, r);
+    }
     return {
       students: [...keys].map((k) => {
-        const student = this.students.get(k)!;
-        const member = sessionId ? this.memberships.get(`${sessionId}|${k}`) : null;
-        return student ? { ...student, ...(member ? { group_name: member.group_name, session_started_at: member.joined_at } : {}) } : student;
-      }).filter(Boolean),
+        const student = this.students.get(k);
+        if (!student) return null;
+        const mine = members.filter((m) => m.student_key === k);
+        if (!mine.length) return student;
+        // the group they last joined with (a real one when they typed one), and when they first joined
+        const named = mine.filter((m) => m.group_name && m.group_name !== '—');
+        return { ...student, group_name: (named.at(-1) ?? mine.at(-1)!).group_name, session_started_at: mine[0].joined_at };
+      }).filter((s): s is StudentRow => s !== null),
       best,
-      tasks: [...done].map(([student_key, n]) => ({ student_key, done: n })),
-      submissions: subs.map(({ lab: _lab, ...s }) => s),
-      checkins: checkins.map(({ student_key, at }) => ({ student_key, at })),
-      views: views.map((v) => ({ student_key: v.student_key, seen: [...v.seen], active_sec: v.active_sec })),
+      tasks: [...done].map(([student_key, set]) => ({ student_key, done: set.size })),
+      submissions: [...sub.values()].map(({ lab: _lab, session_id: _s, ...s }) => s),
+      checkins: [...checkin].map(([student_key, at]) => ({ student_key, at })),
+      views: [...read].map(([student_key, r]) => ({ student_key, seen: [...r.seen], active_sec: r.active_sec })),
     };
   }
-  async studentData(lab: string, studentKey: string, sessionId?: string): Promise<StudentData> {
+  async studentData(lab: string, studentKey: string, sessionId?: string | string[]): Promise<StudentData> {
+    if (Array.isArray(sessionId)) {
+      const ids = new Set(sessionId);
+      const mine = (row: { lab: string; student_key: string; session_id?: string }) => row.lab === lab && row.student_key === studentKey && ids.has(row.session_id ?? '');
+      const sub = [...this.subs.values()].filter(mine).sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
+      const views = [...this.views.values()].filter(mine);
+      const tasks = new Map<string, boolean>();
+      for (const t of [...this.tasks.values()].filter(mine)) tasks.set(t.task, Boolean(tasks.get(t.task)) || t.done);
+      return {
+        student: this.students.get(studentKey) ?? null,
+        attempts: this.attempts.filter(mine).reverse().map(({ student_key: _s, lab: _l, session_id: _q, ...a }) => a),
+        tasks: [...tasks].map(([task, done]) => ({ task, done })),
+        submission: sub ? { url: sub.url, reviewed: sub.reviewed, note: sub.note } : null,
+        checkin: [...this.checkins.values()].filter(mine).map((c) => c.at).sort()[0] ?? null,
+        views: views.length ? { seen: [...new Set(views.flatMap((v) => [...v.seen]))], active_sec: views.reduce((a, v) => a + v.active_sec, 0) } : null,
+      };
+    }
     const key = `${sessionId ?? ''}|${studentKey}|${lab}`;
     const sub = this.subs.get(key);
     const match = (row: { session_id?: string }) => sessionId === undefined || row.session_id === sessionId;
@@ -202,9 +243,11 @@ export class MemoryStore implements ProgressStore {
     const row = this.students.get(studentKey);
     if (row) row.device_key = null;
   }
-  async review(studentKey: string, lab: string, reviewed: boolean, note: string, sessionId?: string) {
-    const sub = this.subs.get(`${sessionId ?? ''}|${studentKey}|${lab}`);
-    if (sub) Object.assign(sub, { reviewed, note });
+  async review(studentKey: string, lab: string, reviewed: boolean, note: string, sessionId?: string | string[]) {
+    for (const id of Array.isArray(sessionId) ? sessionId : [sessionId]) {
+      const sub = this.subs.get(`${id ?? ''}|${studentKey}|${lab}`);
+      if (sub) Object.assign(sub, { reviewed, note });
+    }
   }
   async getSession(lab: string) {
     const now = this.now();
@@ -262,6 +305,16 @@ export class MemoryStore implements ProgressStore {
     const s = sessionId ? this.sessions.get(sessionId) : await this.getSession(lab);
     if (s) s.closes_at = this.stamp();
   }
+  async permanentSession(lab: string) {
+    const found = [...this.sessions.values()].filter((s) => s.lab === lab && s.ta_name === OPEN_LAB.ta && s.closes_at === null)
+      .sort((a, b) => a.opens_at.localeCompare(b.opens_at) || a.id.localeCompare(b.id))[0];
+    if (found) return found;
+    const id = `open_${lab}`;
+    const session = this.sessions.get(id) ?? { id, lab, ta_name: OPEN_LAB.ta, time_slot: OPEN_LAB.slot, opens_at: new Date(this.now() - 3_600_000).toISOString(), closes_at: null, duration_minutes: null };
+    session.closes_at = null;
+    this.sessions.set(id, session);
+    return session;
+  }
   async checkIn(studentKey: string, lab: string, sessionId?: string) {
     const k = `${sessionId ?? ''}|${studentKey}|${lab}`;
     if (!this.checkins.has(k)) this.checkins.set(k, { student_key: studentKey, lab, session_id: sessionId, at: this.stamp() });
@@ -315,8 +368,9 @@ export class MemoryStore implements ProgressStore {
       heat: [...heat].map(([k, n]) => ({ dow: Number(k.split('|')[0]), hour: Number(k.split('|')[1]), n })),
     };
   }
-  async activity(sessionId: string, limit = 40): Promise<Activity> {
-    const att = this.attempts.filter((a) => a.session_id === sessionId);
+  async activity(sessionId: string | string[], limit = 40): Promise<Activity> {
+    const ids = new Set(Array.isArray(sessionId) ? sessionId : [sessionId]);
+    const att = this.attempts.filter((a) => ids.has(a.session_id ?? ''));
     const latest = new Map<string, (typeof att)[number]>();
     for (const a of att) latest.set(a.student_key, a);
     const last = [...latest.values()].map((l) => {
@@ -324,11 +378,16 @@ export class MemoryStore implements ProgressStore {
       const lastPass = Math.max(0, ...mine.filter((a) => a.passed >= a.total).map((a) => a.id));
       return { student_key: l.student_key, exercise: l.exercise, passed: l.passed, total: l.total, at: l.created_at, fails: mine.filter((a) => a.id > lastPass && a.passed < a.total).length };
     });
-    const active = [...this.memberships.values()].filter((m) => m.session_id === sessionId)
-      .map((m) => ({ student_key: m.student_key, at: this.acted.get(`${sessionId}|${m.student_key}`) ?? m.joined_at }));
+    // each student once, with their latest activity in any of the sessions
+    const last_at = new Map<string, string>();
+    for (const m of [...this.memberships.values()].filter((x) => ids.has(x.session_id))) {
+      const at = this.acted.get(`${m.session_id}|${m.student_key}`) ?? m.joined_at;
+      if (!last_at.has(m.student_key) || at > last_at.get(m.student_key)!) last_at.set(m.student_key, at);
+    }
+    const active = [...last_at].map(([student_key, at]) => ({ student_key, at }));
     const events = [
       ...att.map((a) => ({ student_key: a.student_key, kind: 'check' as const, ref: a.exercise, passed: a.passed, total: a.total, at: a.created_at, n: a.id })),
-      ...this.taskLog.filter((t) => t.session_id === sessionId).map((t) => ({ student_key: t.student_key, kind: 'task' as const, ref: t.task, passed: 1, total: 1, at: t.at, n: t.n })),
+      ...this.taskLog.filter((t) => ids.has(t.session_id ?? '')).map((t) => ({ student_key: t.student_key, kind: 'task' as const, ref: t.task, passed: 1, total: 1, at: t.at, n: t.n })),
     ].sort((a, b) => b.at.localeCompare(a.at) || b.n - a.n).slice(0, limit).map(({ n: _n, ...e }) => e);
     return { last, active, events };
   }
@@ -513,18 +572,25 @@ export class NeonStore implements ProgressStore {
     return Number(row?.n ?? 0);
   }
 
-  async labData(lab: string, sessionId?: string): Promise<LabData> {
+  async labData(lab: string, sessionId?: string | string[]): Promise<LabData> {
     if (sessionId) {
       const v = this.v2;
+      // one session or several: each student once, every exercise's best try, a task done in any of them
+      const ids = Array.isArray(sessionId) ? sessionId : [sessionId];
       const [studentRows, best, taskRows, subRows, checkinRows, viewRows] = await Promise.all([
-        this.q(`select s.*, m.group_name, m.joined_at as session_started_at from ${this.t.students} s join ${v.members} m on m.student_key = s.student_key where m.session_id = $1`, [sessionId]),
+        this.q(`select s.*, m.group_name, m.started as session_started_at from ${this.t.students} s join (
+            select student_key, min(joined_at) as started,
+              coalesce((array_agg(group_name order by joined_at desc) filter (where group_name not in ('', '—')))[1], (array_agg(group_name order by joined_at desc))[1]) as group_name
+            from ${v.members} where session_id = any($1::text[]) group by student_key) m on m.student_key = s.student_key`, [ids]),
         this.q(`select student_key, exercise, max(passed) as passed, count(*)::int as attempts, min(created_at) as first_at,
           min(created_at) filter (where passed = total) as solved_at, (array_agg(total order by passed desc, created_at desc))[1] as total
-          from ${v.attempts} where session_id = $1 group by student_key, exercise`, [sessionId]),
-        this.q(`select student_key, (count(*) filter (where done))::int as done from ${v.tasks} where session_id = $1 group by student_key`, [sessionId]),
-        this.q(`select student_key, url, reviewed, note, updated_at from ${v.subs} where session_id = $1`, [sessionId]),
-        this.q(`select student_key, at from ${v.checkins} where session_id = $1`, [sessionId]),
-        this.q(`select student_key, seen, active_sec from ${v.views} where session_id = $1`, [sessionId]),
+          from ${v.attempts} where session_id = any($1::text[]) group by student_key, exercise`, [ids]),
+        this.q(`select student_key, (count(distinct task) filter (where done))::int as done from ${v.tasks} where session_id = any($1::text[]) group by student_key`, [ids]),
+        this.q(`select distinct on (student_key) student_key, url, reviewed, note, updated_at from ${v.subs} where session_id = any($1::text[]) order by student_key, updated_at desc`, [ids]),
+        this.q(`select student_key, min(at) as at from ${v.checkins} where session_id = any($1::text[]) group by student_key`, [ids]),
+        this.q(`select v.student_key, sum(v.active_sec)::int as active_sec,
+            coalesce((select array_agg(distinct x) from ${v.views} w, unnest(w.seen) x where w.session_id = any($1::text[]) and w.student_key = v.student_key), '{}') as seen
+          from ${v.views} v where v.session_id = any($1::text[]) group by v.student_key`, [ids]),
       ]);
       return {
         checkins: checkinRows.map((r) => ({ student_key: r.student_key, at: iso(r.at)! })),
@@ -612,24 +678,25 @@ export class NeonStore implements ProgressStore {
     };
   }
 
-  async activity(sessionId: string, limit = 40): Promise<Activity> {
+  async activity(sessionId: string | string[], limit = 40): Promise<Activity> {
     const v = this.v2;
+    const ids = Array.isArray(sessionId) ? sessionId : [sessionId];
     const [last, active, events] = await Promise.all([
       this.q(`with l as (select distinct on (student_key) id, student_key, exercise, passed, total, created_at from ${v.attempts}
-                where session_id = $1 order by student_key, id desc)
+                where session_id = any($1::text[]) order by student_key, id desc)
               select l.student_key, l.exercise, l.passed, l.total, l.created_at,
-                (select count(*) from ${v.attempts} a where a.session_id = $1 and a.student_key = l.student_key and a.exercise = l.exercise and a.passed < a.total
-                   and a.id > coalesce((select max(b.id) from ${v.attempts} b where b.session_id = $1 and b.student_key = l.student_key and b.exercise = l.exercise and b.passed >= b.total), 0))::int as fails
-              from l`, [sessionId]),
-      this.q(`select m.student_key, greatest(m.joined_at,
-                (select max(created_at) from ${v.attempts} a where a.session_id = $1 and a.student_key = m.student_key),
-                (select max(updated_at) from ${v.tasks} t where t.session_id = $1 and t.student_key = m.student_key),
-                (select updated_at from ${v.views} w where w.session_id = $1 and w.student_key = m.student_key)) as at
-              from ${v.members} m where m.session_id = $1`, [sessionId]),
-      this.q(`(select student_key, 'check' as kind, exercise as ref, passed, total, created_at as at from ${v.attempts} where session_id = $1 order by id desc limit $2)
+                (select count(*) from ${v.attempts} a where a.session_id = any($1::text[]) and a.student_key = l.student_key and a.exercise = l.exercise and a.passed < a.total
+                   and a.id > coalesce((select max(b.id) from ${v.attempts} b where b.session_id = any($1::text[]) and b.student_key = l.student_key and b.exercise = l.exercise and b.passed >= b.total), 0))::int as fails
+              from l`, [ids]),
+      this.q(`select m.student_key, max(greatest(m.joined_at,
+                (select max(created_at) from ${v.attempts} a where a.session_id = m.session_id and a.student_key = m.student_key),
+                (select max(updated_at) from ${v.tasks} t where t.session_id = m.session_id and t.student_key = m.student_key),
+                (select updated_at from ${v.views} w where w.session_id = m.session_id and w.student_key = m.student_key))) as at
+              from ${v.members} m where m.session_id = any($1::text[]) group by m.student_key`, [ids]),
+      this.q(`(select student_key, 'check' as kind, exercise as ref, passed, total, created_at as at from ${v.attempts} where session_id = any($1::text[]) order by id desc limit $2)
               union all
-              (select student_key, 'task' as kind, task as ref, 1, 1, updated_at as at from ${v.tasks} where session_id = $1 and done order by updated_at desc limit $2)
-              order by at desc limit $2`, [sessionId, limit]),
+              (select student_key, 'task' as kind, task as ref, 1, 1, updated_at as at from ${v.tasks} where session_id = any($1::text[]) and done order by updated_at desc limit $2)
+              order by at desc limit $2`, [ids, limit]),
     ]);
     return {
       last: last.map((r) => ({ student_key: r.student_key, exercise: r.exercise, passed: Number(r.passed), total: Number(r.total), at: iso(r.created_at)!, fails: Number(r.fails) })),
@@ -638,16 +705,19 @@ export class NeonStore implements ProgressStore {
     };
   }
 
-  async studentData(lab: string, studentKey: string, sessionId?: string): Promise<StudentData> {
+  async studentData(lab: string, studentKey: string, sessionId?: string | string[]): Promise<StudentData> {
     if (sessionId) {
       const v = this.v2;
+      const ids = Array.isArray(sessionId) ? sessionId : [sessionId];
       const [[student], attemptRows, taskRows, [sub], [checkin], [view]] = await Promise.all([
-        this.q(`select s.* from ${this.t.students} s join ${v.members} m on m.student_key = s.student_key where m.session_id = $1 and s.student_key = $2`, [sessionId, studentKey]),
-        this.q(`select id, exercise, passed, total, code, created_at from ${v.attempts} where session_id = $1 and student_key = $2 order by id desc limit 500`, [sessionId, studentKey]),
-        this.q(`select task, done from ${v.tasks} where session_id = $1 and student_key = $2`, [sessionId, studentKey]),
-        this.q(`select url, reviewed, note from ${v.subs} where session_id = $1 and student_key = $2`, [sessionId, studentKey]),
-        this.q(`select at from ${v.checkins} where session_id = $1 and student_key = $2`, [sessionId, studentKey]),
-        this.q(`select seen, active_sec from ${v.views} where session_id = $1 and student_key = $2`, [sessionId, studentKey]),
+        this.q(`select s.* from ${this.t.students} s where s.student_key = $2 and exists (select 1 from ${v.members} m where m.session_id = any($1::text[]) and m.student_key = s.student_key)`, [ids, studentKey]),
+        this.q(`select id, exercise, passed, total, code, created_at from ${v.attempts} where session_id = any($1::text[]) and student_key = $2 order by id desc limit 500`, [ids, studentKey]),
+        this.q(`select task, bool_or(done) as done from ${v.tasks} where session_id = any($1::text[]) and student_key = $2 group by task`, [ids, studentKey]),
+        this.q(`select url, reviewed, note from ${v.subs} where session_id = any($1::text[]) and student_key = $2 order by updated_at desc limit 1`, [ids, studentKey]),
+        this.q(`select at from ${v.checkins} where session_id = any($1::text[]) and student_key = $2 order by at limit 1`, [ids, studentKey]),
+        this.q(`select seen, active_sec from (select coalesce(sum(active_sec), 0)::int as active_sec, count(*)::int as n,
+            coalesce((select array_agg(distinct x) from ${v.views} w, unnest(w.seen) x where w.session_id = any($1::text[]) and w.student_key = $2), '{}') as seen
+          from ${v.views} where session_id = any($1::text[]) and student_key = $2) r where n > 0`, [ids, studentKey]),
       ]);
       return {
         student: student ? { ...student, created_at: iso(student.created_at)!, last_seen: iso(student.last_seen)! } : null,
@@ -752,6 +822,16 @@ export class NeonStore implements ProgressStore {
   async closeSession(lab: string, sessionId?: string) {
     await this.q(`update ${this.v2.sessions} set closes_at = now() where lab = $1 and ($2::text is null or id = $2) and (closes_at is null or closes_at > now())`, [lab, sessionId ?? null]);
   }
+  async permanentSession(lab: string) {
+    const [found] = await this.q(`select * from ${this.v2.sessions} where lab = $1 and ta_name = $2 and closes_at is null order by opens_at, id limit 1`, [lab, OPEN_LAB.ta]);
+    if (found) return this.sessionRow(found);
+    // one id per lab: servers that create it at the same moment get the same session. It opened an hour ago, so a
+    // database clock that runs a little ahead never makes it look not open yet.
+    const [row] = await this.q(`insert into ${this.v2.sessions} (id, lab, ta_name, time_slot, opens_at, closes_at, duration_minutes)
+      values ($1, $2, $3, $4, now() - interval '1 hour', null, null)
+      on conflict (id) do update set closes_at = null returning *`, [`open_${lab}`, lab, OPEN_LAB.ta, OPEN_LAB.slot]);
+    return this.sessionRow(row);
+  }
 
   async checkIn(studentKey: string, lab: string, sessionId?: string) {
     if (sessionId) {
@@ -788,9 +868,9 @@ export class NeonStore implements ProgressStore {
     await this.q(`update ${this.t.students} set device_key = null where student_key = $1`, [studentKey]);
   }
 
-  async review(studentKey: string, lab: string, reviewed: boolean, note: string, sessionId?: string) {
+  async review(studentKey: string, lab: string, reviewed: boolean, note: string, sessionId?: string | string[]) {
     if (sessionId) {
-      await this.q(`update ${this.v2.subs} set reviewed = $3, note = $4 where student_key = $1 and session_id = $2`, [studentKey, sessionId, reviewed, note]);
+      await this.q(`update ${this.v2.subs} set reviewed = $3, note = $4 where student_key = $1 and session_id = any($2::text[])`, [studentKey, Array.isArray(sessionId) ? sessionId : [sessionId], reviewed, note]);
       return;
     }
     await this.q(`update ${this.t.subs} set reviewed = $3, note = $4 where student_key = $1 and lab = $2`, [studentKey, lab, reviewed, note]);

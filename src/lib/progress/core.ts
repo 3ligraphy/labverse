@@ -132,6 +132,8 @@ export function validateViews(input: unknown, labs: LabStructure[]): Valid<Views
   });
 }
 
+export { ALL_SESSIONS, ALWAYS_OPEN, OPEN_LAB } from './mode.ts';
+
 /** Whether a lab's check-in is open right now. */
 export function sessionState(s: { opens_at: string; closes_at: string | null } | null, now: number): { open: boolean; closesAt: string | null } {
   if (!s) return { open: false, closesAt: null };
@@ -287,9 +289,11 @@ export function moduleStats(labs: LabStructure[], raw: StatsRaw) {
   const percents = new Map<string, number>(); // `${lab}|${student}` → score
   const perLab = labs.map((l) => {
     const students = [...new Set(raw.members.filter((m) => m.lab === l.lab).map((m) => m.student_key))];
+    // only the lab's questions as they are now: tries on a question that was later removed do not count
+    const current = new Set(l.exercises.map((e) => e.id));
     const people: { name: string; id: string; group: string; percent: number; solved: number; tries: number; seconds: number }[] = [];
     const scores = students.map((key) => {
-      const rows = raw.best.filter((b) => b.lab === l.lab && b.student_key === key);
+      const rows = raw.best.filter((b) => b.lab === l.lab && b.student_key === key && current.has(b.exercise));
       const best = rows.map((b) => ({ exercise: b.exercise, passed: b.passed, total: b.total, attempts: b.attempts, firstAt: '', solvedAt: null }));
       const done = raw.tasks.find((t) => t.lab === l.lab && t.student_key === key)?.done ?? 0;
       const sub = raw.subs.some((x) => x.lab === l.lab && x.student_key === key);

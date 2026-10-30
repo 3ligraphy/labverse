@@ -7,6 +7,7 @@
 import Base from '@/layouts/Base.astro';
 import { isAdmin, setupStatus } from '@/lib/attendance/server';
 import { progressSetup } from '@/lib/progress/server';
+import { ALWAYS_OPEN } from '@/lib/progress/mode';
 import { tokenSecret } from '@/lib/accounts/server';
 
 export const prerender = false;
@@ -81,23 +82,32 @@ import AdminShell from '@/components/admin/AdminShell.astro';
           <header class="session-head">
             <div>
               <p class="adm-k mono">Lab sessions</p>
-              <h1 class="adm-h">Manage teaching sessions</h1>
-              <p class="muted">Create a time slot first, then start it when students may begin the lab.</p>
+              {ALWAYS_OPEN ? (
+                <>
+                  <h1 class="adm-h">Sessions are off</h1>
+                  <p class="muted">Every lab is open to all students at any time, day and night. There is nothing to create or start: each lab saves everyone’s work in one session that never closes, and Lab progress adds up all of it.</p>
+                </>
+              ) : (
+                <>
+                  <h1 class="adm-h">Manage teaching sessions</h1>
+                  <p class="muted">Create a time slot first, then start it when students may begin the lab.</p>
+                </>
+              )}
             </div>
-            <label class="practice-toggle">
+            {!ALWAYS_OPEN && <label class="practice-toggle">
               <input type="checkbox" role="switch" data-practice-toggle />
               <span class="practice-track" aria-hidden="true"><i></i></span>
               <span><b>Open practice</b><small data-practice-note>Students can edit and check this lab without a session. Nothing is recorded.</small></span>
-            </label>
+            </label>}
           </header>
-          <form class="session-create" data-session-create>
+          {!ALWAYS_OPEN && <form class="session-create" data-session-create>
             <label><span>TA name</span><input class="input" name="taName" required maxlength="60" placeholder="Teaching assistant name" /></label>
             <label><span>Time slot</span><input class="input" name="timeSlot" required maxlength="80" placeholder="e.g. Monday 10:00–12:00" /></label>
             <label><span>Duration</span><select class="input" name="minutes"><option value="60">60 min</option><option value="90" selected>90 min</option><option value="120">120 min</option><option value="180">180 min</option><option value="">No limit</option></select></label>
             <button class="btn btn-primary" type="submit">Create session</button>
-          </form>
+          </form>}
           <p class="session-message small" data-session-message role="status"></p>
-          <div class="session-list" data-session-list></div>
+          <div class="session-list" data-session-list data-always-open={ALWAYS_OPEN ? '' : undefined}></div>
         </section>
       </div>
       <div data-panel="lab" hidden>
@@ -378,11 +388,27 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     const signature = stats.structure.lab + JSON.stringify(stats.sessions);
     if (list.dataset.signature === signature) return;
     list.dataset.signature = signature;
-    if (!stats.sessions.length) {
-      list.innerHTML = '<p class="empty-session">No sessions for this lab yet. Create the first time slot above.</p>';
+    // sessions off: the list only shows what is there (and "All students", the sum of them, is not a session)
+    const off = list.hasAttribute('data-always-open');
+    const sessions = stats.sessions.filter((session) => session.id !== 'all');
+    if (!sessions.length) {
+      list.innerHTML = off ? '<p class="empty-session">No one has started this lab yet.</p>' : '<p class="empty-session">No sessions for this lab yet. Create the first time slot above.</p>';
       return;
     }
-    list.innerHTML = stats.sessions.map((session) => `<article class="session-row ${session.open ? 'live-row' : ''}" data-session-id="${esc(session.id)}">
+    if (off) {
+      list.innerHTML = sessions.map((session) => `<article class="session-row ${session.open ? 'live-row' : ''}" data-session-id="${esc(session.id)}">
+      <div class="session-meta mono">
+        <span class="session-state ${session.open ? 'live' : ''}">${session.open ? 'Open' : 'Past'}</span>
+        <span>${esc(session.time_slot)} · ${esc(session.ta_name)}</span>
+        <span>Since ${clock(session.opens_at)}</span>
+      </div>
+      <div class="session-actions">
+        <a class="btn btn-ghost btn-sm" href="/admin/progress?lab=${encodeURIComponent(stats.structure.lab)}&session=${encodeURIComponent(session.id)}">View insights</a>
+      </div>
+    </article>`).join('');
+      return;
+    }
+    list.innerHTML = sessions.map((session) => `<article class="session-row ${session.open ? 'live-row' : ''}" data-session-id="${esc(session.id)}">
       <div class="session-meta mono">
         <span class="session-state ${session.open ? 'live' : ''}">${session.open ? 'Live' : 'Inactive'}</span>
         <span>Started ${clock(session.opens_at)}</span>

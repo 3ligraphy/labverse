@@ -6,7 +6,7 @@ import type { APIRoute } from 'astro';
 import { isAdmin } from '@/lib/attendance/server';
 import { access } from '@/lib/accounts/access';
 import { canOnLab, canSeeLab } from '@/lib/accounts/labscope';
-import { getProgressStore, json } from '@/lib/progress/server';
+import { getProgressStore, json, sessionScope } from '@/lib/progress/server';
 
 export const prerender = false;
 
@@ -19,7 +19,8 @@ export const GET: APIRoute = async ({ cookies, url }) => {
   if (!store) return json({ error: 'no-database' }, 503);
   if (!canOnLab(await access(cookies), 'module.progress', lab)) return json({ error: 'forbidden' }, 403);
   try {
-    return json(await store.studentData(lab, id, session));
+    // with sessions off, "All students" is every session of the lab added up
+    return json(await store.studentData(lab, id, await sessionScope(store, lab, session)));
   } catch (err) {
     console.error('[progress] student failed', err);
     return json({ error: 'server' }, 500);
@@ -37,7 +38,10 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   if (body?.action === 'unlock' ? !a.can('module.sessions') : !canOnLab(a, 'module.progress', String(body?.lab ?? ''))) return json({ error: 'forbidden' }, 403);
   try {
     if (body?.action === 'unlock') await store.unlock(id);
-    else if (body?.action === 'review') await store.review(id, String(body.lab ?? ''), body.reviewed === true, String(body.note ?? '').slice(0, 500), typeof body.sessionId === 'string' ? body.sessionId : undefined);
+    else if (body?.action === 'review') {
+      const lab = String(body.lab ?? '');
+      await store.review(id, lab, body.reviewed === true, String(body.note ?? '').slice(0, 500), await sessionScope(store, lab, typeof body.sessionId === 'string' ? body.sessionId : undefined));
+    }
     else return json({ error: 'bad-request' }, 400);
     return json({ ok: true });
   } catch (err) {

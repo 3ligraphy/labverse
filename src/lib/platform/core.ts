@@ -6,6 +6,7 @@
  * so attendance, sessions, Done ticks, graded exercises and the admin dashboards work unchanged.
  * Pure functions only, so they are unit-tested (tests/platform.test.ts) and shared with the builder UI.
  */
+import { ALWAYS_OPEN } from '../progress/mode.ts';
 import type { Check, Step } from '../../runner/protocol';
 import { DEFAULT_FACULTY } from '../accounts/core.ts';
 import { parseCppChecks, type CppCheck } from '../../lab/cpp/checks.ts';
@@ -85,7 +86,9 @@ export const LAB_NODES = {
       { key: 'difficulty', label: 'Difficulty', kind: 'select', options: ['Beginner', 'Intermediate', 'Advanced'] },
       { key: 'estimatedTime', label: 'Estimated time', kind: 'text', placeholder: '2 hours', max: 40 },
       { key: 'objectives', label: 'Learning objectives', kind: 'lines', help: 'One per line', max: 2000 },
-      { key: 'access', label: 'Sessions', kind: 'select', options: [...LAB_ACCESS], help: 'Open any time: anyone with the link opens this lab (no sign-in or enrolment), enters a name and student ID and starts straight away — no TA session needed, and their work is still tracked.' },
+      { key: 'access', label: 'Sessions', kind: 'select', options: [...LAB_ACCESS], help: ALWAYS_OPEN
+        ? 'Sessions are off for the whole site: every lab is open any time and tracked. Open any time also lets anyone with the link in, without sign-in or enrolment.'
+        : 'Open any time: anyone with the link opens this lab (no sign-in or enrolment), enters a name and student ID and starts straight away — no TA session needed, and their work is still tracked.' },
     ],
     defaults: { title: 'New lab', description: '', difficulty: 'Beginner', estimatedTime: '2 hours', objectives: '', access: LAB_ACCESS[0] },
   },

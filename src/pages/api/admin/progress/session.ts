@@ -6,10 +6,10 @@ import type { APIRoute } from 'astro';
 import { isAdmin } from '@/lib/attendance/server';
 import { access } from '@/lib/accounts/access';
 import { canOnLab, canSeeLab } from '@/lib/accounts/labscope';
-import { sessionState, validateStudentIdentity } from '@/lib/progress/core';
+import { ALL_SESSIONS, ALWAYS_OPEN, sessionState, validateStudentIdentity } from '@/lib/progress/core';
 import { sessionDetails } from '@/lib/progress/session-input';
 import { markPresent } from '@/lib/progress/manual-attendance';
-import { getProgressStore, getStructures, json } from '@/lib/progress/server';
+import { getProgressStore, getStructures, json, permanentSession } from '@/lib/progress/server';
 
 export const prerender = false;
 
@@ -24,7 +24,13 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   if (!canOnLab(await access(cookies), 'module.sessions', lab)) return json({ error: 'forbidden', message: 'You do not run sessions for this module.' }, 403);
   try {
     const action = String(body?.action ?? '');
-    const sessionId = typeof body?.sessionId === 'string' ? body.sessionId : '';
+    // sessions are off: every lab is always open in its permanent session, so there is nothing to make, start or end
+    if (ALWAYS_OPEN && ['create', 'open', 'update', 'start', 'close', 'delete'].includes(action)) {
+      return json({ error: 'always-open', message: 'Sessions are off: every lab is open to all students at any time, so there is nothing to start or end.' }, 409);
+    }
+    const asked = typeof body?.sessionId === 'string' ? body.sessionId : '';
+    // "All students" (sessions off) records attendance in the lab's permanent session
+    const sessionId = ALWAYS_OPEN && action === 'add-attendance' && (!asked || asked === ALL_SESSIONS) ? (await permanentSession(store, lab)).id : asked;
     if (action === 'add-attendance') {
       const identity = validateStudentIdentity(body);
       if (!identity.ok) return json({ error: 'invalid', message: Object.values(identity.errors).join(' '), errors: identity.errors }, 400);
@@ -37,8 +43,16 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     }
     if (action === 'attendance') {
       const studentKey = typeof body?.studentKey === 'string' ? body.studentKey : '';
-      if (!sessionId || !studentKey) return json({ error: 'bad-request', message: 'Select a session and student.' }, 400);
-      const at = await markPresent(store, lab, sessionId, studentKey);
+      let target = sessionId;
+      if (ALWAYS_OPEN && studentKey && (!sessionId || sessionId === ALL_SESSIONS)) {
+        // "All students": the permanent session when they are in it, otherwise a session they joined
+        target = '';
+        for (const id of [(await permanentSession(store, lab)).id, ...(await store.listSessions(lab)).map((s) => s.id)]) {
+          if (await store.isSessionStudent(id, studentKey)) { target = id; break; }
+        }
+      }
+      if (!target || !studentKey) return json({ error: 'bad-request', message: 'Select a session and student.' }, 400);
+      const at = await markPresent(store, lab, target, studentKey);
       return at
         ? json({ ok: true, at })
         : json({ error: 'not-found', message: 'Student not found in this session.' }, 404);

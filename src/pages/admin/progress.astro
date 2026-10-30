@@ -323,6 +323,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     totals: { active: number; avgPercent: number; solved: number; submitted: number; checkedIn: number };
     session: (Session & { open: boolean; closesAt: string | null }) | { open: false; closesAt: null };
     sessions: Session[];
+    /** sessions are off: every lab is always open, and the first choice adds up every session ("All students") */
+    alwaysOpen?: boolean;
     live: {
       rows: { key: string; status: Live; working: string | null; fails: number; lastActive: string | null; why: string }[];
       counts: Record<Live, number>;
@@ -418,8 +420,12 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         if (!root!.isConnected) return; // navigated away: stop polling
         if (document.visibilityState === 'visible') await load();
         schedule();
-      }, 5000);
+      }, 4000);
     }
+    // back on this tab: show the latest at once instead of after the next tick
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && root!.isConnected && data) { void load(); schedule(); }
+    });
 
     const picker = () => ({ faculty: $<HTMLSelectElement>('[data-pa-faculty]'), module: $<HTMLSelectElement>('[data-pa-module]'), lab: $<HTMLSelectElement>('[data-pa-lab]') });
     function render() {
@@ -514,7 +520,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       const title = (id: string | null) => d.structure.exercises.find((e) => e.id === id)?.title ?? '';
       const open = 'id' in d.session && d.session.open;
       $('[data-lc-sum]').textContent = !rows.length
-        ? 'No one has joined this session yet.'
+        ? d.alwaysOpen ? 'No one has started this lab yet.' : 'No one has joined this session yet.'
         : `${open ? 'Live now' : 'Session closed, last known state'} · ${counts.active} working · ${counts.help} need help · ${counts.idle} quiet · ${counts.away} away · ${counts.done} done`;
       document.title = counts.help && open ? `(${counts.help}) need help · ${baseTitle}` : baseTitle;
 
@@ -538,7 +544,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             bar(s.percent, false), // the status colour carries the meaning here
             r.status === 'done' ? null : h('span', { class: 'lc-on', title: title(r.working) }, r.working ? h('b', {}, short(r.working)) : null, r.working ? title(r.working) : d.structure.exercises.length ? 'All exercises solved · tasks left' : 'Reading the tasks'),
             h('span', { class: 'lc-why' }, r.status === 'active' && r.lastActive ? `${r.why} · ${ago(r.lastActive)}` : r.why));
-        }) : [h('p', { class: 'lc-empty' }, rows.length ? `No one is in “${LIVE_LABEL[liveFilter as Live]}” right now.` : 'Students appear here as soon as they join the session.')]),
+        }) : [h('p', { class: 'lc-empty' }, rows.length ? `No one is in “${LIVE_LABEL[liveFilter as Live]}” right now.` : d.alwaysOpen ? 'Students appear here as soon as they start the lab.' : 'Students appear here as soon as they join the session.')]),
       );
       for (const r of rows) liveWas.set(r.key, r.status);
 
@@ -580,12 +586,18 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             seen.clear();
             liveWas.clear();
             load();
-          }}, ...d.sessions.map((session) => h('option', { value: session.id, selected: 'id' in d.session && session.id === d.session.id }, `${session.time_slot} - ${session.ta_name}${session.open ? ' - LIVE' : ''}`))) as HTMLSelectElement);
+          }}, ...d.sessions.map((session) => h('option', { value: session.id, selected: 'id' in d.session && session.id === d.session.id },
+            session.id === 'all' ? 'All students · always open' : `${session.time_slot} - ${session.ta_name}${session.open ? ' - LIVE' : ''}`))) as HTMLSelectElement);
           const active = 'id' in d.session && d.session.open ? d.session : null;
-          children.push(active
-            ? h('span', { class: 'ci-state on mono', 'data-ci-left': '' })
-            : h('span', { class: 'ci-state mono' }, 'No active session'));
-          children.push(h('a', { class: 'btn btn-ghost btn-sm ci-action', href: '/admin#sessions' }, 'Manage sessions'));
+          if (d.alwaysOpen) {
+            // sessions are off: nothing to start or end
+            children.push(h('span', { class: 'ci-state on mono' }, 'Always open · students start any time'));
+          } else {
+            children.push(active
+              ? h('span', { class: 'ci-state on mono', 'data-ci-left': '' })
+              : h('span', { class: 'ci-state mono' }, 'No active session'));
+            children.push(h('a', { class: 'btn btn-ghost btn-sm ci-action', href: '/admin#sessions' }, 'Manage sessions'));
+          }
           box.replaceChildren(...children);
         }
         countdown();

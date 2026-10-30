@@ -204,6 +204,7 @@ const steps = [
 <script>
   import { ANY_FACULTY, GENERAL, facultyOfProfile, fitsStudent, hasSpecialization, inSemester, type Faculty, type Semester } from '@/lib/accounts/core';
   import { getMe } from '@/scripts/me';
+  import { ALWAYS_OPEN } from '@/lib/progress/mode';
   type Card = { slug: string; code: string; title: string; term: string; description: string; color: string; href: string; labs: number; builtIn: boolean; category: string; kind: 'core' | 'elective'; open: boolean; years: string[]; specializations: string[]; semester: 'Both' | Semester; faculty: string };
   /** faculty: '' on answers saved before faculties existed (= the default faculty) */
   type Profile = { year: string; specialization: string; modules: string[]; faculty: string };
@@ -288,7 +289,7 @@ const steps = [
       mine.hidden = false;
       mode(true);
       $('[data-hub-title]').innerHTML = 'Your <span>modules</span>';
-      $('[data-hub-sub]').textContent = 'Open a module to see its labs. Your TA starts each lab session.';
+      $('[data-hub-sub]').textContent = `Open a module to see its labs. ${ALWAYS_OPEN ? 'Every lab is open any time.' : 'Your TA starts each lab session.'}`;
       $('[data-mine-chips]').innerHTML = [...(multi ? [facultyNamed(p.faculty)?.name ?? ''] : []), p.year, data.activeSemester, p.specialization === GENERAL ? 'General' : p.specialization, `${p.modules.length} optional`].map((t) => `<span>${esc(t)}</span>`).join('')
         // without an account these answers live only in this browser: say so, so a shared computer doesn't look like "mine"
         + (me.user ? '' : '<span class="warn">saved in this browser only</span>');

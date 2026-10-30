@@ -7,6 +7,7 @@ import { clearStudent, deviceId, getStudent, setStudent } from './store.ts';
 import { cleanName, cleanStudentId, looseGroup, nameError, studentIdError } from '../../lib/identity.ts';
 import { clearProgressIdentity, getIdentity, setProgressIdentity } from '@/scripts/progress';
 import { getMe } from '@/scripts/me';
+import { ALWAYS_OPEN } from '@/lib/progress/mode';
 
 type PublicSession = { id: string; open: boolean; ta_name?: string; time_slot?: string };
 type PublicSessionResponse = PublicSession & { sessions?: PublicSession[]; practice?: boolean; selfPaced?: boolean };
@@ -57,7 +58,7 @@ export function mountStart(lab: string) {
       ? 'Hand-ins and check-in need a live lab session. Exercises and demos work now in practice mode.'
       : sessions.length
         ? (account ? 'Choose your time slot in Start lab and press Start. Then you can edit, run and check.' : 'Join the session first: enter your name and student ID in Start lab. Then you can edit, run and check.')
-        : 'This opens when your TA starts the lab session. You can read everything until then.';
+        : ALWAYS_OPEN ? 'Connecting to the lab… Try again in a moment.' : 'This opens when your TA starts the lab session. You can read everything until then.';
     if (note && note.previousElementSibling === block && note.dataset.text === text && Date.now() - noteAt < 4000) return;
     noteAt = Date.now();
     if (!note) {
@@ -149,9 +150,12 @@ export function mountStart(lab: string) {
     }
   };
 
+  let retry = 0;
   const refreshSession = async () => {
     try {
       const response = await fetch(`/api/progress/session?lab=${encodeURIComponent(lab)}`, { cache: 'no-store' });
+      // a server error says nothing about the lab: keep what we knew instead of locking it
+      if (!response.ok) throw new Error(String(response.status));
       const data = (await response.json()) as PublicSessionResponse;
       sessions = Array.isArray(data.sessions) ? data.sessions.filter((item) => item.open) : data.open ? [data] : [];
       practice = data.practice === true;
@@ -177,24 +181,31 @@ export function mountStart(lab: string) {
           ? 'Practice mode is on: you can edit and check every exercise now. Your progress is saved in this browser only and is not sent to your TA.'
         : 'Waiting for your TA to start this lab session. You can read the content in the meantime.';
     } catch {
-      session = null;
-      sessions = [];
-      practice = false;
-      status.textContent = 'Could not check the session status. You can still read the lab content.';
+      // keep the last answer (an open lab stays usable while the network or the server hiccups) and ask again soon
+      if (!sessions.length) status.textContent = 'Could not reach the server. Trying again…';
+      clearTimeout(retry);
+      retry = window.setTimeout(() => { if (root.isConnected) void refreshSession(); }, 4000);
     }
     show();
     void autoJoin();
   };
 
-  /** Signed-in students: join the one open session automatically (once per session), no form needed. */
+  /**
+   * Signed-in students join the one open session by themselves (once per session), no form needed. In a lab that is
+   * open any time, a student who already typed their name and ID here before is taken back in the same way.
+   */
   const autoJoin = async () => {
-    if (!account || !session?.open || sessions.length !== 1 || autoTried.has(session.id)) return;
+    if (staff || !session?.open || sessions.length !== 1 || autoTried.has(session.id)) return;
     const student = getStudent();
+    const back = !account && selfPaced && student && student.sessionId !== session.id ? student : null;
+    const who = account ?? back;
+    if (!who) return;
     // already in as this account; a classmate's guest identity left on a shared PC is replaced
-    if (student && student.sessionId === session.id && student.id === account.id) return;
+    if (student && student.sessionId === session.id && student.id === who.id) return;
     autoTried.add(session.id);
-    status.textContent = `Joining ${session.ta_name ? `${session.ta_name}’s` : 'the'} session as ${account.name}…`;
-    const problem = await join(account.name, account.id, looseGroup(groupIn.value), session.id);
+    status.textContent = account ? `Joining ${session.ta_name ? `${session.ta_name}’s` : 'the'} session as ${account.name}…` : `Welcome back, ${who.name}. Opening the lab…`;
+    const group = account ? looseGroup(groupIn.value) : back && back.group !== '—' ? back.group : '';
+    const problem = await join(who.name, who.id, group, session.id);
     if (problem) {
       err.textContent = problem;
       autoTried.delete(session.id); // try again on the next status check
@@ -217,9 +228,10 @@ export function mountStart(lab: string) {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) return data.message ?? data.error ?? 'Could not start the lab. Try again.';
-      // Identity is persisted only after verification
-      setStudent({ name, id, group: group || '—', sessionId });
-      setProgressIdentity(name, id, group || '—', sessionId, sharedDeviceId);
+      // Identity is persisted only after verification, with the session the server put the student in
+      const joined = typeof data.sessionId === 'string' && data.sessionId ? data.sessionId : sessionId;
+      setStudent({ name, id, group: group || '—', sessionId: joined });
+      setProgressIdentity(name, id, group || '—', joined, sharedDeviceId);
       if (group) rememberGroup(id, group);
       show();
       return null;
@@ -294,7 +306,9 @@ export function mountStart(lab: string) {
     groupIn.value = savedGroup(cleanStudentId(u.studentId));
     const note = document.createElement('p');
     note.className = 'ls-acct';
-    note.textContent = `Signed in as ${u.name}: nothing to type. You join the lab session by yourself when your TA starts it, and your progress is saved.`;
+    note.textContent = ALWAYS_OPEN
+      ? `Signed in as ${u.name}: nothing to type. You join the lab by yourself, and your progress is saved.`
+      : `Signed in as ${u.name}: nothing to type. You join the lab session by yourself when your TA starts it, and your progress is saved.`;
     form.prepend(note);
     // a valid account identity joins the open session by itself (no form to fill)
     if (!nameError(cleanName(u.name)) && !studentIdError(cleanStudentId(u.studentId))) {

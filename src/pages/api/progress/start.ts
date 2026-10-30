@@ -1,8 +1,8 @@
 /** POST /api/progress/start — join the currently active lab session with name, ID and group. */
 import type { APIRoute } from 'astro';
-import { sessionState, validateIdentity } from '@/lib/progress/core';
+import { validateIdentity } from '@/lib/progress/core';
 import { looseGroup } from '@/lib/identity';
-import { getProgressStore, getStructures, json } from '@/lib/progress/server';
+import { getProgressStore, getStructures, json, liveSession } from '@/lib/progress/server';
 
 export const prerender = false;
 
@@ -17,12 +17,13 @@ export const POST: APIRoute = async ({ request }) => {
   const store = getProgressStore();
   if (!store) return json({ error: 'closed', message: 'Progress tracking is not set up.' }, 503);
   try {
-    const session = await store.getSessionById(sessionId);
-    if (!session || session.lab !== lab || !sessionState(session, Date.now()).open) {
+    // with sessions off this is always the lab's permanent session when the one asked for has ended
+    const session = await liveSession(store, lab, sessionId);
+    if (!session) {
       return json({ error: 'session-closed', message: 'Your TA has not started this lab session yet. You can still read the content.' }, 403);
     }
     await store.touchStudent(identity.value);
-    await store.joinSession(sessionId, identity.value.studentKey, group);
+    await store.joinSession(session.id, identity.value.studentKey, group);
     return json({ ok: true, session });
   } catch (error) {
     console.error('[progress] session start failed', error);
