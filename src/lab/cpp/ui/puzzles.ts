@@ -219,6 +219,8 @@ export function mountAnswer(host: HTMLElement, cfg: AnswerUiCfg, track: Track) {
   field.value = saved.answer ?? '';
   const label = cfg.mode === 'output' ? 'Type exactly what it prints (one line per line on the screen):' : cfg.mode === 'input' ? 'Type what the user types:' : 'Type your answer:';
   const result = h('p', { class: 'cx-pred-res', role: 'status' });
+  const warn = h('p', { class: 'cx-ans-warn' });
+  warn.hidden = true;
   const explain = h('div', { class: 'cx-explain', html: cfg.explainHtml });
   explain.hidden = true;
   const replay = h('div', { class: 'cx-replay' });
@@ -237,6 +239,9 @@ export function mountAnswer(host: HTMLElement, cfg: AnswerUiCfg, track: Track) {
   };
   const doCheck = () => {
     const r = checkAnswer(cfg, field.value);
+    // right but only near (the spacing differs): say what the real output is
+    warn.hidden = !(r.pass && r.warning);
+    warn.textContent = r.pass && r.warning ? `⚠ ${r.warning}` : '';
     if (!field.value.trim()) { result.className = 'cx-pred-res is-bad'; result.textContent = r.message; return; }
     tries++;
     track(r.pass ? 1 : 0, 1, field.value);
@@ -273,7 +278,7 @@ export function mountAnswer(host: HTMLElement, cfg: AnswerUiCfg, track: Track) {
     cfg.code.trim() ? codeBlock(cfg.code) : null,
     cfg.mode === 'output' ? inputChip(cfg.input) : null,
     h('label', { class: 'cx-ans' }, h('span', { class: 'cx-ans-k' }, label), field),
-    h('div', { class: 'cx-pred-bar' }, check, runBtn, result), replay, explain));
+    h('div', { class: 'cx-pred-bar' }, check, runBtn, result), warn, replay, explain));
   grow();
   if (saved.solved) { result.textContent = '✓ You answered this one.'; solvedView(); }
 }

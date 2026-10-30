@@ -109,6 +109,8 @@
 .cx-ck.is-pass { color: var(--text); }
 .cx-ck.is-pass .cx-ck-ico { color: var(--ok); }
 .cx-ck.is-fail .cx-ck-ico { color: var(--danger); }
+.cx-ck.is-warn small { color: var(--warn); }
+.cx-ans-warn { margin: 0 !important; font-size: 13.5px; color: var(--warn); }
 .cx-hints { display: grid; gap: 6px; justify-items: start; }
 .cx-hint-i { margin: 0 !important; padding: 8px 12px; border-radius: 10px; background: var(--info-soft); font-size: 14px; }
 

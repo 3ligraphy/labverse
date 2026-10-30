@@ -6,6 +6,7 @@
  */
 import { run } from './index.ts';
 import { wrapProgram } from './wrap.ts';
+import { nearLine } from './near.ts';
 
 /** a value as typed: trimmed, outer quotes removed ('v' and v are the same answer), spaces collapsed */
 export const normalizeValue = (s: string) => s.trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim().replace(/\s+/g, ' ');
@@ -27,7 +28,8 @@ export function answerHash(id: string, value: string, ignoreCase = false): strin
 
 /** ignoreCase: for word answers (ASCII and ascii are the same answer); C++ values keep their case ('A' is not 'a') */
 export type AnswerCfg = { id: string; mode: 'output' | 'value' | 'input'; code: string; input: string; hashes: string[]; expected: string; ignoreCase?: boolean };
-export type AnswerResult = { pass: boolean; message: string };
+/** warning: right, but only the spacing differs from the real output — says what it really is */
+export type AnswerResult = { pass: boolean; message: string; warning?: string };
 
 /** what the code prints for the given keyboard input (or the build error) */
 export function outputOf(code: string, input: string): { ok: true; output: string } | { ok: false; message: string } {
@@ -54,6 +56,11 @@ export function checkAnswer(cfg: AnswerCfg, answer: string): AnswerResult {
   const want = normalizeOutput(r.output).split('\n');
   const got = normalizeOutput(answer).split('\n');
   if (want.join('\n') === got.join('\n')) return { pass: true, message: 'Correct.' };
+  // the same lines with only the spacing inside them different: right, with a warning (letters, digits, tabs must match)
+  if (want.length === got.length && want.every((w, i) => nearLine(w) === nearLine(got[i]))) {
+    const i = want.findIndex((w, k) => w !== got[k]);
+    return { pass: true, message: 'Correct.', warning: want.length > 1 ? `Check the spaces: line ${i + 1} of the output is “${want[i]}”.` : `Check the spaces: the program prints “${want[i]}”.` };
+  }
   if (want.length !== got.length) return { pass: false, message: `Not correct. The output has ${want.length} line${want.length === 1 ? '' : 's'}; you typed ${got.length}.` };
   const line = want.findIndex((w, i) => w !== got[i]) + 1;
   return { pass: false, message: want.length > 1 ? `Not correct. Check line ${line}.` : 'Not correct. Check every character: spaces count.' };

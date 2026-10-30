@@ -192,7 +192,9 @@ test('typed answers: the code runs, values are right, inputs exist, and wrong an
   assert.equal(checkAnswer(cfg('o-lines'), 'Hello\nWorld').pass, true);
   assert.equal(checkAnswer(cfg('o-lines'), 'Hello\r\nWorld  \n').pass, true);
   assert.equal(checkAnswer(cfg('o-lines'), 'HelloWorld').pass, false);
-  assert.equal(checkAnswer(cfg('o-total'), 'Total:8').pass, false);
+  // only a space missing: right, with a warning that shows the real output
+  assert.match(checkAnswer(cfg('o-total'), 'Total:8').warning ?? '', /check the spaces/i);
+  assert.equal(checkAnswer(cfg('o-total'), 'Total: 9').pass, false);
   assert.equal(checkAnswer(cfg('o-compound'), '5\n9\n10\n9\n5\n10\n5\n1').pass, true);
   assert.equal(checkAnswer(cfg('o-assign-copy'), '8 8').pass, true);
   assert.equal(checkAnswer(cfg('o-assign-copy'), '8 3').pass, false);

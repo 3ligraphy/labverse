@@ -356,9 +356,10 @@ export class CppRunner {
     const checks = this.opts.checks ?? [];
     this.els.checks.replaceChildren(...checks.map((c, i) => {
       const r = outcome?.results[i];
-      return h('li', { class: `cx-ck${r ? (r.pass ? ' is-pass' : ' is-fail') : ''}` },
+      const note = r?.pass ? r.warning && `⚠ ${r.warning}` : r?.message;
+      return h('li', { class: `cx-ck${r ? (r.pass ? (r.warning ? ' is-pass is-warn' : ' is-pass') : ' is-fail') : ''}` },
         h('span', { class: 'cx-ck-ico', 'aria-hidden': 'true' }, r ? (r.pass ? '✓' : '✗') : '○'),
-        h('span', null, c.name, r?.message ? h('small', { html: md(r.message) }) : null));
+        h('span', null, c.name, note ? h('small', { html: md(note) }) : null));
     }));
   }
 
@@ -374,7 +375,10 @@ export class CppRunner {
       this.say(`**Build failed** — Line ${e.line}: ${e.message}`, 'err', e.hint);
     } else if (passed === total) {
       store.set(this.opts.id, { solved: true });
-      this.say(`✓ **All ${total} checks pass.** Well done! Run it once more and read what it shows, like a user would.`, 'ok');
+      const warning = outcome.results.find((r) => r.warning)?.warning;
+      this.say(warning
+        ? `✓ **All ${total} checks pass**, with a warning. ⚠ ${warning} Try to make the output match exactly.`
+        : `✓ **All ${total} checks pass.** Well done! Run it once more and read what it shows, like a user would.`, 'ok');
     } else this.say(`${passed} of ${total} checks pass. Read the first ✗ below, fix one thing, and check again.`, 'warn');
     this.opts.onCheck?.(passed, total, code);
   }
