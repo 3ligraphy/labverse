@@ -98,12 +98,26 @@ class PlatformStore {
    * and once a seed is recorded it never runs again, so a module staff edit or delete stays that way. An update
    * seed rewrites its labs' content once, and only while they still exist. An extend seed adds new labs to a module
    * that already exists: it creates the missing labs and appends their nodes to the end of the module canvas,
-   * keeping everything staff changed on it.
+   * keeping everything staff changed on it. A patch seed sets a few fields on the module node and keeps the rest.
    */
   private async applySeeds() {
     for (const seed of shippedSeeds()) {
       if ((await this.run(`select 1 from ${this.seeds} where id = $1`, [seed.id])).length) continue;
       const m = seed.module;
+      if (seed.patch) {
+        const [row] = await this.run(`select flow from ${this.modules} where slug = $1`, [m.slug]);
+        if (row) {
+          const flow = json(row.flow) as Flow;
+          const root = orderFlow(flow, 'module')[0];
+          if (root) {
+            const nodes = flow.nodes.map((n) => (n.id === root.id ? { ...n, data: { ...n.data, ...seed.patch } } : n));
+            await this.run(`update ${this.modules} set flow = $2::jsonb, updated_at = now() where slug = $1`, [m.slug, JSON.stringify({ ...flow, nodes })]);
+          }
+        }
+        await this.run(`insert into ${this.seeds} (id) values ($1) on conflict (id) do nothing`, [seed.id]);
+        console.info(`[platform] shipped settings applied to ${m.slug} (${seed.id})`);
+        continue;
+      }
       if (seed.extend) {
         const [row] = await this.run(`select flow from ${this.modules} where slug = $1`, [m.slug]);
         if (row) {
@@ -359,6 +373,20 @@ export async function leaderEmail(module: string): Promise<string> {
   if (module === BUILT_IN_MODULE.slug) return (course.contact ?? '').toLowerCase();
   const m = await getPlatformStore()?.getModule(module);
   return m ? flowLeader(m.flow) : '';
+}
+
+const publicModules = new Map<string, { open: boolean; at: number }>();
+/** Modules set to “Anyone with the link”: their pages and labs need no sign-in or invitation (cached for a minute). */
+export async function isPublicModule(slug: string): Promise<boolean> {
+  const hit = publicModules.get(slug);
+  if (hit && Date.now() - hit.at < 60_000) return hit.open;
+  const s = getPlatformStore();
+  if (!s) return false;
+  // a failed lookup is not cached: the next request tries again
+  const row = await s.getModule(slug);
+  const open = Boolean(row?.published && compileModule(row.flow).meta.public === 'Yes');
+  publicModules.set(slug, { open, at: Date.now() });
+  return open;
 }
 
 const openLabs = new Map<string, { open: boolean; at: number }>();

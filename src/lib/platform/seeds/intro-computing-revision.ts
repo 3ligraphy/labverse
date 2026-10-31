@@ -513,6 +513,7 @@ export function introComputingModule(): Flow {
       faculty: 'informatics-computer-science',
       leader: '',
       open: 'No',
+      public: 'Yes',
       category: 'Core',
       years: 'Prep year',
       semester: 'Semester 1',

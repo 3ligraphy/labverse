@@ -40,14 +40,16 @@ const stats = allowed && progressSetup().database
           <dl class="st-tiles">
             <div><dt>Students</dt><dd data-n>{stats.totals.students}</dd><span>joined at least one session</span></div>
             <div><dt>Sessions run</dt><dd>{stats.totals.sessions}</dd><span>across {stats.labs.length} {stats.labs.length === 1 ? 'lab' : 'labs'}</span></div>
-            <div><dt>Attendance</dt><dd>{stats.totals.attendancePct}<small>%</small></dd><span>of joined students checked in</span></div>
+            {stats.totals.attendanceTaken
+              ? <div><dt>Attendance</dt><dd>{stats.totals.attendancePct}<small>%</small></dd><span>of joined students checked in</span></div>
+              : <div><dt>Attendance</dt><dd>—</dd><span>no check-in taken in these labs yet</span></div>}
             <div><dt>Checks run</dt><dd>{stats.totals.checks}</dd><span>{stats.totals.solved} exercises solved</span></div>
             <div><dt>First-try pass</dt><dd>{stats.totals.firstTryPct}<small>%</small></dd><span>exercises right on the first Check</span></div>
           </dl>
 
           <div class="st-grid">
             <figure class="st-card wide">
-              <figcaption><h2>Attendance by session</h2><p>Students who joined each session, and how many checked in.</p></figcaption>
+              <figcaption><h2>Attendance by session</h2><p>Students who joined each TA-led session, and how many checked in. Labs that are open any time have no check-in, so they are not shown here.</p></figcaption>
               <div class="st-legend" aria-hidden="true"><span><i class="k1"></i>Joined</span><span><i class="k2"></i>Checked in</span></div>
               <div class="st-chart" data-chart="sessions"></div>
               <details><summary>Show as table</summary><div data-table="sessions"></div></details>
@@ -77,9 +79,26 @@ const stats = allowed && progressSetup().database
             </figure>
 
             <figure class="st-card">
-              <figcaption><h2>Exercise difficulty</h2><p>Share of the lab’s students who solved each exercise. The lowest bar is the hardest.</p></figcaption>
+              <figcaption><h2>Students in this lab</h2><p>Each student’s score, best first. Hover a bar for their ID, group, solved questions and Checks.</p></figcaption>
+              <div class="st-chart" data-chart="people"></div>
+              <button type="button" class="btn btn-ghost btn-sm st-more" data-more-people hidden></button>
+              <details><summary>Show as table</summary><div data-table="people"></div></details>
+            </figure>
+
+            <figure class="st-card wide">
+              <figcaption><h2>Question difficulty</h2><p>Share of the lab’s students who solved each question. 2.2·3 means task 2.2, its third question. Hover a bar for the time it took.</p></figcaption>
+              <label class="st-sort"><span>Order</span>
+                <select class="input" data-ex-sort><option value="lab">As in the lab</option><option value="hard">Hardest first</option></select>
+              </label>
               <div class="st-chart" data-chart="exercises"></div>
+              <button type="button" class="btn btn-ghost btn-sm st-more" data-more-ex hidden></button>
               <details><summary>Show as table</summary><div data-table="exercises"></div></details>
+            </figure>
+
+            <figure class="st-card wide">
+              <figcaption><h2>Where students give up</h2><p>Questions students tried but never solved, the most given-up first, and how long they kept trying before they stopped. Time on a question runs from the question before to the last try; a gap longer than 15 minutes counts as a break.</p></figcaption>
+              <div class="st-chart" data-chart="giveup"></div>
+              <button type="button" class="btn btn-ghost btn-sm st-more" data-more-quit hidden></button>
             </figure>
 
             <figure class="st-card wide">
@@ -153,6 +172,14 @@ const stats = allowed && progressSetup().database
   .st-filter select { height: 40px; padding: 0 12px; border-radius: 10px; min-width: min(320px, 100%); }
   .st-filter p { font-size: 14px; padding-bottom: 10px; }
 
+  .st-chart .at { fill: var(--text-2); font-size: 12px; font-weight: 600; }
+  .st-more { justify-self: start; }
+  .st-sort { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .st-card .st-sort select { width: auto; height: 34px; padding: 0 10px; border-radius: 8px; }
+  .st-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--text-3); }
+  .st-scale i { width: 22px; height: 12px; border-radius: 3px; }
+  .st-scale span { margin: 0 4px; }
+  .st-scale .st-scale-n { margin-left: 12px; color: var(--text-2); }
   .st-tip { position: fixed; z-index: 300; pointer-events: none; max-width: 260px; padding: 8px 10px; border-radius: 10px; background: var(--text); color: var(--bg); font-size: 12.5px; line-height: 1.45; box-shadow: var(--shadow-lg); }
   .st-tip b { display: block; font-size: 13px; }
 </style>
@@ -160,13 +187,17 @@ const stats = allowed && progressSetup().database
 <script>
   import { onPageLoad } from '@/scripts/page-load';
 
+  type Exercise = { id: string; task: string; title: string; tried: number; solvedPct: number; avgTries: number; firstTryPct: number; solveSec?: number; gaveUp?: number; giveUpSec?: number };
+  type Person = { name: string; id: string; group: string; percent: number; solved: number; tries: number; seconds?: number };
   type Stats = {
+    totals: { attendanceTaken?: boolean };
     sessions: { id: string; lab: string; ta: string; slot: string; at: string; joined: number; attended: number }[];
-    labs: { lab: string; title: string; students: number; sessions: number; avgPercent: number; finished: number; spread: number[];
-      exercises: { id: string; title: string; tried: number; solvedPct: number; avgTries: number; firstTryPct: number }[] }[];
+    labs: { lab: string; title: string; students: number; sessions: number; avgPercent: number; finished: number; spread: number[]; exercises: Exercise[]; people: Person[] }[];
     groups: { group: string; entries: number; avgPercent: number }[];
     heat: number[][];
   };
+  /** the permanent session of a lab that is open any time: it never takes attendance */
+  const OPEN_LAB = 'Open lab';
   const NS = 'http://www.w3.org/2000/svg';
   const svg = (tag: string, attrs: Record<string, string | number> = {}, text?: string) => {
     const el = document.createElementNS(NS, tag);
@@ -185,7 +216,7 @@ const stats = allowed && progressSetup().database
       ? `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`
       : `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
   };
-  /** a top value that splits into four whole-number steps (0, 6, 12, 18, 24 …) */
+  /** a top value that splits into four whole-number steps (0, 1, 2, 3, 4 · 0, 2, 4, 6, 8 · …) */
   const niceMax = (v: number) => {
     const raw = Math.max(1, v / 4);
     const p = 10 ** Math.floor(Math.log10(raw));
@@ -194,19 +225,27 @@ const stats = allowed && progressSetup().database
   const table = (head: string[], rows: (string | number)[][], numeric: number[] = []) =>
     `<table><thead><tr>${head.map((h, i) => `<th${numeric.includes(i) ? ' class="n"' : ''}>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows
       .map((r) => `<tr>${r.map((c, i) => `<td${numeric.includes(i) ? ' class="n"' : ''}>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const empty = (el: HTMLElement, text: string) => void (el.innerHTML = `<p class="empty">${esc(text)}</p>`);
+  /** 45s · 4m 05s · 1h 12m */
+  const dur = (sec = 0) => sec < 60 ? `${sec}s` : sec < 3600 ? `${Math.floor(sec / 60)}m ${String(sec % 60).padStart(2, '0')}s` : `${Math.floor(sec / 3600)}h ${String(Math.floor((sec % 3600) / 60)).padStart(2, '0')}m`;
+  type Scale = { max: number; ticks: number[]; tick: (v: number) => string; value: (v: number) => string };
+  const PERCENT: Scale = { max: 100, ticks: [0, 25, 50, 75, 100], tick: (v) => `${v}%`, value: (v) => `${v}%` };
 
-  /** vertical bars, one or two series side by side */
-  function vBars(el: HTMLElement, cats: string[], series: { color: string; values: number[] }[], tip: (i: number) => string) {
-    const W = Math.max(280, el.clientWidth), H = 230, L = 34, B = 34, T = 8;
+  /** vertical bars, one or two series side by side, with both axes titled */
+  function vBars(el: HTMLElement, cats: string[], series: { color: string; values: number[] }[], tip: (i: number) => string, axis: { x: string; y: string }) {
+    const W = Math.max(280, el.clientWidth), H = 250, L = 52, B = 50, T = 10;
     const max = niceMax(Math.max(1, ...series.flatMap((s) => s.values)));
-    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
+    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `${axis.y} by ${axis.x}` });
     for (let k = 0; k <= 4; k++) {
       const y = T + ((H - T - B) * k) / 4;
       root.append(svg('line', { x1: L, x2: W, y1: y, y2: y, class: k === 4 ? 'base' : 'grid' }), svg('text', { x: L - 8, y: y + 4, 'text-anchor': 'end', class: 'ax' }, String(Math.round(max - (max * k) / 4))));
     }
+    root.append(
+      svg('text', { x: 12, y: T + (H - T - B) / 2, 'text-anchor': 'middle', class: 'at', transform: `rotate(-90 12 ${T + (H - T - B) / 2})` }, axis.y),
+      svg('text', { x: L + (W - L) / 2, y: H - 4, 'text-anchor': 'middle', class: 'at' }, axis.x));
     const slot = (W - L) / cats.length;
-    const bw = Math.min(28, Math.max(4, (slot * 0.7 - 2 * (series.length - 1)) / series.length));
-    const every = Math.ceil(cats.length / Math.max(1, Math.floor((W - L) / 64)));
+    const bw = Math.min(36, Math.max(4, (slot * 0.7 - 2 * (series.length - 1)) / series.length));
+    const every = Math.ceil(cats.length / Math.max(1, Math.floor((W - L) / 58)));
     cats.forEach((c, i) => {
       const g = svg('g', { 'data-tip': tip(i), tabindex: 0 });
       const groupW = bw * series.length + 2 * (series.length - 1);
@@ -218,56 +257,66 @@ const stats = allowed && progressSetup().database
         if (d) g.append(svg('path', { d, fill: s.color }));
       });
       root.append(g);
-      if (i % every === 0) root.append(svg('text', { x: L + slot * i + slot / 2, y: H - B + 18, 'text-anchor': 'middle', class: 'ax' }, c));
+      if (i % every === 0) root.append(svg('text', { x: L + slot * i + slot / 2, y: H - B + 17, 'text-anchor': 'middle', class: 'ax' }, c));
     });
     el.replaceChildren(root);
   }
 
-  /** horizontal bars on a 0–100 % scale with the value at the end of each bar */
-  function hBars(el: HTMLElement, rows: { label: string; value: number; tip: string }[], color = 'var(--s1)') {
-    if (!rows.length) return void (el.innerHTML = '<p class="empty">No data yet.</p>');
+  /** horizontal bars on a 0–100 % scale with the value at the end of each bar and a titled axis */
+  function hBars(el: HTMLElement, rows: { label: string; value: number; tip: string; text?: string }[], axisTitle: string, scale: Scale = PERCENT, color = 'var(--s1)') {
+    if (!rows.length) return empty(el, 'No data yet.');
     const W = Math.max(280, el.clientWidth);
-    const labelW = Math.min(Math.round(W * 0.42), 220), row = 30, T = 4, H = T + rows.length * row + 22, R = 40;
-    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
-    const x = (v: number) => labelW + ((W - labelW - R) * v) / 100;
-    for (const v of [0, 25, 50, 75, 100]) root.append(svg('line', { x1: x(v), x2: x(v), y1: T, y2: H - 22, class: v === 0 ? 'base' : 'grid' }), svg('text', { x: x(v), y: H - 6, 'text-anchor': 'middle', class: 'ax' }, `${v}%`));
+    const labelW = Math.min(Math.round(W * 0.45), 300), row = 28, T = 4, B = 40, H = T + rows.length * row + B, R = 44;
+    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': axisTitle });
+    const x = (v: number) => labelW + ((W - labelW - R) * Math.min(v, scale.max)) / scale.max;
+    for (const v of scale.ticks) root.append(svg('line', { x1: x(v), x2: x(v), y1: T, y2: H - B, class: v === 0 ? 'base' : 'grid' }), svg('text', { x: x(v), y: H - B + 16, 'text-anchor': 'middle', class: 'ax' }, scale.tick(v)));
+    root.append(svg('text', { x: x(scale.max / 2), y: H - 6, 'text-anchor': 'middle', class: 'at' }, axisTitle));
     rows.forEach((r, i) => {
       const y = T + i * row;
       const g = svg('g', { 'data-tip': r.tip, tabindex: 0 });
       const fit = Math.floor((labelW - 12) / 6.6); // ~6.6px per character at 12.5px
       const label = r.label.length > fit ? `${r.label.slice(0, fit - 1)}…` : r.label;
       g.append(svg('rect', { x: 0, y, width: W, height: row, fill: 'transparent' }), svg('text', { x: labelW - 10, y: y + row / 2 + 4, 'text-anchor': 'end', class: 'lb' }, label));
-      const d = barPath(x(0), y + 7, x(r.value) - x(0), row - 14, true);
+      const d = barPath(x(0), y + 6, x(r.value) - x(0), row - 12, true);
       if (d) g.append(svg('path', { d, fill: color }));
-      g.append(svg('text', { x: x(r.value) + 6, y: y + row / 2 + 4, class: 'vl' }, `${r.value}%`));
+      g.append(svg('text', { x: x(r.value) + 6, y: y + row / 2 + 4, class: 'vl' }, r.text ?? scale.value(r.value)));
       root.append(g);
     });
     el.replaceChildren(root);
   }
 
+  /** weekday × hour, one blue ramp light → dark, with its scale */
   function heat(el: HTMLElement, grid: number[][]) {
     const used = grid.flatMap((r) => r.map((n, h) => (n ? h : -1))).filter((h) => h >= 0);
     const from = Math.min(8, ...used), to = Math.max(20, ...used);
     const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i);
     const max = Math.max(1, ...grid.flat());
     const steps = ['var(--h1)', 'var(--h2)', 'var(--h3)', 'var(--h4)', 'var(--h5)', 'var(--h6)'];
-    const W = Math.max(320, el.clientWidth), L = 40, T = 4, B = 24;
+    const step = (n: number) => Math.min(5, Math.floor((n / max) * 6));
+    const W = Math.max(320, el.clientWidth), L = 40, T = 4, B = 44;
     const cw = (W - L) / hours.length, ch = Math.min(30, Math.max(18, cw * 0.8)), H = T + 7 * ch + B;
-    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
+    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Checks by weekday and hour' });
     grid.forEach((row, d) => {
       root.append(svg('text', { x: L - 8, y: T + d * ch + ch / 2 + 4, 'text-anchor': 'end', class: 'ax' }, DAYS[d]));
       hours.forEach((hr, i) => {
         const n = row[hr];
         root.append(svg('rect', {
           x: L + i * cw + 1, y: T + d * ch + 1, width: Math.max(1, cw - 2), height: ch - 2, rx: 3,
-          fill: n ? steps[Math.min(5, Math.floor((n / max) * 6))] : 'var(--seq0)',
-          'data-tip': `<b>${DAYS[d]} ${String(hr).padStart(2, '0')}:00</b>${n} ${n === 1 ? 'Check' : 'Checks'}`,
+          fill: n ? steps[step(n)] : 'var(--seq0)',
+          'data-tip': `<b>${DAYS[d]} ${String(hr).padStart(2, '0')}:00–${String(hr).padStart(2, '0')}:59</b>${n} ${n === 1 ? 'Check' : 'Checks'}`,
         }));
       });
     });
     const every = cw < 26 ? 3 : cw < 40 ? 2 : 1;
-    hours.forEach((hr, i) => i % every === 0 && root.append(svg('text', { x: L + i * cw + cw / 2, y: H - 6, 'text-anchor': 'middle', class: 'ax' }, String(hr).padStart(2, '0'))));
+    hours.forEach((hr, i) => i % every === 0 && root.append(svg('text', { x: L + i * cw + cw / 2, y: T + 7 * ch + 16, 'text-anchor': 'middle', class: 'ax' }, String(hr).padStart(2, '0'))));
+    root.append(svg('text', { x: L + (W - L) / 2, y: H - 4, 'text-anchor': 'middle', class: 'at' }, 'Hour of the day (Cairo time)'));
     el.replaceChildren(root);
+    // the scale: what light and dark mean, in Checks per hour
+    const bound = (k: number) => Math.ceil((k * max) / 6);
+    const legend = document.createElement('div');
+    legend.className = 'st-scale';
+    legend.innerHTML = `<span>Fewer</span>${steps.map((c, k) => `<i style="background:${c}" title="${k === 0 ? 1 : bound(k)}–${bound(k + 1)} Checks"></i>`).join('')}<span>More</span><span class="st-scale-n">1 – ${max} Checks in an hour</span>`;
+    el.append(legend);
   }
 
   onPageLoad(() => {
@@ -278,45 +327,89 @@ const stats = allowed && progressSetup().database
     const d = JSON.parse(raw) as Stats;
     const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
     const pick = $('[data-lab]') as HTMLSelectElement;
+    const sortEx = $('[data-ex-sort]') as HTMLSelectElement;
     const busiest = [...d.labs].sort((a, b) => b.students - a.students)[0];
     pick.replaceChildren(...d.labs.map((l) => new Option(l.title, l.lab, false, l.lab === busiest?.lab)));
+    let allEx = false;
+    let allPeople = false;
+    let allQuit = false;
+    const SHOW = 20;
 
     const drawAll = () => {
-      const sessions = d.sessions.slice(-16);
       const labTitle = (id: string) => d.labs.find((l) => l.lab === id)?.title ?? id;
+      // attendance only means something for TA sessions with a check-in; the open labs' permanent session has none
+      const sessions = d.sessions.filter((s) => s.ta !== OPEN_LAB).slice(-16);
       if (sessions.length) vBars($('[data-chart="sessions"]'), sessions.map((s) => day(s.at)), [
         { color: 'var(--s1)', values: sessions.map((s) => s.joined) },
         { color: 'var(--s2)', values: sessions.map((s) => s.attended) },
       ], (i) => {
         const s = sessions[i];
         return `<b>${esc(labTitle(s.lab))}</b>${esc(day(s.at))} · ${esc(s.slot)} · ${esc(s.ta)}<br>${s.joined} joined · ${s.attended} checked in${s.joined ? ` (${Math.round((100 * s.attended) / s.joined)}%)` : ''}`;
-      });
-      else $('[data-chart="sessions"]').innerHTML = '<p class="empty">No sessions yet.</p>';
-      $('[data-table="sessions"]').innerHTML = table(['Date', 'Lab', 'Time slot', 'TA', 'Joined', 'Checked in'], d.sessions.map((s) => [day(s.at), labTitle(s.lab), s.slot, s.ta, s.joined, s.attended]), [4, 5]);
+      }, { x: 'Session date', y: 'Students' });
+      else empty($('[data-chart="sessions"]'), 'No TA-led sessions yet. Labs that are open any time have no check-in.');
+      $('[data-table="sessions"]').innerHTML = table(['Date', 'Lab', 'Time slot', 'TA', 'Joined', 'Checked in'], d.sessions.map((s) => [day(s.at), labTitle(s.lab), s.slot, s.ta, s.joined, s.ta === OPEN_LAB ? '—' : s.attended]), [4, 5]);
 
-      hBars($('[data-chart="labs"]'), d.labs.map((l) => ({ label: l.title, value: l.avgPercent, tip: `<b>${esc(l.title)}</b>${l.students} students · ${l.sessions} sessions<br>average ${l.avgPercent}% · ${l.finished} at 80%+` })));
+      hBars($('[data-chart="labs"]'), d.labs.map((l) => ({ label: l.title, value: l.avgPercent, tip: `<b>${esc(l.title)}</b>${l.students} students · ${l.sessions} sessions<br>average ${l.avgPercent}% · ${l.finished} at 80%+` })), 'Average score of its students');
       $('[data-table="labs"]').innerHTML = table(['Lab', 'Students', 'Sessions', 'Average', '80%+'], d.labs.map((l) => [l.title, l.students, l.sessions, `${l.avgPercent}%`, l.finished]), [1, 2, 3, 4]);
 
-      hBars($('[data-chart="groups"]'), d.groups.map((g) => ({ label: g.group, value: g.avgPercent, tip: `<b>${esc(g.group)}</b>average ${g.avgPercent}% over ${g.entries} lab ${g.entries === 1 ? 'entry' : 'entries'}` })));
+      hBars($('[data-chart="groups"]'), d.groups.map((g) => ({ label: g.group, value: g.avgPercent, tip: `<b>${esc(g.group)}</b>average ${g.avgPercent}% over ${g.entries} lab ${g.entries === 1 ? 'entry' : 'entries'}` })), 'Average score of the group');
       $('[data-table="groups"]').innerHTML = table(['Group', 'Lab entries', 'Average'], d.groups.map((g) => [g.group, g.entries, `${g.avgPercent}%`]), [1, 2]);
 
       const lab = d.labs.find((l) => l.lab === pick.value) ?? d.labs[0];
       $('[data-lab-sum]').textContent = `${lab.students} students · ${lab.sessions} ${lab.sessions === 1 ? 'session' : 'sessions'} · average ${lab.avgPercent}%`;
       const bands = lab.spread.map((_, i) => (i === 9 ? '90–100' : `${i * 10}–${i * 10 + 9}`));
-      vBars($('[data-chart="spread"]'), bands.map((b) => b.split('–')[0]), [{ color: 'var(--s1)', values: lab.spread }], (i) => `<b>${bands[i]}%</b>${lab.spread[i]} ${lab.spread[i] === 1 ? 'student' : 'students'}`);
+      vBars($('[data-chart="spread"]'), bands, [{ color: 'var(--s1)', values: lab.spread }], (i) => `<b>${bands[i]}%</b>${lab.spread[i]} ${lab.spread[i] === 1 ? 'student' : 'students'}`, { x: 'Score in this lab (%)', y: 'Students' });
       $('[data-table="spread"]').innerHTML = table(['Score', 'Students'], bands.map((b, i) => [`${b}%`, lab.spread[i]]), [1]);
 
-      hBars($('[data-chart="exercises"]'), lab.exercises.map((e, i) => ({
-        label: `E${i + 1} ${e.title}`, value: e.solvedPct,
-        tip: `<b>E${i + 1} · ${esc(e.title)}</b>${e.solvedPct}% solved · ${e.tried} tried<br>${e.avgTries} tries on average · ${e.firstTryPct}% right first time`,
-      })));
-      $('[data-table="exercises"]').innerHTML = table(['Exercise', 'Solved', 'Tried', 'Avg tries', 'First try'], lab.exercises.map((e, i) => [`E${i + 1} ${e.title}`, `${e.solvedPct}%`, e.tried, e.avgTries, `${e.firstTryPct}%`]), [1, 2, 3, 4]);
+      // students, best first
+      const people = lab.people ?? [];
+      const shownPeople = allPeople ? people : people.slice(0, SHOW);
+      hBars($('[data-chart="people"]'), shownPeople.map((p) => ({
+        label: `${p.name}${p.id ? ` · ${p.id}` : ''}`, value: p.percent,
+        tip: `<b>${esc(p.name)}</b>${p.id ? `ID ${esc(p.id)}` : ''}${p.group ? ` · ${esc(p.group)}` : ''}<br>score ${p.percent}% · ${p.solved} solved · ${p.tries} Checks<br>time on the questions: ${dur(p.seconds)}`,
+      })), 'Score in this lab');
+      const morePeople = $('[data-more-people]') as HTMLButtonElement;
+      morePeople.hidden = people.length <= SHOW;
+      morePeople.textContent = allPeople ? `Show the top ${SHOW}` : `Show all ${people.length} students`;
+      $('[data-table="people"]').innerHTML = table(['Student', 'ID', 'Group', 'Score', 'Solved', 'Checks', 'Time'], people.map((p) => [p.name, p.id, p.group || '—', `${p.percent}%`, p.solved, p.tries, dur(p.seconds)]), [3, 4, 5, 6]);
+
+      // each question: its task number and its place in the task (2.2·3 = task 2.2, third question)
+      const count = new Map<string, number>();
+      const named = lab.exercises.map((e) => { const k = (count.get(e.task) ?? 0) + 1; count.set(e.task, k); return { ...e, label: `${e.task || '–'}·${k} ${e.title}` }; });
+      const ordered = sortEx.value === 'hard' ? [...named].sort((a, b) => a.solvedPct - b.solvedPct || b.avgTries - a.avgTries) : named;
+      const shownEx = allEx ? ordered : ordered.slice(0, SHOW);
+      hBars($('[data-chart="exercises"]'), shownEx.map((e) => ({
+        label: e.label, value: e.solvedPct,
+        tip: `<b>${esc(e.label)}</b>${e.solvedPct}% of the lab’s students solved it · ${e.tried} tried<br>${e.avgTries} Checks on average · ${e.firstTryPct}% right the first time<br>time to solve: ${dur(e.solveSec)} (median)${e.gaveUp ? `<br>${e.gaveUp} gave up after ${dur(e.giveUpSec)} (median)` : ''}`,
+      })), 'Students who solved it');
+      const moreEx = $('[data-more-ex]') as HTMLButtonElement;
+      moreEx.hidden = named.length <= SHOW;
+      moreEx.textContent = allEx ? `Show the first ${SHOW}` : `Show all ${named.length} questions`;
+      $('[data-table="exercises"]').innerHTML = table(['Question', 'Solved', 'Tried', 'Avg Checks', 'First try', 'Time to solve', 'Gave up', 'Time before giving up'],
+        ordered.map((e) => [e.label, `${e.solvedPct}%`, e.tried, e.avgTries, `${e.firstTryPct}%`, e.solveSec ? dur(e.solveSec) : '—', e.gaveUp ?? 0, e.gaveUp ? dur(e.giveUpSec) : '—']), [1, 2, 3, 4, 5, 6, 7]);
+
+      // where they give up: tried, never solved — and how long they kept trying first
+      const quit = named.filter((e) => (e.gaveUp ?? 0) > 0).sort((a, b) => (b.gaveUp ?? 0) - (a.gaveUp ?? 0) || (b.giveUpSec ?? 0) - (a.giveUpSec ?? 0));
+      const shownQuit = allQuit ? quit : quit.slice(0, 15);
+      const top = niceMax(Math.max(1, ...shownQuit.map((e) => Math.ceil((e.giveUpSec ?? 0) / 60))));
+      if (shownQuit.length) hBars($('[data-chart="giveup"]'), shownQuit.map((e) => ({
+        label: e.label, value: (e.giveUpSec ?? 0) / 60, text: `${dur(e.giveUpSec)} · ${e.gaveUp} gave up`,
+        tip: `<b>${esc(e.label)}</b>${e.gaveUp} of ${e.tried} who tried it gave up<br>they kept trying for ${dur(e.giveUpSec)} (median) first`,
+      })), 'Minutes of trying before giving up (median)', { max: top, ticks: [0, top / 4, top / 2, (3 * top) / 4, top], tick: (v) => `${v}m`, value: (v) => `${Math.round(v)}m` }, 'var(--s2)');
+      else empty($('[data-chart="giveup"]'), 'Nobody has given up on a question in this lab.');
+      const moreQuit = $('[data-more-quit]') as HTMLButtonElement;
+      moreQuit.hidden = quit.length <= 15;
+      moreQuit.textContent = allQuit ? 'Show the top 15' : `Show all ${quit.length} questions`;
 
       heat($('[data-chart="heat"]'), d.heat);
       $('[data-table="heat"]').innerHTML = table(['Day', ...Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'))], d.heat.map((r, i) => [DAYS[i], ...r]), Array.from({ length: 24 }, (_, i) => i + 1));
     };
     drawAll();
-    pick.addEventListener('change', drawAll);
+    pick.addEventListener('change', () => { allEx = false; allPeople = false; allQuit = false; drawAll(); });
+    $('[data-more-quit]').addEventListener('click', () => { allQuit = !allQuit; drawAll(); });
+    sortEx.addEventListener('change', drawAll);
+    $('[data-more-ex]').addEventListener('click', () => { allEx = !allEx; drawAll(); });
+    $('[data-more-people]').addEventListener('click', () => { allPeople = !allPeople; drawAll(); });
     let last = root.clientWidth;
     const ro = new ResizeObserver(() => { if (Math.abs(root.clientWidth - last) > 8) { last = root.clientWidth; drawAll(); } });
     ro.observe(root);

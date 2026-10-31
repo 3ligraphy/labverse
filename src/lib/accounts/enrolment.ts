@@ -1,15 +1,17 @@
 /**
  * Builder modules are invitation-only: their pages and labs open for staff (doctors, TAs, super admins, the
- * master password) and for students enrolled in that module (invitation accepted or added by module staff).
- * Mobile Development (the built-in course) stays open to everyone.
+ * master password) and for students enrolled in that module (invitation accepted or added by module staff) —
+ * unless the module is set to “Anyone with the link”. Mobile Development (the built-in course) stays open to everyone.
  */
 import type { AstroCookies } from 'astro';
 import { isAdmin } from '@/lib/attendance/server';
 import { getAccountStore, viewer } from './server';
+import { isPublicModule } from '@/lib/platform/server';
 
 export async function moduleAccess(cookies: AstroCookies, module: string): Promise<{ ok: boolean; signedIn: boolean }> {
   if (isAdmin(cookies)) return { ok: true, signedIn: true };
   const v = viewer(cookies);
+  if (await isPublicModule(module).catch(() => false)) return { ok: true, signedIn: Boolean(v) };
   const store = getAccountStore();
   if (!v || !store) return { ok: false, signedIn: Boolean(v) };
   const user = await store.byId(v.u).catch(() => null);

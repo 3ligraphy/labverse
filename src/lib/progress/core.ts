@@ -257,30 +257,50 @@ export function liveClass(
 /** Raw rows for a module's statistics page, across every session of its labs (from ProgressStore.statsRaw). */
 export type StatsRaw = {
   sessions: { id: string; lab: string; ta_name: string; time_slot: string; opens_at: string; joined: number; attended: number }[];
-  /** per lab, student and exercise: best result, tries, and whether the first try passed */
-  best: { lab: string; student_key: string; exercise: string; passed: number; total: number; attempts: number; first_ok: boolean }[];
+  /**
+   * per lab, student and exercise: best result, tries, whether the first try passed, and the time spent on it in
+   * seconds (see TIME_GAP_CAP) until it was solved, or until the last try when it never was
+   */
+  best: { lab: string; student_key: string; exercise: string; passed: number; total: number; attempts: number; first_ok: boolean; seconds?: number }[];
   tasks: { lab: string; student_key: string; done: number }[];
   subs: { lab: string; student_key: string }[];
-  /** the group a student last joined each lab with */
-  members: { lab: string; student_key: string; group_name: string }[];
+  /** the group a student last joined each lab with, and who they are (for the TA's statistics) */
+  members: { lab: string; student_key: string; group_name: string; name?: string; student_id?: string }[];
   /** Checks by weekday (0 = Sunday) and hour, Cairo time */
   heat: { dow: number; hour: number; n: number }[];
 };
 
 const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0);
 
+/**
+ * Time on a question: from the student's previous Check in the lab (the question before) to their first Check on
+ * it, then from Check to Check, until they solve it — or until their last Check when they never do. Each gap counts
+ * at most 15 minutes, so a break does not look like work.
+ */
+export const TIME_GAP_CAP = 15 * 60;
+
+/** median seconds, rounded (0 when there is nothing to measure) */
+const medianSec = (xs: number[]) => Math.round(median(xs) ?? 0);
+
 export function moduleStats(labs: LabStructure[], raw: StatsRaw) {
   const known = new Set(labs.map((l) => l.lab));
   const percents = new Map<string, number>(); // `${lab}|${student}` → score
   const perLab = labs.map((l) => {
     const students = [...new Set(raw.members.filter((m) => m.lab === l.lab).map((m) => m.student_key))];
+    const people: { name: string; id: string; group: string; percent: number; solved: number; tries: number; seconds: number }[] = [];
     const scores = students.map((key) => {
-      const best = raw.best.filter((b) => b.lab === l.lab && b.student_key === key)
-        .map((b) => ({ exercise: b.exercise, passed: b.passed, total: b.total, attempts: b.attempts, firstAt: '', solvedAt: null }));
+      const rows = raw.best.filter((b) => b.lab === l.lab && b.student_key === key);
+      const best = rows.map((b) => ({ exercise: b.exercise, passed: b.passed, total: b.total, attempts: b.attempts, firstAt: '', solvedAt: null }));
       const done = raw.tasks.find((t) => t.lab === l.lab && t.student_key === key)?.done ?? 0;
       const sub = raw.subs.some((x) => x.lab === l.lab && x.student_key === key);
       const p = scoreStudent(l, best, done, sub).percent;
       percents.set(`${l.lab}|${key}`, p);
+      const m = raw.members.find((x) => x.lab === l.lab && x.student_key === key);
+      people.push({
+        name: m?.name || 'Unknown', id: m?.student_id || '', group: m?.group_name && m.group_name !== '—' ? m.group_name : '',
+        percent: p, solved: rows.filter((b) => b.total > 0 && b.passed >= b.total).length, tries: rows.reduce((a, b) => a + b.attempts, 0),
+        seconds: rows.reduce((a, b) => a + (b.seconds ?? 0), 0),
+      });
       return p;
     });
     const spread = Array.from({ length: 10 }, () => 0);
@@ -288,8 +308,11 @@ export function moduleStats(labs: LabStructure[], raw: StatsRaw) {
     const exercises = l.exercises.map((e) => {
       const rows = raw.best.filter((b) => b.lab === l.lab && b.exercise === e.id && students.includes(b.student_key));
       const solved = rows.filter((b) => b.total > 0 && b.passed >= b.total);
+      const gaveUp = rows.filter((b) => !(b.total > 0 && b.passed >= b.total));
       return {
-        id: e.id, title: e.title, tried: rows.length,
+        id: e.id, task: e.task, title: e.title, tried: rows.length,
+        /** median seconds to solve it, and before giving up (tried, never solved) */
+        solveSec: medianSec(solved.map((b) => b.seconds ?? 0)), gaveUp: gaveUp.length, giveUpSec: medianSec(gaveUp.map((b) => b.seconds ?? 0)),
         solvedPct: students.length ? Math.round((100 * solved.length) / students.length) : 0,
         avgTries: rows.length ? Math.round((rows.reduce((a, b) => a + b.attempts, 0) / rows.length) * 10) / 10 : 0,
         firstTryPct: rows.length ? Math.round((100 * rows.filter((b) => b.first_ok).length) / rows.length) : 0,
@@ -299,6 +322,7 @@ export function moduleStats(labs: LabStructure[], raw: StatsRaw) {
     return {
       lab: l.lab, title: l.title, students: students.length, sessions: sessions.length,
       avgPercent: avg(scores), finished: scores.filter((p) => p >= 80).length, spread, exercises,
+      people: people.sort((a, b) => b.percent - a.percent || a.name.localeCompare(b.name)),
     };
   });
 
@@ -322,6 +346,8 @@ export function moduleStats(labs: LabStructure[], raw: StatsRaw) {
       students: new Set(raw.members.filter((m) => known.has(m.lab)).map((m) => m.student_key)).size,
       sessions: sessions.length,
       attendancePct: joined ? Math.round((100 * attended) / joined) : 0,
+      /** labs that never take attendance (open any time, no check-in) don't count towards it */
+      attendanceTaken: attended > 0,
       checks: inLabs.reduce((a, b) => a + b.attempts, 0),
       solved: inLabs.filter((b) => b.total > 0 && b.passed >= b.total).length,
       firstTryPct: inLabs.length ? Math.round((100 * inLabs.filter((b) => b.first_ok).length) / inLabs.length) : 0,

@@ -312,12 +312,13 @@ export const MODULE_NODES = {
       { key: 'faculty', label: 'Faculty', kind: 'text', max: 60, help: 'The faculty whose students this module is for (“all” = every faculty). Choices come from Admin → Catalogue.' },
       { key: 'leader', label: 'Module leader (doctor email)', kind: 'text', placeholder: 'name@bue.edu.eg', max: 200, help: 'Only this doctor sets the assessment (weights, components). Their doctor account must use this email.' },
       { key: 'open', label: 'Students may add it themselves', kind: 'select', options: ['No', 'Yes'], help: 'No: students join only by invitation or enrolment.' },
+      { key: 'public', label: 'Anyone with the link', kind: 'select', options: ['No', 'Yes'], help: 'Yes: anyone opens this module and its labs without signing in or an invitation — students enter their name and student ID in each lab, as in Mobile Development.' },
       { key: 'category', label: 'Category', kind: 'text', max: 40, placeholder: 'Core', help: 'A category from Admin → Catalogue (core: shown to matching students; elective: only to those who choose or are enrolled).' },
       { key: 'years', label: 'Years', kind: 'text', placeholder: 'Year 2, Year 3', help: 'Comma-separated; empty = every year', max: 200 },
       { key: 'semester', label: 'Semester', kind: 'select', options: ['Semester 1', 'Semester 2', 'Both'], help: 'Students see the active semester’s modules first (the admin switches the active semester).' },
       { key: 'specializations', label: 'Specializations', kind: 'text', placeholder: 'Software Engineering, Artificial Intelligence', help: 'Comma-separated; empty = every specialization', max: 600 },
     ],
-    defaults: { code: '', title: 'New module', term: '', description: '', color: '#7cb1ff', faculty: DEFAULT_FACULTY, leader: '', category: 'Core', open: 'No', years: '', semester: 'Semester 1', specializations: '' },
+    defaults: { code: '', title: 'New module', term: '', description: '', color: '#7cb1ff', faculty: DEFAULT_FACULTY, leader: '', category: 'Core', open: 'No', public: 'No', years: '', semester: 'Semester 1', specializations: '' },
   },
   lab: {
     label: 'Lab', hint: 'A lab of this module (double-click to build it)', color: '#7cb1ff', glyph: '⚗',
@@ -733,7 +734,10 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
         if (mode !== 'output' && !answers.length) { warnings.push(`“${excerptOf(d.question)}” needs at least one accepted answer.`); break; }
         if (mode !== 'value' && !(d.code ?? '').trim()) { warnings.push(`“${excerptOf(d.question)}” needs the C++ code it is about.`); break; }
         push({ kind: 'cppanswer', id, question: d.question ?? '', code: d.code ?? '', input: d.input ?? '', mode, answers, explain: d.explain ?? '' });
-        exercises[id] = { kind: 'cppanswer', title: excerptOf(d.question) || 'Type the answer', files: { 'main.cpp': d.code ?? '' }, checks: [{ name: 'Right answer', steps: [] }] };
+        // many questions read “What does this print?”: the first line of their code tells them apart in the TA's statistics
+        const firstLine = (d.code ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+        const title = [excerptOf((d.question ?? '').replace(/[*`]/g, '')), firstLine && excerptOf(firstLine)].filter(Boolean).join(' · ');
+        exercises[id] = { kind: 'cppanswer', title: title || 'Type the answer', files: { 'main.cpp': d.code ?? '' }, checks: [{ name: 'Right answer', steps: [] }] };
         outline.push(`<Playground ex="${id}" />`);
         break;
       }

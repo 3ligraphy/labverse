@@ -5,7 +5,7 @@
  */
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
-import { type Activity, type Best, type Identity, type StatsRaw } from './core.ts';
+import { TIME_GAP_CAP, type Activity, type Best, type Identity, type StatsRaw } from './core.ts';
 
 export type StudentRow = { student_key: string; student_id: string; name: string; device_key: string | null; created_at: string; last_seen: string; group_name?: string; session_started_at?: string };
 export type AttemptRow = { id: number; exercise: string; passed: number; total: number; code: string; created_at: string };
@@ -296,11 +296,22 @@ export class MemoryStore implements ProgressStore {
         attended: [...this.checkins.values()].filter((c) => c.session_id === x.id).length })),
       best: [...groups.values()].map((g) => {
         const top = [...g].sort((a, b) => b.passed - a.passed || b.id - a.id)[0];
-        return { lab: top.lab, student_key: top.student_key, exercise: top.exercise, passed: top.passed, total: top.total, attempts: g.length, first_ok: g[0].passed >= g[0].total };
+        // time on the question, as in the SQL version (core.ts TIME_GAP_CAP)
+        const mine = att.filter((a) => a.lab === top.lab && a.student_key === top.student_key).sort((a, b) => a.id - b.id);
+        let seconds = 0;
+        for (const [i, a] of g.entries()) {
+          if (g.slice(0, i).some((b) => b.total > 0 && b.passed >= b.total)) break;
+          const prev = i ? g[i - 1] : mine[mine.findIndex((b) => b.id === a.id) - 1];
+          if (prev) seconds += Math.min((Date.parse(a.created_at) - Date.parse(prev.created_at)) / 1000, TIME_GAP_CAP);
+        }
+        return { lab: top.lab, student_key: top.student_key, exercise: top.exercise, passed: top.passed, total: top.total, attempts: g.length, first_ok: g[0].passed >= g[0].total, seconds: Math.round(seconds) };
       }),
       tasks: [...done].map(([k, set]) => ({ lab: k.split('|')[0], student_key: k.split('|')[1], done: set.size })),
       subs: [...this.subs.values()].filter((x) => x.session_id && labOf.has(x.session_id)).map((x) => ({ lab: x.lab, student_key: x.student_key })),
-      members: [...new Map([...members].sort((a, b) => a.joined_at.localeCompare(b.joined_at)).map((m) => [`${labOf.get(m.session_id)}|${m.student_key}`, { lab: labOf.get(m.session_id)!, student_key: m.student_key, group_name: m.group_name }])).values()],
+      members: [...new Map([...members].sort((a, b) => a.joined_at.localeCompare(b.joined_at)).map((m) => [`${labOf.get(m.session_id)}|${m.student_key}`, {
+        lab: labOf.get(m.session_id)!, student_key: m.student_key, group_name: m.group_name,
+        name: this.students.get(m.student_key)?.name, student_id: this.students.get(m.student_key)?.student_id,
+      }])).values()],
       heat: [...heat].map(([k, n]) => ({ dow: Number(k.split('|')[0]), hour: Number(k.split('|')[1]), n })),
     };
   }
@@ -568,23 +579,35 @@ export class NeonStore implements ProgressStore {
                 (select count(*) from ${v.members} m where m.session_id = s.id)::int as joined,
                 (select count(*) from ${v.checkins} c where c.session_id = s.id)::int as attended
               from ${v.sessions} s where s.lab = any($1)`, [labs]),
-      this.q(`select lab, student_key, exercise, max(passed) as passed, (array_agg(total order by passed desc, id desc))[1] as total,
-                count(*)::int as attempts, (array_agg(passed >= total order by id))[1] as first_ok
-              from ${v.attempts} where lab = any($1) group by lab, student_key, exercise`, [labs]),
+      // time on each question (core.ts TIME_GAP_CAP): the gap before the first Check comes from the student's previous
+      // Check in the lab, the rest from Check to Check on this question, each gap capped, until it was solved
+      this.q(`with a as (
+                select lab, student_key, exercise, passed, total, id,
+                  extract(epoch from created_at - lag(created_at) over (partition by lab, student_key order by id)) as gap_any,
+                  extract(epoch from created_at - lag(created_at) over (partition by lab, student_key, exercise order by id)) as gap_same,
+                  coalesce(bool_or(total > 0 and passed >= total) over (partition by lab, student_key, exercise order by id
+                    rows between unbounded preceding and 1 preceding), false) as solved_before
+                from ${v.attempts} where lab = any($1))
+              select lab, student_key, exercise, max(passed) as passed, (array_agg(total order by passed desc, id desc))[1] as total,
+                count(*)::int as attempts, (array_agg(passed >= total order by id))[1] as first_ok,
+                coalesce(round(sum(case when gap_same is null then least(coalesce(gap_any, 0), $2) else least(gap_same, $2) end)
+                  filter (where not solved_before)), 0)::int as seconds
+              from a group by lab, student_key, exercise`, [labs, TIME_GAP_CAP]),
       this.q(`select lab, student_key, (count(distinct task) filter (where done))::int as done from ${v.tasks} where lab = any($1) group by lab, student_key`, [labs]),
       this.q(`select distinct lab, student_key from ${v.subs} where lab = any($1)`, [labs]),
-      this.q(`select distinct on (s.lab, m.student_key) s.lab, m.student_key, m.group_name
-              from ${v.members} m join ${v.sessions} s on s.id = m.session_id where s.lab = any($1)
+      this.q(`select distinct on (s.lab, m.student_key) s.lab, m.student_key, m.group_name, st.name, st.student_id
+              from ${v.members} m join ${v.sessions} s on s.id = m.session_id left join ${this.t.students} st on st.student_key = m.student_key
+              where s.lab = any($1)
               order by s.lab, m.student_key, m.joined_at desc`, [labs]),
       this.q(`select extract(dow from created_at at time zone 'Africa/Cairo')::int as dow, extract(hour from created_at at time zone 'Africa/Cairo')::int as hour, count(*)::int as n
               from ${v.attempts} where lab = any($1) group by 1, 2`, [labs]),
     ]);
     return {
       sessions: sessions.map((r) => ({ id: r.id, lab: r.lab, ta_name: r.ta_name, time_slot: r.time_slot, opens_at: iso(r.opens_at)!, joined: Number(r.joined), attended: Number(r.attended) })),
-      best: best.map((r) => ({ lab: r.lab, student_key: r.student_key, exercise: r.exercise, passed: Number(r.passed), total: Number(r.total), attempts: Number(r.attempts), first_ok: Boolean(r.first_ok) })),
+      best: best.map((r) => ({ lab: r.lab, student_key: r.student_key, exercise: r.exercise, passed: Number(r.passed), total: Number(r.total), attempts: Number(r.attempts), first_ok: Boolean(r.first_ok), seconds: Number(r.seconds) })),
       tasks: tasks.map((r) => ({ lab: r.lab, student_key: r.student_key, done: Number(r.done) })),
       subs: subs.map((r) => ({ lab: r.lab, student_key: r.student_key })),
-      members: members.map((r) => ({ lab: r.lab, student_key: r.student_key, group_name: r.group_name })),
+      members: members.map((r) => ({ lab: r.lab, student_key: r.student_key, group_name: r.group_name, name: r.name ?? undefined, student_id: r.student_id ?? undefined })),
       heat: heat.map((r) => ({ dow: Number(r.dow), hour: Number(r.hour), n: Number(r.n) })),
     };
   }

@@ -216,7 +216,10 @@ test('the site ships the module itself: one seed, published content, only the C+
   const seeds = shippedSeeds();
   assert.equal(new Set(seeds.map((s) => s.id)).size, seeds.length, 'seed ids are unique');
   // @1 created the module; @2 only rewrites the live lab (it never creates anything)
-  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update), Boolean(s.extend)]), [['intro-to-computing@1', false, false], ['intro-to-computing@2', true, false], ['intro-to-computing@3', true, false], ['intro-to-computing@4', true, false], ['intro-to-computing@5', false, true]]);
+  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update), Boolean(s.extend)]), [['intro-to-computing@1', false, false], ['intro-to-computing@2', true, false], ['intro-to-computing@3', true, false], ['intro-to-computing@4', true, false], ['intro-to-computing@5', false, true], ['intro-to-computing@6', false, false]]);
+  // @6 removes the invitation lock on the live module (anyone with the link), keeping its other settings
+  assert.deepEqual(seeds[5].patch, { public: 'Yes' });
+  assert.equal(compileModule(introComputingModule()).meta.public, 'Yes');
   // @5 adds the practice lab to the module that already exists
   assert.deepEqual(seeds[4].labs.map((l) => l.slug), ['revision-practice']);
   assert.ok(seeds[3].labs[0].flow.nodes.some((n) => n.id === 'p0') && seeds[3].labs[0].flow.nodes.some((n) => n.id === 'c-story' && n.data.visual === 'Your first program, line by line'), 'the latest update carries the Start here part and the first program');

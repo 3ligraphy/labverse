@@ -15,6 +15,8 @@ export type Seed = {
   update?: boolean;
   /** add these labs to the module that already exists: create them, and append their nodes to its canvas */
   extend?: boolean;
+  /** set these fields on the module node of the module that already exists (everything else is kept) */
+  patch?: Record<string, string>;
   module: { slug: string; title: string; flow: Flow; labNodes: LabNodeType[] };
   labs: { slug: string; title: string; flow: Flow }[];
 };
@@ -49,5 +51,7 @@ export function shippedSeeds(): Seed[] {
     // a second lab: practice questions on everything (open any time, tracked)
     { ...seed('intro-to-computing@5', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
       [{ slug: 'revision-practice', flow: introComputingPracticeLab() }]), extend: true },
+    // no invitation lock: anyone with the link opens the module and its labs (they enter a name and ID in each lab)
+    { ...seed('intro-to-computing@6', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']), []), patch: { public: 'Yes' } },
   ];
 }
