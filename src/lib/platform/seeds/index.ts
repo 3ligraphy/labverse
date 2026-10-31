@@ -17,6 +17,8 @@ export type Seed = {
   extend?: boolean;
   /** set these fields on the module node of the module that already exists (everything else is kept) */
   patch?: Record<string, string>;
+  /** publish (true) or hide (false) these labs of the module, by slug — hidden labs are kept, not deleted */
+  publish?: Record<string, boolean>;
   module: { slug: string; title: string; flow: Flow; labNodes: LabNodeType[] };
   labs: { slug: string; title: string; flow: Flow }[];
 };
@@ -53,5 +55,10 @@ export function shippedSeeds(): Seed[] {
       [{ slug: 'revision-practice', flow: introComputingPracticeLab() }]), extend: true },
     // no invitation lock: anyone with the link opens the module and its labs (they enter a name and ID in each lab)
     { ...seed('intro-to-computing@6', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']), []), patch: { public: 'Yes' } },
+    // the practice lab without the complex numbers and quaternions part, and with more questions
+    { ...seed('intro-to-computing@7', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
+      [{ slug: 'revision-practice', flow: introComputingPracticeLab() }]), update: true },
+    // hide the week 6 revision lab from students for now (kept, not deleted; staff still open it in the builder)
+    { ...seed('intro-to-computing@8', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']), []), publish: { 'revision-week-6': false } },
   ];
 }

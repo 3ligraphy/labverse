@@ -99,11 +99,20 @@ class PlatformStore {
    * seed rewrites its labs' content once, and only while they still exist. An extend seed adds new labs to a module
    * that already exists: it creates the missing labs and appends their nodes to the end of the module canvas,
    * keeping everything staff changed on it. A patch seed sets a few fields on the module node and keeps the rest.
+   * A publish seed shows or hides labs (hidden labs are kept, and staff still open them in the builder).
    */
   private async applySeeds() {
     for (const seed of shippedSeeds()) {
       if ((await this.run(`select 1 from ${this.seeds} where id = $1`, [seed.id])).length) continue;
       const m = seed.module;
+      if (seed.publish) {
+        for (const [slug, on] of Object.entries(seed.publish)) {
+          await this.run(`update ${this.labs} set published = $3, updated_at = now() where module = $1 and slug = $2`, [m.slug, slug, on]);
+        }
+        await this.run(`insert into ${this.seeds} (id) values ($1) on conflict (id) do nothing`, [seed.id]);
+        console.info(`[platform] shipped lab visibility applied to ${m.slug} (${seed.id})`);
+        continue;
+      }
       if (seed.patch) {
         const [row] = await this.run(`select flow from ${this.modules} where slug = $1`, [m.slug]);
         if (row) {

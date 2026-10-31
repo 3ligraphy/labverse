@@ -23,7 +23,6 @@ const passes = (id: string, code: string) => {
 };
 
 const VEC = (v: string) => `    int ${v}c = ${v}s.find(',');\n    int ${v}x = stoi(${v}s.substr(1, ${v}c - 1));\n    int ${v}y = stoi(${v}s.substr(${v}c + 1, ${v}s.find('>') - ${v}c - 1));`;
-const COMPLEX = `    string s;\n    getline(cin, s);\n    int sp1 = s.find(' ');\n    string a = s.substr(0, sp1);\n    string rest = s.substr(sp1 + 1);\n    int sp2 = rest.find(' ');\n    string sign = rest.substr(0, sp2);\n    string bi = rest.substr(sp2 + 1);`;
 const MEDIAN = (out: string) => `    if (n1 < n2) {\n        if (n3 > n2) cout << "${out}" << n2 << "\\n";\n        else if (n3 < n1) cout << "${out}" << n1 << "\\n";\n        else cout << "${out}" << n3 << "\\n";\n    } else {\n        if (n3 > n1) cout << "${out}" << n1 << "\\n";\n        else if (n3 < n2) cout << "${out}" << n2 << "\\n";\n        else cout << "${out}" << n3 << "\\n";\n    }`;
 const READ5 = ['    int n, x, sum = 0;', '    cin >> n;', ...[1, 2, 3, 4, 5].map((i) => `    if (n >= ${i}) { cin >> x; sum += x; }`)].join('\n');
 
@@ -66,20 +65,27 @@ const SOLUTIONS: Record<string, string> = {
   'w-vecsum': P(`    string as, bs;\n    getline(cin, as);\n    getline(cin, bs);\n${VEC('a')}\n${VEC('b')}\n    cout << "the sum is: <" << ax + bx << ", " << ay + by << ">\\n";`),
   'w-dot': P(`    string as, bs;\n    getline(cin, as);\n    getline(cin, bs);\n${VEC('a')}\n${VEC('b')}\n    cout << "the dot product is: " << ax * bx + ay * by << "\\n";`),
   'w-orth': P(`    string as, bs;\n    getline(cin, as);\n    getline(cin, bs);\n${VEC('a')}\n${VEC('b')}\n    if (ax * bx + ay * by == 0) cout << "are orthogonal\\n";\n    else cout << "are not orthogonal\\n";`),
-  'w-complex': P("    string s;\n    getline(cin, s);\n    int sp1 = s.find(' ');\n    if (sp1 == string::npos) cout << \"is not a complex number\\n\";\n    else {\n        string a = s.substr(0, sp1);\n        string rest = s.substr(sp1 + 1);\n        int sp2 = rest.find(' ');\n        if (sp2 == string::npos) cout << \"is not a complex number\\n\";\n        else {\n            string sign = rest.substr(0, sp2);\n            string bi = rest.substr(sp2 + 1);\n            if (a.length() > 0 and (sign == \"+\" or sign == \"-\") and bi.length() > 1 and bi[bi.length() - 1] == 'i') cout << \"is a complex number\\n\";\n            else cout << \"is not a complex number\\n\";\n        }\n    }"),
-  'w-parts': P(`${COMPLEX}\n    string b = bi.substr(0, bi.length() - 1);\n    cout << "real part: " << a << "\\n";\n    if (sign == "-") cout << "imaginary part: -" << b << "\\n";\n    else cout << "imaginary part: " << b << "\\n";`),
-  'w-conj': P(`${COMPLEX}\n    string other = "+";\n    if (sign == "+") other = "-";\n    cout << "the conjugate is: " << a << " " << other << " " << bi << "\\n";`),
-  'w-quat': P('    string s;\n    getline(cin, s);\n    int p1 = s.find(" + ");\n    int a = stoi(s.substr(0, p1));\n    string r1 = s.substr(p1 + 3);\n    int p2 = r1.find(" + ");\n    int b = stoi(r1.substr(0, p2));\n    string r2 = r1.substr(p2 + 3);\n    int p3 = r2.find(" + ");\n    int c = stoi(r2.substr(0, p3));\n    int d = stoi(r2.substr(p3 + 3));\n    if (b == 0 and c == 0 and d == 0) cout << "is a real quaternion\\n";\n    else if (a == 0) cout << "is a pure quaternion\\n";\n    else cout << "is a quaternion\\n";'),
+  'w-banner': P('    cout << "*******\\n";\n    cout << "* C++ *\\n";\n    cout << "*******\\n";'),
+  'w-avg2': P('    int a, b;\n    cin >> a >> b;\n    cout << "the average is: " << (a + b) / 2.0 << "\\n";'),
+  'w-minmax': `#include <iostream>\n#include <algorithm>\nusing namespace std;\n\nint main() {\n    int a, b, c;\n    cin >> a >> b >> c;\n    cout << "the largest is: " << max(a, max(b, c)) << "\\n";\n    cout << "the smallest is: " << min(a, min(b, c)) << "\\n";\n    return 0;\n}\n`,
+  'w-grade': P('    int m;\n    cin >> m;\n    if (m >= 85) cout << "grade: A\\n";\n    else if (m >= 70) cout << "grade: B\\n";\n    else if (m >= 50) cout << "grade: C\\n";\n    else cout << "grade: F\\n";'),
+  'w-case': P("    char c;\n    cin >> c;\n    if (c >= 'A' and c <= 'Z') cout << \"uppercase\\n\";\n    else if (c >= 'a' and c <= 'z') cout << \"lowercase\\n\";\n    else cout << \"not a letter\\n\";"),
+  'w-firstlast': P('    string s;\n    cin >> s;\n    cout << "first: " << s[0] << "\\n";\n    cout << "last: " << s[s.length() - 1] << "\\n";'),
+  'w-initials': P("    string s;\n    getline(cin, s);\n    int sp = s.find(' ');\n    cout << \"initials: \" << s[0] << \".\" << s[sp + 1] << \".\\n\";"),
+  'w-swapname': P("    string s;\n    getline(cin, s);\n    int sp = s.find(' ');\n    cout << \"the name is: \" << s.substr(sp + 1) << \", \" << s.substr(0, sp) << \"\\n\";"),
+  'w-scale': P(`    string s;\n    getline(cin, s);\n    int k;\n    cin >> k;\n${VEC('')}\n    cout << "the result is: <" << k * x << ", " << k * y << ">\\n";`),
+  'w-setmax': P('    int n, x, largest;\n    cin >> n;\n    cin >> largest;\n    if (n >= 2) { cin >> x; largest = max(largest, x); }\n    if (n >= 3) { cin >> x; largest = max(largest, x); }\n    if (n >= 4) { cin >> x; largest = max(largest, x); }\n    if (n >= 5) { cin >> x; largest = max(largest, x); }\n    cout << "the largest is: " << largest << "\\n";'),
   'w-setsum': P(`${READ5}\n    cout << "the sum is: " << sum << "\\n";`),
   'w-setavg': P(`${READ5}\n    cout << "the average is: " << (float)sum / n << "\\n";`),
   'w-sd': P('    float a, b, c;\n    cin >> a >> b >> c;\n    float m = (a + b + c) / 3;\n    float sd = sqrt((pow(a - m, 2) + pow(b - m, 2) + pow(c - m, 2)) / 3);\n    cout << "the average is: " << m << "\\n";\n    cout << "the standard deviation is: " << sd << "\\n";'),
   'w-stats3': P(`    float a, b, c;\n    cin >> a >> b >> c;\n    float m = (a + b + c) / 3;\n    float sd = sqrt((pow(a - m, 2) + pow(b - m, 2) + pow(c - m, 2)) / 3);\n    cout << "the average is: " << m << "\\n";\n    cout << "the standard deviation is: " << sd << "\\n";\n    float n1 = a, n2 = b, n3 = c;\n${MEDIAN('the median is: ')}`),
 };
 
-test('the lab: open any time, 10 parts from easy to hard, every item tracked, no warnings', () => {
+test('the lab: open any time, 9 parts from easy to hard, every item tracked, no warnings', () => {
   assert.deepEqual(lab.warnings, []);
   assert.equal(lab.meta.open, true);
-  assert.equal(all.filter((b) => b.kind === 'part').length, 10);
+  assert.equal(all.filter((b) => b.kind === 'part').length, 9);
+  assert.ok(!all.some((b) => b.kind === 'part' && /complex|quaternion/i.test(b.title)), 'the complex numbers part was removed');
   assert.ok(progs.length >= 40 && answers.length >= 30, `${progs.length} programs, ${answers.length} typed answers`);
   assert.equal(Object.keys(lab.exercises).length, progs.length + answers.length);
   // questions only: no options to choose from, no explanations that give answers away
@@ -124,8 +130,12 @@ test('typical wrong programs are marked wrong', () => {
     ['w-names', P("    string line;\n    getline(cin, line);\n    int sp = line.find(' ');\n    cout << \"first name: \" << line.substr(0, sp) << \"\\n\";\n    cout << \"second name: \" << line.substr(sp + 1) << \"\\n\";")],
     // printing both answers is not an answer
     ['w-football', P('    string s;\n    getline(cin, s);\n    cout << "win draw\\n";')],
-    // only checks the last character
-    ['w-complex', P("    string s;\n    getline(cin, s);\n    if (s[s.length() - 1] == 'i') cout << \"is a complex number\\n\";\n    else cout << \"is not a complex number\\n\";")],
+    // int / int cuts the decimals
+    ['w-avg2', P('    int a, b;\n    cin >> a >> b;\n    cout << "the average is: " << (a + b) / 2 << "\\n";')],
+    // > instead of >= at the boundaries
+    ['w-grade', P('    int m;\n    cin >> m;\n    if (m > 85) cout << "grade: A\\n";\n    else if (m > 70) cout << "grade: B\\n";\n    else if (m > 50) cout << "grade: C\\n";\n    else cout << "grade: F\\n";')],
+    // 'A' to 'z' takes [ \ ] ^ _ ` as letters
+    ['w-case', P("    char c;\n    cin >> c;\n    if (c >= 'A' and c <= 'z') cout << \"uppercase\\n\";\n    else cout << \"not a letter\\n\";")],
     // only checks < and >
     ['w-vector', P("    string s;\n    getline(cin, s);\n    if (s.find('<') != string::npos and s.find('>') != string::npos) cout << \"correct format\\n\";\n    else cout << \"wrong format\\n\";")],
   ];
@@ -138,7 +148,7 @@ test('typed answers: the code runs, values are right, inputs exist, and wrong an
     if (a.mode !== 'value' || a.code.trim()) assert.ok(outputOf(a.code, a.input).ok || a.mode === 'input', `${a.id} does not run`);
   }
   // values: the accepted answer is what the code really gives
-  const valueOf: Record<string, string> = { 'v-postinc': 'cout << y;', 'v-preinc': 'cout << y;', 'v-find-o': 'cout << j;', 'v-find-sub': 'cout << j;', 'v-round': '', 'v-ceil': '' };
+  const valueOf: Record<string, string> = { 'v-postinc': 'cout << y;', 'v-preinc': 'cout << y;', 'v-find-o': 'cout << j;', 'v-find-sub': 'cout << j;', 'v-round': '', 'v-ceil': '', 'v-modmul': 'cout << x;', 'v-banana': 'cout << p;' };
   for (const [id, print] of Object.entries(valueOf)) {
     const q = byId(id);
     const r = outputOf(`${q.code}\n${print}`, '');
@@ -155,6 +165,9 @@ test('typed answers: the code runs, values are right, inputs exist, and wrong an
   assert.equal(checkAnswer(cfg('o-lines'), 'HelloWorld').pass, false);
   assert.equal(checkAnswer(cfg('o-total'), 'Total:8').pass, false);
   assert.equal(checkAnswer(cfg('o-compound'), '5\n9\n10\n9\n5\n10\n5\n1').pass, true);
+  assert.equal(checkAnswer(cfg('o-assign-copy'), '8 8').pass, true);
+  assert.equal(checkAnswer(cfg('o-assign-copy'), '8 3').pass, false);
+  assert.equal(checkAnswer(cfg('o-nested'), 'D').pass, true);
   // inputs: the program runs with what the student typed
   assert.equal(checkAnswer(cfg('i-npos'), 'hello').pass, true);
   assert.equal(checkAnswer(cfg('i-npos'), 'pizza').pass, false);

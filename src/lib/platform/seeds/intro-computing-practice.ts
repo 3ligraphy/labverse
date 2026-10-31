@@ -36,24 +36,25 @@ export function introComputingPracticeLab(): Flow {
       title: 'Revision practice: Lectures 1 to 5',
       description: 'Practice questions on Lectures 1 to 5 and the lab programs, from easy to hard. Type every answer and every program yourself. Each answer is checked straight away.',
       difficulty: 'Beginner',
-      estimatedTime: '4 h',
+      estimatedTime: '6 h 40 min',
       objectives: [
         'Read C++ code and say exactly what it prints',
         'Write programs with cout, cin, getline and the right data types',
         'Calculate with operators, cmath and algorithm',
         'Choose with if / else if / else',
         'Work with characters and strings: [ ], at, length, find, substr, npos, stoi, stod, to_string',
-        'Write the lab programs: vectors, complex numbers, quaternions and sets of numbers',
+        'Write the lab programs: strings, vectors and sets of numbers',
       ].join('\n'),
       access: 'Open any time (no session, still tracked)',
     } },
 
     /* ---------------------------------------------------------------- 1. output (easy) */
-    part('p1', 'Output with cout', '20 min'),
+    part('p1', 'Output with cout', '25 min'),
     task('t1-1', 'What does it print?', '8 min', 'Type **exactly** what each program prints: every character and every space. One line on the screen = one line in your answer.'),
     out('o-hello', 'What does this print?', 'cout << "Hello";\ncout << "World";'),
     out('o-lines', 'What does this print?', 'cout << "Hello\\n";\ncout << "World\\n";'),
     out('o-total', 'What does this print?', 'cout << "Total: " << 5 + 3 << "\\n";'),
+    out('o-calc-text', 'What does this print?', 'cout << "1 + 1 = " << 1 + 1;'),
     out('o-comments', 'What does this print?', '// cout << "A";\ncout << "B";\n/* cout << "C"; */\ncout << "D";'),
     out('o-numbers', 'What does this print?', 'cout << 7 << 8 << "\\n" << 9;'),
     task('t1-2', 'Write it', '12 min', 'Write each program from the start. Paste is off: type the code yourself.'),
@@ -67,9 +68,14 @@ export function introComputingPracticeLab(): Flow {
       goal: 'Print this table. Use `\\t` (a tab) between the two columns:\n\n```\nName\tAge\nMona\t19\n```',
       checks: ['Prints the table :: exact Name\\tAge\\nMona\\t19\\n', 'Uses \\t :: code /\\\\t/ Use \\t between the columns.'],
     }),
+    prog('w-banner', {
+      title: 'A box of stars',
+      goal: 'Print exactly this box (seven stars, then a star, a space, C++, a space and a star, then seven stars):\n\n```\n*******\n* C++ *\n*******\n```',
+      checks: ['Prints the box :: expect *******\\n* C++ *\\n*******'],
+    }),
 
     /* ------------------------------------------------- 2. variables, types and assignment */
-    part('p2', 'Variables, types and assignment', '25 min'),
+    part('p2', 'Variables, types and assignment', '30 min'),
     task('t2-1', 'Types', '6 min', 'Type exactly what each program prints.'),
     out('o-intdiv', 'What does this print?', 'int x = 7;\nint y = 2;\ncout << x / y;'),
     out('o-floatdiv', 'What does this print?', 'float a = 7;\ncout << a / 2;'),
@@ -80,6 +86,8 @@ export function introComputingPracticeLab(): Flow {
     val('v-postinc', 'What is the final value of **y**?', 'int x = 4; int y = 2;\nx += y;\ny = x++;', ['6']),
     val('v-preinc', 'What is the final value of **y**?', 'int x = 4; int y = 2;\nx += y;\ny = ++x;', ['7']),
     out('o-incexpr', 'What does this print?', 'int x = 5;\nint y = x++ + 2;\ncout << x << " " << y;'),
+    out('o-assign-copy', 'What does this print?', 'int a = 3, b = 8;\na = b;\nb = a;\ncout << a << " " << b;'),
+    val('v-modmul', 'What is the final value of **x**?', 'int x = 17;\nx %= 5;\nx *= 3;', ['6']),
     task('t2-3', 'Fix it', '9 min', 'Each program does not build. Fix it so it builds and prints what it should. Keep the variable and its type.'),
     prog('w-fix-char', {
       title: 'Fix the declaration',
@@ -95,7 +103,7 @@ export function introComputingPracticeLab(): Flow {
     }),
 
     /* ------------------------------------------------- 3. calculating: cmath and algorithm */
-    part('p3', 'Calculating: operators, cmath and algorithm', '35 min'),
+    part('p3', 'Calculating: operators, cmath and algorithm', '45 min'),
     task('t3-1', 'Values', '10 min', 'Type the value, or exactly what the program prints.'),
     val('v-round', 'What does `round(5.5)` return?', 'cout << round(5.5);', ['6', '6.0']),
     val('v-ceil', 'What does `ceil(4.1)` return?', 'cout << ceil(4.1);', ['5', '5.0']),
@@ -103,7 +111,9 @@ export function introComputingPracticeLab(): Flow {
     out('o-mod', 'What does this print?', 'cout << 17 % 5 << " " << 17 / 5 << " " << 17 / 5.0;'),
     out('o-rounding', 'What does this print?', 'cout << round(2.5) << " " << floor(-2.5) << " " << ceil(-2.5);'),
     out('o-minmax', 'What does this print?', 'cout << min(4, 9) << " " << max(-1, -7);'),
-    task('t3-2', 'Programs 1, 2, 9, 11 and 12', '25 min', 'Write each program. Your program may say hello and goodbye, but it must print the line shown, exactly.'),
+    out('o-pow-sqrt', 'What does this print?', 'cout << pow(3, 2) + sqrt(16);'),
+    out('o-fcr', 'What does this print?', 'cout << floor(7.99) << " " << ceil(7.01) << " " << round(7.49);'),
+    task('t3-2', 'Programs 1, 2, 9, 11, 12 and more', '35 min', 'Write each program. Your program may say hello and goodbye, but it must print the line shown, exactly.'),
     prog('w-product', {
       title: 'Program 1: the product of two numbers',
       goal: 'The user enters two whole numbers. Print `the product is: ` and their product.\n\n- `3 5` → `the product is: 15`',
@@ -129,16 +139,31 @@ export function introComputingPracticeLab(): Flow {
       goal: 'The user enters the length of a side of a regular hexagon. Print `the area is: ` and the area.\n\nThe area of a regular hexagon is (3 × √3 ÷ 2) × side × side.\n\n- `2` → `the area is: 10.3923`',
       checks: ['Side 2 :: in 2; expect the area is: 10.3923', 'Side 1 :: in 1; expect the area is: 2.59808', 'Side 3.5 :: in 3.5; expect the area is: 31.8264', 'Uses sqrt :: code /sqrt\\s*\\(/ Use sqrt from cmath for √3.'],
     }),
+    prog('w-avg2', {
+      title: 'The average of two numbers',
+      goal: 'The user enters two whole numbers. Print `the average is: ` and their average (it can have decimals).\n\n- `3 4` → `the average is: 3.5`',
+      checks: ['3 and 4 :: in 3 4; expect the average is: 3.5', '10 and 20 :: in 10 20; expect the average is: 15', '-1 and 2 :: in -1 2; expect the average is: 0.5', '7 and 8 :: in 7 8; expect the average is: 7.5'],
+    }),
+    prog('w-minmax', {
+      title: 'The largest and the smallest',
+      goal: 'The user enters three whole numbers. Print `the largest is: ` and the largest, then `the smallest is: ` and the smallest. Use `max` and `min`.\n\n- `4 9 2` → `the largest is: 9` and `the smallest is: 2`',
+      checks: [
+        '4 9 2 :: in 4 9 2; expect the largest is: 9; expect the smallest is: 2', 'Negative numbers :: in -1 -7 -3; expect the largest is: -1; expect the smallest is: -7',
+        'All the same :: in 5 5 5; expect the largest is: 5; expect the smallest is: 5', 'Largest last :: in 1 2 30; expect the largest is: 30; expect the smallest is: 1',
+        'Uses max :: code /max\\s*\\(/ Use max from the algorithm library.', 'Uses min :: code /min\\s*\\(/ Use min from the algorithm library.',
+      ],
+    }),
 
     /* ------------------------------------------------------------- 4. choosing: if / else */
-    part('p4', 'Choosing: if / else', '35 min'),
+    part('p4', 'Choosing: if / else', '45 min'),
     task('t4-1', 'Follow the conditions', '10 min', 'Type exactly what each program prints.'),
     out('o-charcmp', 'What does this print? (Lecture 4)', "if ('a' > 'b') cout << \"yes\\n\"; else cout << \"no\\n\";\nif ('a' == 'b') cout << \"yes\\n\"; else cout << \"no\\n\";\nif ('a' != 'b') cout << \"yes\\n\"; else cout << \"no\\n\";"),
     out('o-quiz-cd', 'What is the output of this statement?', "if ('c' > 'd') { cout << \"yes\\n\"; } else { cout << \"no\\n\"; }"),
     out('o-and', 'What does this print?', 'int x = 5;\nif (x > 3 and x < 10) cout << "in";\nelse cout << "out";'),
     out('o-elseif', 'What does this print?', 'int t = 25;\nif (t > 30) cout << "hot";\nelse if (t > 20) cout << "warm";\nelse cout << "cold";'),
+    out('o-nested', 'What does this print?', 'int a = 4, b = 9;\nif (a > b) cout << "A";\nelse if (a == b) cout << "B";\nelse {\n    if (b % 2 == 0) cout << "C";\n    else cout << "D";\n}'),
     inp('i-median', 'Type three numbers the user could enter so that this program prints `median is: 7`.', 'int a, b, c;\ncin >> a >> b >> c;\nif (a < b) {\n    if (c > b) cout << "median is: " << b;\n    else if (c < a) cout << "median is: " << a;\n    else cout << "median is: " << c;\n} else {\n    if (c > a) cout << "median is: " << a;\n    else if (c < b) cout << "median is: " << b;\n    else cout << "median is: " << c;\n}', 'median is: 7'),
-    task('t4-2', 'Program 7 and even or odd', '25 min', 'Write each program. Test it with equal numbers too.'),
+    task('t4-2', 'Program 7, even or odd, and a grade', '35 min', 'Write each program. Test it with equal numbers too.'),
     prog('w-median', {
       title: 'Program 7: the median of three numbers',
       goal: 'The user enters three whole numbers. Print `median is: ` and the median (the middle number). It must also work when some of the numbers are equal.\n\n- `5 2 9` → `median is: 5`\n- `2 2 5` → `median is: 2`',
@@ -159,9 +184,19 @@ export function introComputingPracticeLab(): Flow {
         '-8 :: in -8; expect the number is even; not the number is odd', 'Uses % :: code /%/ Use % (the remainder).',
       ],
     }),
+    prog('w-grade', {
+      title: 'A letter grade',
+      goal: 'The user enters a mark from 0 to 100. Print `grade: A` for 85 and above, `grade: B` for 70 to 84, `grade: C` for 50 to 69, and `grade: F` below 50.\n\n- `84` → `grade: B`',
+      checks: [
+        '100 :: in 100; expect grade: A; not grade: B; not grade: C; not grade: F', '85 :: in 85; expect grade: A; not grade: B; not grade: C; not grade: F',
+        '84 :: in 84; expect grade: B; not grade: A; not grade: C; not grade: F', '70 :: in 70; expect grade: B; not grade: A; not grade: C; not grade: F',
+        '69 :: in 69; expect grade: C; not grade: A; not grade: B; not grade: F', '50 :: in 50; expect grade: C; not grade: A; not grade: B; not grade: F',
+        '49 :: in 49; expect grade: F; not grade: A; not grade: B; not grade: C', '0 :: in 0; expect grade: F; not grade: A; not grade: B; not grade: C',
+      ],
+    }),
 
     /* ------------------------------------------------------------------ 5. characters */
-    part('p5', 'Characters', '25 min'),
+    part('p5', 'Characters', '30 min'),
     task('t5-1', 'Characters are numbers', '6 min', 'Type exactly what each program prints.'),
     out('o-char-b', 'What does this print?', "char c = 'b';\ncout << (char)(c - 32);"),
     out('o-char-cmp', 'What does this print?', "cout << ('B' < 'a') << \" \" << ('z' > 'Z');"),
@@ -185,9 +220,19 @@ export function introComputingPracticeLab(): Flow {
         'a :: in a; expect is not a digit', '# :: in #; expect is not a digit', 'Compares characters :: nocode /isdigit/ Compare the characters yourself (Lecture 4), not isdigit.',
       ],
     }),
+    prog('w-case', {
+      title: 'Uppercase, lowercase or not a letter',
+      goal: 'The user enters one character. Print `uppercase` if it is a letter from A to Z, `lowercase` if it is a letter from a to z, otherwise `not a letter`.\n\n- `G` → `uppercase`\n- `5` → `not a letter`',
+      checks: [
+        'G :: in G; expect uppercase; not lowercase; not not a letter', 'Z :: in Z; expect uppercase; not lowercase; not not a letter',
+        'g :: in g; expect lowercase; not uppercase; not not a letter', 'a :: in a; expect lowercase; not uppercase; not not a letter',
+        '5 :: in 5; expect not a letter; not uppercase; not lowercase', '[ (between Z and a) :: in [; expect not a letter; not uppercase; not lowercase',
+        'Compares characters :: nocode /isupper|islower|isalpha/ Compare the characters yourself (Lecture 4).',
+      ],
+    }),
 
     /* --------------------------------------------------------------------- 6. strings */
-    part('p6', 'Strings', '40 min'),
+    part('p6', 'Strings', '50 min'),
     task('t6-1', 'Read the string', '12 min', 'Type exactly what each program prints, or the value asked for.'),
     out('o-hello-ops', 'What does this print? (Lecture 4)', 'string s = "hello";\ncout << s.length() << " " << s.find(\'e\') << " " << s.find(\'l\') << " " << s.find("el");'),
     out('o-hello-idx', 'What does this print?', 'string s = "hello";\ncout << s[0] << s[3] << " " << s.substr(1, 3);'),
@@ -196,6 +241,8 @@ export function introComputingPracticeLab(): Flow {
     val('v-find-sub', 'What is **j**?', 'string s, sub;\ns = "Introduction to Computing";\nsub = s.substr(14);\nint j = s.find(\'o\');', ['4']),
     inp('i-npos', 'Type a string the user could enter so that this program prints `2`.', 'string s;\ncin >> s;\nint j = s.find(\'z\');\nif (j != std::string::npos) {\n    cout << "1\\n";\n} else {\n    cout << "2\\n";\n}', '2'),
     out('o-stoi', 'What does this print?', 'string a = "12";\nstring b = "30";\ncout << a + b << " " << stoi(a) + stoi(b);'),
+    out('o-at-length', 'What does this print?', 'string s = "Cairo";\ncout << s.at(s.length() - 1) << s.length();'),
+    val('v-banana', 'What is **p**?', 'string s = "banana";\nint p = s.find("na");', ['2']),
     task('t6-2', 'Write it', '28 min', 'Write each program. The user types a word or a line of text.'),
     prog('w-length', {
       title: 'The length of a word',
@@ -206,6 +253,11 @@ export function introComputingPracticeLab(): Flow {
       title: 'The fourth character',
       goal: 'The user enters a word with at least 4 characters. Print `the fourth character is: ` and the character at position 3.\n\n- `University` → `the fourth character is: v`',
       checks: ['University :: in University; expect the fourth character is: v', 'Liverpool :: in Liverpool; expect the fourth character is: e', 'test :: in test; expect the fourth character is: t', 'Uses an index :: code /\\[\\s*3\\s*\\]|\\.at\\s*\\(\\s*3\\s*\\)/ Use the position: s[3] or s.at(3).'],
+    }),
+    prog('w-firstlast', {
+      title: 'The first and the last character',
+      goal: 'The user enters a word. Print `first: ` and its first character, then `last: ` and its last character.\n\n- `Cairo` → `first: C` and `last: o`',
+      checks: ['Cairo :: in Cairo; expect first: C; expect last: o', 'a :: in a; expect first: a; expect last: a', 'Egypt :: in Egypt; expect first: E; expect last: t', 'Uses the length :: code /length\\s*\\(\\s*\\)|size\\s*\\(\\s*\\)/ Use the length to find the last character.'],
     }),
     prog('w-rest', {
       title: 'From position 5 to the end',
@@ -229,7 +281,7 @@ export function introComputingPracticeLab(): Flow {
     }),
 
     /* ----------------------------------------------- 7. string programs (programs 15–20) */
-    part('p7', 'Programs with strings', '60 min'),
+    part('p7', 'Programs with strings', '70 min'),
     task('t7-1', 'Is it there?', '20 min', 'Write each program. The user types one line of text: read it with getline.'),
     prog('w-hasdigit', {
       title: 'Does the string contain a digit? (Lecture 2)',
@@ -283,6 +335,16 @@ export function introComputingPracticeLab(): Flow {
         'Pele :: in Pele; expect Only one name: Pele; not second name', 'Checks for npos :: code /npos/ When there is no space, find gives string::npos: check for it.',
       ],
     }),
+    prog('w-initials', {
+      title: 'Initials',
+      goal: 'The user enters a first and a second name with one space between them. Print `initials: ` and the first letter of each name, each followed by a dot.\n\n- `Mohamed Salah` → `initials: M.S.`',
+      checks: ['Mohamed Salah :: in Mohamed Salah; expect initials: M.S.', 'Lionel Messi :: in Lionel Messi; expect initials: L.M.', 'Ahmed Zewail :: in Ahmed Zewail; expect initials: A.Z.', 'Uses find :: code /find\\s*\\(/ Find the space with find.'],
+    }),
+    prog('w-swapname', {
+      title: 'Second name first',
+      goal: 'The user enters a first and a second name with one space between them. Print `the name is: ` and the second name, a comma and a space, then the first name.\n\n- `Mohamed Salah` → `the name is: Salah, Mohamed`',
+      checks: ['Mohamed Salah :: in Mohamed Salah; expect the name is: Salah, Mohamed', 'Lionel Messi :: in Lionel Messi; expect the name is: Messi, Lionel', 'Mo Ali :: in Mo Ali; expect the name is: Ali, Mo', 'Uses substr :: code /substr\\s*\\(/ Cut the names with substr.'],
+    }),
     prog('w-email', {
       title: 'Is it an email address? (Lecture 4)',
       goal: 'The user enters a string. It is an email address when:\n\n1. it contains `@`, and\n2. there is something before the `@` and something after it, and\n3. the part after the `@` contains a `.`, and\n4. there is something before that `.` and something after it.\n\nPrint `is an email address` or `is not an email address`.',
@@ -307,8 +369,8 @@ export function introComputingPracticeLab(): Flow {
     val('v-tld', 'Where is the top-level domain (TLD) in an email address? Type the TLD of `gerard.mckee@bue.edu.eg`.', '', ['eg', '.eg']),
 
     /* -------------------------------------------- 8. vectors (programs 21–25 and 29) */
-    part('p8', 'Vectors', '45 min'),
-    task('t8-1', 'Programs 21, 22 and 25', '20 min', 'A two-dimensional vector is typed like `<3, 4>`: `<`, a number, a comma, a number, `>`. There can be a space after the comma, so read the whole line with getline.'),
+    part('p8', 'Vectors', '50 min'),
+    task('t8-1', 'Programs 21, 22, 25 and more', '25 min', 'A two-dimensional vector is typed like `<3, 4>`: `<`, a number, a comma, a number, `>`. There can be a space after the comma, so read the whole line with getline.'),
     prog('w-vector', {
       title: 'Program 21: is it a two-dimensional vector?',
       goal: 'The user enters a line. It is a two-dimensional vector when it contains `<`, then `>`, and between them a `,` with something on both sides of the comma. Print `correct format` or `wrong format`.\n\n- `<2, 3>` → `correct format`\n- `2,3>` → `wrong format`',
@@ -328,6 +390,11 @@ export function introComputingPracticeLab(): Flow {
       goal: 'The user enters a vector like `<1, 2, 2>` (three whole numbers). Print `the norm is: ` and its norm: √(x² + y² + z²).\n\n- `<1, 2, 2>` → `the norm is: 3`',
       checks: ['<1, 2, 2> :: in <1, 2, 2>; expect the norm is: 3', '<2, 3, 6> :: in <2, 3, 6>; expect the norm is: 7', '<1, 1, 1> :: in <1, 1, 1>; expect the norm is: 1.73205', '<-2, 0, 0> :: in <-2, 0, 0>; expect the norm is: 2'],
     }),
+    prog('w-scale', {
+      title: 'Multiply a vector by a number',
+      goal: 'The user enters a vector like `<1, 2>`, then a whole number k on the next line. Print `the result is: ` and the vector with both numbers multiplied by k, written like `<3, 6>`.\n\n- `<1, 2>` and `3` → `the result is: <3, 6>`',
+      checks: ['<1, 2> × 3 :: in <1, 2>\\n3; expect the result is: <3, 6>', '<-2, 5> × 2 :: in <-2, 5>\\n2; expect the result is: <-4, 10>', '<0, 7> × 0 :: in <0, 7>\\n0; expect the result is: <0, 0>'],
+    }),
     task('t8-2', 'Programs 23, 24 and 29', '25 min', 'The user enters two vectors, one on each line, like `<1, 2>` and then `<3, 4>`.'),
     prog('w-vecsum', {
       title: 'Program 23: the sum of two vectors',
@@ -345,44 +412,9 @@ export function introComputingPracticeLab(): Flow {
       checks: ['<1, 0> and <0, 1> :: in <1, 0>\\n<0, 1>; expect are orthogonal; not are not orthogonal', '<1, 2> and <2, -1> :: in <1, 2>\\n<2, -1>; expect are orthogonal; not are not orthogonal', '<1, 2> and <3, 4> :: in <1, 2>\\n<3, 4>; expect are not orthogonal', '<-3, 4> and <4, 3> :: in <-3, 4>\\n<4, 3>; expect are orthogonal; not are not orthogonal'],
     }),
 
-    /* -------------------------------- 9. complex numbers and quaternions (26–28 and 30) */
-    part('p9', 'Complex numbers and quaternions', '45 min'),
-    task('t9-1', 'Programs 26, 27 and 28', '25 min', 'A complex number is typed as `a + bi` or `a - bi`: a number, a space, `+` or `-`, a space, then a number followed by `i`. For example `3 + 4i` or `-3 - 4i`. Read the whole line with getline.'),
-    prog('w-complex', {
-      title: 'Program 26: is it a complex number?',
-      goal: 'Print `is a complex number` if the line has that format, otherwise print `is not a complex number`.\n\n- `3 + 4i` → `is a complex number`\n- `3 + 4` → `is not a complex number`',
-      checks: [
-        '3 + 4i :: in 3 + 4i; expect is a complex number; not is not a complex number', '-3 - 4i :: in -3 - 4i; expect is a complex number; not is not a complex number',
-        '12 - 7i :: in 12 - 7i; expect is a complex number; not is not a complex number', '3 + 4 :: in 3 + 4; expect is not a complex number',
-        '3 * 4i :: in 3 * 4i; expect is not a complex number', '3+4i :: in 3+4i; expect is not a complex number', '3 + i :: in 3 + i; expect is not a complex number',
-      ],
-    }),
-    prog('w-parts', {
-      title: 'Program 27: the real and imaginary parts',
-      goal: 'The user enters a complex number in the format above. Print `real part: ` and the real part, then `imaginary part: ` and the imaginary part (with its sign).\n\n- `3 + 4i` → `real part: 3` and `imaginary part: 4`\n- `-3 - 4i` → `real part: -3` and `imaginary part: -4`',
-      checks: ['3 + 4i :: in 3 + 4i; expect real part: 3; expect imaginary part: 4', '-3 - 4i :: in -3 - 4i; expect real part: -3; expect imaginary part: -4', '5 + 12i :: in 5 + 12i; expect real part: 5; expect imaginary part: 12', '7 - 2i :: in 7 - 2i; expect real part: 7; expect imaginary part: -2'],
-    }),
-    prog('w-conj', {
-      title: 'Program 28: the complex conjugate',
-      goal: 'The conjugate of `a + bi` is `a - bi`, and the conjugate of `a - bi` is `a + bi`. Print `the conjugate is: ` and the conjugate in the same format.\n\n- `3 + 4i` → `the conjugate is: 3 - 4i`',
-      checks: ['3 + 4i :: in 3 + 4i; expect the conjugate is: 3 - 4i', '-3 - 4i :: in -3 - 4i; expect the conjugate is: -3 + 4i', '5 + 12i :: in 5 + 12i; expect the conjugate is: 5 - 12i'],
-    }),
-    task('t9-2', 'Program 30', '20 min', 'A quaternion is typed as `a + bi + cj + dk`, with whole numbers (0 or more) and ` + ` between the parts, like `1 + 2i + 3j + 4k`.'),
-    prog('w-quat', {
-      title: 'Program 30: what kind of quaternion?',
-      goal: 'It is a **real quaternion** when b, c and d are all 0, like `5 + 0i + 0j + 0k`. It is a **pure quaternion** when a is 0, like `0 + 2i + 3j + 4k`. Otherwise it is a general quaternion. Print `is a real quaternion`, `is a pure quaternion` or `is a quaternion`.',
-      checks: [
-        '1 + 2i + 3j + 4k :: in 1 + 2i + 3j + 4k; expect is a quaternion; not is a real quaternion; not is a pure quaternion',
-        '5 + 0i + 0j + 0k :: in 5 + 0i + 0j + 0k; expect is a real quaternion; not is a pure quaternion',
-        '0 + 2i + 3j + 4k :: in 0 + 2i + 3j + 4k; expect is a pure quaternion; not is a real quaternion',
-        '7 + 0i + 1j + 0k :: in 7 + 0i + 1j + 0k; expect is a quaternion; not is a real quaternion; not is a pure quaternion',
-        '12 + 0i + 0j + 0k :: in 12 + 0i + 0j + 0k; expect is a real quaternion; not is a pure quaternion',
-      ],
-    }),
-
     /* ----------------------------------- 10. sets of numbers (programs 3–6 and 8) */
-    part('p10', 'Sets of numbers, without loops', '50 min'),
-    task('t10-1', 'Programs 3 and 4', '25 min', 'In Part 1 there are no loops, so think: how can sequence and selection handle “the user first enters how many numbers”? The user enters a count from 1 to 5, then that many whole numbers.'),
+    part('p10', 'Sets of numbers, without loops', '55 min'),
+    task('t10-1', 'Programs 3 and 4, and the largest', '30 min', 'In Part 1 there are no loops, so think: how can sequence and selection handle “the user first enters how many numbers”? The user enters a count from 1 to 5, then that many whole numbers.'),
     prog('w-setsum', {
       title: 'Program 3: the sum of a set of numbers',
       goal: 'The user first enters how many numbers (1 to 5), then the numbers. Print `the sum is: ` and their sum.\n\n- `3 1 2 3` → `the sum is: 6`',
@@ -392,6 +424,11 @@ export function introComputingPracticeLab(): Flow {
       title: 'Program 4: the average of a set of numbers',
       goal: 'The user first enters how many numbers (1 to 5), then the numbers. Print `the average is: ` and their average.\n\n- `2 3 4` → `the average is: 3.5`',
       checks: ['2 numbers :: in 2 3 4; expect the average is: 3.5', '3 numbers :: in 3 1 2 4; expect the average is: 2.33333', '1 number :: in 1 9; expect the average is: 9', '5 numbers :: in 5 1 2 3 4 5; expect the average is: 3', 'Uses selection :: code /\\bif\\b/ Use if to read only as many numbers as the user said.'],
+    }),
+    prog('w-setmax', {
+      title: 'The largest of a set of numbers',
+      goal: 'The user first enters how many numbers (1 to 5), then the numbers. Print `the largest is: ` and the largest of them.\n\n- `3 4 9 2` → `the largest is: 9`',
+      checks: ['3 numbers :: in 3 4 9 2; expect the largest is: 9', '1 number :: in 1 -5; expect the largest is: -5', '5 numbers :: in 5 1 2 3 4 5; expect the largest is: 5', 'All negative :: in 4 -3 -1 -7 -2; expect the largest is: -1', 'Uses selection :: code /\\bif\\b/ Use if to read only as many numbers as the user said.'],
     }),
     task('t10-2', 'Programs 5, 6 and 8', '25 min', 'The user enters three whole numbers. The standard deviation of three numbers a, b and c with average m is √(((a − m)² + (b − m)² + (c − m)²) ÷ 3).'),
     prog('w-sd', {
