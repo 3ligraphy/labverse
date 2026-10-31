@@ -28,6 +28,15 @@ export const KITS: Record<Kit, { label: string; hint: string }> = {
 };
 
 /** The animated C++ visuals a builder can place (label shown in the builder → id used by the page). */
+/** how students get into a lab: a session the TA starts, or open any time (a permanent session, still tracked) */
+export const LAB_ACCESS = ['TA starts a session', 'Open any time (no session, still tracked)'] as const;
+/** typed-answer questions: what the student types and how it is checked */
+export const ANSWER_MODES: Record<string, 'output' | 'value' | 'input'> = {
+  'What it prints (the output)': 'output',
+  'A value': 'value',
+  'What the user types (an input)': 'input',
+};
+
 export const CPP_VISUALS: Record<string, string> = {
   'Program logic → code': 'logic',
   'cout & cin: data in and out': 'streams',
@@ -76,8 +85,9 @@ export const LAB_NODES = {
       { key: 'difficulty', label: 'Difficulty', kind: 'select', options: ['Beginner', 'Intermediate', 'Advanced'] },
       { key: 'estimatedTime', label: 'Estimated time', kind: 'text', placeholder: '2 hours', max: 40 },
       { key: 'objectives', label: 'Learning objectives', kind: 'lines', help: 'One per line', max: 2000 },
+      { key: 'access', label: 'Sessions', kind: 'select', options: [...LAB_ACCESS], help: 'Open any time: anyone with the link opens this lab (no sign-in or enrolment), enters a name and student ID and starts straight away — no TA session needed, and their work is still tracked.' },
     ],
-    defaults: { title: 'New lab', description: '', difficulty: 'Beginner', estimatedTime: '2 hours', objectives: '' },
+    defaults: { title: 'New lab', description: '', difficulty: 'Beginner', estimatedTime: '2 hours', objectives: '', access: LAB_ACCESS[0] },
   },
   part: {
     label: 'Part', hint: 'Big numbered section', color: '#7cb1ff', glyph: '§',
@@ -252,6 +262,18 @@ export const LAB_NODES = {
       { key: 'trace', label: 'Step through after answering', kind: 'select', options: ['Yes', 'No'] },
     ],
     defaults: { question: 'What does this program print?', code: 'int x = 3;\nx = x + 2;\ncout << x;', input: '', options: '*5\n3\nx + 2', explain: '', trace: 'Yes' },
+  },
+  cppanswer: {
+    label: 'Type the answer', hint: 'The student types the answer (no options): what the code prints, a value, or an input — checked exactly', color: '#ffb547', glyph: '⌨', kit: 'cpp',
+    fields: [
+      { key: 'question', label: 'Question', kind: 'textarea', max: 800 },
+      { key: 'code', label: 'C++ code', kind: 'code', help: 'A whole program, or just the lines inside main (they are wrapped for you).', max: 8000 },
+      { key: 'input', label: 'Keyboard input', kind: 'textarea', help: 'For “what it prints”: what the user types when it runs.', max: 1000 },
+      { key: 'mode', label: 'The student types', kind: 'select', options: Object.keys(ANSWER_MODES), help: 'What it prints: checked against the real output of the code. A value: one of the accepted answers. What the user types: the code runs with it and must print the expected output.' },
+      { key: 'answers', label: 'Accepted answers', kind: 'lines', help: 'A value: every accepted form, one per line (e.g. 6 and 6.0). What the user types: the output it must produce. Not used for “what it prints”.', max: 1000 },
+      { key: 'explain', label: 'Explanation (after a right answer)', kind: 'markdown', max: 3000 },
+    ],
+    defaults: { question: 'What does this program print?', code: 'int x = 3;\nx = x + 2;\ncout << x;', input: '', mode: Object.keys(ANSWER_MODES)[0], answers: '', explain: '' },
   },
   parsons: {
     label: 'Order the lines', hint: 'Parsons puzzle: put the code blocks in the right order, then run it', color: '#7ce0a3', glyph: '⇅', kit: 'cpp',
@@ -523,7 +545,7 @@ export function parseChecks(text: string): Result<Check[]> {
 /* ------------------------------------------------------------- compile a lab */
 
 /** A graded item of a lab. RN exercises carry runner checks; C++ items (kind) carry one entry per check, for counting. */
-export type Exercise = { title: string; goal?: string; hint?: string; files: Record<string, string>; solution?: Record<string, string>; checks: Check[]; kind?: 'cpp' | 'cpppredict' | 'parsons' };
+export type Exercise = { title: string; goal?: string; hint?: string; files: Record<string, string>; solution?: Record<string, string>; checks: Check[]; kind?: 'cpp' | 'cpppredict' | 'cppanswer' | 'parsons' };
 export type Block =
   | { kind: 'part'; n: string; title: string; time: string }
   | { kind: 'task'; n: string; title: string; time: string; body: string; children: Block[] }
@@ -545,11 +567,13 @@ export type Block =
   | { kind: 'clickpath'; title: string; steps: string[] }
   | { kind: 'cpp'; id: string; title: string; goal: string; starter: string; input: string; checks: CppCheck[]; hints: string[]; paste: boolean }
   | { kind: 'cpppredict'; id: string; question: string; code: string; input: string; options: { text: string; correct: boolean }[]; explain: string; trace: boolean }
+  | { kind: 'cppanswer'; id: string; question: string; code: string; input: string; mode: 'output' | 'value' | 'input'; answers: string[]; explain: string }
   | { kind: 'parsons'; id: string; title: string; goal: string; code: string; input: string }
   | { kind: 'cppvisual'; id: string; visual: string; text: string; caption: string };
 
 export type CompiledLab = {
-  meta: { title: string; description: string; difficulty: string; estimatedTime: string; objectives: string[] };
+  /** open: students join a permanent session by themselves (no TA session needed) and are still tracked */
+  meta: { title: string; description: string; difficulty: string; estimatedTime: string; objectives: string[]; open: boolean };
   blocks: Block[];
   /** MDX-syntax outline (<Part>/<Task>/<Playground>/<RepoSubmit>) for the progress tracker. */
   outline: string;
@@ -701,6 +725,18 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
         outline.push(`<Playground ex="${id}" />`);
         break;
       }
+      case 'cppanswer': {
+        const id = `${key}--${node.id}`;
+        const mode = ANSWER_MODES[d.mode ?? ''] ?? 'output';
+        const answers = (d.answers ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        if (!(d.question ?? '').trim()) { warnings.push('A “Type the answer” question has no question text.'); break; }
+        if (mode !== 'output' && !answers.length) { warnings.push(`“${excerptOf(d.question)}” needs at least one accepted answer.`); break; }
+        if (mode !== 'value' && !(d.code ?? '').trim()) { warnings.push(`“${excerptOf(d.question)}” needs the C++ code it is about.`); break; }
+        push({ kind: 'cppanswer', id, question: d.question ?? '', code: d.code ?? '', input: d.input ?? '', mode, answers, explain: d.explain ?? '' });
+        exercises[id] = { kind: 'cppanswer', title: excerptOf(d.question) || 'Type the answer', files: { 'main.cpp': d.code ?? '' }, checks: [{ name: 'Right answer', steps: [] }] };
+        outline.push(`<Playground ex="${id}" />`);
+        break;
+      }
       case 'parsons': {
         const id = `${key}--${node.id}`;
         if (!(d.code ?? '').trim()) { warnings.push(`Order the lines “${d.title}” has no code.`); break; }
@@ -720,7 +756,7 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
   }
   const objectives = (start.objectives ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   return {
-    meta: { title: start.title || 'Untitled lab', description: start.description ?? '', difficulty: start.difficulty || 'Beginner', estimatedTime: start.estimatedTime ?? '', objectives },
+    meta: { title: start.title || 'Untitled lab', description: start.description ?? '', difficulty: start.difficulty || 'Beginner', estimatedTime: start.estimatedTime ?? '', objectives, open: start.access === LAB_ACCESS[1] },
     blocks, outline: outline.join('\n'), exercises, hasCheckin, warnings,
   };
 }

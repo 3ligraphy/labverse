@@ -38,6 +38,9 @@ if (!item) Astro.response.status = 404;
 
 const key = labKey(moduleSlug, Astro.params.lab ?? '');
 const c = item?.compiled;
+// a lab that is open any time works like the Mobile Development labs: anyone with the link enters a name and a
+// student ID and is tracked — no sign-in or enrolment (the rest of the module stays invitation-only)
+const openToAll = Boolean(c?.meta.open);
 const blocks = c ? await renderBlocks(c.blocks) : [];
 const pad = (n: number) => String(n).padStart(2, '0');
 const slugNumber = item?.lab.slug.match(/^lab-(\d+)$/)?.[1];
@@ -54,7 +57,7 @@ const next = data && idx >= 0 ? data.items[idx + 1] : null;
 const q = preview ? '?preview' : '';
 ---
 <Base title={item ? `${label} — ${c!.meta.title}` : 'Lab not found'} description={c?.meta.description} module={data ? { slug: moduleSlug, title: data.meta.title || data.module.title, color } : undefined}>
-  {data && !gate.ok ? (
+  {data && !gate.ok && !openToAll ? (
     <Locked title={data.meta.title || data.module.title} code={data.meta.code} color={color} description={data.meta.description} signedIn={gate.signedIn} next={Astro.url.pathname} />
   ) : !item || !c ? (
     <div class="container" style="padding-block: 160px 120px">

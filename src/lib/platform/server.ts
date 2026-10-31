@@ -8,7 +8,7 @@ import { getSecret } from 'astro:env/server';
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
 import { course } from '@/site.config';
-import { compileLab, compileModule, emptyFlow, flowLeader, labKey, parseNodeList, type AssessmentItem, type CompiledLab, type Flow, type LabNodeType } from './core';
+import { compileLab, compileModule, emptyFlow, flowLeader, labKey, orderFlow, parseNodeList, type AssessmentItem, type CompiledLab, type Flow, type LabNodeType } from './core';
 import { DEFAULT_FACULTY, DEFAULT_SETTINGS, kindOf, listOf, moduleFaculty, type Audience, type Category } from '@/lib/accounts/core';
 import type { ModuleBannerInput } from './banner';
 import { shippedSeeds } from './seeds/index';
@@ -96,12 +96,35 @@ class PlatformStore {
   /**
    * Creates each shipped module (and its labs) once per database: it never overwrites one that already exists,
    * and once a seed is recorded it never runs again, so a module staff edit or delete stays that way. An update
-   * seed rewrites its labs' content once, and only while they still exist.
+   * seed rewrites its labs' content once, and only while they still exist. An extend seed adds new labs to a module
+   * that already exists: it creates the missing labs and appends their nodes to the end of the module canvas,
+   * keeping everything staff changed on it.
    */
   private async applySeeds() {
     for (const seed of shippedSeeds()) {
       if ((await this.run(`select 1 from ${this.seeds} where id = $1`, [seed.id])).length) continue;
       const m = seed.module;
+      if (seed.extend) {
+        const [row] = await this.run(`select flow from ${this.modules} where slug = $1`, [m.slug]);
+        if (row) {
+          for (const lab of seed.labs) {
+            await this.run(`insert into ${this.labs} (module, slug, title, published, flow) values ($1, $2, $3, true, $4::jsonb) on conflict (module, slug) do nothing`,
+              [m.slug, lab.slug, lab.title, JSON.stringify(lab.flow)]);
+          }
+          const flow = json(row.flow) as Flow;
+          const have = new Set(flow.nodes.map((n) => n.id));
+          const add = m.flow.nodes.filter((n) => !have.has(n.id));
+          const last = orderFlow(flow, 'module').at(-1);
+          if (add.length && last) {
+            const nodes = [...flow.nodes, ...add.map((n, i) => ({ ...n, x: last.x, y: last.y + 150 * (i + 1) }))];
+            const edges = [...flow.edges, { from: last.id, to: add[0].id }, ...add.slice(1).map((n, i) => ({ from: add[i].id, to: n.id }))];
+            await this.run(`update ${this.modules} set flow = $2::jsonb, updated_at = now() where slug = $1`, [m.slug, JSON.stringify({ nodes, edges })]);
+          }
+        }
+        await this.run(`insert into ${this.seeds} (id) values ($1) on conflict (id) do nothing`, [seed.id]);
+        console.info(`[platform] shipped labs added to ${m.slug} (${seed.id})`);
+        continue;
+      }
       if (seed.update) {
         for (const lab of seed.labs) {
           await this.run(`update ${this.labs} set title = $3, flow = $4::jsonb, updated_at = now() where module = $1 and slug = $2`,
@@ -336,4 +359,22 @@ export async function leaderEmail(module: string): Promise<string> {
   if (module === BUILT_IN_MODULE.slug) return (course.contact ?? '').toLowerCase();
   const m = await getPlatformStore()?.getModule(module);
   return m ? flowLeader(m.flow) : '';
+}
+
+const openLabs = new Map<string, { open: boolean; at: number }>();
+/**
+ * Builder labs marked "Open any time" (Lab node → Sessions): students join a permanent session by themselves,
+ * so no TA has to start one, and their work is still tracked. Cached for a minute (the session status is polled).
+ */
+export async function isOpenLab(lab: string): Promise<boolean> {
+  const hit = openLabs.get(lab);
+  if (hit && Date.now() - hit.at < 60_000) return hit.open;
+  const i = lab.indexOf('--');
+  const s = getPlatformStore();
+  if (i < 1 || !s) return false;
+  // a failed lookup is not cached: the next status check tries again
+  const row = await s.getLab(lab.slice(0, i), lab.slice(i + 2));
+  const open = Boolean(row?.published && compileLab(row.flow, lab).meta.open);
+  openLabs.set(lab, { open, at: Date.now() });
+  return open;
 }

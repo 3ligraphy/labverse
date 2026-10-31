@@ -520,5 +520,6 @@ export function introComputingModule(): Flow {
     } },
     { id: 'week-6', type: 'divider', data: { title: 'Week 6 · Revision' } },
     { id: 'lab-revision', type: 'lab', data: { slug: 'revision-week-6' } },
+    { id: 'lab-practice', type: 'lab', data: { slug: 'revision-practice' } },
   ]);
 }

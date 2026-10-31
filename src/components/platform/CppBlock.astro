@@ -7,9 +7,10 @@
  */
 import type { RenderedBlock } from '@/lib/platform/render';
 import { highlightLines } from '@/lab/cpp/highlight';
+import { answerHash } from '@/lab/cpp/answer';
 import '@/styles/cpp-lab.css';
 
-type CppKinds = Extract<RenderedBlock, { kind: 'cpp' | 'cpppredict' | 'parsons' | 'cppvisual' }>;
+type CppKinds = Extract<RenderedBlock, { kind: 'cpp' | 'cpppredict' | 'cppanswer' | 'parsons' | 'cppvisual' }>;
 interface Props { block: CppKinds }
 const { block: b } = Astro.props;
 
@@ -18,14 +19,17 @@ const cfg = b.kind === 'cpp'
   ? { kind: b.kind, id: b.id, starter: b.starter, input: b.input, checks: b.checks, hints: b.hints, paste: b.paste }
   : b.kind === 'cpppredict'
     ? { kind: b.kind, id: b.id, code: b.code, input: b.input, options: b.options, trace: b.trace }
+    // accepted values reach the page only as hashes; "what it prints" is worked out by running the code
+    : b.kind === 'cppanswer'
+    ? { kind: b.kind, id: b.id, mode: b.mode, code: b.code, input: b.input, hashes: b.mode === 'value' ? b.answers.map((a) => answerHash(b.id, a)) : [], expected: b.mode === 'input' ? (b.answers[0] ?? '') : '' }
     : b.kind === 'parsons'
       ? { kind: b.kind, id: b.id, code: b.code, input: b.input }
       : { kind: b.kind, id: b.id, visual: b.visual, text: b.text };
 // </script> inside the JSON would end the tag early
 const json = JSON.stringify(cfg).replace(/</g, '\\u003c');
-const staticCode = b.kind === 'cpp' ? b.starter : b.kind === 'cpppredict' ? b.code : b.kind === 'parsons' ? '' : '';
+const staticCode = b.kind === 'cpp' ? b.starter : b.kind === 'cpppredict' || b.kind === 'cppanswer' ? b.code : '';
 const lines = staticCode ? highlightLines(staticCode.replace(/\s+$/, '')) : [];
-const kindLabel = b.kind === 'cpp' ? (graded ? 'C++ exercise' : 'C++ playground') : b.kind === 'cpppredict' ? 'Predict, then run' : b.kind === 'parsons' ? 'Order the lines' : 'Visual';
+const kindLabel = b.kind === 'cpp' ? (graded ? 'C++ exercise' : 'C++ playground') : b.kind === 'cpppredict' ? 'Predict, then run' : b.kind === 'cppanswer' ? 'Type the answer' : b.kind === 'parsons' ? 'Order the lines' : 'Visual';
 const gate = b.kind === 'cppvisual' ? { 'data-free': '' } : graded ? { 'data-exercise': '' } : { 'data-demo': '' };
 ---
 <section class={`cx-block cx-k-${b.kind}`} data-cpp data-cpp-id={b.id} data-graded={graded ? '' : undefined} {...gate}>
@@ -35,8 +39,8 @@ const gate = b.kind === 'cppvisual' ? { 'data-free': '' } : graded ? { 'data-exe
     {b.kind === 'parsons' && <h4 class="cx-title">{b.title}</h4>}
   </header>
   {(b.kind === 'cpp' || b.kind === 'parsons') && b.htmlGoal && <div class="cx-goal" set:html={b.htmlGoal} />}
-  {b.kind === 'cpppredict' && <div class="cx-q" data-cpp-q set:html={b.htmlQuestion} />}
-  {b.kind === 'cpppredict' && <div hidden data-cpp-x set:html={b.htmlExplain} />}
+  {(b.kind === 'cpppredict' || b.kind === 'cppanswer') && <div class="cx-q" data-cpp-q set:html={b.htmlQuestion} />}
+  {(b.kind === 'cpppredict' || b.kind === 'cppanswer') && <div hidden data-cpp-x set:html={b.htmlExplain} />}
   <div class="cx-host" data-cpp-host>
     {lines.length > 0 && (
       <pre class="cx-static mono"><code>{lines.map((l, i) => <span class="cx-sl" data-n={String(i + 1)} set:html={l || ' '} />)}</code></pre>

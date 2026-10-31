@@ -36,7 +36,7 @@ test('the lab and module compile cleanly, fit about 3 hours (with the Start here
   assert.equal(mod.meta.code, '26CSCI01P');
   assert.equal(mod.meta.years, 'Prep year');
   assert.equal(mod.meta.faculty, 'informatics-computer-science');
-  assert.deepEqual(mod.items, [{ kind: 'week', title: 'Week 6 · Revision' }, { kind: 'lab', slug: 'revision-week-6' }]);
+  assert.deepEqual(mod.items, [{ kind: 'week', title: 'Week 6 · Revision' }, { kind: 'lab', slug: 'revision-week-6' }, { kind: 'lab', slug: 'revision-practice' }]);
   const kit = new Set(nodesOfKits(['cpp']));
   for (const n of introComputingRevisionLab().nodes) if (n.type !== 'start') assert.ok(kit.has(n.type as never), `${n.type} is in the C++ palette`);
 });
@@ -216,7 +216,9 @@ test('the site ships the module itself: one seed, published content, only the C+
   const seeds = shippedSeeds();
   assert.equal(new Set(seeds.map((s) => s.id)).size, seeds.length, 'seed ids are unique');
   // @1 created the module; @2 only rewrites the live lab (it never creates anything)
-  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update)]), [['intro-to-computing@1', false], ['intro-to-computing@2', true], ['intro-to-computing@3', true], ['intro-to-computing@4', true]]);
+  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update), Boolean(s.extend)]), [['intro-to-computing@1', false, false], ['intro-to-computing@2', true, false], ['intro-to-computing@3', true, false], ['intro-to-computing@4', true, false], ['intro-to-computing@5', false, true]]);
+  // @5 adds the practice lab to the module that already exists
+  assert.deepEqual(seeds[4].labs.map((l) => l.slug), ['revision-practice']);
   assert.ok(seeds[3].labs[0].flow.nodes.some((n) => n.id === 'p0') && seeds[3].labs[0].flow.nodes.some((n) => n.id === 'c-story' && n.data.visual === 'Your first program, line by line'), 'the latest update carries the Start here part and the first program');
   const intro = seeds.find((s) => s.module.slug === 'intro-to-computing');
   assert.ok(intro, 'Introduction to Computing is shipped');

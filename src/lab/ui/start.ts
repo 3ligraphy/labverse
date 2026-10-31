@@ -9,7 +9,7 @@ import { clearProgressIdentity, getIdentity, setProgressIdentity } from '@/scrip
 import { getMe } from '@/scripts/me';
 
 type PublicSession = { id: string; open: boolean; ta_name?: string; time_slot?: string };
-type PublicSessionResponse = PublicSession & { sessions?: PublicSession[]; practice?: boolean };
+type PublicSessionResponse = PublicSession & { sessions?: PublicSession[]; practice?: boolean; selfPaced?: boolean };
 
 /** each student's last group, per student ID (a shared lab PC never hands one student's group to the next) */
 const groupKey = (id: string) => `lab:group:${id}`;
@@ -37,6 +37,7 @@ export function mountStart(lab: string) {
   let session: PublicSession | null = null;
   let sessions: PublicSession[] = [];
   let practice = false; // the admin's "open practice" toggle: solve without a session, nothing recorded
+  let selfPaced = false; // a lab that is open any time: a permanent session, no TA needed, still tracked
   let staff = false; // TAs, doctors and admins: try every exercise any time, nothing recorded
   /** a signed-in student whose account identity is valid: joins the open session by itself */
   let account: { name: string; id: string } | null = null;
@@ -154,6 +155,7 @@ export function mountStart(lab: string) {
       const data = (await response.json()) as PublicSessionResponse;
       sessions = Array.isArray(data.sessions) ? data.sessions.filter((item) => item.open) : data.open ? [data] : [];
       practice = data.practice === true;
+      selfPaced = data.selfPaced === true;
       const student = getStudent();
       const previousId = sessionIn.value;
       sessionIn.replaceChildren(...sessions.map((item) => new Option(`${item.time_slot ?? 'Current time slot'} — ${item.ta_name ?? 'TA'}`, item.id)));
@@ -165,6 +167,8 @@ export function mountStart(lab: string) {
       sessionField.hidden = sessions.length < 2;
       status.textContent = staff && !getStudent()
         ? 'Staff preview: you can edit, run and check every exercise and demo now, without starting a session. Nothing you do here is recorded.'
+        : selfPaced && session && sessions.length === 1
+        ? 'This lab is open any time. Enter your name and student ID to start. Your work is saved.'
         : sessions.length > 1
         ? `${sessions.length} sessions are running. Choose your time slot and TA, then enter your details.`
         : session

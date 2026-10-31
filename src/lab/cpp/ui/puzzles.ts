@@ -7,16 +7,12 @@ import { clearPick, draggable, dropPicked } from '../../ui/dnd.ts';
 import { compile, Machine } from '../index.ts';
 import { highlightCpp, highlightLines } from './syntax.ts';
 import { CppRunner } from './runner.ts';
+import { wrapProgram } from '../wrap.ts';
+import { checkAnswer, type AnswerCfg } from '../answer.ts';
 
 export type Track = (passed: number, total: number, code: string) => void;
 
-const HEAD = '#include <iostream>\n#include <string>\n#include <cmath>\n#include <algorithm>\nusing namespace std;\n\nint main() {\n';
-/** a snippet of statements → a whole program (and how many lines were added on top) */
-export function wrapProgram(code: string): { src: string; offset: number } {
-  if (/\b(int|void)\s+main\s*\(/.test(code)) return { src: code, offset: 0 };
-  const body = code.replace(/\s+$/, '').split('\n').map((l) => (l ? `    ${l}` : l)).join('\n');
-  return { src: `${HEAD}${body}\n    return 0;\n}\n`, offset: HEAD.split('\n').length - 1 };
-}
+export { wrapProgram };
 
 const store = {
   get(id: string): Record<string, unknown> { try { return JSON.parse(localStorage.getItem(`cpp:${id}`) ?? '{}'); } catch { return {}; } },
@@ -207,4 +203,77 @@ export function mountParsons(host: HTMLElement, cfg: ParsonsCfg, track: Track) {
     fixedView(head), list, fixedView(tail), inputChip(cfg.input),
     h('div', { class: 'cx-pred-bar' }, checkBtn), result, replay));
   if (saved.solved) say(md('✓ **Solved** before. You can still move the cards and check again.'), 'ok');
+}
+
+/* ----------------------------------------------------------------- type the answer */
+
+export type AnswerUiCfg = AnswerCfg & { questionHtml: string; explainHtml: string };
+
+/** The student types the answer (no options). Typing is required: paste is off, as in the lab test. */
+export function mountAnswer(host: HTMLElement, cfg: AnswerUiCfg, track: Track) {
+  const saved = store.get(cfg.id) as { answer?: string; solved?: boolean };
+  const multi = cfg.mode === 'output';
+  const field = (multi
+    ? h('textarea', { class: 'input mono cx-ans-in', rows: '3', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Your answer: exactly what the program prints' })
+    : h('input', { class: 'input mono cx-ans-in', spellcheck: 'false', autocomplete: 'off', 'aria-label': cfg.mode === 'input' ? 'Your answer: what the user types' : 'Your answer' })) as HTMLInputElement | HTMLTextAreaElement;
+  field.value = saved.answer ?? '';
+  const label = cfg.mode === 'output' ? 'Type exactly what it prints (one line per line on the screen):' : cfg.mode === 'input' ? 'Type what the user types:' : 'Type your answer:';
+  const result = h('p', { class: 'cx-pred-res', role: 'status' });
+  const explain = h('div', { class: 'cx-explain', html: cfg.explainHtml });
+  explain.hidden = true;
+  const replay = h('div', { class: 'cx-replay' });
+  replay.hidden = true;
+  const check = h('button', { type: 'button', class: 'btn btn-primary btn-sm' }, 'Check my answer') as HTMLButtonElement;
+  const runBtn = h('button', { type: 'button', class: 'cx-btn' }, '⏭ Step through it') as HTMLButtonElement;
+  runBtn.hidden = true;
+  let tries = 0;
+  let runner: CppRunner | null = null;
+
+  const grow = () => { if (multi) { field.style.height = 'auto'; field.style.height = `${Math.max(field.scrollHeight, 60)}px`; } };
+  const solvedView = () => {
+    result.className = 'cx-pred-res is-ok';
+    explain.hidden = !cfg.explainHtml.trim();
+    runBtn.hidden = cfg.mode === 'value' && !cfg.code.trim();
+  };
+  const doCheck = () => {
+    const r = checkAnswer(cfg, field.value);
+    if (!field.value.trim()) { result.className = 'cx-pred-res is-bad'; result.textContent = r.message; return; }
+    tries++;
+    track(r.pass ? 1 : 0, 1, field.value);
+    store.set(cfg.id, { answer: field.value, solved: r.pass || Boolean(saved.solved) });
+    if (r.pass) {
+      saved.solved = true;
+      result.textContent = tries === 1 ? '✓ Correct, first time!' : '✓ Correct.';
+      solvedView();
+    } else {
+      result.className = 'cx-pred-res is-bad';
+      result.textContent = `✗ ${r.message}`;
+    }
+  };
+  check.addEventListener('click', doCheck);
+  field.addEventListener('keydown', (e) => {
+    const ke = e as KeyboardEvent;
+    if (ke.key === 'Enter' && (!multi || ke.ctrlKey || ke.metaKey)) { e.preventDefault(); doCheck(); }
+  });
+  field.addEventListener('input', grow);
+  // typed, not pasted — the same rule as the lab test
+  field.addEventListener('paste', (e) => { e.preventDefault(); result.className = 'cx-pred-res is-bad'; result.textContent = 'Type your answer yourself: pasting is off in this lab.'; });
+  field.addEventListener('drop', (e) => e.preventDefault());
+
+  runBtn.addEventListener('click', () => {
+    replay.hidden = false;
+    if (!runner) {
+      const { src } = wrapProgram(cfg.code);
+      runner = new CppRunner(replay, { id: `${cfg.id}--replay`, starter: src, input: cfg.mode === 'input' ? field.value : cfg.input, readOnly: true, autoStep: true });
+    }
+    replay.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+
+  host.replaceChildren(h('div', { class: 'cx-pred-body' },
+    cfg.code.trim() ? codeBlock(cfg.code) : null,
+    cfg.mode === 'output' ? inputChip(cfg.input) : null,
+    h('label', { class: 'cx-ans' }, h('span', { class: 'cx-ans-k' }, label), field),
+    h('div', { class: 'cx-pred-bar' }, check, runBtn, result), replay, explain));
+  grow();
+  if (saved.solved) { result.textContent = '✓ You answered this one.'; solvedView(); }
 }

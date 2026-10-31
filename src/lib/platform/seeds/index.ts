@@ -7,11 +7,14 @@
  */
 import { compileLab, compileModule, nodesOfKits, sanitizeFlow, type Flow, type LabNodeType } from '../core.ts';
 import { introComputingModule, introComputingRevisionLab } from './intro-computing-revision.ts';
+import { introComputingPracticeLab } from './intro-computing-practice.ts';
 
 export type Seed = {
   id: string;
   /** rewrite the labs' content (once) instead of creating the module */
   update?: boolean;
+  /** add these labs to the module that already exists: create them, and append their nodes to its canvas */
+  extend?: boolean;
   module: { slug: string; title: string; flow: Flow; labNodes: LabNodeType[] };
   labs: { slug: string; title: string; flow: Flow }[];
 };
@@ -43,5 +46,8 @@ export function shippedSeeds(): Seed[] {
     // the café comparison is replaced by a plain line-by-line explanation
     { ...seed('intro-to-computing@4', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
       [{ slug: 'revision-week-6', flow: introComputingRevisionLab() }]), update: true },
+    // a second lab: practice questions on everything (open any time, tracked)
+    { ...seed('intro-to-computing@5', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
+      [{ slug: 'revision-practice', flow: introComputingPracticeLab() }]), extend: true },
   ];
 }
