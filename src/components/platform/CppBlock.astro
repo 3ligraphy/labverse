@@ -21,7 +21,7 @@ const cfg = b.kind === 'cpp'
     ? { kind: b.kind, id: b.id, code: b.code, input: b.input, options: b.options, trace: b.trace }
     // accepted values reach the page only as hashes; "what it prints" is worked out by running the code
     : b.kind === 'cppanswer'
-    ? { kind: b.kind, id: b.id, mode: b.mode, code: b.code, input: b.input, hashes: b.mode === 'value' ? b.answers.map((a) => answerHash(b.id, a)) : [], expected: b.mode === 'input' ? (b.answers[0] ?? '') : '' }
+    ? { kind: b.kind, id: b.id, mode: b.mode, code: b.code, input: b.input, hashes: b.mode === 'value' ? b.answers.map((a) => answerHash(b.id, a, b.ignoreCase)) : [], expected: b.mode === 'input' ? (b.answers[0] ?? '') : '', ignoreCase: b.ignoreCase }
     : b.kind === 'parsons'
       ? { kind: b.kind, id: b.id, code: b.code, input: b.input }
       : { kind: b.kind, id: b.id, visual: b.visual, text: b.text };

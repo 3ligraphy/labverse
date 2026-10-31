@@ -60,5 +60,8 @@ export function shippedSeeds(): Seed[] {
       [{ slug: 'revision-practice', flow: introComputingPracticeLab() }]), update: true },
     // hide the week 6 revision lab from students for now (kept, not deleted; staff still open it in the builder)
     { ...seed('intro-to-computing@8', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']), []), publish: { 'revision-week-6': false } },
+    // the practice lab with theory questions from the lectures at the start (every question kept)
+    { ...seed('intro-to-computing@9', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
+      [{ slug: 'revision-practice', flow: introComputingPracticeLab() }]), update: true },
   ];
 }

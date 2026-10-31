@@ -271,9 +271,10 @@ export const LAB_NODES = {
       { key: 'input', label: 'Keyboard input', kind: 'textarea', help: 'For “what it prints”: what the user types when it runs.', max: 1000 },
       { key: 'mode', label: 'The student types', kind: 'select', options: Object.keys(ANSWER_MODES), help: 'What it prints: checked against the real output of the code. A value: one of the accepted answers. What the user types: the code runs with it and must print the expected output.' },
       { key: 'answers', label: 'Accepted answers', kind: 'lines', help: 'A value: every accepted form, one per line (e.g. 6 and 6.0). What the user types: the output it must produce. Not used for “what it prints”.', max: 1000 },
+      { key: 'caps', label: 'Capital letters', kind: 'select', options: ['Count', 'Do not count'], help: 'For “a value” only. Count: A and a are different answers (as in C++). Do not count: for word answers, e.g. ASCII and ascii.' },
       { key: 'explain', label: 'Explanation (after a right answer)', kind: 'markdown', max: 3000 },
     ],
-    defaults: { question: 'What does this program print?', code: 'int x = 3;\nx = x + 2;\ncout << x;', input: '', mode: Object.keys(ANSWER_MODES)[0], answers: '', explain: '' },
+    defaults: { question: 'What does this program print?', code: 'int x = 3;\nx = x + 2;\ncout << x;', input: '', mode: Object.keys(ANSWER_MODES)[0], answers: '', caps: 'Count', explain: '' },
   },
   parsons: {
     label: 'Order the lines', hint: 'Parsons puzzle: put the code blocks in the right order, then run it', color: '#7ce0a3', glyph: '⇅', kit: 'cpp',
@@ -568,7 +569,7 @@ export type Block =
   | { kind: 'clickpath'; title: string; steps: string[] }
   | { kind: 'cpp'; id: string; title: string; goal: string; starter: string; input: string; checks: CppCheck[]; hints: string[]; paste: boolean }
   | { kind: 'cpppredict'; id: string; question: string; code: string; input: string; options: { text: string; correct: boolean }[]; explain: string; trace: boolean }
-  | { kind: 'cppanswer'; id: string; question: string; code: string; input: string; mode: 'output' | 'value' | 'input'; answers: string[]; explain: string }
+  | { kind: 'cppanswer'; id: string; question: string; code: string; input: string; mode: 'output' | 'value' | 'input'; answers: string[]; ignoreCase: boolean; explain: string }
   | { kind: 'parsons'; id: string; title: string; goal: string; code: string; input: string }
   | { kind: 'cppvisual'; id: string; visual: string; text: string; caption: string };
 
@@ -733,7 +734,7 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
         if (!(d.question ?? '').trim()) { warnings.push('A “Type the answer” question has no question text.'); break; }
         if (mode !== 'output' && !answers.length) { warnings.push(`“${excerptOf(d.question)}” needs at least one accepted answer.`); break; }
         if (mode !== 'value' && !(d.code ?? '').trim()) { warnings.push(`“${excerptOf(d.question)}” needs the C++ code it is about.`); break; }
-        push({ kind: 'cppanswer', id, question: d.question ?? '', code: d.code ?? '', input: d.input ?? '', mode, answers, explain: d.explain ?? '' });
+        push({ kind: 'cppanswer', id, question: d.question ?? '', code: d.code ?? '', input: d.input ?? '', mode, answers, ignoreCase: mode === 'value' && d.caps === 'Do not count', explain: d.explain ?? '' });
         // many questions read “What does this print?”: the first line of their code tells them apart in the TA's statistics
         const firstLine = (d.code ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
         const title = [excerptOf((d.question ?? '').replace(/[*`]/g, '')), firstLine && excerptOf(firstLine)].filter(Boolean).join(' · ');

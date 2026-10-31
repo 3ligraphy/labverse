@@ -14,9 +14,10 @@ export const normalizeValue = (s: string) => s.trim().replace(/^(['"])([\s\S]*)\
 export const normalizeOutput = (s: string) => s.replace(/\r\n?/g, '\n').split('\n').map((l) => l.replace(/\s+$/, '')).join('\n').replace(/^\n+|\n+$/g, '');
 
 /** FNV-1a (32-bit), salted with the question id: enough to keep accepted values out of the page source */
-export function answerHash(id: string, value: string): string {
+export function answerHash(id: string, value: string, ignoreCase = false): string {
   let h = 0x811c9dc5;
-  const text = `${id}|${normalizeValue(value)}`;
+  const v = normalizeValue(value);
+  const text = `${id}|${ignoreCase ? v.toLowerCase() : v}`;
   for (let i = 0; i < text.length; i++) {
     h ^= text.charCodeAt(i);
     h = Math.imul(h, 0x01000193) >>> 0;
@@ -24,7 +25,8 @@ export function answerHash(id: string, value: string): string {
   return h.toString(16).padStart(8, '0');
 }
 
-export type AnswerCfg = { id: string; mode: 'output' | 'value' | 'input'; code: string; input: string; hashes: string[]; expected: string };
+/** ignoreCase: for word answers (ASCII and ascii are the same answer); C++ values keep their case ('A' is not 'a') */
+export type AnswerCfg = { id: string; mode: 'output' | 'value' | 'input'; code: string; input: string; hashes: string[]; expected: string; ignoreCase?: boolean };
 export type AnswerResult = { pass: boolean; message: string };
 
 /** what the code prints for the given keyboard input (or the build error) */
@@ -38,8 +40,8 @@ export function outputOf(code: string, input: string): { ok: true; output: strin
 export function checkAnswer(cfg: AnswerCfg, answer: string): AnswerResult {
   if (!answer.trim()) return { pass: false, message: 'Type your answer first.' };
   if (cfg.mode === 'value') {
-    const pass = cfg.hashes.includes(answerHash(cfg.id, answer));
-    return { pass, message: pass ? 'Correct.' : 'Not correct. Read the code again, line by line.' };
+    const pass = cfg.hashes.includes(answerHash(cfg.id, answer, cfg.ignoreCase));
+    return { pass, message: pass ? 'Correct.' : cfg.code.trim() ? 'Not correct. Read the code again, line by line.' : 'Not correct. Try again.' };
   }
   if (cfg.mode === 'input') {
     const r = outputOf(cfg.code, answer);

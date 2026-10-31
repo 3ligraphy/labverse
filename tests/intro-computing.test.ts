@@ -216,7 +216,10 @@ test('the site ships the module itself: one seed, published content, only the C+
   const seeds = shippedSeeds();
   assert.equal(new Set(seeds.map((s) => s.id)).size, seeds.length, 'seed ids are unique');
   // @1 created the module; @2 only rewrites the live lab (it never creates anything)
-  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update), Boolean(s.extend)]), [['intro-to-computing@1', false, false], ['intro-to-computing@2', true, false], ['intro-to-computing@3', true, false], ['intro-to-computing@4', true, false], ['intro-to-computing@5', false, true], ['intro-to-computing@6', false, false], ['intro-to-computing@7', true, false], ['intro-to-computing@8', false, false]]);
+  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update), Boolean(s.extend)]), [['intro-to-computing@1', false, false], ['intro-to-computing@2', true, false], ['intro-to-computing@3', true, false], ['intro-to-computing@4', true, false], ['intro-to-computing@5', false, true], ['intro-to-computing@6', false, false], ['intro-to-computing@7', true, false], ['intro-to-computing@8', false, false], ['intro-to-computing@9', true, false]]);
+  // @9 rewrites the practice lab again: the theory part first, nothing removed
+  assert.deepEqual(seeds[8].labs.map((l) => l.slug), ['revision-practice']);
+  assert.ok(seeds[8].labs[0].flow.nodes.some((n) => n.id === 'p0' && n.data.title === 'Theory from the lectures'));
   // @7 rewrites the practice lab; @8 hides the week 6 revision lab (it is kept)
   assert.deepEqual(seeds[6].labs.map((l) => l.slug), ['revision-practice']);
   assert.deepEqual(seeds[7].publish, { 'revision-week-6': false });

@@ -12,7 +12,7 @@ import { mountVisual } from './visuals.ts';
 type Cfg =
   | { kind: 'cpp'; id: string; starter: string; input: string; checks: CppCheck[]; hints: string[]; paste: boolean }
   | { kind: 'cpppredict'; id: string; code: string; input: string; options: { text: string; correct: boolean }[]; trace: boolean }
-  | { kind: 'cppanswer'; id: string; mode: 'output' | 'value' | 'input'; code: string; input: string; hashes: string[]; expected: string }
+  | { kind: 'cppanswer'; id: string; mode: 'output' | 'value' | 'input'; code: string; input: string; hashes: string[]; expected: string; ignoreCase?: boolean }
   | { kind: 'parsons'; id: string; code: string; input: string }
   | { kind: 'cppvisual'; id: string; visual: string; text: string };
 
@@ -53,7 +53,7 @@ function start(el: HTMLElement) {
     } else if (cfg.kind === 'cppanswer') {
       const q = el.querySelector<HTMLElement>('[data-cpp-q]');
       const x = el.querySelector<HTMLElement>('[data-cpp-x]');
-      mountAnswer(host, { id: cfg.id, mode: cfg.mode, code: cfg.code, input: cfg.input, hashes: cfg.hashes, expected: cfg.expected, questionHtml: q?.innerHTML ?? '', explainHtml: x?.innerHTML ?? '' }, track);
+      mountAnswer(host, { id: cfg.id, mode: cfg.mode, code: cfg.code, input: cfg.input, hashes: cfg.hashes, expected: cfg.expected, ignoreCase: cfg.ignoreCase, questionHtml: q?.innerHTML ?? '', explainHtml: x?.innerHTML ?? '' }, track);
     } else if (cfg.kind === 'parsons') {
       mountParsons(host, { id: cfg.id, code: cfg.code, input: cfg.input }, track);
     } else if (cfg.kind === 'cppvisual') {

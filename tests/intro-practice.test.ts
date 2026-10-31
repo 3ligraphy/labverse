@@ -81,10 +81,12 @@ const SOLUTIONS: Record<string, string> = {
   'w-stats3': P(`    float a, b, c;\n    cin >> a >> b >> c;\n    float m = (a + b + c) / 3;\n    float sd = sqrt((pow(a - m, 2) + pow(b - m, 2) + pow(c - m, 2)) / 3);\n    cout << "the average is: " << m << "\\n";\n    cout << "the standard deviation is: " << sd << "\\n";\n    float n1 = a, n2 = b, n3 = c;\n${MEDIAN('the median is: ')}`),
 };
 
-test('the lab: open any time, 9 parts from easy to hard, every item tracked, no warnings', () => {
+test('the lab: open any time, 10 parts from easy to hard, every item tracked, no warnings', () => {
   assert.deepEqual(lab.warnings, []);
   assert.equal(lab.meta.open, true);
-  assert.equal(all.filter((b) => b.kind === 'part').length, 9);
+  const parts = all.filter((b) => b.kind === 'part');
+  assert.equal(parts.length, 10);
+  assert.equal(parts[0].kind === 'part' && parts[0].title, 'Theory from the lectures');
   assert.ok(!all.some((b) => b.kind === 'part' && /complex|quaternion/i.test(b.title)), 'the complex numbers part was removed');
   assert.ok(progs.length >= 40 && answers.length >= 30, `${progs.length} programs, ${answers.length} typed answers`);
   assert.equal(Object.keys(lab.exercises).length, progs.length + answers.length);
@@ -154,11 +156,38 @@ test('typed answers: the code runs, values are right, inputs exist, and wrong an
     const r = outputOf(`${q.code}\n${print}`, '');
     assert.ok(r.ok && q.answers.includes(r.output.trim()), `${id}: accepted ${q.answers} but the code gives ${r.ok ? r.output : r.message}`);
   }
-  const cfg = (id: string) => { const q = byId(id); return { id: q.id, mode: q.mode, code: q.code, input: q.input, hashes: q.answers.map((x) => answerHash(q.id, x)), expected: q.answers[0] ?? '' }; };
+  const cfg = (id: string) => { const q = byId(id); return { id: q.id, mode: q.mode, code: q.code, input: q.input, hashes: q.answers.map((x) => answerHash(q.id, x, q.ignoreCase)), expected: q.answers[0] ?? '', ignoreCase: q.ignoreCase }; };
   assert.equal(checkAnswer(cfg('v-postinc'), '6').pass, true);
   assert.equal(checkAnswer(cfg('v-postinc'), '7').pass, false);
   assert.equal(checkAnswer(cfg('v-tld'), '.eg').pass, true);
   assert.equal(checkAnswer(cfg('v-tld'), 'edu').pass, false);
+  // a C++ value keeps its case: the code gives eg, not EG
+  assert.equal(checkAnswer(cfg('v-tld'), 'EG').pass, false);
+  // theory: word answers from the lectures, capital letters do not count; everything else is still exact
+  const theory = answers.filter((a) => a.id.startsWith(`${KEY}--th-`));
+  assert.equal(theory.length, 27);
+  for (const t of theory) assert.ok(t.mode === 'value' && t.ignoreCase && !t.code.trim(), `${t.id} must be a word answer without code`);
+  assert.ok(answers.filter((a) => !a.id.startsWith(`${KEY}--th-`)).every((a) => !a.ignoreCase), 'only the theory questions ignore capitals');
+  const right: [string, string][] = [
+    ['th-logic', 'Program Logic'], ['th-close', 'Close'], ['th-selection', 'selection'], ['th-median', '6'], ['th-cases', '6'],
+    ['th-tests', 'three'], ['th-iostream', '#include <iostream>'], ['th-cmath', 'cmath'], ['th-algorithm', '<algorithm>'],
+    ['th-std', 'using namespace std;'], ['th-newline', '\\n'], ['th-newline', "'\\n'"], ['th-tab', '"\\t"'], ['th-const', 'const'],
+    ['th-types', 'String'], ['th-ascii', 'ASCII'], ['th-ascii', 'ascii'], ['th-quotes', 'Single quotes'], ['th-32', '32'],
+    ['th-index', '0'], ['th-npos', 'std::string::npos'], ['th-npos', 'npos'], ['th-getline', 'getline'], ['th-stoi', 'stoi'],
+    ['th-stod', 'stod()'], ['th-tostring', 'to_string'], ['th-at', '@'], ['th-vector', '<x, y>'], ['th-vector-read', 'getline'],
+    ['th-stoi-neg', '-23'],
+  ];
+  for (const [id, a] of right) assert.equal(checkAnswer(cfg(id), a).pass, true, `${id}: “${a}” should be right`);
+  const wrongTheory: [string, string][] = [
+    ['th-median', '5'], ['th-cases', '3'], ['th-tests', '6'], ['th-selection', 'iteration'], ['th-iostream', 'cmath'],
+    ['th-cmath', 'algorithm'], ['th-algorithm', 'cmath'], ['th-newline', 'n'], ['th-newline', '\\t'], ['th-tab', '\\n'],
+    ['th-quotes', 'double'], ['th-quotes', "''"], ['th-32', '65'], ['th-index', '1'], ['th-stoi', 'stod'], ['th-stod', 'stoi'],
+    ['th-vector-read', 'cin'], ['th-stoi-neg', '23'], ['th-at', '.'],
+  ];
+  for (const [id, a] of wrongTheory) assert.equal(checkAnswer(cfg(id), a).pass, false, `${id}: “${a}” should be wrong`);
+  // a theory question has no code to read again
+  assert.equal(checkAnswer(cfg('th-median'), '5').message, 'Not correct. Try again.');
+  assert.equal(checkAnswer(cfg('v-postinc'), '7').message, 'Not correct. Read the code again, line by line.');
   // outputs: exact, but spaces at line ends and the last newline don't count
   assert.equal(checkAnswer(cfg('o-lines'), 'Hello\nWorld').pass, true);
   assert.equal(checkAnswer(cfg('o-lines'), 'Hello\r\nWorld  \n').pass, true);

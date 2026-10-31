@@ -15,12 +15,14 @@ const chain = (nodes: N[]): Flow => ({
 });
 const part = (id: string, title: string, time: string): N => ({ id, type: 'part', data: { title, time } });
 const task = (id: string, title: string, time: string, body: string): N => ({ id, type: 'task', data: { title, time, body } });
-const answer = (id: string, mode: string, question: string, code: string, extra: { input?: string; answers?: string[] } = {}): N =>
-  ({ id, type: 'cppanswer', data: { question, code, input: extra.input ?? '', mode, answers: (extra.answers ?? []).join('\n'), explain: '' } });
+const answer = (id: string, mode: string, question: string, code: string, extra: { input?: string; answers?: string[]; caps?: string } = {}): N =>
+  ({ id, type: 'cppanswer', data: { question, code, input: extra.input ?? '', mode, answers: (extra.answers ?? []).join('\n'), caps: extra.caps ?? 'Count', explain: '' } });
 /** type exactly what the code prints (checked against the real output) */
 const out = (id: string, question: string, code: string, input = '') => answer(id, 'What it prints (the output)', question, code, { input });
 /** type a value (checked against the accepted forms) */
 const val = (id: string, question: string, code: string, answers: string[]) => answer(id, 'A value', question, code, { answers });
+/** a theory question from the lectures: type a word, a number or a symbol (capital letters do not count) */
+const word = (id: string, question: string, answers: string[]) => answer(id, 'A value', question, '', { answers, caps: 'Do not count' });
 /** type what the user types (the code runs with it and must print `expected`) */
 const inp = (id: string, question: string, code: string, expected: string) => answer(id, 'What the user types (an input)', question, code, { answers: [expected] });
 
@@ -36,8 +38,9 @@ export function introComputingPracticeLab(): Flow {
       title: 'Revision practice: Lectures 1 to 5',
       description: 'Practice questions on Lectures 1 to 5 and the lab programs, from easy to hard. Type every answer and every program yourself. Each answer is checked straight away.',
       difficulty: 'Beginner',
-      estimatedTime: '6 h 40 min',
+      estimatedTime: '7 h',
       objectives: [
+        'Answer the theory questions from Lectures 1 to 5',
         'Read C++ code and say exactly what it prints',
         'Write programs with cout, cin, getline and the right data types',
         'Calculate with operators, cmath and algorithm',
@@ -47,6 +50,40 @@ export function introComputingPracticeLab(): Flow {
       ].join('\n'),
       access: 'Open any time (no session, still tracked)',
     } },
+
+    /* ------------------------------------------- 0. theory from the lectures (typed answers) */
+    part('p0', 'Theory from the lectures', '20 min'),
+    task('t0-1', 'Program logic (Lectures 1 and 2)', '5 min', 'Type a short answer: a word, a number or a symbol.'),
+    word('th-logic', 'What do we call **how a program goes about solving the problem it was developed to solve**? (Lecture 1)', ['program logic', 'the program logic', 'logic']),
+    word('th-close', 'The essential program logic for Part 1: say what you do, ask for input, do something with the input, give output, perhaps ask for more input and provide more output, say goodbye, then …? Type the last step.', ['close', 'close.', 'close the program', 'closing']),
+    word('th-selection', 'Program logic typically includes sequence, selection and iteration. In Part 1, program code can only use sequence and …?', ['selection']),
+    word('th-median', 'What is the **median** of this set of numbers: 13, 5, 6, 2, 17, 4, 11, 1, 9? (Lecture 2)', ['6', 'six']),
+    word('th-cases', 'How many possible cases (orders) are there for three numbers num1, num2 and num3? (Lecture 2)', ['6', 'six']),
+    word('th-tests', 'In the second median program (Lecture 2), at most how many conditions are tested?', ['3', 'three']),
+    task('t0-2', 'Program code (Lecture 3)', '6 min', 'Type a short answer.'),
+    word('th-iostream', 'Which library do you include to use `cout` and `cin`?', ['iostream', '<iostream>', '#include <iostream>']),
+    word('th-cmath', 'Which library do you include to use `pow`, `sqrt`, `floor`, `ceil` and `round`?', ['cmath', '<cmath>', '#include <cmath>']),
+    word('th-algorithm', 'Which library do you include to use `max` and `min`?', ['algorithm', '<algorithm>', '#include <algorithm>']),
+    word('th-std', 'Which line do you write at the top so that you do not have to write `std::cout`?', ['using namespace std;', 'using namespace std']),
+    word('th-newline', 'Which special character starts a **new line**?', ['\\n']),
+    word('th-tab', 'Which special character is a **tab**?', ['\\t']),
+    word('th-const', 'Which word makes a variable **constant**, so it cannot be changed?', ['const']),
+    word('th-types', 'In Lecture 3 we work with four data types: int, float, char and …?', ['string']),
+    task('t0-3', 'Characters and strings (Lecture 4)', '6 min', 'Type a short answer.'),
+    word('th-ascii', 'Characters are represented as unsigned integers. Which character set gives each character its number?', ['ascii', 'the ascii character set', 'ascii character set', 'ascii table']),
+    word('th-quotes', 'Characters are written between single quotes or double quotes?', ['single', 'single quotes', 'single quote']),
+    word('th-32', 'To convert a lowercase character to uppercase, what number do you subtract from it?', ['32']),
+    word('th-index', 'What is the index of the **first** character of a string?', ['0', 'zero']),
+    word('th-npos', 'If `find` cannot find the character or substring it is looking for, what does it return?', ['std::string::npos', 'string::npos', 'npos']),
+    word('th-getline', 'Which function reads in a full line that may include spaces?', ['getline', 'getline()', 'getline(cin, s)', 'getline(cin, line)']),
+    word('th-stoi', 'Which function converts a string to an integer?', ['stoi', 'stoi()']),
+    word('th-stod', 'Which function converts a string to a decimal number (double)?', ['stod', 'stod()']),
+    word('th-tostring', 'Which function converts a value to a string?', ['to_string', 'to_string()']),
+    word('th-at', 'Which character must a string contain to be a candidate for an email address?', ['@']),
+    task('t0-4', 'Vectors (Lecture 5)', '3 min', 'Type a short answer.'),
+    word('th-vector', 'In program 21, in which format is a two-dimensional vector entered? Use x and y.', ['<x, y>', '<x,y>']),
+    word('th-vector-read', 'To read the vector, do we use `cin >>` or `getline`? (There may be a space after the comma.)', ['getline', 'getline()', 'getline(cin, line)']),
+    word('th-stoi-neg', 'Does `stoi` work for negative numbers? What does `stoi("-23")` return?', ['-23']),
 
     /* ---------------------------------------------------------------- 1. output (easy) */
     part('p1', 'Output with cout', '25 min'),
