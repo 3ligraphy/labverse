@@ -20,7 +20,9 @@ test('nodesOfKits always includes the core kit', () => {
   assert.ok(web.includes('prompt') && web.includes('websandbox') && !web.includes('terminal'));
   const cpp = nodesOfKits(['cpp']);
   assert.ok(cpp.includes('cpp') && cpp.includes('parsons') && cpp.includes('quiz') && !cpp.includes('exercise') && !cpp.includes('prompt'));
-  assert.deepEqual(nodesOfKits(['mobile', 'web', 'cpp']), LAB_NODE_TYPES);
+  const ai = nodesOfKits(['ai']);
+  assert.ok(ai.includes('aiprompt') && ai.includes('agentsim') && ai.includes('aidiff') && ai.includes('aivisual') && ai.includes('quiz') && !ai.includes('cpp'));
+  assert.deepEqual(nodesOfKits(['mobile', 'web', 'cpp', 'ai']), LAB_NODE_TYPES);
 });
 
 test('presets: everything, mobile, web', () => {

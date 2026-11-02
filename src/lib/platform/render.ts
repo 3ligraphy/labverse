@@ -67,6 +67,8 @@ export async function renderBlocks(blocks: Block[]): Promise<RenderedBlock[]> {
       case 'cpppredict': return { ...b, htmlQuestion: await markdown(b.question), htmlExplain: await markdown(b.explain) };
       case 'cppanswer': return { ...b, htmlQuestion: await markdown(b.question), htmlExplain: await markdown(b.explain) };
       case 'cppvisual': return { ...b, html: await markdown(b.caption) };
+      case 'aiprompt': case 'agentsim': case 'aidiff': return { ...b, htmlGoal: await markdown(b.goal) };
+      case 'aivisual': return { ...b, html: await markdown(b.caption) };
       default: return b;
     }
   }));

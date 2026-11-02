@@ -213,8 +213,10 @@ test('the order-the-lines puzzle: 7 cards between a fixed top and bottom, and th
 });
 
 test('the site ships the module itself: one seed, published content, only the C++ components', () => {
-  const seeds = shippedSeeds();
-  assert.equal(new Set(seeds.map((s) => s.id)).size, seeds.length, 'seed ids are unique');
+  const shipped = shippedSeeds();
+  assert.equal(new Set(shipped.map((s) => s.id)).size, shipped.length, 'seed ids are unique');
+  // other modules ship their own seeds (e.g. ai-for-coding); this test covers this module's
+  const seeds = shipped.filter((s) => s.module.slug === 'intro-to-computing');
   // @1 created the module; @2 only rewrites the live lab (it never creates anything)
   assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update), Boolean(s.extend)]), [['intro-to-computing@1', false, false], ['intro-to-computing@2', true, false], ['intro-to-computing@3', true, false], ['intro-to-computing@4', true, false], ['intro-to-computing@5', false, true], ['intro-to-computing@6', false, false], ['intro-to-computing@7', true, false], ['intro-to-computing@8', false, false], ['intro-to-computing@9', true, false]]);
   // @9 rewrites the practice lab again: the theory part first, nothing removed

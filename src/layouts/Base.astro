@@ -9,13 +9,14 @@ import { platform } from '@/site.config';
 import '@/styles/global.css';
 
 /** `module`: the builder module this page belongs to (its sections replace the course nav). */
-interface Props { title?: string; description?: string; noindex?: boolean; module?: { slug: string; title: string; color?: string } }
+/** `module.skin`: the module's design ('neon' = the futuristic AI for Coding look); sets data-skin on <html>. */
+interface Props { title?: string; description?: string; noindex?: boolean; module?: { slug: string; title: string; color?: string; skin?: string } }
 const { title, description = platform.tagline, noindex = false, module } = Astro.props;
 const fullTitle = title ? `${title} · ${platform.name}` : `${platform.name} — ${platform.tagline}`;
 const builtInCourse = /^\/mobile-development(\/|$)/.test(Astro.url.pathname);
 ---
 <!doctype html>
-<html lang="en" class="no-js">
+<html lang="en" class="no-js" data-skin={module?.skin || undefined}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -33,6 +34,9 @@ const builtInCourse = /^\/mobile-development(\/|$)/.test(Astro.url.pathname);
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap"
     />
+    {module?.skin === 'neon' && (
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400..700&display=swap" />
+    )}
     <script is:inline>
       // Theme before paint (no flash). Re-applied after each client-side navigation.
       (function () {
