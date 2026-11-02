@@ -1,0 +1,68 @@
+---
+/**
+ * The module header in the Neon (futuristic) design — used by AI for Coding (module design "Neon (futuristic)").
+ * A HUD-style hero: aurora sky, a perspective grid floor, a glitch-lit title and a live agent console that types
+ * a short coding-agent session. Everything is readable without scripts and still under prefers-reduced-motion.
+ */
+interface Props {
+  slug: string; title: string; description?: string; color: string; kicker: string; preview: boolean;
+  start: { href: string; title: string; meta: string } | null; labsHref: string; labs: number; tasks: number; stages: number;
+}
+const { slug, title, description, color, kicker, preview, start, labsHref, labs, tasks, stages } = Astro.props;
+const pad = (n: number) => String(n).padStart(2, '0');
+const CONSOLE = [
+  { c: 'nx-l-user', t: '❯ add a dark-mode switch to app/settings.tsx — use theme.ts, no new packages, test it' },
+  { c: 'nx-l-think', t: '✻ reading app/settings.tsx, lib/theme.ts, CLAUDE.md…' },
+  { c: 'nx-l-tool', t: '● Edit(app/settings.tsx)  +24 −3' },
+  { c: 'nx-l-tool', t: '● Bash(npm test)  → 18 passed' },
+  { c: 'nx-l-say', t: '◆ Done: switch added, saved in theme.ts, tests green.' },
+];
+const TICKER = ['PROMPT ENGINEERING', 'CONTEXT WINDOWS', 'THE AGENT LOOP', 'INSTRUCTION FILES', 'PRDs FOR AGENTS', 'PLAN → ACT → VERIFY', 'CODE REVIEW', 'TESTS AS GUARDRAILS', 'SAFE TOOL USE'];
+---
+<header class="nx-hero" style={`--c:${color}`}>
+  <div class="nx-sky" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="nx-floor" aria-hidden="true"></div>
+  <div class="container nx-wrap">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><span aria-current="page">{slug}</span></nav>
+    {preview && <p class="nx-prev mono">Admin preview · drafts included</p>}
+    <div class="nx-grid">
+      <div class="nx-copy">
+        <p class="nx-kicker mono"><span class="nx-pulse" aria-hidden="true"></span>{kicker || 'MODULE'} <span class="nx-sep" aria-hidden="true">//</span> SYSTEM ONLINE</p>
+        <h1 class="nx-title" data-text={title}>{title}</h1>
+        {description && <p class="nx-lead">{description}</p>}
+        <div class="nx-actions">
+          {start && <a class="nx-cta" href={start.href}><span>Launch lab 01</span><span class="nx-cta-arrow" aria-hidden="true">→</span></a>}
+          <a class="nx-ghost" href={labsHref}>Explore the labs <span aria-hidden="true">↓</span></a>
+        </div>
+        <dl class="nx-stats">
+          <div><dt>Labs</dt><dd>{pad(labs)}</dd></div>
+          <div><dt>Missions</dt><dd>{pad(tasks)}</dd></div>
+          <div><dt>{stages ? 'Stages' : 'Mode'}</dt><dd>{stages ? pad(stages) : 'LIVE'}</dd></div>
+        </dl>
+      </div>
+      <aside class="nx-console" aria-label="Example coding-agent session">
+        <div class="nx-console-bar">
+          <span class="nx-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="mono">agent · ~/my-app</span>
+          <span class="nx-rec mono"><span aria-hidden="true"></span>LIVE</span>
+        </div>
+        <ol class="nx-console-body mono">
+          {CONSOLE.map((l, i) => <li class={l.c} style={`--i:${i}`}><span>{l.t}</span></li>)}
+          <li class="nx-caret" style={`--i:${CONSOLE.length}`} aria-hidden="true">❯ <i></i></li>
+        </ol>
+        <div class="nx-console-foot">
+          <p class="mono">YOU</p><p>write the prompt, set the limits, check the result.</p>
+          <p class="mono">THE AGENT</p><p>reads, plans, edits and runs the tests.</p>
+        </div>
+        {start && (
+          <a class="nx-next" href={start.href}>
+            <span class="mono">NEXT MISSION</span>
+            <b>{start.title}</b>
+            {start.meta && <small class="mono">{start.meta}</small>}
+          </a>
+        )}
+      </aside>
+    </div>
+  </div>
+  <div class="nx-ticker" aria-hidden="true"><div>{[...TICKER, ...TICKER].map((t) => <span>{t}<i>◆</i></span>)}</div></div>
+</header>

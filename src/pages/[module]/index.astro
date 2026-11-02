@@ -8,9 +8,12 @@ import { moduleAccess } from '@/lib/accounts/enrolment';
 import SplitBar from '@/components/SplitBar.astro';
 import { loadModule } from '@/lib/platform/server';
 import { moduleAssessment } from '@/lib/platform/assessment';
+import NeonHero from '@/components/platform/NeonHero.astro';
+import NeonOverview from '@/components/platform/NeonOverview.astro';
 import PsychologyWorkspace from '@/components/platform/PsychologyWorkspace.astro';
 import { moduleSections, moduleSectionHref, PSYCHOLOGY_MODULE } from '@/lib/platform/module-sections';
-import { labKey } from '@/lib/platform/core';
+import { labKey, MODULE_SKINS } from '@/lib/platform/core';
+import '@/styles/skin-neon.css';
 
 export const prerender = false;
 const preview = isAdmin(Astro.cookies) && Astro.url.searchParams.has('preview');
@@ -20,6 +23,7 @@ const data = await loadModule(Astro.params.module ?? '', { drafts: preview }).ca
 const gate = data ? await moduleAccess(Astro.cookies, data.module.slug) : { ok: false, signedIn: false };
 if (!data) Astro.response.status = 404;
 const color = data?.meta.color || '#7cb1ff';
+const skin = MODULE_SKINS[data?.meta.skin ?? ''] || '';
 // set by the module leader in /admin/assessment/<module>
 const assessment = data ? (await moduleAssessment(data.module.slug)).items : [];
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -34,7 +38,7 @@ const activeTab = sections.some((s) => s.toLowerCase() === requestedTab) ? reque
 const psychology = data?.module.slug === PSYCHOLOGY_MODULE;
 const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?? '', section, preview);
 ---
-<Base title={data ? data.meta.title || data.module.title : 'Module not found'} description={data?.meta.description} module={data ? { slug: data.module.slug, title: data.meta.title || data.module.title, color } : undefined}>
+<Base title={data ? data.meta.title || data.module.title : 'Module not found'} description={data?.meta.description} module={data ? { slug: data.module.slug, title: data.meta.title || data.module.title, color, skin } : undefined}>
   {data && !gate.ok ? (
     <Locked title={data.meta.title || data.module.title} code={data.meta.code} color={color} description={data.meta.description} signedIn={gate.signedIn} next={Astro.url.pathname} />
   ) : !data ? (
@@ -44,40 +48,50 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
     </div>
   ) : (
     <>
-      <header class="mdh" style={`--c:${color}`}>
-        <div class="mdh-bg" aria-hidden="true"></div>
-        <div class="container">
-          <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><span aria-current="page">{data.module.slug}</span></nav>
-          {preview && <p class="mdh-prev mono">Admin preview · drafts included</p>}
-          <div class="mdh-grid"><div class="mdh-copy">
-          <p class="mdh-k mono"><span class="mdh-dot" aria-hidden="true"></span>{[data.meta.code, data.meta.term].filter(Boolean).join(' · ') || 'Your learning space'}</p>
-          <h1 class="mdh-t">{data.meta.title || data.module.title}</h1>
-          {data.meta.description && <p class="lead mdh-l">{data.meta.description}</p>}
-          <div class="mdh-actions">
-            {firstLab && <a class="mdh-start" href={labHref(firstLab.lab.slug)}>Start learning <span aria-hidden="true">↗</span></a>}
-            <a class="mdh-browse" href={`${sectionHref('labs')}#workspace`}>Explore the labs <span aria-hidden="true">↓</span></a>
-          </div>
-          <div class="mdh-stats">
-            <div><b>{pad(data.items.length)}</b><span>Practical labs</span></div>
-            <div><b>{pad(taskCount)}</b><span>Hands-on tasks</span></div>
-            <div><b>{weeks.size ? pad(weeks.size) : '↗'}</b><span>{weeks.size ? 'Learning stages' : 'Learn by doing'}</span></div>
-          </div>
-          </div>
-          <aside class="mdh-feature" aria-label="Your starting point">
-            <div class="mdh-orbit" aria-hidden="true"><span></span><b>01</b><i>EXPLORE / CREATE / LEARN</i></div>
-            <div class="mdh-feature-copy"><p class="mono">YOUR STARTING POINT</p>
-              <h2>{firstLab ? firstLab.compiled.meta.title : 'Something good is taking shape.'}</h2>
-              <p>{firstLab ? [firstLab.week, firstLab.compiled.meta.estimatedTime, firstLab.compiled.meta.difficulty].filter(Boolean).join(' · ') || 'A little curiosity. A lot of possibility.' : 'Your teaching team will publish the first lab here.'}</p>
-              {firstLab && <a href={labHref(firstLab.lab.slug)}>Open the first lab <span aria-hidden="true">→</span></a>}
+      {skin === 'neon' ? (
+        <NeonHero
+          slug={data.module.slug} title={data.meta.title || data.module.title} description={data.meta.description} color={color}
+          kicker={[data.meta.code, data.meta.term].filter(Boolean).join(' · ')} preview={preview}
+          start={firstLab ? { href: labHref(firstLab.lab.slug), title: firstLab.compiled.meta.title, meta: [firstLab.compiled.meta.estimatedTime, firstLab.compiled.meta.difficulty].filter(Boolean).join(' · ') } : null}
+          labsHref={`${sectionHref('labs')}#workspace`} labs={data.items.length} tasks={taskCount} stages={weeks.size}
+        />
+      ) : (
+        <header class="mdh" style={`--c:${color}`}>
+          <div class="mdh-bg" aria-hidden="true"></div>
+          <div class="container">
+            <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><span aria-current="page">{data.module.slug}</span></nav>
+            {preview && <p class="mdh-prev mono">Admin preview · drafts included</p>}
+            <div class="mdh-grid"><div class="mdh-copy">
+            <p class="mdh-k mono"><span class="mdh-dot" aria-hidden="true"></span>{[data.meta.code, data.meta.term].filter(Boolean).join(' · ') || 'Your learning space'}</p>
+            <h1 class="mdh-t">{data.meta.title || data.module.title}</h1>
+            {data.meta.description && <p class="lead mdh-l">{data.meta.description}</p>}
+            <div class="mdh-actions">
+              {firstLab && <a class="mdh-start" href={labHref(firstLab.lab.slug)}>Start learning <span aria-hidden="true">↗</span></a>}
+              <a class="mdh-browse" href={`${sectionHref('labs')}#workspace`}>Explore the labs <span aria-hidden="true">↓</span></a>
             </div>
-          </aside></div>
-        </div>
-      </header>
+            <div class="mdh-stats">
+              <div><b>{pad(data.items.length)}</b><span>Practical labs</span></div>
+              <div><b>{pad(taskCount)}</b><span>Hands-on tasks</span></div>
+              <div><b>{weeks.size ? pad(weeks.size) : '↗'}</b><span>{weeks.size ? 'Learning stages' : 'Learn by doing'}</span></div>
+            </div>
+            </div>
+            <aside class="mdh-feature" aria-label="Your starting point">
+              <div class="mdh-orbit" aria-hidden="true"><span></span><b>01</b><i>EXPLORE / CREATE / LEARN</i></div>
+              <div class="mdh-feature-copy"><p class="mono">YOUR STARTING POINT</p>
+                <h2>{firstLab ? firstLab.compiled.meta.title : 'Something good is taking shape.'}</h2>
+                <p>{firstLab ? [firstLab.week, firstLab.compiled.meta.estimatedTime, firstLab.compiled.meta.difficulty].filter(Boolean).join(' · ') || 'A little curiosity. A lot of possibility.' : 'Your teaching team will publish the first lab here.'}</p>
+                {firstLab && <a href={labHref(firstLab.lab.slug)}>Open the first lab <span aria-hidden="true">→</span></a>}
+              </div>
+            </aside></div>
+          </div>
+        </header>
+      )}
 
       <div class="container module-workspace" id="workspace" style={`--module-color:${color}`}>
         <nav class="module-tabs" aria-label="Module sections">{sections.map((section) => <a href={`${sectionHref(section)}#workspace`} aria-current={activeTab === section.toLowerCase() ? 'page' : undefined}>{section}</a>)}</nav>
         {psychology && activeTab !== 'labs' && activeTab !== 'assessment' && <PsychologyWorkspace section={activeTab} />}
-        {!psychology && activeTab === 'overview' && <div class="module-intro"><h2>Your module workspace</h2><p>Follow the practical labs in order and use the task checkboxes to keep track of your learning.</p><a class="btn btn-primary" href={`${sectionHref('labs')}#workspace`}>Explore the labs →</a></div>}
+        {!psychology && activeTab === 'overview' && skin === 'neon' && <NeonOverview labsHref={`${sectionHref('labs')}#workspace`} />}
+        {!psychology && activeTab === 'overview' && skin !== 'neon' && <div class="module-intro"><h2>Your module workspace</h2><p>Follow the practical labs in order and use the task checkboxes to keep track of your learning.</p><a class="btn btn-primary" href={`${sectionHref('labs')}#workspace`}>Explore the labs →</a></div>}
       </div>
       {activeTab === 'assessment' && (
         <section class="container mda" id="assessment">

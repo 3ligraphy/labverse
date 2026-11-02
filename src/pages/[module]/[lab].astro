@@ -14,7 +14,8 @@ import LabBlock from '@/components/platform/LabBlock.astro';
 import { isAdmin } from '@/lib/attendance/server';
 import Locked from '@/components/platform/Locked.astro';
 import { moduleAccess } from '@/lib/accounts/enrolment';
-import { labKey } from '@/lib/platform/core';
+import { labKey, MODULE_SKINS } from '@/lib/platform/core';
+import '@/styles/skin-neon.css';
 import { claimedByFileLab } from '@/lib/lab/claimed';
 import { renderBlocks } from '@/lib/platform/render';
 import { loadModule } from '@/lib/platform/server';
@@ -51,12 +52,13 @@ const taskCount = blocks.filter((b) => b.kind === 'task').length;
 const isMission = taskCount > 0;
 const totalMin = parts.reduce((a, p) => a + minutes(p.time), 0);
 const color = data?.meta.color || '#7cb1ff';
+const skin = MODULE_SKINS[data?.meta.skin ?? ''] || '';
 const PART_COLORS = [color, '#7cb1ff', '#ffb547', '#ff8ad8', '#5ee0d2'];
 const prev = data && idx > 0 ? data.items[idx - 1] : null;
 const next = data && idx >= 0 ? data.items[idx + 1] : null;
 const q = preview ? '?preview' : '';
 ---
-<Base title={item ? `${label} — ${c!.meta.title}` : 'Lab not found'} description={c?.meta.description} module={data ? { slug: moduleSlug, title: data.meta.title || data.module.title, color } : undefined}>
+<Base title={item ? `${label} — ${c!.meta.title}` : 'Lab not found'} description={c?.meta.description} module={data ? { slug: moduleSlug, title: data.meta.title || data.module.title, color, skin } : undefined}>
   {data && !gate.ok && !openToAll ? (
     <Locked title={data.meta.title || data.module.title} code={data.meta.code} color={color} description={data.meta.description} signedIn={gate.signedIn} next={Astro.url.pathname} />
   ) : !item || !c ? (

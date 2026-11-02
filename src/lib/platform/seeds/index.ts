@@ -8,6 +8,7 @@
 import { compileLab, compileModule, nodesOfKits, sanitizeFlow, type Flow, type LabNodeType } from '../core.ts';
 import { introComputingModule, introComputingRevisionLab } from './intro-computing-revision.ts';
 import { introComputingPracticeLab } from './intro-computing-practice.ts';
+import { aiForCodingLab01, aiForCodingModule } from './ai-for-coding.ts';
 
 export type Seed = {
   id: string;
@@ -63,5 +64,11 @@ export function shippedSeeds(): Seed[] {
     // the practice lab with theory questions from the lectures at the start (every question kept)
     { ...seed('intro-to-computing@9', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
       [{ slug: 'revision-practice', flow: introComputingPracticeLab() }]), update: true },
+    // AI FOR CODING: a new module in the Neon design, with Lab 01 — prompt engineering and coding agents
+    seed('ai-for-coding@1', 'ai-for-coding', aiForCodingModule(), nodesOfKits(['ai']),
+      [{ slug: 'lab-01', flow: aiForCodingLab01() }]),
+    // Lab 01 gains a part on preparing a PRD for the coding agent (rewrites the lab once if @1 already created it)
+    { ...seed('ai-for-coding@2', 'ai-for-coding', aiForCodingModule(), nodesOfKits(['ai']),
+      [{ slug: 'lab-01', flow: aiForCodingLab01() }]), update: true },
   ];
 }

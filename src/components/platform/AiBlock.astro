@@ -1,0 +1,51 @@
+---
+/**
+ * The AI-for-coding blocks of a builder lab (kit "AI for coding"): prompt workbench, agent run, review the AI
+ * diff and the animated visuals. The server renders a readable version (the starting prompt, the script, the
+ * diff); src/lab/ai/ui/mount.ts turns it into the live widget. Graded blocks carry data-exercise (tracked like
+ * every exercise); visuals are data-free (always usable).
+ */
+import type { RenderedBlock } from '@/lib/platform/render';
+import '@/styles/ai-lab.css';
+
+type AiKinds = Extract<RenderedBlock, { kind: 'aiprompt' | 'agentsim' | 'aidiff' | 'aivisual' }>;
+interface Props { block: AiKinds }
+const { block: b } = Astro.props;
+
+const graded = b.kind === 'aiprompt' || (b.kind === 'agentsim' && b.steps.some((s) => s.kind === 'ask')) || (b.kind === 'aidiff' && b.lines.some((l) => l.bug));
+const cfg = b.kind === 'aiprompt'
+  ? { kind: b.kind, id: b.id, starter: b.starter, rubric: b.rubric, minWords: b.minWords, example: b.example }
+  : b.kind === 'agentsim'
+    ? { kind: b.kind, id: b.id, steps: b.steps }
+    : b.kind === 'aidiff'
+      ? { kind: b.kind, id: b.id, file: b.file, lines: b.lines }
+      : { kind: b.kind, id: b.id, visual: b.visual };
+// </script> inside the JSON would end the tag early
+const json = JSON.stringify(cfg).replace(/</g, '\\u003c');
+const KIND = { aiprompt: ['Prompt workbench', '⌬'], agentsim: ['Agent run', '⟳'], aidiff: ['Code review', '±'], aivisual: ['Visual', '◈'] } as const;
+const [kindLabel, glyph] = KIND[b.kind];
+const title = b.kind === 'aivisual' ? '' : b.title;
+const gate = b.kind === 'aivisual' ? { 'data-free': '' } : graded ? { 'data-exercise': '' } : { 'data-demo': '' };
+---
+<section class={`ax ax-k-${b.kind}`} data-ai data-ai-id={b.id} data-graded={graded ? '' : undefined} {...gate}>
+  <span class="ax-corner ax-c1" aria-hidden="true"></span><span class="ax-corner ax-c2" aria-hidden="true"></span>
+  <header class="ax-head">
+    <span class="ax-kind mono"><span class="ax-glyph" aria-hidden="true">{glyph}</span>{kindLabel}</span>
+    {title && <h4 class="ax-title">{title}</h4>}
+  </header>
+  {b.kind !== 'aivisual' && b.htmlGoal && <div class="ax-goal" set:html={b.htmlGoal} />}
+  <div class="ax-host" data-ai-host>
+    {b.kind === 'aiprompt' && <pre class="ax-static mono">{b.starter || '(empty prompt)'}</pre>}
+    {b.kind === 'agentsim' && <ol class="ax-static-list mono">{b.steps.slice(0, 6).map((s) => <li>{s.kind}: {s.text}</li>)}</ol>}
+    {b.kind === 'aidiff' && <pre class="ax-static mono">{b.lines.map((l) => `${l.sign}${l.code}`).join('\n')}</pre>}
+    <p class="ax-loading mono">{b.kind === 'aivisual' ? 'Booting the visual…' : 'Booting the agent console…'}</p>
+  </div>
+  {b.kind === 'aivisual' && b.html && <div class="ax-caption" set:html={b.html} />}
+  <script type="application/json" set:html={json} />
+</section>
+
+<script>
+  import { mountAi } from '@/lab/ai/ui/mount';
+  import { onPageLoad } from '@/scripts/page-load';
+  onPageLoad(mountAi);
+</script>
