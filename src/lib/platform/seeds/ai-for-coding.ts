@@ -56,20 +56,32 @@ export const INSTRUCTIONS_RUBRIC = [
 ];
 export const INSTRUCTIONS_STRONG = '# CLAUDE.md — Campus Eats\n\nExpo + React Native app in TypeScript.\n\n## Commands\n- npm install · npx expo start · npm test · npm run lint\n\n## Map\n- Screens live in app/ (expo-router), shared UI in components/, API calls in lib/api.ts\n\n## Conventions\n- Use function components and hooks; prefer StyleSheet.create; camelCase names\n\n## Never\n- Never edit .env files or commit secrets. Do not add packages without asking.\n\n## Before you finish\n- Run npm test and npm run lint; both must pass.';
 
+export const PRD_RUBRIC = [
+  'Problem :: /^#+\\s*(problem|why|background)|\\b(problem|pain|today students|currently)\\b/im :: Why build it: the problem, in one or two sentences',
+  'Users :: /\\b(users?|students?|staff|admins?|personas?|as an? )\\b/i :: Who uses it, and in which roles',
+  'Goals & non-goals :: /\\b(non-goals?|out of scope|not in scope|will not|won\'t)\\b/i :: What it will NOT do (non-goals / out of scope) — agents love extra features',
+  'User stories :: /\\bas an? .{2,60}\\b(i want|i can|i need|so that)\\b/i :: Write user stories: “As a student, I want … so that …”',
+  'Acceptance criteria :: /^#+\\s*acceptance|\\bacceptance criteria\\b|\\bgiven\\b.{1,80}\\bwhen\\b.{1,80}\\bthen\\b|\\b(cannot be|must not be|at most|at least|within \\d+)\\b/im :: Testable rules: “a room cannot be booked twice”, “within 5 s”',
+  'Tech & constraints :: /\\b(expo|react|typescript|node|supabase|firebase|python|stack|tech|constraints?)\\b/i :: The stack and limits the agent must respect',
+  'Milestones :: /\\b(milestones?|m1|phase \\d|step 1|v1|mvp)\\b/i :: An order to build in: small milestones, one agent session each',
+];
+export const PRD_STRONG = '# PRD — Study Room Booking\n\n## Problem\nStudents walk between floors to find a free study room; many rooms sit empty.\n\n## Users\nStudents (book rooms) and library staff (see and cancel bookings), mostly on phones.\n\n## Goals / Non-goals\nGoal: book a free room in under 30 s. Non-goals: payments, chat, calendar sync.\n\n## User stories\n- As a student, I want to see rooms free now so that I do not walk around.\n- As a student, I want to cancel my booking so that others can use the room.\n- As staff, I want to see today\'s bookings.\n\n## Acceptance criteria\n- A room cannot be booked twice for the same time.\n- A booking is at most 2 hours.\n- A new booking shows on the staff list within 5 s.\n\n## Tech & constraints\nExpo + TypeScript, our existing Supabase project, expo-router. No new UI library.\n\n## Milestones\nM1 list free rooms · M2 book & cancel · M3 staff view · M4 Arabic.';
+
 /* --------------------------------------------------------------- lab */
 
 export function aiForCodingLab01(): Flow {
   return chain([
     { id: 'root', type: 'start', data: {
       title: 'Prompt Engineering & Coding Agents',
-      description: 'Meet the coding agent: a model that reads your project, edits files and runs commands in a loop. You see how it thinks and what it can see, learn the five parts of a prompt it can act on, write an instructions file it reads every time, approve and steer a live session, and catch the bugs it slips into a diff.',
+      description: 'Meet the coding agent: a model that reads your project, edits files and runs commands in a loop. You see how it thinks and what it can see, learn the five parts of a prompt it can act on, write an instructions file it reads every time, plan a feature with a PRD the agent can build from, approve and steer a live session, and catch the bugs it slips into a diff.',
       difficulty: 'Beginner',
-      estimatedTime: '2 h 25 min',
+      estimatedTime: '2 h 55 min',
       objectives: [
         'Explain the agent loop (gather → plan → act → observe → verify) and why tests let an agent correct itself',
         'Choose what goes into the context window: signal, not noise',
         'Write coding prompts with context, goal, limits, an example and a “done when”',
         'Write a short instructions file (CLAUDE.md / AGENTS.md) for a real project',
+        'Prepare a PRD (product requirements document) and turn it into small, testable agent tasks',
         'Approve, deny and steer an agent’s commands safely',
         'Review an AI-written diff and catch secrets, deleted checks and “fixed” tests',
       ].join('\n'),
@@ -148,6 +160,55 @@ export function aiForCodingLab01(): Flow {
       '“Do not add packages without asking”',
     ], 'The instructions file is committed to git and read by every tool and teammate. Secrets belong in environment variables or a secret manager — never in files the agent (or anyone) reads.'),
     callout('c-secrets', 'WARNING', 'Treat everything you paste into an AI tool as **shared**. Never paste API keys, passwords, tokens or personal data — and check your university’s and employer’s rules on what code you may share.'),
+
+    /* ------------------------------------------ 4. a PRD for the agent (30) */
+    part('p-prd', 'Plan before code: a PRD for the agent', '30 min'),
+    text('prd-intro', 'A prompt is enough for a bug fix. A **whole feature** needs more: a **PRD** (product requirements document). It is a short file in the repo, often `docs/PRD.md`, that says **why** you are building something, **for whom**, **what is in and out**, **how you will know it works** and **in what order** to build it.\n\nFor a coding agent, the PRD is the context that does not fit in one prompt:\n\n- It is **written once and read in every session**: “Read docs/PRD.md, then do milestone 2.”\n- Its **acceptance criteria** become the agent’s tests: the *done when* of every task.\n- Its **non-goals** stop scope creep: agents happily add features nobody asked for.\n- Its **milestones** cut the work into small changes you can actually review.\n\nYou can even ask the agent to **interview you** and draft the PRD — but you read, fix and own it before any code is written.'),
+    task('t-prd-1', 'What each section buys you', '6 min', 'Switch PRD sections off and read what the agent would do without them. Then switch everything back on and press **⚡ Break it into agent tasks**. Try it again with **Acceptance criteria** or **Milestones** off.'),
+    visual('v-prd', 'A PRD for the agent: sections → tasks', 'One PRD, many short sessions. Each task prompt starts with **“Read docs/PRD.md”** and ends with the acceptance criteria as its *done when*.'),
+    { id: 'prd-sample', type: 'code', data: { title: 'docs/PRD.md (template)', lang: 'text', code: '# PRD — <feature name>\n\n## Problem\nWhy are we building this? What hurts today? (2–3 sentences)\n\n## Users\nWho uses it, in which roles, on which devices.\n\n## Goals / Non-goals\nGoals: measurable outcomes.  Non-goals: what we will NOT build now.\n\n## User stories\n- As a <user>, I want <action> so that <benefit>.\n\n## Acceptance criteria\n- Given <state>, when <action>, then <result>.   (each one = a test)\n\n## Tech & constraints\nStack, existing services, packages allowed or not, languages, performance.\n\n## Milestones\nM1 … M2 … M3 …   (each small enough for one agent session and one review)\n\n## Open questions\nWhat is still undecided — the agent must ask, not guess.' } },
+    task('t-prd-2', 'Write the PRD', '14 min', 'Pick a feature for **your course project** (or use *Study Room Booking*: students book free library study rooms on their phones). Write its PRD in the workbench using the template above. Every section should light up. Keep it to about one screen: a PRD is a contract, not a novel.'),
+    prompt('w-prd', {
+      title: 'PRD workbench · docs/PRD.md',
+      goal: 'Write a PRD a coding agent could build from, one milestone at a time.',
+      starter: '# PRD — \n\n',
+      rubric: PRD_RUBRIC,
+      minWords: 80,
+      example: PRD_STRONG,
+    }),
+    task('t-prd-3', 'Build from the PRD', '7 min', 'Watch an agent start the feature from the PRD in **plan mode** (it plans before it edits anything). Decide at each checkpoint.'),
+    agent('a-prd', 'Session · build milestone 1 from the PRD', 'The PRD is in `docs/PRD.md`. The agent starts in plan mode.', [
+      'user: Read `docs/PRD.md`. Plan **milestone 1** only (list rooms that are free now). Do not edit files yet. Ask me about anything the PRD leaves open.',
+      'read: docs/PRD.md',
+      'out: 48 lines · 7 sections · 4 milestones · 1 open question',
+      'read: lib/supabase.ts',
+      'out: export const supabase = createClient(…)',
+      'think: Milestone 1 needs the rooms and bookings tables. The PRD does not say what “free now” means near the end of a booking.',
+      'ask: The agent asks: **“Is a room free if its booking ends in the next 10 minutes?”** What do you do?',
+      'ok: Answer it, and add the rule to the PRD’s acceptance criteria so every later session knows it :: Answers that only live in one chat are lost in the next session. The PRD is the single source of truth.',
+      'no: Tell it to decide for itself :: Then the rule exists only in code nobody reviewed, and the staff view (M3) may decide differently.',
+      'no: Ignore the question and say “just build it” :: The agent asked because the PRD has a gap. Guesses here become bugs in M2.',
+      'say: **Plan for M1:** 1) `lib/rooms.ts`: `freeRoomsNow(now)` querying rooms without a booking overlapping `now` · 2) `app/rooms.tsx` list screen · 3) tests for “booked now is hidden” and “ends within 10 min is shown”. Then milestone 2 (booking) would add a `bookings` insert and the payment screen.',
+      'ask: Read the plan again. What do you reply?',
+      'ok: “Good, but remove the payment screen: payments are a non-goal in the PRD. Build steps 1–3 only.” :: The plan sneaked in a non-goal. Catching scope creep in the plan costs one sentence; in code it costs a revert.',
+      'no: “Approved, go.” :: The plan includes a payment screen, which the PRD lists as a non-goal. Read plans as carefully as diffs.',
+      'no: “Build all four milestones now to save time.” :: One giant change is impossible to review and the agent’s context fills up. One milestone per session.',
+      'edit: lib/rooms.ts',
+      '+export async function freeRoomsNow(now = new Date()) {',
+      '+  // rooms with no booking overlapping now (ends within 10 min count as free — PRD)',
+      'edit: lib/rooms.test.ts',
+      '+test(\'a room booked now is not listed\', …)',
+      '+test(\'a booking ending in 8 min counts as free\', …)',
+      'run: npm test',
+      'out: ✓ 26 passed',
+      'say: Milestone 1 done: `freeRoomsNow` + the rooms screen, 2 new tests from the acceptance criteria. I updated nothing outside M1. Ready for review; M2 next session.',
+    ]),
+    quiz('q-prd', 'Which of these is a good **acceptance criterion** for an agent to build against?', [
+      'The booking screen should be fast and user-friendly',
+      '*A room cannot be booked twice for overlapping times; the second booking shows “Room already booked”',
+      'Use best practices for the database',
+      'Students should like the new booking feature',
+    ], 'A good criterion is **testable**: the agent can turn it into a test that passes or fails. “Fast”, “friendly” and “best practices” cannot be checked, so the agent will just say it did them.'),
 
     /* ------------------------------------------------ 4. driving the agent (30) */
     part('p4', 'Driving the agent: approve, deny, steer', '30 min'),

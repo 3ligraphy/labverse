@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { AI_VISUALS, compileLab, compileModule, kitOf, MODULE_SKINS, nodesOfKits, sanitizeFlow, type Block } from '../src/lib/platform/core.ts';
 import { gradeReview, parseAgentScript, parseDiff, parseRubric, scorePrompt, tokenEstimate } from '../src/lab/ai/core.ts';
 import {
-  aiForCodingLab01, aiForCodingModule, BUGFIX_RUBRIC, BUGFIX_STRONG, FEATURE_RUBRIC, FEATURE_STRONG, INSTRUCTIONS_RUBRIC, INSTRUCTIONS_STRONG,
+  aiForCodingLab01, aiForCodingModule, BUGFIX_RUBRIC, BUGFIX_STRONG, FEATURE_RUBRIC, FEATURE_STRONG, INSTRUCTIONS_RUBRIC, INSTRUCTIONS_STRONG, PRD_RUBRIC, PRD_STRONG,
 } from '../src/lib/platform/seeds/ai-for-coding.ts';
 import { labStructure } from '../src/lib/progress/core.ts';
 import { shippedSeeds } from '../src/lib/platform/seeds/index.ts';
@@ -23,7 +23,8 @@ test('the lab compiles cleanly, uses only the AI kit and fits its estimated time
   assert.ok(lab.meta.open, 'open any time');
   assert.ok(lab.hasCheckin);
   const parts = lab.blocks.filter((b) => b.kind === 'part') as Extract<Block, { kind: 'part' }>[];
-  assert.equal(parts.length, 5);
+  assert.equal(parts.length, 6);
+  assert.equal(parts[3].title, 'Plan before code: a PRD for the agent');
   const minutes = parts.reduce((a, p) => a + parseInt(p.time), 0);
   assert.equal(lab.meta.estimatedTime, `${Math.floor(minutes / 60)} h ${minutes % 60} min`);
   const kit = new Set(nodesOfKits(['ai']));
@@ -43,6 +44,10 @@ test('the module is public, in the Neon design and links its lab', () => {
   assert.ok(seed && !seed.update && !seed.extend && !seed.patch, 'a create seed');
   assert.equal(seed.module.slug, 'ai-for-coding');
   assert.deepEqual(seed.labs.map((l) => l.slug), ['lab-01']);
+  // @2 rewrites Lab 01 once (it gained the PRD part) wherever @1 already created it
+  const update = shippedSeeds().find((s) => s.id === 'ai-for-coding@2');
+  assert.ok(update?.update);
+  assert.ok(update.labs[0].flow.nodes.some((n) => n.id === 'w-prd'));
   // other modules keep the standard design (a missing or unknown value is Standard)
   const plain = sanitizeFlow({ nodes: [{ id: 'root', type: 'module', data: {} }], edges: [] }, 'module');
   assert.ok(plain.ok);
@@ -56,16 +61,29 @@ test('every graded activity is tracked: prompts, agent decisions and reviews', (
     const ex = lab.exercises[id];
     return ex ? { title: ex.title, checks: ex.checks.length } : null;
   });
-  assert.equal(of('aiprompt').length, 3);
-  assert.equal(of('agentsim').length, 2);
+  assert.equal(of('aiprompt').length, 4);
+  assert.equal(of('agentsim').length, 3);
   assert.equal(of('aidiff').length, 2);
-  assert.equal(structure.exercises.length, 7);
-  assert.equal(structure.tasks.length, 11);
+  assert.equal(structure.exercises.length, 9);
+  assert.equal(structure.tasks.length, 14);
   for (const e of structure.exercises) assert.ok(lab.exercises[e.id].checks.length >= 1 && lab.exercises[e.id].checks.length <= 50);
 });
 
+test('the PRD rubric needs every section: a PRD without non-goals does not pass', () => {
+  const r = parseRubric(PRD_RUBRIC.join('\n'));
+  assert.ok(r.ok);
+  const noScope = PRD_STRONG.replace(/Non-goals: payments, chat, calendar sync\./, '').replace('Goals / Non-goals', 'Goals');
+  const s = scorePrompt(noScope, r.value, 80);
+  assert.ok(!s.solved);
+  assert.deepEqual(r.value.filter((_, i) => !s.found[i]).map((x) => x.name), ['Goals & non-goals']);
+  // “cannot” in the problem statement is not an acceptance criterion
+  const draft = scorePrompt('# PRD\n\n## Problem\nStudents cannot find free rooms.\n\n## Users\nStudents and staff.', r.value, 0);
+  assert.equal(draft.found[r.value.findIndex((x) => x.name === 'Acceptance criteria')], false);
+  assert.ok(scorePrompt('Given a booked room, when another student books it, then they see “Room already booked”.', r.value, 0).found[4]);
+});
+
 test('prompt rubrics: each strong example passes, each weak starter fails', () => {
-  const cases: [string[], string, number][] = [[BUGFIX_RUBRIC, BUGFIX_STRONG, 30], [FEATURE_RUBRIC, FEATURE_STRONG, 35], [INSTRUCTIONS_RUBRIC, INSTRUCTIONS_STRONG, 40]];
+  const cases: [string[], string, number][] = [[BUGFIX_RUBRIC, BUGFIX_STRONG, 30], [FEATURE_RUBRIC, FEATURE_STRONG, 35], [INSTRUCTIONS_RUBRIC, INSTRUCTIONS_STRONG, 40], [PRD_RUBRIC, PRD_STRONG, 80]];
   for (const [lines, strong, min] of cases) {
     const r = parseRubric(lines.join('\n'));
     assert.ok(r.ok, r.ok ? '' : r.error);

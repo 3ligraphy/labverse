@@ -36,6 +36,7 @@ export const AI_VISUALS: Record<string, string> = {
   'The context window: what the agent can see': 'context',
   'Anatomy of a great coding prompt': 'anatomy',
   'Vague → specific: how many guesses?': 'specificity',
+  'A PRD for the agent: sections → tasks': 'prd',
 };
 /** module page designs: the platform's standard look, or the futuristic neon design (AI for Coding) */
 export const MODULE_SKINS: Record<string, string> = { Standard: '', 'Neon (futuristic)': 'neon' };

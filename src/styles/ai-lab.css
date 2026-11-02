@@ -265,6 +265,36 @@
 .vz-sp-list li.is-ok { border-style: solid; border-color: var(--ax-ok); }
 .vz-sp-list li.is-ok span { color: var(--ax-ok); }
 
+/* PRD → tasks */
+.vz-prd-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 12px; margin-top: 10px; align-items: start; }
+.vz-prd-grid .vz-an-fx { margin-top: 0 !important; }
+.vz-prd-doc { border: 1px solid var(--line-2); background: var(--code-bg); padding: 8px; display: grid; gap: 4px; }
+.vz-prd-file { margin: 0 0 4px !important; padding: 2px 6px 8px; font-size: 12px; color: var(--text-3); border-bottom: 1px solid var(--line); }
+.vz-prd-sec { position: relative; display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; padding: 8px; border-left: 2px solid var(--pc); cursor: pointer; transition: opacity var(--t-med), background var(--t-fast); }
+.vz-prd-sec:hover { background: color-mix(in oklab, var(--pc) 7%, transparent); }
+.vz-prd-sec input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.vz-prd-sec .vz-ctx-sw { margin-top: 3px; }
+.vz-prd-sec input:checked + .vz-ctx-sw { background: color-mix(in oklab, var(--ic) 25%, transparent); }
+.vz-prd-sec input:checked + .vz-ctx-sw::after { transform: translateX(12px); opacity: 1; }
+.vz-prd-sec input:focus-visible + .vz-ctx-sw { outline: 2px solid var(--ax-a); outline-offset: 2px; }
+.vz-prd-body { display: grid; gap: 2px; min-width: 0; }
+.vz-prd-k { font-size: 12px; color: var(--pc); }
+.vz-prd-t { font-size: 13.5px; color: var(--text-2); }
+.vz-prd-sec.is-off { opacity: 0.4; border-left-style: dashed; }
+.vz-prd-sec.is-off .vz-prd-t { text-decoration: line-through; }
+.vz-prd .ax-actions { border-top: 0; padding-inline: 0; }
+.vz-prd-tasks { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.vz-prd-tasks:empty { display: none; }
+.vz-prd-task { position: relative; margin: 0 !important; padding: 12px; border: 1px solid var(--line-2); background: var(--ax-glass); display: grid; gap: 6px; align-content: start; animation: vz-pop 380ms var(--ease-out); }
+.vz-prd-task > .mono:first-child { font-size: 11px; letter-spacing: 0.14em; color: var(--ax-a); }
+.vz-prd-task b { font-family: var(--font-display); }
+.vz-prd-task p { margin: 0 !important; font-size: 12.5px; color: var(--text-2); }
+.vz-prd-task p.mono { color: var(--text-3); }
+.vz-prd-done { font-weight: 700; color: var(--ax-ok); }
+.vz-prd-task.is-bad { border-color: var(--ax-bad); }
+@keyframes vz-pop { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+@media (max-width: 700px) { .vz-prd-grid { grid-template-columns: 1fr; } }
+
 @media (prefers-reduced-motion: reduce) {
   .ax *, .ax *::before, .ax *::after { transition: none !important; animation: none !important; }
 }

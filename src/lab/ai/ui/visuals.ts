@@ -4,6 +4,7 @@
  *   context     — the context window: add and remove what the agent sees, watch it fill and lose focus
  *   anatomy     — a strong prompt split into its parts; switch a part off and see what the agent would do instead
  *   specificity — a slider from vague to specific: how many things the agent must guess
+ *   prd         — a PRD for the agent: switch sections off to see the risk, then break it into agent-sized tasks
  */
 import { h, md } from '../../ui/dom.ts';
 import { wait } from './store.ts';
@@ -13,7 +14,7 @@ export function mountAiVisual(host: HTMLElement, visual: string) {
   host.replaceChildren(make ? make() : h('p', null, 'This visual is not available.'));
 }
 
-const VISUALS: Record<string, () => HTMLElement> = { loop, context, anatomy, specificity };
+const VISUALS: Record<string, () => HTMLElement> = { loop, context, anatomy, specificity, prd };
 
 /* -------------------------------------------------------------------- loop */
 
@@ -227,4 +228,73 @@ function specificity(): HTMLElement {
   range.addEventListener('input', draw);
   draw();
   return el;
+}
+
+/* --------------------------------------------------------------------- prd */
+
+const PRD = [
+  { k: 'Problem', c: '#00e5ff', text: 'Students walk between floors to find a free study room. 40% of rooms sit empty while others are full.', risk: 'builds a technically nice feature that solves nobody’s real problem.' },
+  { k: 'Users', c: '#4dffb8', text: 'BUE students (book a room) and library staff (see and cancel bookings). Mostly on phones.', risk: 'designs for a desktop admin and forgets the staff role completely.' },
+  { k: 'Goals & non-goals', c: '#9b7bff', text: 'Goal: book a free room in under 30 seconds. Non-goal: payments, room chat, calendar sync.', risk: 'adds payments and a chat because “booking apps usually have them”.' },
+  { k: 'User stories', c: '#ffd166', text: 'As a student I see rooms free now · I book one for 1–2 hours · I cancel my booking. As staff I see today’s bookings.', risk: 'guesses the flows and screens — each guess a rewrite later.' },
+  { k: 'Acceptance criteria', c: '#ff4fd8', text: 'A room cannot be booked twice for the same time · max 2 h per booking · a booking shows on the staff list within 5 s.', risk: 'cannot tell when it is done, so it never writes the tests that would catch double bookings.' },
+  { k: 'Tech & constraints', c: '#5cf0ff', text: 'Expo + TypeScript, existing Supabase project, expo-router. No new UI library. Arabic and English.', risk: 'picks its favourite stack: a new backend, a UI kit, English only.' },
+  { k: 'Milestones', c: '#ff8a5c', text: 'M1 list free rooms · M2 book & cancel · M3 staff view · M4 Arabic.', risk: 'tries to build everything in one giant change you cannot review.' },
+];
+const PRD_TASKS = [
+  { m: 'M1', t: 'List rooms that are free now', p: 'Read docs/PRD.md (M1). Add app/rooms.tsx listing rooms free now from the rooms table.', d: 'Test: a room with a booking now is not listed. npm test passes.' },
+  { m: 'M2', t: 'Book and cancel', p: 'Implement M2 from docs/PRD.md. Enforce: no double booking, max 2 h.', d: 'Tests for double booking and the 2 h limit pass.' },
+  { m: 'M3', t: 'Staff view', p: 'Implement M3: staff see today’s bookings and can cancel any.', d: 'A new booking appears in the staff list within 5 s.' },
+  { m: 'M4', t: 'Arabic', p: 'Implement M4: every new string in both languages, RTL layout on the rooms screens.', d: 'Screens render in Arabic without clipped text.' },
+];
+
+function prd(): HTMLElement {
+  const off = new Set<number>();
+  const doc = h('div', { class: 'vz-prd-doc' });
+  const risks = h('ul', { class: 'vz-an-fx', 'aria-live': 'polite' });
+  const score = h('b', { class: 'vz-an-score' });
+  const tasks = h('ol', { class: 'vz-prd-tasks' });
+  const status = h('p', { class: 'ax-status', role: 'status' });
+  const split = h('button', { type: 'button', class: 'ax-btn ax-btn-primary' }, '⚡ Break it into agent tasks') as HTMLButtonElement;
+  const rows = PRD.map((s, i) => {
+    const box = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement;
+    box.addEventListener('change', () => { box.checked ? off.delete(i) : off.add(i); draw(); });
+    return h('label', { class: 'vz-prd-sec', style: `--pc:${s.c}` }, box, h('span', { class: 'vz-ctx-sw', style: `--ic:${s.c}`, 'aria-hidden': 'true' }),
+      h('span', { class: 'vz-prd-body' }, h('b', { class: 'vz-prd-k mono' }, `## ${s.k}`), h('span', { class: 'vz-prd-t' }, s.text)));
+  });
+  doc.append(h('p', { class: 'vz-prd-file mono' }, 'docs/PRD.md — Study Room Booking'), ...rows);
+  const draw = () => {
+    rows.forEach((r, i) => r.classList.toggle('is-off', off.has(i)));
+    score.textContent = `${PRD.length - off.size}/${PRD.length}`;
+    risks.replaceChildren(...(off.size
+      ? [...off].sort().map((i) => h('li', { style: `--pc:${PRD[i].c}` }, h('b', null, `No ${PRD[i].k.toLowerCase()}:`), ` the agent ${PRD[i].risk}`))
+      : [h('li', { class: 'is-ok' }, h('b', null, 'Complete PRD.'), ' The agent knows why, for whom, what is in and out, how to test it, and in what order to build.')]));
+    tasks.replaceChildren();
+    status.textContent = '';
+  };
+  split.addEventListener('click', async () => {
+    split.disabled = true;
+    tasks.replaceChildren();
+    const needs = [4, 6].filter((i) => off.has(i));
+    if (needs.length) {
+      status.className = 'ax-status is-bad';
+      status.textContent = `✗ Cannot split it well: without ${needs.map((i) => PRD[i].k.toLowerCase()).join(' and ')} there is no order to build in and no way to know a task is done. The agent gets one huge vague task.`;
+      tasks.append(h('li', { class: 'vz-prd-task is-bad' }, h('span', { class: 'mono' }, 'ALL'), h('b', null, 'Build the study room app'), h('p', null, 'Done when: nobody knows.')));
+      split.disabled = false;
+      return;
+    }
+    for (const t of PRD_TASKS) {
+      tasks.append(h('li', { class: 'vz-prd-task' }, h('span', { class: 'mono' }, t.m), h('b', null, t.t), h('p', { class: 'mono' }, `❯ ${t.p}`), h('p', null, h('span', { class: 'vz-prd-done' }, 'Done when '), t.d)));
+      await wait(380);
+    }
+    status.className = 'ax-status is-ok';
+    status.textContent = '✓ Four small tasks, each one prompt, each one reviewable, each with a test. One PRD, many short agent sessions — and each starts with “Read docs/PRD.md”.';
+    split.disabled = false;
+  });
+  draw();
+  return h('div', { class: 'vz vz-prd' },
+    h('div', { class: 'vz-an-head' }, h('p', { class: 'mono vz-k' }, 'SWITCH A SECTION OFF'), h('p', { class: 'mono vz-k' }, 'SECTIONS ', score)),
+    h('div', { class: 'vz-prd-grid' }, doc, risks),
+    h('div', { class: 'ax-actions' }, split),
+    tasks, status);
 }

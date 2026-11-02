@@ -1,12 +1,13 @@
 ---
-/** The Overview tab of a Neon-design module (AI for Coding): what the module trains, as four holographic cards. */
+/** The Overview tab of a Neon-design module (AI for Coding): what the module trains, as five holographic cards. */
 interface Props { labsHref: string }
 const { labsHref } = Astro.props;
 const CARDS = [
   { n: '01', k: 'Prompt', t: 'Say exactly what you want', d: 'Context, goal, constraints, an example and a “done when”: the five parts that turn a wish into a task an agent can finish.' },
   { n: '02', k: 'Context', t: 'Feed it the right files', d: 'The context window is the agent’s whole world. Give it signal, not noise — and an instructions file it reads every time.' },
-  { n: '03', k: 'Loop', t: 'Let it plan, act and check', d: 'Agents work in a loop: gather, plan, act, observe, verify. Tests are what let the loop correct itself.' },
-  { n: '04', k: 'Review', t: 'You are still the engineer', d: 'Approve commands with care, read every diff, and never merge what you would not have written yourself.' },
+  { n: '03', k: 'PRD', t: 'Plan the feature first', d: 'A short PRD — problem, users, non-goals, acceptance criteria, milestones — becomes the context and the tests for every agent session.' },
+  { n: '04', k: 'Loop', t: 'Let it plan, act and check', d: 'Agents work in a loop: gather, plan, act, observe, verify. Tests are what let the loop correct itself.' },
+  { n: '05', k: 'Review', t: 'You are still the engineer', d: 'Approve commands with care, read every diff, and never merge what you would not have written yourself.' },
 ];
 ---
 <section class="nx-ov" aria-labelledby="nx-ov-t">

@@ -67,5 +67,8 @@ export function shippedSeeds(): Seed[] {
     // AI FOR CODING: a new module in the Neon design, with Lab 01 — prompt engineering and coding agents
     seed('ai-for-coding@1', 'ai-for-coding', aiForCodingModule(), nodesOfKits(['ai']),
       [{ slug: 'lab-01', flow: aiForCodingLab01() }]),
+    // Lab 01 gains a part on preparing a PRD for the coding agent (rewrites the lab once if @1 already created it)
+    { ...seed('ai-for-coding@2', 'ai-for-coding', aiForCodingModule(), nodesOfKits(['ai']),
+      [{ slug: 'lab-01', flow: aiForCodingLab01() }]), update: true },
   ];
 }
