@@ -7,7 +7,7 @@ import type { AstroCookies } from 'astro';
 import { masterAdmin } from '@/lib/attendance/server';
 import { flowLeader } from '@/lib/platform/core';
 import { getPlatformStore } from '@/lib/platform/server';
-import { DEFAULT_STORED, permitted, type ModuleRole, type Permission, type Who } from './permissions';
+import { DEFAULT_STORED, allowed, type ModuleRole, type Permission, type Who } from './permissions';
 import { getAccountStore, viewer } from './server';
 
 type AccessResult = {
@@ -49,7 +49,7 @@ async function loadAccess(cookies: AstroCookies): Promise<AccessResult> {
     user, who, matrix, master,
     /** display name for audit fields */
     by: user?.name ?? (master ? 'Admin password' : ''),
-    can: (perm: Permission, module?: string) => permitted(matrix, who, perm, module),
+    can: (perm: Permission, module?: string) => allowed(matrix, who, perm, module),
   };
 }
 
