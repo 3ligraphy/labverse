@@ -384,20 +384,6 @@ export async function leaderEmail(module: string): Promise<string> {
   return m ? flowLeader(m.flow) : '';
 }
 
-const publicModules = new Map<string, { open: boolean; at: number }>();
-/** Modules set to “Anyone with the link”: their pages and labs need no sign-in or invitation (cached for a minute). */
-export async function isPublicModule(slug: string): Promise<boolean> {
-  const hit = publicModules.get(slug);
-  if (hit && Date.now() - hit.at < 60_000) return hit.open;
-  const s = getPlatformStore();
-  if (!s) return false;
-  // a failed lookup is not cached: the next request tries again
-  const row = await s.getModule(slug);
-  const open = Boolean(row?.published && compileModule(row.flow).meta.public === 'Yes');
-  publicModules.set(slug, { open, at: Date.now() });
-  return open;
-}
-
 const openLabs = new Map<string, { open: boolean; at: number }>();
 /**
  * Builder labs marked "Open any time" (Lab node → Sessions): students join a permanent session by themselves,

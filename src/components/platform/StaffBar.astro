@@ -1,0 +1,87 @@
+---
+/**
+ * Staff tools on every module and lab page, shown only to staff (the script asks the server): lock or unlock the
+ * module's labs, and Edit, Progress and Statistics. Locked: students still see the module and its list of labs,
+ * but cannot open a lab or save work in it.
+ * `overlay`: on pages built ahead of time (the Mobile Development labs) the server can't check who is viewing, so a
+ * locked module's lab is covered here for students.
+ */
+interface Props { module: string; edit?: string; progress: string; stats: string; overlay?: boolean; back: string }
+const { module, edit, progress, stats, overlay = false, back } = Astro.props;
+---
+<div class="sbar" data-sbar data-module={module} data-overlay={overlay ? '' : undefined} hidden>
+  <span class="sbar-k mono">Staff</span>
+  <span class="sbar-state mono" data-sbar-state></span>
+  <button type="button" class="sbar-lock" data-sbar-lock></button>
+  {edit && <a href={edit}>Edit</a>}
+  <a href={progress}>Progress</a>
+  <a href={stats}>Statistics</a>
+</div>
+{overlay && (
+  <div class="sbar-locked" data-sbar-overlay role="alert" hidden>
+    <div class="sbar-locked-in">
+      <span class="sbar-locked-ic" aria-hidden="true">🔒</span>
+      <h2>This lab is locked</h2>
+      <p>Your teaching team has locked this module's labs for now. You can still read the module and its list of labs. Check back later.</p>
+      <div class="sbar-locked-go"><a class="btn btn-primary" href={back}>Back to the module</a><a class="btn btn-ghost" href="/modules">All modules</a></div>
+    </div>
+  </div>
+)}
+
+<style>
+  .sbar { position: fixed; z-index: 96; right: 18px; bottom: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: calc(100vw - 36px); padding: 8px;
+    border-radius: 16px; border: 1px solid var(--line-2); background: color-mix(in oklab, var(--surface) 94%, transparent); box-shadow: 0 18px 40px -18px rgb(0 0 0 / .55);
+    backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px); font-size: 13px; }
+  .sbar[hidden] { display: none; }
+  .sbar-k { padding: 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+  .sbar-state { padding: 4px 9px; border-radius: 999px; font-size: 12px; background: var(--surface-2); color: var(--text-2); }
+  .sbar-state.is-locked { background: color-mix(in oklab, var(--warn) 20%, var(--surface-2)); color: var(--text); }
+  .sbar a, .sbar-lock { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg); color: var(--text); font: 600 12.5px var(--font-body); cursor: pointer; }
+  .sbar a:hover, .sbar-lock:hover { border-color: var(--accent-text); }
+  .sbar-lock:disabled { opacity: .6; cursor: progress; }
+  /* phones: above the bottom tab bar */
+  @media (max-width: 719px) { .sbar { left: 12px; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom)); justify-content: center; } }
+
+  .sbar-locked { position: fixed; z-index: 90; inset: var(--nav-h) 0 0 0; display: grid; place-items: center; padding: 24px 16px; background: var(--hero-bg); color: var(--hero-text); }
+  .sbar-locked[hidden] { display: none; }
+  .sbar-locked-in { max-width: 560px; display: grid; gap: 14px; justify-items: start; }
+  .sbar-locked-ic { font-size: 34px; }
+  .sbar-locked h2 { font-size: clamp(2rem, 1.2rem + 3vw, 3.2rem); letter-spacing: -.04em; line-height: 1; }
+  .sbar-locked p { color: var(--hero-lead); }
+  .sbar-locked-go { display: flex; flex-wrap: wrap; gap: 8px; }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  onPageLoad(() => {
+    document.querySelectorAll<HTMLElement>('[data-sbar]').forEach(async (bar) => {
+      if (bar.dataset.wired) return;
+      bar.dataset.wired = '1';
+      const module = bar.dataset.module!;
+      const r = await fetch(`/api/modules/state?module=${encodeURIComponent(module)}`, { cache: 'no-store' }).then((x) => (x.ok ? x.json() : null)).catch(() => null) as { locked: boolean; staff: boolean } | null;
+      if (!r) return;
+      if (!r.staff) {
+        if (r.locked && bar.hasAttribute('data-overlay')) document.querySelector<HTMLElement>('[data-sbar-overlay]')?.removeAttribute('hidden');
+        return;
+      }
+      bar.hidden = false;
+      const state = bar.querySelector<HTMLElement>('[data-sbar-state]')!;
+      const btn = bar.querySelector<HTMLButtonElement>('[data-sbar-lock]')!;
+      let locked = r.locked;
+      const paint = () => {
+        state.textContent = locked ? '🔒 Labs locked' : '🔓 Labs open';
+        state.classList.toggle('is-locked', locked);
+        btn.textContent = locked ? 'Unlock labs' : 'Lock labs';
+        btn.title = locked ? 'Students can see the labs but not open them. Press to open them again.' : 'Students can open every lab. Press to lock them.';
+      };
+      paint();
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        const res = await fetch('/api/admin/module-lock', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ module, locked: !locked }) }).catch(() => null);
+        btn.disabled = false;
+        if (res?.ok) { locked = !locked; paint(); }
+        else btn.textContent = 'Could not change it · try again';
+      });
+    });
+  });
+</script>

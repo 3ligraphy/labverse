@@ -218,7 +218,9 @@ test('the site ships the module itself: one seed, published content, only the C+
   // other modules ship their own seeds (e.g. ai-for-coding); this test covers this module's
   const seeds = shipped.filter((s) => s.module.slug === 'intro-to-computing');
   // @1 created the module; @2 only rewrites the live lab (it never creates anything)
-  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update), Boolean(s.extend)]), [['intro-to-computing@1', false, false], ['intro-to-computing@2', true, false], ['intro-to-computing@3', true, false], ['intro-to-computing@4', true, false], ['intro-to-computing@5', false, true], ['intro-to-computing@6', false, false], ['intro-to-computing@7', true, false], ['intro-to-computing@8', false, false], ['intro-to-computing@9', true, false]]);
+  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update), Boolean(s.extend)]), [['intro-to-computing@1', false, false], ['intro-to-computing@2', true, false], ['intro-to-computing@3', true, false], ['intro-to-computing@4', true, false], ['intro-to-computing@5', false, true], ['intro-to-computing@6', false, false], ['intro-to-computing@7', true, false], ['intro-to-computing@8', false, false], ['intro-to-computing@9', true, false], ['intro-to-computing@10', false, false]]);
+  // @10 shows the teaching team on the module page (module leader from the lecture slides)
+  assert.deepEqual(seeds[9].patch, { leader: 'gerard.mckee@bue.edu.eg', leaderName: 'Prof. Gerard McKee', lecturers: 'Assoc. Prof. Wessam El-Behaidy' });
   // @9 rewrites the practice lab again: the theory part first, nothing removed
   assert.deepEqual(seeds[8].labs.map((l) => l.slug), ['revision-practice']);
   assert.ok(seeds[8].labs[0].flow.nodes.some((n) => n.id === 'p0' && n.data.title === 'Theory from the lectures'));

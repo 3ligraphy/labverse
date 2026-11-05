@@ -64,6 +64,9 @@ export function shippedSeeds(): Seed[] {
     // the practice lab with theory questions from the lectures at the start (every question kept)
     { ...seed('intro-to-computing@9', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
       [{ slug: 'revision-practice', flow: introComputingPracticeLab() }]), update: true },
+    // the module page shows its teaching team: the module leader and the other lecturer (from the lecture slides)
+    { ...seed('intro-to-computing@10', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']), []),
+      patch: { leader: 'gerard.mckee@bue.edu.eg', leaderName: 'Prof. Gerard McKee', lecturers: 'Assoc. Prof. Wessam El-Behaidy' } },
     // AI FOR CODING: a new module in the Neon design, with Lab 01 — prompt engineering and coding agents
     seed('ai-for-coding@1', 'ai-for-coding', aiForCodingModule(), nodesOfKits(['ai']),
       [{ slug: 'lab-01', flow: aiForCodingLab01() }]),

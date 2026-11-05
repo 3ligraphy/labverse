@@ -92,7 +92,7 @@ const knownYear = settings.years.includes(user.profile.year);
               <span><b>{m.card!.title}</b><small class="mono">{m.card!.code} · {m.how}</small></span>
               <span aria-hidden="true">→</span>
             </a>
-          )) : <p class="pr-fine">You aren't in any module yet. {student ? 'Pick Mobile Development as an optional module, or accept an invitation from a module leader.' : 'A module leader or the super admin can add you to a module team.'}</p>}
+          )) : <p class="pr-fine">You aren't in any module yet. {student ? 'Answer the questions under Your studies, and your modules appear on your home page. Every module is open in All modules too.' : 'Every module is open to staff from All modules and the admin workspace.'}</p>}
           {!student && <a class="btn btn-ghost btn-sm" href="/admin">Open the admin workspace</a>}
         </div>
       </div>

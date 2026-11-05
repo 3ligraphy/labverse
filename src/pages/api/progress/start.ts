@@ -2,7 +2,7 @@
 import type { APIRoute } from 'astro';
 import { validateIdentity } from '@/lib/progress/core';
 import { looseGroup } from '@/lib/identity';
-import { getProgressStore, getStructures, json, liveSession } from '@/lib/progress/server';
+import { LOCKED_MESSAGE, getProgressStore, getStructures, json, labLocked, liveSession } from '@/lib/progress/server';
 
 export const prerender = false;
 
@@ -17,6 +17,7 @@ export const POST: APIRoute = async ({ request }) => {
   const store = getProgressStore();
   if (!store) return json({ error: 'closed', message: 'Progress tracking is not set up.' }, 503);
   try {
+    if (await labLocked(lab)) return json({ error: 'locked', message: LOCKED_MESSAGE }, 403);
     // with sessions off this is always the lab's permanent session when the one asked for has ended
     const session = await liveSession(store, lab, sessionId);
     if (!session) {

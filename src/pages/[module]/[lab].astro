@@ -14,6 +14,8 @@ import LabBlock from '@/components/platform/LabBlock.astro';
 import { isAdmin } from '@/lib/attendance/server';
 import Locked from '@/components/platform/Locked.astro';
 import { moduleAccess } from '@/lib/accounts/enrolment';
+import { hubData } from '@/lib/accounts/hub';
+import { moduleTrail } from '@/lib/platform/trail';
 import { labKey, MODULE_SKINS } from '@/lib/platform/core';
 import '@/styles/skin-neon.css';
 import { claimedByFileLab } from '@/lib/lab/claimed';
@@ -24,7 +26,7 @@ import '@/styles/lab.css';
 
 export const prerender = false;
 const preview = isAdmin(Astro.cookies) && Astro.url.searchParams.has('preview');
-// invitation-only: depends on who is viewing, so never cached publicly
+// staff see more (drafts, a locked lab): depends on who is viewing, so never cached publicly
 Astro.response.headers.set('cache-control', 'private, no-store');
 
 const moduleSlug = Astro.params.module ?? '';
@@ -32,16 +34,16 @@ const moduleSlug = Astro.params.module ?? '';
 const claimed = claimedByFileLab(labKey(moduleSlug, Astro.params.lab ?? ''));
 if (claimed) return Astro.redirect(`/mobile-development/labs/${claimed}${Astro.url.search}`, 301);
 const data = await loadModule(moduleSlug, { drafts: preview }).catch(() => null);
-const gate = data ? await moduleAccess(Astro.cookies, data.module.slug) : { ok: false, signedIn: false };
+// a lab opens for everyone unless staff locked its module (staff open it either way)
+const gate = data ? await moduleAccess(Astro.cookies, data.module.slug) : { ok: false, signedIn: false, locked: false, staff: false };
+const trail = data ? moduleTrail(data.meta, (await hubData()).settings.faculties) : [];
+const moduleTitle = data ? data.meta.title || data.module.title : '';
 const idx = data ? data.items.findIndex((i) => i.lab.slug === Astro.params.lab) : -1;
 const item = idx >= 0 ? data!.items[idx] : null;
 if (!item) Astro.response.status = 404;
 
 const key = labKey(moduleSlug, Astro.params.lab ?? '');
 const c = item?.compiled;
-// a lab that is open any time works like the Mobile Development labs: anyone with the link enters a name and a
-// student ID and is tracked — no sign-in or enrolment (the rest of the module stays invitation-only)
-const openToAll = Boolean(c?.meta.open);
 const blocks = c ? await renderBlocks(c.blocks) : [];
 const pad = (n: number) => String(n).padStart(2, '0');
 const slugNumber = item?.lab.slug.match(/^lab-(\d+)$/)?.[1];
@@ -59,8 +61,8 @@ const next = data && idx >= 0 ? data.items[idx + 1] : null;
 const q = preview ? '?preview' : '';
 ---
 <Base title={item ? `${label} — ${c!.meta.title}` : 'Lab not found'} description={c?.meta.description} module={data ? { slug: moduleSlug, title: data.meta.title || data.module.title, color, skin } : undefined}>
-  {data && !gate.ok && !openToAll ? (
-    <Locked title={data.meta.title || data.module.title} code={data.meta.code} color={color} description={data.meta.description} signedIn={gate.signedIn} next={Astro.url.pathname} />
+  {data && !gate.ok ? (
+    <Locked title={data.meta.title || data.module.title} code={data.meta.code} color={color} description={data.meta.description} back={`/${moduleSlug}${q}`} />
   ) : !item || !c ? (
     <div class="container" style="padding-block: 160px 120px">
       <h1 class="sr-only">Lab not found</h1>
@@ -73,8 +75,8 @@ const q = preview ? '?preview' : '';
         <div class="grid-bg" aria-hidden="true"></div>
         <div class="container">
           <nav class="crumbs" aria-label="Breadcrumb">
-            <a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span>
-            <a href={`/${moduleSlug}${q}`}>{moduleSlug}</a><span aria-hidden="true">/</span><span aria-current="page">{item.lab.slug}</span>
+            {trail.map((t) => <><a href={t.href}>{t.label}</a><span aria-hidden="true">/</span></>)}
+            <a href={`/${moduleSlug}${q}`}>{moduleTitle}</a><span aria-hidden="true">/</span><span aria-current="page">{c.meta.title}</span>
           </nav>
           {preview && <p class="bl-prev mono">Admin preview{!item.lab.published ? ' · draft' : ''}</p>}
           <div class="bl-grid">

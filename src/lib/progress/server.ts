@@ -121,6 +121,13 @@ export async function liveSession(store: ProgressStore, lab: string, sessionId: 
   return ALWAYS_OPEN ? permanentSession(store, lab) : null;
 }
 
+/** Are the labs of this lab's module locked by staff? Then students can't start the lab or save work in it. */
+export async function labLocked(lab: string): Promise<boolean> {
+  const { settings } = await hubData();
+  return settings.locked.includes(labModuleOf(lab));
+}
+export const LOCKED_MESSAGE = 'This module’s labs are locked by your teaching team for now.';
+
 /** The sessions the TA pages read: the chosen one, or — with sessions off — every session of the lab, added up. */
 export async function sessionScope(store: ProgressStore, lab: string, sessionParam: string | null | undefined): Promise<string | string[] | undefined> {
   if (ALWAYS_OPEN && (!sessionParam || sessionParam === ALL_SESSIONS)) return (await store.listSessions(lab)).map((s) => s.id);
@@ -149,6 +156,7 @@ export async function studentWrite<V extends Identity>(
   if (!s) return json({ error: 'closed', message: 'Progress tracking is not set up yet.' }, 503);
   try {
     const lab = String((v.value as any).lab ?? '');
+    if (await labLocked(lab)) return json({ error: 'locked', message: LOCKED_MESSAGE }, 403);
     let session = await liveSession(s, lab, String((body as Record<string, unknown>)?.sessionId ?? ''));
     if (!session) {
       return json({ error: 'session-closed', message: 'This lab session has not been started, or it has already ended. You can still read the lab content.' }, 403);

@@ -5,6 +5,7 @@ import Footer from '@/components/Footer.astro';
 import SearchPalette from '@/components/SearchPalette.astro';
 import Announce from '@/components/Announce.astro';
 import ModuleAnnounce from '@/components/ModuleAnnounce.astro';
+import StaffBar from '@/components/platform/StaffBar.astro';
 import { platform } from '@/site.config';
 import '@/styles/global.css';
 
@@ -18,6 +19,18 @@ const builtInCourse = /^\/mobile-development(\/|$)/.test(Astro.url.pathname);
 const adminArea = /^\/admin(\/|$)/.test(Astro.url.pathname);
 // inside a module the navbar has a second row with the module's sections (pages leave room for it via --nav-h)
 const modbar = !adminArea && (Boolean(module) || builtInCourse);
+// staff tools on module and lab pages (lock the labs, edit, progress, statistics), with this page's links
+const page = Astro.url.pathname.replace(/\/$/, '');
+const builderLab = module && page.startsWith(`/${module.slug}/`) ? page.slice(module.slug.length + 2) : '';
+const courseLab = builtInCourse && /^\/mobile-development\/labs\/[^/]+$/.test(page);
+const staffBar = adminArea ? null
+  : module ? {
+    module: module.slug, back: `/${module.slug}`, stats: `/admin/stats?module=${module.slug}`,
+    edit: builderLab ? `/admin/builder/${module.slug}/${builderLab}` : `/admin/builder/${module.slug}`,
+    progress: builderLab ? `/admin/progress?lab=${module.slug}--${builderLab}` : `/admin/progress?module=${module.slug}`,
+  }
+  : builtInCourse ? { module: 'mobile-development', back: '/mobile-development/labs', edit: '/admin/cms', progress: '/admin/progress?module=mobile-development', stats: '/admin/stats?module=mobile-development', overlay: courseLab }
+  : null;
 ---
 <!doctype html>
 <html lang="en" class:list={['no-js', { 'no-site-nav': adminArea, 'has-modbar': modbar }]} data-skin={module?.skin || undefined}>
@@ -68,6 +81,7 @@ const modbar = !adminArea && (Boolean(module) || builtInCourse);
     {builtInCourse && <Announce />}
     {builtInCourse && <ModuleAnnounce module="mobile-development" color="#c8ff4d" />}
     {module && <ModuleAnnounce module={module.slug} color={module.color} />}
+    {staffBar && <StaffBar {...staffBar} />}
     <script>
       import '@/scripts/app';
     </script>

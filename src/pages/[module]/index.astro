@@ -3,8 +3,9 @@
 import Base from '@/layouts/Base.astro';
 import EmptyState from '@/components/EmptyState.astro';
 import { isAdmin } from '@/lib/attendance/server';
-import Locked from '@/components/platform/Locked.astro';
 import { moduleAccess } from '@/lib/accounts/enrolment';
+import { hubData } from '@/lib/accounts/hub';
+import { moduleTrail } from '@/lib/platform/trail';
 import SplitBar from '@/components/SplitBar.astro';
 import { loadModule } from '@/lib/platform/server';
 import { moduleAssessment } from '@/lib/platform/assessment';
@@ -17,10 +18,16 @@ import '@/styles/skin-neon.css';
 
 export const prerender = false;
 const preview = isAdmin(Astro.cookies) && Astro.url.searchParams.has('preview');
-// invitation-only: depends on who is viewing, so never cached publicly
+// staff see more (drafts, the lock): depends on who is viewing, so never cached publicly
 Astro.response.headers.set('cache-control', 'private, no-store');
 const data = await loadModule(Astro.params.module ?? '', { drafts: preview }).catch(() => null);
-const gate = data ? await moduleAccess(Astro.cookies, data.module.slug) : { ok: false, signedIn: false };
+// every module and its list of labs is open to everyone; a lock (set by staff) only stops students opening labs
+const gate = data ? await moduleAccess(Astro.cookies, data.module.slug) : { ok: false, signedIn: false, locked: false, staff: false };
+const { settings } = await hubData();
+const trail = data ? moduleTrail(data.meta, settings.faculties) : [];
+const facultyName = settings.faculties.find((f) => f.slug === data?.meta.faculty)?.name ?? (data?.meta.faculty === 'all' ? 'Every faculty' : '');
+const yearsText = (data?.meta.years ?? '').split(',').map((y) => y.trim()).filter(Boolean).join(', ') || 'Every year';
+const lecturers = (data?.meta.lecturers ?? '').split(',').map((n) => n.trim()).filter(Boolean);
 if (!data) Astro.response.status = 404;
 const color = data?.meta.color || '#7cb1ff';
 const skin = MODULE_SKINS[data?.meta.skin ?? ''] || '';
@@ -39,9 +46,7 @@ const psychology = data?.module.slug === PSYCHOLOGY_MODULE;
 const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?? '', section, preview);
 ---
 <Base title={data ? data.meta.title || data.module.title : 'Module not found'} description={data?.meta.description} module={data ? { slug: data.module.slug, title: data.meta.title || data.module.title, color, skin } : undefined}>
-  {data && !gate.ok ? (
-    <Locked title={data.meta.title || data.module.title} code={data.meta.code} color={color} description={data.meta.description} signedIn={gate.signedIn} next={Astro.url.pathname} />
-  ) : !data ? (
+  {!data ? (
     <div class="container" style="padding-block: 160px 120px">
       <h1 class="sr-only">Module not found</h1>
       <EmptyState title="This module isn't available." body="It may not be published yet." path="modules/" />
@@ -59,7 +64,7 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
         <header class="mdh" style={`--c:${color}`}>
           <div class="mdh-bg" aria-hidden="true"></div>
           <div class="container">
-            <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><span aria-current="page">{data.module.slug}</span></nav>
+            <nav class="crumbs" aria-label="Breadcrumb">{trail.map((t) => <><a href={t.href}>{t.label}</a><span aria-hidden="true">/</span></>)}<span aria-current="page">{data.meta.title || data.module.title}</span></nav>
             {preview && <p class="mdh-prev mono">Admin preview · drafts included</p>}
             <div class="mdh-grid"><div class="mdh-copy">
             <p class="mdh-k mono"><span class="mdh-dot" aria-hidden="true"></span>{[data.meta.code, data.meta.term].filter(Boolean).join(' · ') || 'Your learning space'}</p>
@@ -88,6 +93,22 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
       )}
 
       <div class="container module-workspace" id="workspace" style={`--module-color:${color}`}>
+        {gate.locked && !gate.staff && <p class="mod-lock" role="status">🔒 Your teaching team has locked this module's labs for now. You can see the labs, but you can't open them yet.</p>}
+        {activeTab === 'overview' && (
+          <section class="mod-facts" aria-label="About this module">
+            <h2>About this module</h2>
+            <dl>
+              {data.meta.leader && <div><dt>Module leader</dt><dd>{data.meta.leaderName && <b>{data.meta.leaderName}</b>}<a href={`mailto:${data.meta.leader}`}>{data.meta.leader}</a></dd></div>}
+              {lecturers.length > 0 && <div><dt>Also teaching</dt><dd>{lecturers.join(', ')}</dd></div>}
+              {facultyName && <div><dt>Faculty</dt><dd>{facultyName}</dd></div>}
+              <div><dt>Year</dt><dd>{yearsText}</dd></div>
+              {data.meta.semester && <div><dt>Semester</dt><dd>{data.meta.semester === 'Both' ? 'Both semesters' : data.meta.semester}</dd></div>}
+              {data.meta.category && <div><dt>Category</dt><dd>{data.meta.category}</dd></div>}
+              <div><dt>Labs</dt><dd>{data.items.length}</dd></div>
+              <div><dt>Labs are</dt><dd>{gate.locked ? '🔒 Locked by the teaching team' : 'Open any time, day and night'}</dd></div>
+            </dl>
+          </section>
+        )}
         {psychology && activeTab !== 'labs' && activeTab !== 'assessment' && <PsychologyWorkspace section={activeTab} />}
         {!psychology && activeTab === 'overview' && skin === 'neon' && <NeonOverview labsHref={`${sectionHref('labs')}#workspace`} />}
         {!psychology && activeTab === 'overview' && skin !== 'neon' && <div class="module-intro"><h2>Your module workspace</h2><p>Follow the practical labs in order and use the task checkboxes to keep track of your learning.</p><a class="btn btn-primary" href={`${sectionHref('labs')}#workspace`}>Explore the labs →</a></div>}
@@ -200,6 +221,13 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
   .lab-m { font-size: 12px; color: var(--text-3); }
   .lab-go { font-size: 20px; color: var(--text-3); }
   @media (max-width: 480px) { .lab { gap: 12px; padding: 18px 14px; grid-template-columns: auto 1fr; } }
+  .mod-lock { margin: 18px 0 0; padding: 14px 18px; border-radius: 14px; border: 1px solid color-mix(in oklab, var(--warn) 45%, var(--line-2)); background: color-mix(in oklab, var(--warn) 12%, var(--surface)); color: var(--text); }
+  .mod-facts { margin-top: 24px; padding: clamp(18px, 3vw, 28px); border-radius: 20px; border: 1px solid var(--line-2); background: var(--surface); display: grid; gap: 14px; }
+  .mod-facts h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
+  .mod-facts dl { display: grid; gap: 14px 24px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+  .mod-facts dt { font: 600 11.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+  .mod-facts dd { margin-top: 4px; display: grid; gap: 2px; color: var(--text); }
+  .mod-facts dd a { color: var(--accent-text); overflow-wrap: anywhere; }
 </style>
 <script>
   import '@/scripts/session-card-progress';

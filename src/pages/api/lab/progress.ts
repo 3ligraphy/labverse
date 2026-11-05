@@ -6,7 +6,7 @@ import type { APIRoute } from 'astro';
 import { validateLabEvent } from '@/lib/lab/core';
 import { getLabBackend } from '@/lib/lab/server';
 import { ALWAYS_OPEN } from '@/lib/progress/core';
-import { getProgressStore, getStructures, liveSession } from '@/lib/progress/server';
+import { LOCKED_MESSAGE, getProgressStore, getStructures, labLocked, liveSession } from '@/lib/progress/server';
 import { noStore } from '@/lib/attendance/server';
 
 export const prerender = false;
@@ -26,6 +26,7 @@ export const POST: APIRoute = async ({ request }) => {
   if (!v.ok) return json({ ok: false, error: v.error }, 400);
 
   const progress = getProgressStore();
+  if (await labLocked(v.event.lab).catch(() => false)) return json({ ok: false, error: 'locked', message: LOCKED_MESSAGE }, 403);
   let session;
   try {
     // with sessions off: the lab's permanent session when the student's own has ended (their work is never refused)
