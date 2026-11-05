@@ -55,7 +55,7 @@ const knownYear = settings.years.includes(user.profile.year);
           </form>
 
           {student && (
-            <form class="glass pr-card" data-pr-form="study" data-study={study}>
+            <form class="glass pr-card" id="studies" data-pr-form="study" data-study={study}>
               <h2>Your studies</h2>
               <label class="pr-fac" data-faculty-field hidden={oneFaculty}><span>Faculty</span><select class="input" name="faculty" required={!oneFaculty} disabled={oneFaculty}>{!settings.faculties.some((f) => f.slug === myFaculty) && <option value="" selected>Choose your faculty…</option>}{settings.faculties.map((f) => <option value={f.slug} selected={f.slug === myFaculty}>{f.name}</option>)}</select></label>
               <div class="pr-row pr-study">
@@ -67,7 +67,7 @@ const knownYear = settings.years.includes(user.profile.year);
                 {optionalCards.length ? optionalCards.map((c) => (
                   <label class="pr-opt"><input type="checkbox" name="modules" value={c.slug} checked={user.profile.modules.includes(c.slug)} /> <span>{c.title} <small>{c.code}</small></span></label>
                 )) : <p class="pr-fine">No optional modules are open right now.</p>}
-                <p class="pr-fine">Other modules are added when you accept an invitation from their module leader.</p>
+                <p class="pr-fine">These answers decide which modules your home page shows.</p>
               </fieldset>
               <p class="pr-msg" data-msg role="status"></p>
               <button class="btn btn-primary" type="submit">Save</button>

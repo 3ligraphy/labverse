@@ -11,7 +11,7 @@ import { getPlayground } from '@/lib/playgrounds';
 import { exerciseMeta } from '@/lab/exercises/registry';
 import { claimedByFileLab } from '@/lib/lab/claimed';
 import { noStore } from '@/lib/attendance/server';
-import { ALL_SESSIONS, ALWAYS_OPEN, OPEN_LAB, exerciseStats, labStructure, liveClass, moduleStats, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
+import { ALL_SESSIONS, ALWAYS_OPEN, LAB_DONE, OPEN_LAB, exerciseStats, labStructure, liveClass, moduleStats, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
 import { NeonStore, type ProgressStore, type Session } from './store';
 import { looseGroup } from '@/lib/identity';
 import { publishedLabSources } from '@/lib/platform/server';
@@ -215,6 +215,70 @@ async function labChoices(labs: LabStructure[]) {
       href: claimedByFileLab(l.lab) ? `/mobile-development/labs/${claimedByFileLab(l.lab)}` : key ? `/${key.module}/${key.lab}` : `/mobile-development/labs/${l.lab}`,
     };
   });
+}
+
+/* ------------------------------------------------------------ home page */
+
+const BUILT_IN_SLUG = 'mobile-development';
+/** the module a lab belongs to: builder labs carry it in their id ("<module>--<lab>"); file labs are the course's */
+export const labModuleOf = (lab: string) => splitLabKey(lab)?.module ?? BUILT_IN_SLUG;
+/** where a lab opens */
+export const labHref = (lab: string) => {
+  const k = splitLabKey(lab);
+  return k && k.module !== BUILT_IN_SLUG ? `/${k.module}/${k.lab}` : `/${BUILT_IN_SLUG}/labs/${k?.lab ?? lab}`;
+};
+
+export type ModuleProgress = { percent: number; done: number; labs: number; started: boolean; next: { title: string; href: string } | null };
+
+/**
+ * A student's progress in each module, from every lab and session: the average of its labs' scores (the TA's
+ * score), how many labs are done (LAB_DONE, as on the statistics page), and the first lab not done yet.
+ */
+export async function studentModules(studentKey: string): Promise<Record<string, ModuleProgress>> {
+  const s = getProgressStore();
+  if (!s) return {};
+  const [labs, mine] = await Promise.all([getStructures(), s.studentProgress(studentKey)]);
+  const out: Record<string, ModuleProgress & { sum: number }> = {};
+  for (const l of labs) {
+    const slug = labModuleOf(l.lab);
+    const best = mine.best.filter((b) => b.lab === l.lab).map((b) => ({ ...b, attempts: 1, firstAt: '', solvedAt: null }));
+    const percent = scoreStudent(l, best, mine.tasks.find((t) => t.lab === l.lab)?.done ?? 0, mine.subs.includes(l.lab)).percent;
+    const m = (out[slug] ??= { percent: 0, done: 0, labs: 0, started: false, next: null, sum: 0 });
+    m.labs++;
+    m.sum += percent;
+    m.started ||= best.length > 0 || percent > 0;
+    if (percent >= LAB_DONE) m.done++;
+    else m.next ??= { title: l.title, href: labHref(l.lab) };
+  }
+  return Object.fromEntries(Object.entries(out).map(([slug, { sum, ...m }]) => [slug, { ...m, percent: m.labs ? Math.round(sum / m.labs) : 0 }]));
+}
+
+export type ClassProgress = { students: number; avgPercent: number; labs: number };
+let overview: { at: number; data: Promise<Record<string, ClassProgress>> } | null = null;
+
+/** Each module's class: students who started any of its labs, and their average score (weighted by lab). Cached a minute. */
+export function classOverview(): Promise<Record<string, ClassProgress>> {
+  if (overview && Date.now() - overview.at < 60_000) return overview.data;
+  const data = (async () => {
+    const s = getProgressStore();
+    if (!s) return {};
+    const labs = await getStructures();
+    const raw = await s.statsRaw(labs.map((l) => l.lab));
+    const stats = moduleStats(labs, raw);
+    const out: Record<string, { students: Set<string>; weighted: number; n: number; labs: number }> = {};
+    for (const l of labs) (out[labModuleOf(l.lab)] ??= { students: new Set(), weighted: 0, n: 0, labs: 0 }).labs++;
+    for (const m of raw.members) out[labModuleOf(m.lab)]?.students.add(m.student_key);
+    for (const l of stats.labs) {
+      const m = out[labModuleOf(l.lab)];
+      if (!m || !l.students) continue;
+      m.weighted += l.avgPercent * l.students;
+      m.n += l.students;
+    }
+    return Object.fromEntries(Object.entries(out).map(([slug, m]) => [slug, { students: m.students.size, avgPercent: m.n ? Math.round(m.weighted / m.n) : 0, labs: m.labs }]));
+  })();
+  overview = { at: Date.now(), data };
+  data.catch(() => { overview = null; });
+  return data;
 }
 
 /** The statistics page for one module: every lab the person may see, across all sessions. */

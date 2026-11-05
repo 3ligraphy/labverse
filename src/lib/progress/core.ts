@@ -134,6 +134,9 @@ export function validateViews(input: unknown, labs: LabStructure[]): Valid<Views
 
 export { ALL_SESSIONS, ALWAYS_OPEN, OPEN_LAB } from './mode.ts';
 
+/** A lab counts as done (finished) from this score: the statistics page and the students' home page agree. */
+export const LAB_DONE = 80;
+
 /** Whether a lab's check-in is open right now. */
 export function sessionState(s: { opens_at: string; closes_at: string | null } | null, now: number): { open: boolean; closesAt: string | null } {
   if (!s) return { open: false, closesAt: null };
@@ -325,7 +328,7 @@ export function moduleStats(labs: LabStructure[], raw: StatsRaw) {
     const sessions = raw.sessions.filter((s) => s.lab === l.lab);
     return {
       lab: l.lab, title: l.title, students: students.length, sessions: sessions.length,
-      avgPercent: avg(scores), finished: scores.filter((p) => p >= 80).length, spread, exercises,
+      avgPercent: avg(scores), finished: scores.filter((p) => p >= LAB_DONE).length, spread, exercises,
       people: people.sort((a, b) => b.percent - a.percent || a.name.localeCompare(b.name)),
     };
   });

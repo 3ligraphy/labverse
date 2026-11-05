@@ -94,3 +94,22 @@ test('statistics count only the questions the lab has now', async () => {
   const st = moduleStats([lab], await store.statsRaw(['lab-03']));
   assert.deepEqual(st.labs[0].people.map((p) => [p.name, p.solved, p.tries]), [['Mona', 1, 1]]);
 });
+
+test('a student\'s own progress adds up every lab and session (their home page)', async () => {
+  const store = new MemoryStore(() => NOW);
+  const a = await store.permanentSession('lab-03');
+  const b = await store.openSession('lab-03', 90, 'Nour', 'Sun 10:00');
+  await store.touchStudent({ studentKey: '240001', studentId: '240001', name: 'Mona', deviceKey: 'd' });
+  const check = (sessionId: string, exercise: string, passed: number) => store.addAttempt({ studentKey: '240001', lab: 'lab-03', exercise, passed, total: 1, code: '', sessionId });
+  await check(b.id, 'e1', 1);
+  await check(a.id, 'e1', 0); // a later wrong try keeps the solve
+  await check(a.id, 'e2', 0);
+  await store.setTask({ studentKey: '240001', lab: 'lab-03', task: '1', done: true, sessionId: a.id });
+  await store.setTask({ studentKey: '240001', lab: 'lab-03', task: '1', done: true, sessionId: b.id });
+  const p = await store.studentProgress('240001');
+  assert.deepEqual(p.best.map((x) => [x.exercise, x.passed]).sort(), [['e1', 1], ['e2', 0]]);
+  assert.deepEqual(p.tasks, [{ lab: 'lab-03', done: 1 }]);
+  const best = p.best.map((x) => ({ ...x, attempts: 1, firstAt: '', solvedAt: null }));
+  assert.equal(scoreStudent(lab, best, 1, false).solved, 1);
+  assert.deepEqual((await store.studentProgress('someone-else')).best, []);
+});
