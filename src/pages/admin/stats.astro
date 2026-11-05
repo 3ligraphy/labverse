@@ -10,6 +10,8 @@ import { access } from '@/lib/accounts/access';
 import { canOnLab } from '@/lib/accounts/labscope';
 import { buildStats, progressSetup } from '@/lib/progress/server';
 import { ADMIN_MODULE_COOKIE } from '@/scripts/admin-module';
+import { hubData } from '@/lib/accounts/hub';
+import ModulePicker from '@/components/admin/ModulePicker.astro';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'no-store, max-age=0');
@@ -17,6 +19,8 @@ if (!isAdmin(Astro.cookies)) return Astro.redirect('/admin', 303);
 const a = await access(Astro.cookies);
 const module = Astro.url.searchParams.get('module') ?? Astro.cookies.get(ADMIN_MODULE_COOKIE)?.value ?? 'mobile-development';
 const allowed = a.can('module.progress', module);
+// the module is chosen on the page (the admin menu has no module switcher)
+const pickable = (await hubData()).cards.filter((c) => a.can('module.progress', c.slug)).map((c) => ({ slug: c.slug, title: c.title }));
 const stats = allowed && progressSetup().database
   ? await buildStats(module, (lab) => canOnLab(a, 'module.progress', lab)).catch((e) => { console.error('[stats] failed', e); return null; })
   : null;
@@ -27,6 +31,7 @@ const stats = allowed && progressSetup().database
       <header class="st-head">
         <h1>Statistics</h1>
         <p class="muted">Every lab session of this module so far. Hover or tap a bar for its numbers; each chart can also show its table.</p>
+        <ModulePicker modules={pickable} current={module} href="/admin/stats?module=__M__" />
       </header>
 
       {!allowed ? (

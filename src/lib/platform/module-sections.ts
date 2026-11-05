@@ -2,8 +2,8 @@
 export const PSYCHOLOGY_MODULE = 'technology-for-psychology';
 export function moduleSections(slug: string) {
   return slug === PSYCHOLOGY_MODULE
-    ? ['Overview', 'Labs', 'Project', 'Deployment', 'Tools', 'Setup', 'Resources', 'Troubleshooting', 'Assessment']
-    : ['Overview', 'Labs', 'Assessment'];
+    ? ['Overview', 'Labs', 'Project', 'Deployment', 'Tools', 'Setup', 'Resources', 'Troubleshooting']
+    : ['Overview', 'Labs'];
 }
 export function moduleSectionHref(slug: string, section: string, preview = false) {
   const query = new URLSearchParams();

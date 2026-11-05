@@ -7,7 +7,6 @@
 import Base from '@/layouts/Base.astro';
 import { isAdmin, setupStatus } from '@/lib/attendance/server';
 import { progressSetup } from '@/lib/progress/server';
-import { ALWAYS_OPEN } from '@/lib/progress/mode';
 import { tokenSecret } from '@/lib/accounts/server';
 
 export const prerender = false;
@@ -69,47 +68,13 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     ) : (
       <>
       <div class="adm-tabs" role="tablist" aria-label="Admin sections">
-        <button role="tab" type="button" aria-selected="true" data-tab="att">Attendance</button>
-        <button role="tab" type="button" aria-selected="false" data-tab="lab">Lab progress</button>
-        <button role="tab" type="button" aria-selected="false" data-tab="sessions">Sessions</button>
+        <button role="tab" type="button" aria-selected="true" data-tab="att" hidden>Attendance</button>
         <label class="tab-filter" hidden><span>Faculty</span><select class="input" data-admin-faculty aria-label="Select faculty"></select></label>
         <label class="tab-filter" hidden><span>Module</span><select class="input" data-admin-module aria-label="Select module"></select></label>
         <label class="tab-filter"><span>Lab</span><select class="input" data-admin-lab aria-label="Select lab"></select></label>
         <label class="tab-filter"><span>Attendance session</span><select class="input" data-admin-session aria-label="Select attendance session"></select></label>
       </div>
-      <div data-panel="sessions" hidden>
-        <section class="session-admin">
-          <header class="session-head">
-            <div>
-              <p class="adm-k mono">Lab sessions</p>
-              {ALWAYS_OPEN ? (
-                <>
-                  <h1 class="adm-h">Sessions are off</h1>
-                  <p class="muted">Every lab is open to all students at any time, day and night. There is nothing to create or start: each lab saves everyone’s work in one session that never closes, and Lab progress adds up all of it.</p>
-                </>
-              ) : (
-                <>
-                  <h1 class="adm-h">Manage teaching sessions</h1>
-                  <p class="muted">Create a time slot first, then start it when students may begin the lab.</p>
-                </>
-              )}
-            </div>
-            {!ALWAYS_OPEN && <label class="practice-toggle">
-              <input type="checkbox" role="switch" data-practice-toggle />
-              <span class="practice-track" aria-hidden="true"><i></i></span>
-              <span><b>Open practice</b><small data-practice-note>Students can edit and check this lab without a session. Nothing is recorded.</small></span>
-            </label>}
-          </header>
-          {!ALWAYS_OPEN && <form class="session-create" data-session-create>
-            <label><span>TA name</span><input class="input" name="taName" required maxlength="60" placeholder="Teaching assistant name" /></label>
-            <label><span>Time slot</span><input class="input" name="timeSlot" required maxlength="80" placeholder="e.g. Monday 10:00–12:00" /></label>
-            <label><span>Duration</span><select class="input" name="minutes"><option value="60">60 min</option><option value="90" selected>90 min</option><option value="120">120 min</option><option value="180">180 min</option><option value="">No limit</option></select></label>
-            <button class="btn btn-primary" type="submit">Create session</button>
-          </form>}
-          <p class="session-message small" data-session-message role="status"></p>
-          <div class="session-list" data-session-list data-always-open={ALWAYS_OPEN ? '' : undefined}></div>
-        </section>
-      </div>
+      <!-- not shown: Lab progress has its own page; the script reads this lab's data through it for the attendance -->
       <div data-panel="lab" hidden>
         <div class="labp" data-labp data-lab="">
           <header class="board-head">
@@ -147,12 +112,11 @@ import AdminShell from '@/components/admin/AdminShell.astro';
           </div>
             <div class="board-actions">
               <span class="live mono" data-att-live>loading…</span>
-              <button class="btn btn-primary btn-sm" type="button" data-open-sessions>Manage selected session</button>
               <a class="btn btn-ghost btn-sm" data-session-insights href="/admin/progress">Session insights →</a>
           </div>
         </header>
-        <p class="muted small">This attendance list belongs only to the teaching session selected above. Students, check-ins and progress from parallel sessions remain separate.</p>
-        <p class="muted small">Use Mark present to manually record attendance for a student in this session, even after it has ended.</p>
+        <p class="muted small">Everyone who started this lab, and who checked in. Labs are always open, so this list adds up every session of the lab.</p>
+        <p class="muted small">Use Mark present to record attendance for a student yourself, for example when they were in the lab but did not check in.</p>
         <form class="session-create" data-add-attendance>
           <label><span>Student name</span><input class="input" name="name" required minlength="2" maxlength="60" autocomplete="off" placeholder="Full name" /></label>
           <label><span>Student ID</span><input class="input" name="studentId" required minlength="3" maxlength="20" pattern="[0-9]{5,9}" inputmode="numeric" autocomplete="off" placeholder="Student ID (digits)" /></label>
@@ -636,7 +600,6 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       history.replaceState(null, '', name === 'att' ? location.pathname + location.search : `#${name}`);
     };
     tabs.forEach((t) => t.addEventListener('click', () => show(t.dataset.tab!)));
-    document.querySelectorAll<HTMLButtonElement>('[data-open-sessions]').forEach((button) => button.addEventListener('click', () => show('sessions')));
     if (document.querySelector('[data-admin-lab]')) wireLabPicker(picker(), () => labChoices);
     document.querySelector<HTMLSelectElement>('[data-admin-lab]')?.addEventListener('change', (event) => {
       if (!root) return;
@@ -668,7 +631,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         void sessionAction('create', { taName: form.get('taName'), timeSlot: form.get('timeSlot'), minutes: rawMinutes ? Number(rawMinutes) : null }).then((saved) => saved && create.reset());
       });
     }
-    show(location.hash === '#lab' ? 'lab' : location.hash === '#sessions' ? 'sessions' : 'att');
+    show('att');
     if (root) {
       void load(root);
       clearInterval(timer);

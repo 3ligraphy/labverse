@@ -1,0 +1,35 @@
+---
+/**
+ * The module an admin page is about, chosen on the page itself (the admin menu has no module switcher). Changing it
+ * opens `href` with the module's slug in place of __M__.
+ */
+interface Props { modules: { slug: string; title: string }[]; current: string; href: string; label?: string }
+const { modules, current, href, label = 'Module' } = Astro.props;
+---
+<label class="mpick" data-mpick data-href={href}>
+  <span>{label}</span>
+  <select class="input">
+    {modules.map((m) => <option value={m.slug} selected={m.slug === current}>{m.title}</option>)}
+  </select>
+</label>
+
+<style>
+  .mpick { display: inline-grid; gap: 4px; min-width: min(340px, 100%); font-size: 12px; font-weight: 600; color: var(--text-3); }
+  .mpick select { height: 40px; padding: 0 12px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--text); }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+  import { rememberAdminModule } from '@/scripts/admin-module';
+  onPageLoad(() => {
+    document.querySelectorAll<HTMLElement>('[data-mpick]').forEach((box) => {
+      if (box.dataset.wired) return;
+      box.dataset.wired = '1';
+      box.querySelector('select')!.addEventListener('change', (e) => {
+        const slug = (e.target as HTMLSelectElement).value;
+        rememberAdminModule(slug);
+        location.href = box.dataset.href!.replaceAll('__M__', encodeURIComponent(slug));
+      });
+    });
+  });
+</script>

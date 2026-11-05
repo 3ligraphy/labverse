@@ -46,10 +46,9 @@ if (staff) {
     modules: mine.map((c) => {
       const mr = a.who.modules[c.slug];
       const tools: { label: string; href: string; primary?: boolean }[] = [];
-      if (a.can('module.sessions', c.slug) || a.can('module.progress', c.slug)) tools.push({ label: 'Sessions', href: `/admin/sessions?module=${encodeURIComponent(c.slug)}`, primary: true });
-      if (a.can('module.progress', c.slug)) tools.push({ label: 'Progress', href: `/admin/progress?module=${encodeURIComponent(c.slug)}` });
-      if (a.can('module.invite', c.slug)) tools.push({ label: 'Team & invites', href: `/admin/team/${c.slug}` });
-      tools.push({ label: 'Assessment', href: `/admin/assessment/${c.slug}` });
+      if (a.can('module.progress', c.slug)) tools.push({ label: 'Progress', href: `/admin/progress?module=${encodeURIComponent(c.slug)}`, primary: true });
+      if (a.can('module.progress', c.slug)) tools.push({ label: 'Statistics', href: `/admin/stats?module=${encodeURIComponent(c.slug)}` });
+      if (a.can('module.sessions', c.slug) || a.can('module.progress', c.slug)) tools.push({ label: 'Attendance', href: `/admin/sessions?module=${encodeURIComponent(c.slug)}` });
       if (a.can('module.build', c.slug) || a.can('module.submissions', c.slug)) tools.push({ label: 'Banners', href: `/admin/banner/${c.slug}` });
       if (a.can('module.build', c.slug)) tools.push({ label: 'Canvas', href: `/admin/builder/${c.slug}` });
       if (c.builtIn && a.can('module.submissions', c.slug)) tools.push({ label: 'Submissions', href: '/admin/project' });
@@ -60,7 +59,7 @@ if (staff) {
     platformTools: [
       a.can('modules.create') && { label: 'Modules & lab builder', href: '/admin/builder', desc: 'Create modules and visually build their labs and exercises', icon: '⬡' },
       a.can('platform.settings') && { label: 'Catalogue', href: '/admin/catalogue', desc: 'Years, specializations, categories, active semester', icon: '▦' },
-      (a.can('accounts.manage') || a.can('accounts.staff')) && { label: 'Accounts & roles', href: '/admin/accounts', desc: 'Staff and student accounts, invitations, permissions', icon: '⚿' },
+      (a.can('accounts.manage') || a.can('accounts.staff')) && { label: 'Accounts & roles', href: '/admin/accounts', desc: 'Staff and student accounts', icon: '⚿' },
       a.can('cms.edit') && { label: 'Course content', href: '/admin/cms', desc: 'Edit the built-in course’s lists and info', icon: '✎' },
     ].filter(Boolean) as { label: string; href: string; desc: string; icon: string }[],
   };

@@ -6,9 +6,7 @@ import { isAdmin } from '@/lib/attendance/server';
 import { moduleAccess } from '@/lib/accounts/enrolment';
 import { hubData } from '@/lib/accounts/hub';
 import { moduleTrail } from '@/lib/platform/trail';
-import SplitBar from '@/components/SplitBar.astro';
 import { loadModule } from '@/lib/platform/server';
-import { moduleAssessment } from '@/lib/platform/assessment';
 import NeonHero from '@/components/platform/NeonHero.astro';
 import NeonOverview from '@/components/platform/NeonOverview.astro';
 import PsychologyWorkspace from '@/components/platform/PsychologyWorkspace.astro';
@@ -31,8 +29,6 @@ const lecturers = (data?.meta.lecturers ?? '').split(',').map((n) => n.trim()).f
 if (!data) Astro.response.status = 404;
 const color = data?.meta.color || '#7cb1ff';
 const skin = MODULE_SKINS[data?.meta.skin ?? ''] || '';
-// set by the module leader in /admin/assessment/<module>
-const assessment = data ? (await moduleAssessment(data.module.slug)).items : [];
 const pad = (n: number) => String(n).padStart(2, '0');
 let lastWeek = '';
 const firstLab = data?.items[0];
@@ -109,16 +105,10 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
             </dl>
           </section>
         )}
-        {psychology && activeTab !== 'labs' && activeTab !== 'assessment' && <PsychologyWorkspace section={activeTab} />}
+        {psychology && activeTab !== 'labs' && <PsychologyWorkspace section={activeTab} />}
         {!psychology && activeTab === 'overview' && skin === 'neon' && <NeonOverview labsHref={`${sectionHref('labs')}#workspace`} />}
         {!psychology && activeTab === 'overview' && skin !== 'neon' && <div class="module-intro"><h2>Your module workspace</h2><p>Follow the practical labs in order and use the task checkboxes to keep track of your learning.</p><a class="btn btn-primary" href={`${sectionHref('labs')}#workspace`}>Explore the labs →</a></div>}
       </div>
-      {activeTab === 'assessment' && (
-        <section class="container mda" id="assessment">
-          <h2>Assessment</h2>
-          {assessment.length ? <SplitBar items={assessment.map((a) => ({ label: a.label, value: a.weight, sub: a.detail }))} size="md" /> : <p class="muted">Your module leader has not published the assessment breakdown yet. Keep working through the labs; grading and submission details will appear here when available.</p>}
-        </section>
-      )}
 
       {activeTab === 'labs' &&
       <section class="container mdl" id="labs">

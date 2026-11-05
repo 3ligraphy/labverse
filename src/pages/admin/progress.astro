@@ -31,7 +31,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       <>
         <header class="pa-head" data-reveal>
           <div>
-            <p class="pa-k mono">Progress · <a href="/admin/sessions">Sessions</a> · <a href="/admin/cms">CMS</a></p>
+            <p class="pa-k mono">Admin workspace · live</p>
             <h1 class="pa-h">Lab progress</h1>
           </div>
           <div class="pa-tools">
@@ -52,7 +52,6 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             <div class="pa-ci" data-pa-ci></div>
             <span class="pa-live mono" data-pa-live>connecting…</span>
             <a class="btn btn-ghost btn-sm" data-pa-csv href="#" download>Export CSV</a>
-            <form method="post" action="/api/admin/logout"><button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
           </div>
         </header>
 
@@ -128,11 +127,11 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .pa-k { font-size: 12px; color: var(--accent-text); }
   .pa-k a { color: var(--text-3); text-decoration: underline; text-underline-offset: 3px; }
   .pa-k a:hover { color: var(--text); }
-  .pa-h { font-size: var(--fs-2xl); letter-spacing: -0.04em; }
+  .pa-h { font-size: var(--fs-xl); letter-spacing: -0.03em; }
   .pa-t { font-size: var(--fs-lg); letter-spacing: -0.02em; }
 
   .pa-head { display: grid; gap: 18px; }
-  .pa-tools { display: grid; grid-template-columns: minmax(260px, 380px) minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px; }
+  .pa-tools { display: grid; grid-template-columns: minmax(260px, 380px) minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
   .pa-select { grid-column: 1; min-width: 0; }
   .pa-pick { display: flex; flex-wrap: wrap; gap: 8px; }
   .pa-pick label[hidden] { display: none; }
@@ -140,7 +139,6 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .pa-ci { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; border-radius: var(--r-lg); border: 1px solid var(--line-2); background: var(--surface); }
   .pa-tools > .pa-live { grid-column: 3; grid-row: 1; }
   .pa-tools > [data-pa-csv] { grid-column: 4; grid-row: 1; }
-  .pa-tools > form { grid-column: 5; grid-row: 1; }
   .pa-ci :global(.ci-state) { font-size: 12px; color: var(--text-3); display: inline-flex; align-items: center; gap: 6px; }
   .pa-ci :global(.ci-state)::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
   .pa-ci :global(.ci-state.on) { color: var(--ok); font-weight: 600; }
@@ -157,7 +155,6 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     .pa-select select { max-width: none; }
     .pa-tools > .pa-live { grid-column: 1; grid-row: 2; }
     .pa-tools > [data-pa-csv] { grid-column: 2; grid-row: 2; }
-    .pa-tools > form { grid-column: 3; grid-row: 2; }
     .pa-ci { grid-row: 3; }
     .pa-ci :global(.ci-len) { flex-basis: 100%; }
     .pa-ci :global(.ci-action) { width: 100%; }
@@ -175,7 +172,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .pa-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-block: 28px; }
   @media (min-width: 700px) { .pa-stats { grid-template-columns: repeat(3, 1fr); } }
   @media (min-width: 1100px) { .pa-stats { grid-template-columns: repeat(5, 1fr); } }
-  .pa-stat { display: grid; gap: 6px; padding: 18px; border-radius: var(--r-lg); border: 1px solid var(--line); background: linear-gradient(160deg, var(--accent-soft), var(--surface) 65%); }
+  .pa-stat { display: grid; gap: 6px; padding: 18px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
   .pa-stat span { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
   .pa-stat b { font-family: var(--font-display); font-size: 2.4rem; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
   .pa-stat b i { font-style: normal; }
