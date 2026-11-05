@@ -32,7 +32,7 @@
   --r-xs: 4px; --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-xl: 24px; --r-full: 999px;
   --w-max: 1240px;
   --w-read: 720px;
-  --nav-h: 64px;
+  --nav-h: 64px; /* the navbar's height: pages leave this much room at the top (see the overrides below :root) */
 
   /* motion */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -88,6 +88,14 @@
   --hero-warn: #ffb547;
   --hero-danger: #ff8a7a;
 }
+
+/* inside a module the navbar has a second row (its sections); admin pages have no site navbar */
+:root.has-modbar { --nav-h: 108px; }
+:root.no-site-nav { --nav-h: 0px; }
+/* every light/dark switch (navbar, admin menu, builder): the sun in light mode, the moon in dark */
+[data-theme-toggle] .i-sun { display: none; }
+:root[data-theme='light'] [data-theme-toggle] .i-sun { display: block; }
+:root[data-theme='light'] [data-theme-toggle] .i-moon { display: none; }
 
 :root[data-theme='light'] {
   color-scheme: light;

@@ -70,6 +70,7 @@ if (staff) {
   {!view ? (
     <section class="ah-gate">
       <div class="ah-sky" aria-hidden="true"></div>
+      <a class="ah-back" href="/">← Back to the site</a>
       <div class="glass ah-login">
         <p class="ah-k mono">Admin workspace</p>
         <h1>Sign in to manage your modules</h1>
@@ -136,6 +137,7 @@ if (staff) {
 </Base>
 
 <style>
+  .ah-back { position: absolute; top: 18px; left: 18px; z-index: 1; display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--hero-text) 25%, transparent); color: var(--hero-text); font-size: 13px; font-weight: 600; }
   .ah-gate { position: relative; min-height: 100dvh; display: grid; place-items: center; padding: calc(var(--nav-h) + 40px) 16px 80px; background: var(--hero-bg); color: var(--hero-text); isolation: isolate; overflow: hidden; overflow: clip; }
   .ah-sky { position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 20% 0%, color-mix(in oklab, var(--hero-accent) 16%, transparent), transparent 45%); }
   .ah-login { width: min(100%, 520px); padding: clamp(26px, 5vw, 44px); display: grid; gap: 16px; }

@@ -14,9 +14,13 @@ interface Props { title?: string; description?: string; noindex?: boolean; modul
 const { title, description = platform.tagline, noindex = false, module } = Astro.props;
 const fullTitle = title ? `${title} · ${platform.name}` : `${platform.name} — ${platform.tagline}`;
 const builtInCourse = /^\/mobile-development(\/|$)/.test(Astro.url.pathname);
+// the admin workspace has its own menu and a Back button instead of the site navbar
+const adminArea = /^\/admin(\/|$)/.test(Astro.url.pathname);
+// inside a module the navbar has a second row with the module's sections (pages leave room for it via --nav-h)
+const modbar = !adminArea && (Boolean(module) || builtInCourse);
 ---
 <!doctype html>
-<html lang="en" class="no-js" data-skin={module?.skin || undefined}>
+<html lang="en" class:list={['no-js', { 'no-site-nav': adminArea, 'has-modbar': modbar }]} data-skin={module?.skin || undefined}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -55,7 +59,7 @@ const builtInCourse = /^\/mobile-development(\/|$)/.test(Astro.url.pathname);
   </head>
   <body>
     <a href="#main" class="skip-link">Skip to content</a>
-    <Nav module={module} />
+    {!adminArea && <Nav module={module} />}
     <main id="main" tabindex="-1" transition:name="main">
       <slot />
     </main>

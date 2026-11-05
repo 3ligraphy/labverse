@@ -2,25 +2,25 @@
 import Icon from './Icon.astro';
 import InstitutionBrand from './InstitutionBrand.astro';
 import Logo from './Logo.astro';
-import { nav, secondaryNav, course, platform } from '@/site.config';
+import { nav as courseSections, course, platform } from '@/site.config';
 import { moduleSections, moduleSectionHref } from '@/lib/platform/module-sections';
 
 /**
- * Platform pages (module chooser, directory, sign-in, profile) list the platform's own pages, plus a link back to
- * the last module opened and, for staff, Admin (both added by the script below). Inside the built-in course the
- * nav lists its sections; inside a builder module, that module's.
+ * The site navbar, the same on every page: the brand (home), All modules, search, light/dark, and Sign in — or
+ * Profile once signed in, plus Admin for staff (shown by the script below). Inside a module (the built-in course or
+ * a builder module) a second row lists that module's sections; the first row never changes.
+ * Admin pages have no site navbar (Base.astro): they have their own menu and a Back button.
  */
 interface Props { module?: { slug: string; title: string; color?: string } }
 const { module } = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 const COURSE = /^\/mobile-development(\/|$)/;
+const preview = Astro.url.searchParams.has('preview');
+// a builder module's sections open at its workspace, below the module's header
+const sectionLink = (slug: string, label: string) => moduleSectionHref(slug, label, preview) + (label.toLowerCase() === 'overview' ? '' : '#workspace');
 const context = module
-  ? { title: module.title, color: module.color ?? '#7cb1ff', items: moduleSections(module.slug).map((label) => ({ label, href: moduleSectionHref(module.slug, label, Astro.url.searchParams.has('preview')) })) }
-  : COURSE.test(path) ? { title: course.name, color: '#c8ff4d', items: nav } : null;
-const PLATFORM = [{ label: 'Your modules', href: '/' }, { label: 'All modules', href: '/modules' }];
-const items = context?.items ?? PLATFORM;
-// remembered by the script, so platform pages can offer "back to the module you were in"
-const contextLink = module ? `/${module.slug}` : context ? '/mobile-development' : '';
+  ? { title: module.title, color: module.color ?? '#7cb1ff', home: moduleSectionHref(module.slug, 'overview', preview), items: moduleSections(module.slug).map((label) => ({ label, href: sectionLink(module.slug, label) })) }
+  : COURSE.test(path) ? { title: course.name, color: '#c8ff4d', home: '/mobile-development', items: courseSections } : null;
 // the sign-in page is the sign-in: no second "Sign in" button above it
 const onLogin = path === '/login';
 const isActive = (href: string) => {
@@ -32,98 +32,61 @@ const isActive = (href: string) => {
   // the course home is the parent of every course page, so it is only active on itself
   return path === href.replace(/#.*$/, '') || (href !== '/' && href !== '/mobile-development' && !href.includes('#') && path.startsWith(href + '/'));
 };
-
-/** Phones: the main sections as a bottom tab bar, like an app. "More" opens the full menu. */
-type Tab = { label: string; icon: 'grid' | 'book' | 'flask' | 'search' | 'file' | 'rocket' | 'key'; href?: string; kind?: 'search' | 'account'; on?: boolean };
-const tabs: Tab[] = module
-  ? [{ label: 'Modules', icon: 'grid', href: '/' }, { label: 'Overview', icon: 'book', href: moduleSectionHref(module.slug, 'overview', Astro.url.searchParams.has('preview')) },
-     { label: 'Labs', icon: 'flask', href: moduleSectionHref(module.slug, 'labs', Astro.url.searchParams.has('preview')) }, { label: 'Search', icon: 'search', kind: 'search' }]
-  : COURSE.test(path)
-    ? [{ label: 'Course', icon: 'book', href: '/mobile-development' }, { label: 'Labs', icon: 'flask', href: '/mobile-development/labs' },
-       { label: 'Coursework', icon: 'file', href: '/mobile-development/coursework' }, { label: 'Project', icon: 'rocket', href: '/mobile-development/project' }]
-    : [{ label: 'Modules', icon: 'grid', href: '/', on: path === '/' || path === '/modules' }, { label: 'Search', icon: 'search', kind: 'search' },
-       { label: 'Account', icon: 'key', href: '/login', kind: 'account', on: path === '/login' || path === '/account' }];
-for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.href));
 ---
-<header class="nav" data-nav data-context={context ? JSON.stringify({ title: context.title, href: contextLink, color: context.color }) : undefined}>
+<header class="nav" data-nav>
   <div class="nav-inner container">
-    <a href="/" class="brand" aria-label={`${platform.name} — choose a module`}>
+    <a href="/" class="brand" aria-label={`${platform.name}: home`}>
       <Logo />
       <span class="brand-text">
         <span class="brand-name">{platform.name}</span>
-        <span class="brand-sub mono">{context ? context.title : platform.tagline}</span>
+        <span class="brand-sub mono">{platform.tagline}</span>
       </span>
     </a>
 
     <div class="nav-institution"><InstitutionBrand compact /></div>
 
     <nav aria-label="Primary" class="nav-links">
-      <ul data-nav-list>
-        {context && <li><a href="/" class="nav-modules" style={`--mc:${context.color}`}>← Modules</a></li>}
-        {items.map((item) => (
-          <li>
-            <a href={item.href} data-nav-link aria-current={isActive(item.href) ? 'page' : undefined}>{item.label}</a>
-          </li>
-        ))}
+      <ul>
+        <li><a href="/modules" aria-current={path === '/modules' ? 'page' : undefined}>All modules</a></li>
+        <li data-nav-admin hidden><a href="/admin">Admin</a></li>
       </ul>
     </nav>
 
     <div class="nav-actions">
-      <button class="search-trigger" data-search-open aria-label="Search the course (Ctrl K)">
+      <button class="search-trigger" data-search-open aria-label="Search (Ctrl K)">
         <Icon name="search" size={16} />
         <span class="hide-sm">Search</span>
         <span class="keys hide-sm kbd-hint"><kbd class="kbd" data-mod-key>Ctrl</kbd><kbd class="kbd">K</kbd></span>
       </button>
       {!onLogin && <a class="nav-account" href="/login" data-nav-account data-pending>Sign in</a>}
-      <button class="icon-btn theme-toggle" data-theme-toggle aria-label="Toggle color theme">
+      <button class="icon-btn theme-toggle" data-theme-toggle aria-label="Switch between light and dark">
         <Icon name="sun" class="i-sun" />
         <Icon name="moon" class="i-moon" />
       </button>
-      <button class="icon-btn menu-btn" data-menu-open aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
-        <Icon name="menu" />
-      </button>
     </div>
   </div>
 
+  {context && (
+    <div class="modbar" style={`--mc:${context.color}`}>
+      <div class="modbar-inner container">
+        <a class="modbar-title" href={context.home}><i aria-hidden="true"></i><span>{context.title}</span></a>
+        <nav class="modbar-links" aria-label={`${context.title}: sections`}>
+          {context.items.map((item) => <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>{item.label}</a>)}
+        </nav>
+      </div>
+    </div>
+  )}
 </header>
 
-<!-- Outside <header>: the scrolled header uses backdrop-filter, which would make it the containing block of this
-     position:fixed menu and squeeze the menu into the header bar. -->
-<div id="mobile-menu" class="mobile-menu" data-menu role="dialog" aria-modal="true" aria-label="Menu" hidden>
-  <div class="mm-top container">
-    <a href="/" class="brand"><Logo /><span class="brand-name">{platform.name}</span></a>
-    <button class="icon-btn" data-menu-close aria-label="Close menu"><Icon name="close" /></button>
-  </div>
-  <nav aria-label="Mobile" class="container mm-body">
-    <ol class="mm-list" data-mm-list>
-      {context && <li style="--i:0"><a href="/"><span class="mono ix">00</span><span>All modules</span></a></li>}
-      {items.map((item, i) => (
-        <li style={`--i:${i}`}>
-          <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
-            <span class="mono ix">{String(i + 1).padStart(2, '0')}</span>
-            <span>{item.label}</span>
-          </a>
-        </li>
-      ))}
-    </ol>
-    <div class="mm-secondary" hidden={!context || Boolean(module)}>
-      {secondaryNav.map((item) => <a href={item.href} class="chip">{item.label}</a>)}
-    </div>
-  </nav>
-</div>
-
-<nav class="tabbar" aria-label="Sections">
-  {tabs.map((t) => t.kind === 'search'
-    ? <button type="button" class="tab" data-search-open><Icon name={t.icon} size={20} /><span>{t.label}</span></button>
-    : <a class="tab" href={t.href} aria-current={t.on ? 'page' : undefined} data-tab-account={t.kind === 'account' ? '' : undefined}><Icon name={t.icon} size={20} /><span>{t.label}</span></a>)}
-  <button type="button" class="tab" data-menu-open aria-controls="mobile-menu"><Icon name="menu" size={20} /><span>More</span></button>
+<nav class="tabbar" aria-label="Main">
+  <a class="tab" href="/" aria-current={path === '/' ? 'page' : undefined}><Icon name="sparkle" size={20} /><span>Home</span></a>
+  <a class="tab" href="/modules" aria-current={path === '/modules' ? 'page' : undefined}><Icon name="grid" size={20} /><span>All modules</span></a>
+  <button type="button" class="tab" data-search-open><Icon name="search" size={20} /><span>Search</span></button>
+  <a class="tab" href="/login" data-tab-account aria-current={path === '/login' || path === '/account' ? 'page' : undefined}><Icon name="key" size={20} /><span>Sign in</span></a>
+  <a class="tab" href="/admin" data-nav-admin hidden><Icon name="wrench" size={20} /><span>Admin</span></a>
 </nav>
 
 <style>
-  .nav-modules, .nav-links :global(.nav-resume) { color: var(--mc) !important; font-weight: 600; }
-  .nav-links :global(.nav-resume) { display: inline-flex !important; align-items: center; gap: 7px; }
-  .nav-links :global(.nav-resume)::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  :global(:root[data-theme='light']) .nav-modules, :global(:root[data-theme='light'] .nav-links .nav-resume) { color: color-mix(in oklab, var(--mc) 40%, #000) !important; }
   .nav-account { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
     border: 1px solid var(--line-2); color: var(--text); white-space: nowrap; transition: border-color var(--t-fast), background var(--t-fast); }
   .nav-account:hover { border-color: var(--accent-text); }
@@ -131,36 +94,36 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
   .nav-account[data-pending] { visibility: hidden; animation: nav-account-show 0s 1.5s forwards; }
   @keyframes nav-account-show { to { visibility: visible; } }
   .nav-account.in { background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent-text) 40%, var(--line-2)); }
-  @media (max-width: 640px) { .nav-account { display: none; } }
+  @media (max-width: 719px) { .nav-account { display: none; } }
 
-  /* phones: an app-style bottom tab bar; the header keeps the brand, search and theme */
+  /* phones: the same four places as a bottom tab bar (plus Admin for staff); the header keeps brand, search and theme */
   .tabbar { display: none; }
   @media (max-width: 719px) {
     .nav-inner { gap: 8px; }
-    .menu-btn { display: none !important; }
     .tabbar { position: fixed; z-index: 95; left: 0; right: 0; bottom: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
       padding: 6px 6px calc(env(safe-area-inset-bottom) + 6px); background: color-mix(in oklab, var(--surface) 92%, transparent); border-top: 1px solid var(--line);
       backdrop-filter: saturate(160%) blur(16px); -webkit-backdrop-filter: saturate(160%) blur(16px); }
     .tab { position: relative; display: grid; justify-items: center; gap: 3px; padding: 6px 0 4px; border: 0; background: none; color: var(--text-3);
       font: 600 12px var(--font-body); letter-spacing: .01em; -webkit-tap-highlight-color: transparent; }
+    .tab[hidden] { display: none; }
     .tab:active { transform: scale(.94); }
     .tab[aria-current='page'] { color: var(--text); }
     .tab[aria-current='page']::before { content: ''; position: absolute; top: -6px; left: 50%; width: 22px; height: 3px; translate: -50% 0; border-radius: 0 0 3px 3px; background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
     .tab[aria-current='page'] :global(svg) { color: var(--accent-text); }
     :global(body:not(:has(.ash, .cv))) { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
-    :global(body:has(.ash, .cv)) .tabbar { display: none; } /* admin pages and the builder have their own */
   }
   .nav {
-    position: fixed; inset: 0 0 auto; z-index: 100; height: var(--nav-h);
-    transition: background var(--t-med), border-color var(--t-med), height var(--t-med) var(--ease-out);
+    --bar-h: 64px;
+    position: fixed; inset: 0 0 auto; z-index: 100;
+    transition: background var(--t-med), border-color var(--t-med);
     border-bottom: 1px solid transparent;
   }
-  .nav[data-scrolled] {
-    --nav-h: 56px;
+  .nav[data-scrolled], .nav:has(.modbar) {
     background: var(--glass); border-bottom-color: var(--line);
     backdrop-filter: saturate(160%) blur(16px); -webkit-backdrop-filter: saturate(160%) blur(16px);
   }
-  .nav-inner { height: 100%; display: flex; align-items: center; gap: 24px; }
+  .nav[data-scrolled] { --bar-h: 56px; }
+  .nav-inner { height: var(--bar-h); display: flex; align-items: center; gap: 24px; transition: height var(--t-med) var(--ease-out); }
   .brand { display: inline-flex; align-items: center; gap: 12px; flex: none; }
   .brand-text { display: grid; line-height: 1.1; }
   .brand-name { font-family: var(--font-display); font-weight: 650; letter-spacing: -0.02em; font-size: 16px; }
@@ -171,27 +134,21 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
 
   .nav-links { margin-inline: auto; display: none; }
   .nav-links ul { display: flex; gap: 2px; list-style: none; padding: 4px; border-radius: var(--r-full); }
-  .nav-links :global(a) {
-    position: relative; display: block; padding: 7px 13px; border-radius: var(--r-full);
+  .nav-links li[hidden] { display: none; }
+  .nav-links a {
+    position: relative; display: block; padding: 7px 13px; border-radius: var(--r-full); white-space: nowrap;
     font-size: 13.5px; font-weight: 500; color: var(--text-2); transition: color var(--t-fast), background var(--t-fast);
   }
-  .nav-links :global(a) { white-space: nowrap; }
-  .nav-links :global(a:hover) { color: var(--text); background: var(--surface-2); }
-  /* laptops: the course nav has 9 links; keep them on one line beside search and sign-in */
-  @media (min-width: 1180px) and (max-width: 1360px) {
-    .nav-inner { gap: 14px; }
-    .nav-links :global(a) { padding: 7px 9px; font-size: 13px; }
-    .search-trigger .keys { display: none; }
-  }
-  .nav-links :global(a[aria-current='page']) { color: var(--text); background: var(--surface-2); box-shadow: 0 0 0 1px var(--line-2) inset; }
-  .nav-links :global(a[aria-current='page']::after) {
+  .nav-links a:hover { color: var(--text); background: var(--surface-2); }
+  .nav-links a[aria-current='page'] { color: var(--text); background: var(--surface-2); box-shadow: 0 0 0 1px var(--line-2) inset; }
+  .nav-links a[aria-current='page']::after {
     content: ''; position: absolute; left: 50%; bottom: -6px; width: 4px; height: 4px; border-radius: 50%;
     background: var(--accent); translate: -50% 0; box-shadow: 0 0 10px var(--accent-glow);
   }
-  @media (min-width: 1180px) { .nav-links { display: block; } .menu-btn { display: none !important; } }
+  @media (min-width: 720px) { .nav-links { display: block; } }
 
   .nav-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-  @media (min-width: 1180px) { .nav-actions { margin-left: 0; } }
+  @media (min-width: 720px) { .nav-actions { margin-left: 0; } }
   .search-trigger {
     display: inline-flex; align-items: center; gap: 10px; height: 38px; padding: 0 8px 0 12px;
     border-radius: var(--r-full); border: 1px solid var(--line-2); color: var(--text-3); font-size: 13px;
@@ -199,70 +156,32 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
   }
   .search-trigger:hover { color: var(--text); border-color: var(--text-3); }
   .search-trigger .keys { display: inline-flex; gap: 3px; }
+  @media (max-width: 1100px) { .search-trigger .keys { display: none; } }
   @media (max-width: 719px) { .search-trigger { width: 40px; padding: 0; justify-content: center; border-color: transparent; background: none; } }
 
-  .theme-toggle :global(.i-sun) { display: none; }
-  :global(:root[data-theme='light']) .theme-toggle :global(.i-sun) { display: block; }
-  :global(:root[data-theme='light']) .theme-toggle :global(.i-moon) { display: none; }
   .theme-toggle :global(svg) { transition: transform var(--t-slow) var(--ease-out); }
   .theme-toggle:active :global(svg) { transform: rotate(90deg) scale(0.8); }
 
-  /* mobile menu */
-  .mobile-menu {
-    position: fixed; inset: 0; z-index: 200; background: var(--bg);
-    display: flex; flex-direction: column; overflow-y: auto;
-  }
-  .mobile-menu[hidden] { display: none; }
-  .mobile-menu.open { animation: mm-in 380ms var(--ease-out); }
-  @keyframes mm-in { from { opacity: 0; clip-path: inset(0 0 100% 0); } to { opacity: 1; clip-path: inset(0); } }
-  .mm-top { display: flex; align-items: center; justify-content: space-between; height: 64px; flex: none; }
-  .mm-body { padding-block: 24px 40px; display: flex; flex-direction: column; gap: 32px; flex: 1; }
-  .mm-list { list-style: none; padding: 0; border-top: 1px solid var(--line); }
-  .mm-list :global(li) { border-bottom: 1px solid var(--line); }
-  .mobile-menu.open .mm-list :global(li) { animation: mm-item 520ms var(--ease-out) both; animation-delay: calc(var(--i) * 35ms + 80ms); }
-  @keyframes mm-item { from { opacity: 0; transform: translateY(12px); } }
-  .mm-list :global(a) { display: flex; align-items: baseline; gap: 16px; padding: 16px 2px; font-family: var(--font-display); font-size: clamp(28px, 8vw, 40px); font-weight: 600; letter-spacing: -0.03em; }
-  .mm-list :global(a[aria-current='page']) { color: var(--accent-text); }
-  .mm-list :global(.ix) { font-size: 12px; color: var(--text-3); font-family: var(--font-mono); letter-spacing: 0; }
-  .mm-secondary { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* inside a module: its sections, in the module's colour, on a second row */
+  .modbar { border-top: 1px solid var(--line); }
+  .modbar-inner { height: 44px; display: flex; align-items: center; gap: 14px; }
+  .modbar-title { display: inline-flex; align-items: center; gap: 8px; flex: none; max-width: 38%; font-size: 13.5px; font-weight: 650; color: var(--text); }
+  .modbar-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modbar-title i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--mc); box-shadow: 0 0 10px var(--mc); }
+  .modbar-links { display: flex; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .modbar-links::-webkit-scrollbar { display: none; }
+  .modbar-links a { flex: none; padding: 6px 11px; border-radius: var(--r-full); font-size: 13px; color: var(--text-2); white-space: nowrap; transition: color var(--t-fast), background var(--t-fast); }
+  .modbar-links a:hover { color: var(--text); background: var(--surface-2); }
+  .modbar-links a[aria-current='page'] { color: var(--text); background: color-mix(in oklab, var(--mc) 16%, var(--surface-2)); box-shadow: inset 0 -2px var(--mc); }
+  @media (max-width: 719px) { .modbar-title { max-width: 42%; font-size: 13px; } }
 </style>
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
   import { getMe } from '@/scripts/me';
-  const LAST = 'buenova:last-module';
-  /** Adds a link to the desktop nav and the phone menu (once per page). */
-  function addLink(key: string, label: string, href: string, color?: string) {
-    const list = document.querySelector('[data-nav-list]'), menu = document.querySelector('[data-mm-list]');
-    if (!list || list.querySelector(`[data-extra="${key}"]`)) return;
-    const li = document.createElement('li');
-    const a = Object.assign(document.createElement('a'), { href, textContent: label });
-    a.dataset.extra = key;
-    if (color) { a.className = 'nav-resume'; a.style.setProperty('--mc', color); a.title = `Back to ${label}`; }
-    if (location.pathname === href) a.setAttribute('aria-current', 'page');
-    li.append(a);
-    // the module link stays last, after Admin
-    const resumeItem = list.querySelector('[data-extra="resume"]')?.parentElement;
-    if (resumeItem && key !== 'resume') resumeItem.before(li); else list.append(li);
-    if (menu) {
-      const n = menu.children.length + 1;
-      const m = document.createElement('li');
-      m.innerHTML = `<a href="${href}"><span class="mono ix">${String(n).padStart(2, '0')}</span><span></span></a>`;
-      m.querySelector('span:last-child')!.textContent = label;
-      menu.append(m);
-    }
-  }
-  /** Inside a module: remember it. On platform pages: offer the way back to it. */
-  function resume() {
-    const header = document.querySelector<HTMLElement>('[data-nav]');
-    if (!header) return;
-    try {
-      if (header.dataset.context) return localStorage.setItem(LAST, header.dataset.context);
-      const last = JSON.parse(localStorage.getItem(LAST) ?? 'null') as { title: string; href: string; color: string } | null;
-      if (last?.href?.startsWith('/') && last.title) addLink('resume', last.title, last.href, last.color);
-    } catch { /* storage blocked: no resume link */ }
-  }
-  /** Sign in → "Name · role" once signed in (doctors and TAs go to /admin, students to their modules). */
+  /** the last page of the site itself, for the admin pages' Back button */
+  const BACK = 'buenova:back';
+  /** Sign in → Profile once signed in; staff (and the admin password) also get Admin. */
   async function account() {
     const a = document.querySelector<HTMLAnchorElement>('[data-nav-account]');
     const tab = document.querySelector<HTMLAnchorElement>('[data-tab-account]');
@@ -275,16 +194,18 @@ for (const t of tabs) t.on ??= Boolean(t.href && t.href !== '/' && isActive(t.hr
     footer.forEach((l) => (l.href = signIn));
     const me = await getMe<{ user: { name: string; role: string } | null; staff?: boolean }>();
     a?.removeAttribute('data-pending');
-    // staff reach Admin from the platform pages too
-    if (me?.staff && !document.querySelector<HTMLElement>('[data-nav]')?.dataset.context) addLink('admin', 'Admin', '/admin');
+    if (me?.staff) document.querySelectorAll<HTMLElement>('[data-nav-admin]').forEach((el) => (el.hidden = false));
     if (!me?.user) return;
-    footer.forEach((l) => { l.textContent = 'Your profile'; l.href = '/account'; });
-    const first = me.user.name.split(' ')[0];
-    if (tab) { tab.href = me.user.role === 'student' ? '/account' : '/admin'; tab.querySelector('span')!.textContent = first; }
+    footer.forEach((l) => { l.textContent = 'Profile'; l.href = '/account'; });
+    if (tab) { tab.href = '/account'; tab.querySelector('span')!.textContent = 'Profile'; }
     if (!a) return;
-    a.textContent = `${first} · ${({ super_admin: 'super admin', doctor: 'Dr.', ta: 'TA', student: 'student' } as Record<string, string>)[me.user.role] ?? me.user.role}`;
+    a.textContent = 'Profile';
+    a.title = `Signed in as ${me.user.name}`;
     a.href = '/account';
     a.classList.add('in');
   }
-  onPageLoad(() => { resume(); void account(); });
+  onPageLoad(() => {
+    try { sessionStorage.setItem(BACK, location.pathname + location.search + location.hash); } catch { /* storage off: Back goes home */ }
+    void account();
+  });
 </script>
