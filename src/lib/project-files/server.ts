@@ -16,7 +16,7 @@ import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { del, head } from '@vercel/blob';
 import type { View } from './results';
-import { TYPE_KEYS, matchesSignature, mimesFor, typeForName, type Entry, type EntryInput, type FileType, type ProjectFile, type Settings } from './core';
+import { COURSE_MODULE, SHIPPED_ITEMS, TYPE_KEYS, matchesSignature, mimesFor, typeForName, type Entry, type EntryInput, type FileType, type ProjectFile, type Settings } from './core';
 
 const env = (key: string) => getSecret(key) || undefined;
 const onVercel = () => Boolean(env('VERCEL'));
@@ -42,6 +42,7 @@ const toFile = (r: any): ProjectFile => ({
   accepting: Boolean(r.accepting),
   accept_types: (Array.isArray(r.accept_types) && r.accept_types.length ? r.accept_types : ['pdf']).filter((t: string) => (TYPE_KEYS as string[]).includes(t)) as FileType[],
   max_mb: r.max_mb == null ? 4 : Number(r.max_mb),
+  module: r.module || COURSE_MODULE,
   published_by: r.published_by, created_at: iso(r.created_at)!,
 });
 const toEntry = (r: any): Entry => ({ ...r, size: Number(r.size), created_at: iso(r.created_at)!, updated_at: iso(r.updated_at)! });
@@ -99,8 +100,25 @@ class FilesStore {
         file_id text not null references ${this.files}(id) on delete cascade, student_id text not null,
         first_at timestamptz not null default now(), last_at timestamptz not null default now(), count int not null default 1,
         primary key (file_id, student_id))`,
+      // v6: items belong to a module (the built-in course until now), and staff see which hand-ins are new
+      `alter table ${this.files} add column if not exists module text not null default '${COURSE_MODULE}'`,
+      // hand-ins from before this count as seen; every new one (or a replaced file) is new until staff open its item
+      `alter table ${this.entries} add column if not exists seen boolean not null default true`,
+      `alter table ${this.entries} alter column seen set default false`,
     ];
     for (const s of statements) await this.run(s);
+    // items the site ships, created once: a marker remembers it, so an item staff remove is not brought back
+    for (const item of SHIPPED_ITEMS) {
+      const marker = `shipped:${item.id}`;
+      const [done] = await this.run(`select 1 from ${this.groups} where key = $1`, [marker]);
+      if (done) continue;
+      await this.run(
+        `insert into ${this.files} (id, title, description, kind, accepting, accept_types, max_mb, module, published_by)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, 'BUENOVA') on conflict (id) do nothing`,
+        [item.id, item.title, item.description, item.kind, item.accepting, item.accept_types, item.max_mb, item.module],
+      );
+      await this.run(`insert into ${this.groups} (key, data) values ($1, '{}'::jsonb) on conflict (key) do nothing`, [marker]);
+    }
   }
 
   private async q(text: string, params: unknown[] = []) {
@@ -108,8 +126,23 @@ class FilesStore {
     return this.run(text, params);
   }
 
-  async list(): Promise<ProjectFile[]> {
-    return (await this.q(`select * from ${this.files} order by created_at desc`)).map(toFile);
+  /** Every item, or one module's. */
+  async list(module?: string): Promise<ProjectFile[]> {
+    return (module
+      ? await this.q(`select * from ${this.files} where module = $1 order by created_at desc`, [module])
+      : await this.q(`select * from ${this.files} order by created_at desc`)).map(toFile);
+  }
+
+  /** Hand-ins staff haven't looked at yet, per item (the red badge in the admin menu, and the admin home). */
+  async unseen(): Promise<{ file_id: string; title: string; module: string; count: number }[]> {
+    const rows = await this.q(`select f.id as file_id, f.title, f.module, count(*)::int as count, max(e.updated_at) as last
+      from ${this.entries} e join ${this.files} f on f.id = e.file_id where not e.seen group by f.id, f.title, f.module order by last desc`);
+    return rows.map((r) => ({ file_id: r.file_id, title: r.title, module: r.module || COURSE_MODULE, count: Number(r.count) }));
+  }
+
+  /** Staff opened this item's hand-ins: none of them is new any more. */
+  async markSeen(fileId: string): Promise<void> {
+    await this.q(`update ${this.entries} set seen = true where file_id = $1 and not seen`, [fileId]);
   }
 
   async get(id: string): Promise<ProjectFile | null> {
@@ -117,12 +150,12 @@ class FilesStore {
     return row ? toFile(row) : null;
   }
 
-  async add(meta: Settings, file: Stored | null, by: string): Promise<ProjectFile> {
+  async add(meta: Settings, file: Stored | null, by: string, module = COURSE_MODULE): Promise<ProjectFile> {
     const [row] = await this.q(
-      `insert into ${this.files} (id, title, description, kind, due_at, cutoff_at, url, pathname, size, accepting, accept_types, max_mb, published_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning *`,
+      `insert into ${this.files} (id, title, description, kind, due_at, cutoff_at, url, pathname, size, accepting, accept_types, max_mb, published_by, module)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning *`,
       [randomUUID(), meta.title, meta.description, meta.kind, meta.dueAt, meta.cutoffAt, file?.url ?? null, file?.pathname ?? null, file?.size ?? null,
-        meta.accepting, meta.acceptTypes, meta.maxMb, by],
+        meta.accepting, meta.acceptTypes, meta.maxMb, by, module],
     );
     return toFile(row);
   }
@@ -177,7 +210,7 @@ class FilesStore {
       `insert into ${this.entries} (id, file_id, student_id, name, group_name, note, device_key, url, pathname, size)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        on conflict (file_id, student_id) do update set name = excluded.name, group_name = excluded.group_name,
-         note = excluded.note, url = excluded.url, pathname = excluded.pathname, size = excluded.size, updated_at = now()
+         note = excluded.note, url = excluded.url, pathname = excluded.pathname, size = excluded.size, updated_at = now(), seen = false
        returning *`,
       [randomUUID(), fileId, who.studentId, who.name, who.group, who.note, who.deviceKey, file.url, file.pathname, file.size],
     );

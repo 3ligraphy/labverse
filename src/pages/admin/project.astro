@@ -2,30 +2,37 @@
 import Base from '@/layouts/Base.astro';
 import { canManageSubmissions } from '@/lib/accounts/labscope';
 import { isAdmin } from '@/lib/attendance/server';
-import { KINDS, KIND_LABEL } from '@/lib/project-files/core';
+import { COURSE_MODULE, KINDS, KIND_LABEL } from '@/lib/project-files/core';
 import { blobFolder, projectFilesSetup } from '@/lib/project-files/server';
+import { access } from '@/lib/accounts/access';
+import { hubData } from '@/lib/accounts/hub';
+import { ADMIN_MODULE_COOKIE } from '@/scripts/admin-module';
+import ModulePicker from '@/components/admin/ModulePicker.astro';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'no-store, max-age=0');
-if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin', 303);
+// every module can collect hand-ins; the page shows one module's (?module=, else the last one picked, else the course)
+const a = await access(Astro.cookies);
+const pickable = (await hubData()).cards.filter((c) => a.can('module.submissions', c.slug)).map((c) => ({ slug: c.slug, title: c.title }));
+const asked = Astro.url.searchParams.get('module') ?? Astro.cookies.get(ADMIN_MODULE_COOKIE)?.value ?? COURSE_MODULE;
+const module = pickable.some((m) => m.slug === asked) ? asked : pickable.some((m) => m.slug === COURSE_MODULE) ? COURSE_MODULE : pickable[0]?.slug ?? COURSE_MODULE;
+if (!(await canManageSubmissions(Astro.cookies, module))) return Astro.redirect('/admin', 303);
+const course = module === COURSE_MODULE;
 
 const setup = projectFilesSetup();
 const ready = setup.database && setup.storage;
 import AdminShell from '@/components/admin/AdminShell.astro';
 ---
-<Base title="Project submissions" noindex>
+<Base title="Submissions" noindex>
 <AdminShell active="submissions">
   <section class="pf-shell container">
     <header class="pf-top">
       <div>
         <p class="pf-k mono">Admin workspace</p>
-        <h1>Project submissions</h1>
-        <p class="muted">Publish a submission (with or without a PDF). It's announced site-wide and students hand in on its own page.</p>
+        <h1>Submissions</h1>
+        <p class="muted">Open a hand-in for a module (with or without a PDF brief). Students type their name and student ID and hand in on its own page, inside the module. New hand-ins show as a red number on Submissions in the menu.</p>
       </div>
-      <div class="pf-links">
-        <a class="btn btn-ghost btn-sm" href="/admin/sessions">Sessions</a>
-        <a class="btn btn-ghost btn-sm" href="/admin/cms">CMS</a>
-      </div>
+      <ModulePicker modules={pickable} current={module} href="/admin/project?module=__M__" />
     </header>
 
     {!ready ? (
@@ -45,12 +52,12 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         <ul class="pf-results" data-pf-results hidden></ul>
       </section>
 
-      <div class="pf-grid" data-pf data-mode={setup.storage} data-folder={blobFolder()}>
+      <div class="pf-grid" data-pf data-mode={setup.storage} data-folder={blobFolder()} data-module={module}>
         <form class="pf-card pf-pad pf-form" data-pf-form>
           <h2>Publish</h2>
-          <label><span>Title</span><input class="input" name="title" required maxlength="120" value="Project proposal submission" /></label>
+          <label><span>Title</span><input class="input" name="title" required maxlength="120" value={course ? 'Project proposal submission' : 'Submission'} /></label>
           <label><span>Type</span>
-            <select class="input" name="kind">{KINDS.map((k) => <option value={k}>{KIND_LABEL[k]}</option>)}</select>
+            <select class="input" name="kind">{KINDS.map((k) => <option value={k} selected={course ? k === 'proposal' : k === 'submission'}>{KIND_LABEL[k]}</option>)}</select>
           </label>
           <label><span>Instructions <small>(optional)</small></span><textarea class="input" name="description" rows="4" maxlength="2000" placeholder="What students should hand in, format, team rules…"></textarea></label>
           <label><span>Due <small>(optional)</small></span><input class="input" name="dueAt" type="datetime-local" /></label>
@@ -199,7 +206,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     const say = (text: string, kind: '' | 'ok' | 'err' = '') => { msg.textContent = text; msg.className = `pf-msg ${kind}`; };
 
     async function load() {
-      const res = await fetch('/api/admin/project/files');
+      const res = await fetch(`/api/admin/project/files?module=${encodeURIComponent(root!.dataset.module ?? '')}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { list.innerHTML = `<li class="muted">${esc(data.error ?? 'Could not load.')}</li>`; return; }
       const items: Item[] = data.files;
@@ -278,10 +285,11 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             url = blob.url;
             say('Publishing…');
           }
-          res = await fetch('/api/admin/project/files', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...meta, url }) });
+          res = await fetch('/api/admin/project/files', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...meta, url, module: root.dataset.module }) });
         } else {
           fd.set('dueAt', meta.dueAt);
           fd.set('accepting', String(meta.accepting));
+          fd.set('module', root.dataset.module ?? '');
           res = await fetch('/api/admin/project/files', { method: 'POST', body: fd });
         }
         const data = await res.json().catch(() => ({}));

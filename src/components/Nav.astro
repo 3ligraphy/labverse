@@ -27,6 +27,8 @@ const isActive = (href: string) => {
   if (module) {
     const target = new URL(href, Astro.url);
     const section = target.searchParams.get('tab') ?? 'overview';
+    // a lab page is under Labs; a hand-in page (/<module>/submit/…) under none of them
+    if (path.startsWith(`/${module.slug}/submit/`)) return false;
     return path.startsWith(`/${module.slug}/`) ? section === 'labs' : path === target.pathname && section === (Astro.url.searchParams.get('tab') ?? 'overview');
   }
   // the course home is the parent of every course page, so it is only active on itself

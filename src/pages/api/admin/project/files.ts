@@ -12,17 +12,26 @@ import { canManageSubmissions } from '@/lib/accounts/labscope';
 import { isAdmin } from '@/lib/attendance/server';
 import { currentEditor } from '@/lib/cms/server';
 import { json } from '@/lib/progress/server';
-import { MAX_PDF_BYTES, isBlobUrl, looksLikePdf, parseMeta, parseSettings, safePdfName } from '@/lib/project-files/core';
+import { COURSE_MODULE, MAX_PDF_BYTES, isBlobUrl, looksLikePdf, parseMeta, parseSettings, safePdfName } from '@/lib/project-files/core';
+import { hubData } from '@/lib/accounts/hub';
 import { blobFolder, blobToken, deleteStored, getFilesStore, saveLocal, storageMode, verifyUpload } from '@/lib/project-files/server';
 
 export const prerender = false;
 
-export const GET: APIRoute = async ({ cookies }) => {
-  if (!(await canManageSubmissions(cookies))) return json({ error: 'Unauthorized' }, 401);
+/** The module an admin request is about: ?module= (or the form's "module"), the course by default. */
+const moduleOf = async (asked: unknown) => {
+  const slug = typeof asked === 'string' && asked ? asked : COURSE_MODULE;
+  return (await hubData()).cards.some((c) => c.slug === slug) ? slug : null;
+};
+
+export const GET: APIRoute = async ({ cookies, url }) => {
+  const module = await moduleOf(url.searchParams.get('module'));
+  if (!module) return json({ error: 'Unknown module.' }, 400);
+  if (!(await canManageSubmissions(cookies, module))) return json({ error: 'Unauthorized' }, 401);
   const store = getFilesStore();
   if (!store) return json({ error: 'No database is connected.' }, 503);
   try {
-    const [files, stats] = await Promise.all([store.list(), store.entryStats()]);
+    const [files, stats] = await Promise.all([store.list(module), store.entryStats()]);
     return json({ files: files.map((f) => ({ ...f, entries: stats[f.id]?.count ?? 0, entryBytes: stats[f.id]?.bytes ?? 0 })) });
   } catch (error) {
     console.error('[project-files] could not list files', error);
@@ -31,7 +40,7 @@ export const GET: APIRoute = async ({ cookies }) => {
 };
 
 export const POST: APIRoute = async ({ request, cookies }) => {
-  if (!(await canManageSubmissions(cookies))) return json({ error: 'Unauthorized' }, 401);
+  if (!isAdmin(cookies)) return json({ error: 'Unauthorized' }, 401);
   const store = getFilesStore();
   if (!store) return json({ error: 'No database is connected.' }, 503);
   const by = currentEditor(cookies) ?? '';
@@ -40,27 +49,31 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     if ((request.headers.get('content-type') ?? '').startsWith('multipart/form-data')) {
       if (storageMode() !== 'local') return json({ error: 'Upload through Vercel Blob on this deployment.' }, 400);
       const form = await request.formData();
+      const module = await moduleOf(form.get('module'));
+      if (!module || !(await canManageSubmissions(cookies, module))) return json({ error: 'Unauthorized' }, 401);
       const meta = parseMeta(Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === 'string')));
       if (!meta.ok) return json({ error: meta.error }, 400);
       const file = form.get('file');
-      if (!(file instanceof File) || !file.size) return json({ file: await store.add(meta.value, null, by) }, 201);
+      if (!(file instanceof File) || !file.size) return json({ file: await store.add(meta.value, null, by, module) }, 201);
       if (file.size > MAX_PDF_BYTES) return json({ error: 'The PDF must be 20 MB or smaller.' }, 400);
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (!looksLikePdf(bytes)) return json({ error: 'That file is not a PDF.' }, 400);
       const saved = await saveLocal(safePdfName(file.name), bytes);
-      return json({ file: await store.add(meta.value, { ...saved, size: file.size }, by) }, 201);
+      return json({ file: await store.add(meta.value, { ...saved, size: file.size }, by, module) }, 201);
     }
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body) return json({ error: 'Invalid request.' }, 400);
+    const module = await moduleOf(body.module);
+    if (!module || !(await canManageSubmissions(cookies, module))) return json({ error: 'Unauthorized' }, 401);
     const meta = parseMeta(body);
     if (!meta.ok) return json({ error: meta.error }, 400);
     const url = typeof body.url === 'string' ? body.url : '';
-    if (!url) return json({ file: await store.add(meta.value, null, by) }, 201);
+    if (!url) return json({ file: await store.add(meta.value, null, by, module) }, 201);
     if (!blobToken() || !isBlobUrl(url)) return json({ error: 'Upload the PDF first.' }, 400);
     const upload = await verifyUpload(url, blobFolder(), MAX_PDF_BYTES);
     if (!upload.ok) return json({ error: upload.error }, 400);
-    return json({ file: await store.add(meta.value, upload.file, by) }, 201);
+    return json({ file: await store.add(meta.value, upload.file, by, module) }, 201);
   } catch (error) {
     console.error('[project-files] could not publish file', error);
     return json({ error: 'Could not publish.' }, 500);
@@ -68,12 +81,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 };
 
 export const PATCH: APIRoute = async ({ url, request, cookies }) => {
-  if (!(await canManageSubmissions(cookies))) return json({ error: 'Unauthorized' }, 401);
+  if (!isAdmin(cookies)) return json({ error: 'Unauthorized' }, 401);
   const store = getFilesStore();
   if (!store) return json({ error: 'No database is connected.' }, 503);
   try {
     const current = await store.get(url.searchParams.get('id') ?? '');
     if (!current) return json({ error: 'Not found.' }, 404);
+    if (!(await canManageSubmissions(cookies, current.module))) return json({ error: 'Unauthorized' }, 401);
 
     // Fields come as JSON (Blob mode: a replacement PDF is uploaded first and sent as `attachmentUrl`)
     // or as multipart on a laptop (the replacement PDF is the `file` field).
@@ -119,10 +133,12 @@ export const PATCH: APIRoute = async ({ url, request, cookies }) => {
 };
 
 export const DELETE: APIRoute = async ({ url, cookies }) => {
-  if (!(await canManageSubmissions(cookies))) return json({ error: 'Unauthorized' }, 401);
+  if (!isAdmin(cookies)) return json({ error: 'Unauthorized' }, 401);
   const store = getFilesStore();
   if (!store) return json({ error: 'No database is connected.' }, 503);
   try {
+    const item = await store.get(url.searchParams.get('id') ?? '');
+    if (item && !(await canManageSubmissions(cookies, item.module))) return json({ error: 'Unauthorized' }, 401);
     const removed = await store.remove(url.searchParams.get('id') ?? '');
     if (!removed) return json({ error: 'Not found.' }, 404);
     await Promise.all([removed.file, ...removed.entries].map(deleteStored));

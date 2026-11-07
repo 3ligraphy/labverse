@@ -8,11 +8,12 @@ import SubmissionSettings from '@/components/admin/SubmissionSettings.astro';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'no-store, max-age=0');
-if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin', 303);
-
 const store = getFilesStore();
 const file = store ? await store.get(Astro.params.id ?? '').catch(() => null) : null;
 if (!file) return Astro.redirect('/admin/project', 303);
+if (!(await canManageSubmissions(Astro.cookies, file.module))) return Astro.redirect('/admin', 303);
+// staff opened this item: its hand-ins are no longer new (the red badge in the admin menu goes down)
+await store!.markSeen(file.id).catch(() => {});
 import AdminShell from '@/components/admin/AdminShell.astro';
 ---
 <Base title={`Submissions · ${file.title}`} noindex>
@@ -20,7 +21,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   <section class="si-shell container" data-si data-id={file.id} data-title={file.title} data-due-at={file.due_at ?? ''}>
     <header class="si-top">
       <div>
-        <p class="si-k mono"><a href="/admin/project">← Project submissions</a> · {KIND_LABEL[file.kind]}</p>
+        <p class="si-k mono"><a href={`/admin/project?module=${encodeURIComponent(file.module)}`}>← Submissions</a> · {KIND_LABEL[file.kind]}</p>
         <h1>{file.title}</h1>
         <p class="muted" data-si-sub>{file.due_at ? 'Due ' : 'No due date'}<span data-due={file.due_at ?? ''}></span>{file.cutoff_at && <> · cut-off <span data-due={file.cutoff_at}></span></>} · {file.accept_types.length} file type{file.accept_types.length === 1 ? '' : 's'}, {file.max_mb} MB max</p>
       </div>

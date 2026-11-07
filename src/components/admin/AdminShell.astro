@@ -36,7 +36,7 @@ const teaching: Item[] = [
   { key: 'progress', label: 'Lab progress', href: '/admin/progress', icon: '▤', show: any('module.progress') },
   { key: 'stats', label: 'Statistics', href: '/admin/stats', icon: '◫', show: any('module.progress') },
   { key: 'banner', label: 'Banners', href: `/admin/banner/${encodeURIComponent(firstModule)}`, icon: '⚑', show: any('module.build') || any('module.submissions') },
-  { key: 'submissions', label: 'Project submissions', href: '/admin/project', icon: '⇪', show: a.can('module.submissions', 'mobile-development') },
+  { key: 'submissions', label: 'Submissions', href: '/admin/project', icon: '⇪', show: any('module.submissions') },
 ];
 // anyone who teaches (TA, doctor, module staff, super admin) handles students' forgot-password requests
 const teachingStaff = a.master || (a.user !== null && a.user.role !== 'student') || modules.length > 0;
@@ -87,7 +87,7 @@ const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessi
       {groups.map((g) => (
         <div class="ash-group">
           <p class="ash-gt mono">{g.title}</p>
-          {g.items.map((i) => <a class:list={['ash-link', { on: i.key === active }]} href={i.href} aria-current={i.key === active ? 'page' : undefined}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}{i.key === 'resets' && <span class="ash-badge" data-reset-badge hidden></span>}</a>)}
+          {g.items.map((i) => <a class:list={['ash-link', { on: i.key === active }]} href={i.href} aria-current={i.key === active ? 'page' : undefined}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}{i.key === 'resets' && <span class="ash-badge" data-reset-badge hidden></span>}{i.key === 'submissions' && <span class="ash-badge" data-sub-badge hidden></span>}</a>)}
         </div>
       ))}
     </nav>
@@ -100,7 +100,7 @@ const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessi
 
   <nav class="ash-tabbar" aria-label="Admin sections">
     {tabItems.map((i) => <a class="ash-tab" href={i.href} aria-current={i.key === active ? 'page' : undefined}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{short[i.key] ?? i.label}</a>)}
-    <button type="button" class="ash-tab" data-ash-more aria-expanded="false" aria-controls="ash-more"><span class="ash-ic" aria-hidden="true">⋯</span>More<span class="ash-badge dot" data-reset-badge hidden></span></button>
+    <button type="button" class="ash-tab" data-ash-more aria-expanded="false" aria-controls="ash-more"><span class="ash-ic" aria-hidden="true">⋯</span>More<span class="ash-badge dot" data-reset-badge hidden></span><span class="ash-badge dot" data-sub-badge hidden></span></button>
   </nav>
   <div class="ash-scrim" data-ash-scrim hidden></div>
   <div class="ash-sheet" id="ash-more" data-ash-sheet hidden role="dialog" aria-label="Admin menu">
@@ -113,7 +113,7 @@ const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessi
       <div class="ash-sheet-group">
         <p class="ash-gt mono">{g.title}</p>
         <div class="ash-sheet-grid">
-          {g.items.map((i) => <a class:list={['ash-sheet-item', { on: i.key === active }]} href={i.href}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}{i.key === 'resets' && <span class="ash-badge" data-reset-badge hidden></span>}</a>)}
+          {g.items.map((i) => <a class:list={['ash-sheet-item', { on: i.key === active }]} href={i.href}><span class="ash-ic" aria-hidden="true">{i.icon}</span>{i.label}{i.key === 'resets' && <span class="ash-badge" data-reset-badge hidden></span>}{i.key === 'submissions' && <span class="ash-badge" data-sub-badge hidden></span>}</a>)}
         </div>
       </div>
     ))}
@@ -253,6 +253,16 @@ const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessi
     badges.forEach((b) => { b.hidden = n === 0; b.textContent = n > 99 ? '99+' : String(n); b.setAttribute('aria-label', `${n} waiting`); });
   };
 
+  /** The red badge on "Submissions": hand-ins no one has opened yet (e.g. a new one on Introduction to Computing). */
+  const refreshSubmissions = async () => {
+    const badges = document.querySelectorAll<HTMLElement>('[data-sub-badge]');
+    if (!badges.length) return;
+    const d = await fetch('/api/admin/submissions/new', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const n = Number(d?.pending ?? 0);
+    const where = [...new Set(((d?.items ?? []) as { moduleTitle: string }[]).map((i) => i.moduleTitle))].join(', ');
+    badges.forEach((b) => { b.hidden = n === 0; b.textContent = n > 99 ? '99+' : String(n); b.setAttribute('aria-label', `${n} new hand-in${n === 1 ? '' : 's'}${where ? ` on ${where}` : ''}`); b.title = b.getAttribute('aria-label')!; });
+  };
+
   document.addEventListener('buenova:resets-changed', () => void refreshBadge());
   /** Back: to the last page of the site itself (remembered by the navbar), or home. */
   const wireBack = () => {
@@ -264,8 +274,9 @@ const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessi
   onPageLoad( () => {
     wireBack();
     void refreshBadge();
+    void refreshSubmissions();
     clearInterval(badgeTimer);
-    badgeTimer = window.setInterval(() => document.visibilityState === 'visible' && void refreshBadge(), 60_000);
+    badgeTimer = window.setInterval(() => { if (document.visibilityState === 'visible') { void refreshBadge(); void refreshSubmissions(); } }, 60_000);
     // Phones: scroll the menu row so the current page's pill is visible (without moving the page).
     const nav = document.querySelector<HTMLElement>('.ash-nav');
     const on = nav?.querySelector<HTMLElement>('.ash-link.on');

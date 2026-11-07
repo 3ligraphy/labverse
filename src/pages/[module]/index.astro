@@ -6,6 +6,8 @@ import { isAdmin } from '@/lib/attendance/server';
 import { moduleAccess } from '@/lib/accounts/enrolment';
 import { hubData } from '@/lib/accounts/hub';
 import { moduleTrail } from '@/lib/platform/trail';
+import { canSubmit, describeTypes, submitHref } from '@/lib/project-files/core';
+import { getFilesStore } from '@/lib/project-files/server';
 import { loadModule } from '@/lib/platform/server';
 import NeonHero from '@/components/platform/NeonHero.astro';
 import NeonOverview from '@/components/platform/NeonOverview.astro';
@@ -26,6 +28,9 @@ const trail = data ? moduleTrail(data.meta, settings.faculties) : [];
 const facultyName = settings.faculties.find((f) => f.slug === data?.meta.faculty)?.name ?? (data?.meta.faculty === 'all' ? 'Every faculty' : '');
 const yearsText = (data?.meta.years ?? '').split(',').map((y) => y.trim()).filter(Boolean).join(', ') || 'Every year';
 const lecturers = (data?.meta.lecturers ?? '').split(',').map((n) => n.trim()).filter(Boolean);
+// hand-ins the teaching team opened for this module (e.g. "Flowchart program logic submission")
+const handIns = data ? ((await getFilesStore()?.list(data.module.slug).catch(() => [])) ?? []).filter((f) => f.accepting) : [];
+const due = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo' });
 if (!data) Astro.response.status = 404;
 const color = data?.meta.color || '#7cb1ff';
 const skin = MODULE_SKINS[data?.meta.skin ?? ''] || '';
@@ -90,6 +95,18 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
 
       <div class="container module-workspace" id="workspace" style={`--module-color:${color}`}>
         {gate.locked && !gate.staff && <p class="mod-lock" role="status">🔒 Your teaching team has locked this module's labs for now. You can see the labs, but you can't open them yet.</p>}
+        {activeTab === 'overview' && handIns.length > 0 && (
+          <section class="mod-handins" aria-labelledby="handins-title">
+            <h2 id="handins-title">Hand in</h2>
+            {handIns.map((f) => (
+              <a class="mod-handin" href={submitHref(f)}>
+                <span class="mod-handin-k mono">{canSubmit(f) ? 'Open' : 'Closed'} · {describeTypes(f.accept_types)} · up to {f.max_mb} MB{f.due_at && ` · due ${due(f.due_at)}`}</span>
+                <b>{f.title}</b>
+                <span class="mod-handin-go" aria-hidden="true">→</span>
+              </a>
+            ))}
+          </section>
+        )}
         {activeTab === 'overview' && (
           <section class="mod-facts" aria-label="About this module">
             <h2>About this module</h2>
@@ -218,6 +235,13 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
   .mod-facts dt { font: 600 11.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
   .mod-facts dd { margin-top: 4px; display: grid; gap: 2px; color: var(--text); }
   .mod-facts dd a { color: var(--accent-text); overflow-wrap: anywhere; }
+  .mod-handins { margin-top: 24px; display: grid; gap: 10px; }
+  .mod-handins h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
+  .mod-handin { position: relative; display: grid; gap: 6px; padding: 18px 56px 18px 20px; border-radius: 18px; border: 1px solid color-mix(in oklab, var(--module-color) 45%, var(--line-2)); background: color-mix(in oklab, var(--module-color) 8%, var(--surface)); color: var(--text); transition: border-color var(--t-fast), transform var(--t-fast); }
+  .mod-handin:hover { border-color: var(--module-color); transform: translateY(-2px); }
+  .mod-handin b { font-size: 1.15rem; letter-spacing: -.02em; }
+  .mod-handin-k { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .mod-handin-go { position: absolute; right: 20px; top: 50%; translate: 0 -50%; font-size: 20px; color: var(--module-color); }
 </style>
 <script>
   import '@/scripts/session-card-progress';

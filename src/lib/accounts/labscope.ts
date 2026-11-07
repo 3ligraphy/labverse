@@ -15,7 +15,7 @@ export const canOnLab = (a: Access, perm: Permission, lab: string) => a.can(perm
 /** Lab dashboards (attendance, sessions, progress): either permission opens a lab; actions check their own. */
 export const canSeeLab = (a: Access, lab: string) => canOnLab(a, 'module.progress', lab) || canOnLab(a, 'module.sessions', lab);
 
-/** Project submissions belong to the built-in course: `module.submissions` on it. */
-export async function canManageSubmissions(cookies: Parameters<typeof access>[0]) {
-  return (await access(cookies)).can('module.submissions', BUILT_IN);
+/** A module's hand-ins (the built-in course's project by default): `module.submissions` on that module. */
+export async function canManageSubmissions(cookies: Parameters<typeof access>[0], module = BUILT_IN) {
+  return (await access(cookies)).can('module.submissions', module);
 }
