@@ -32,7 +32,7 @@ const labs = [
 const levels = ['Beginner', 'Intermediate', 'Advanced'].filter((d) => labs.some((l) => l.difficulty === d));
 ---
 <Base title="Labs" description="Hands-on, step-by-step labs for the Mobile Development course.">
-  <PageHeader eyebrow="Labs" title="Learn by <span class='accent'>building.</span>" lead="Hands-on sessions that take you from your first running screen to a complete app. Each lab follows the same structure, so you always know where to look." crumbs={[{ label: 'labs' }]}>
+  <PageHeader eyebrow="Labs" title="Learn by <span class='accent'>building.</span>" lead="Hands-on labs that take you from your first running screen to a complete app. Each lab follows the same structure, so you always know where to look." crumbs={[{ label: 'labs' }]}>
     {labs.length > 0 && (
       <div class="lf" role="toolbar" aria-label="Filter labs by difficulty">
         <button class="chip" aria-pressed="true" data-lf="all">All <span class="count">{labs.length}</span></button>

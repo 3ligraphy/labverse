@@ -36,6 +36,8 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ ok: false, error: 'Could not save progress.' }, 503); // the browser keeps the event and sends it again
   }
   if (!session) {
+    // with sessions off this only happens when progress tracking is not set up (every lab is open)
+    if (ALWAYS_OPEN) return json({ ok: false, error: 'Progress tracking is not set up yet.' }, 503);
     return json({ ok: false, error: 'session-closed', message: 'Your TA has not started this lab session yet. You can read the content, but you cannot start or record attendance.' }, 403);
   }
   if (!ALWAYS_OPEN && v.event.event !== 'start' && !(await progress!.isSessionStudent(session.id, v.event.studentKey))) {

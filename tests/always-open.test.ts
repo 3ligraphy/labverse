@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ALWAYS_OPEN, OPEN_LAB, moduleStats, scoreStudent, sessionState, type LabStructure } from '../src/lib/progress/core.ts';
 import { MemoryStore } from '../src/lib/progress/store.ts';
+import { validateLabEvent } from '../src/lib/lab/core.ts';
 
 const lab: LabStructure = {
   lab: 'lab-03', title: 'Lab 03', hasSubmission: false,
@@ -112,4 +113,26 @@ test('a student\'s own progress adds up every lab and session (their home page)'
   const best = p.best.map((x) => ({ ...x, attempts: 1, firstAt: '', solvedAt: null }));
   assert.equal(scoreStudent(lab, best, 1, false).solved, 1);
   assert.deepEqual((await store.studentProgress('someone-else')).best, []);
+});
+
+test('starting a lab needs no session: every permanent session id is accepted, and any other id is simply ignored', async () => {
+  const store = new MemoryStore(() => NOW);
+  const who = { name: 'Mona Adel', studentId: '240001', deviceId: 'device-0000000000001', event: 'start' };
+  const known = () => true;
+  // the ids the server hands out (open_<lab>), for course labs and module labs alike
+  for (const key of ['lab-02', 'lab-05', 'mobile-development--lab-03', 'intro-to-computing--revision-practice']) {
+    const { id } = await store.permanentSession(key);
+    const v = validateLabEvent({ ...who, lab: key, sessionId: id }, known);
+    assert.ok(v.ok, `${key}: ${v.ok ? '' : v.error}`);
+    if (v.ok) assert.equal(v.event.sessionId, id);
+  }
+  // an older permanent session made when a TA ran sessions (s_…) still works
+  const old = validateLabEvent({ ...who, lab: 'lab-02', sessionId: 's_mvwloyov_899288920010' }, known);
+  assert.ok(old.ok && old.event.sessionId === 's_mvwloyov_899288920010');
+  // no session, or one the server can't use: the student still starts (the server picks the lab's own session)
+  for (const sessionId of [undefined, '', 'not a session', 's_x', 'open_']) {
+    const v = validateLabEvent({ ...who, lab: 'lab-02', sessionId }, known);
+    assert.ok(v.ok, `sessionId ${JSON.stringify(sessionId)}: ${v.ok ? '' : v.error}`);
+    if (v.ok) assert.equal(v.event.sessionId, 'legacy');
+  }
 });

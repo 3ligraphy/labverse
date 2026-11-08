@@ -2,6 +2,7 @@
  * INTERACTIVE LAB PROGRESS — core logic (pure TypeScript; tested by tests/lab-progress.test.ts).
  * Students' browsers send events (start / check / hint); /admin reads aggregated stats.
  */
+import { ALWAYS_OPEN } from '../progress/mode.ts';
 import { validateCheckIn } from '../attendance/core.ts';
 import { looseGroup } from '../identity.ts';
 import { INTERACTIVE_LABS } from '../../lab/exercises/registry.ts';
@@ -29,9 +30,12 @@ export type LabEvent = {
   score: number | null;
 };
 
+/** Session ids: s_… (made when a TA ran a session) or open_<lab> (a lab's permanent session, ALWAYS_OPEN). */
+export const SESSION_ID = /^(?:s_[A-Za-z0-9_]{6,80}|open_[a-z0-9][a-z0-9-]{0,150})$/;
+
 /**
- * `known` lists every other lab that exists (file-based and builder labs): they may record a `start`
- * (the session gate binds the student to the session); check/hint events need an interactive definition.
+ * `known` lists every other lab that exists (file-based and builder labs): they may record a `start`;
+ * check/hint events need an interactive definition.
  */
 export function validateLabEvent(body: unknown, known: (lab: string) => boolean = () => false): { ok: true; event: LabEvent } | { ok: false; error: string } {
   const o = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
@@ -43,11 +47,13 @@ export function validateLabEvent(body: unknown, known: (lab: string) => boolean 
   const rawSessionId = String(o.sessionId ?? '').trim();
   // the group is optional and free text ("12" is tidied to "G12"); empty is shown as —
   const rawGroup = looseGroup(o.group);
-  // Legacy defaults keep the pure core/backend usable for old data and unit tests.
-  // The HTTP endpoint still requires a real, currently-open session ID.
-  const sessionId = rawSessionId || 'legacy';
+  // no id (or, with sessions off, an id the server can't use) → 'legacy': the endpoint then puts the student in
+  // the lab's permanent session. Old data and unit tests use 'legacy' too.
+  const sessionId = (SESSION_ID.test(rawSessionId) && rawSessionId) || 'legacy';
   const group = rawGroup || '—';
-  if (rawSessionId && !/^s_[A-Za-z0-9_]{6,80}$/.test(rawSessionId)) return { ok: false, error: 'This lab session is not available. Refresh the page.' };
+  // a session the TA ran (s_…) or a lab's permanent session (open_<lab>). With sessions off any other id is simply
+  // ignored: the server puts the student in the lab's permanent session, so nobody is ever turned away here.
+  if (rawSessionId && !SESSION_ID.test(rawSessionId) && !ALWAYS_OPEN) return { ok: false, error: 'This lab session is not available. Refresh the page.' };
   const event = String(o.event ?? '') as LabEventKind;
   if (!['start', 'check', 'hint'].includes(event)) return { ok: false, error: 'Unknown event.' };
   let exercise: string | null = null;

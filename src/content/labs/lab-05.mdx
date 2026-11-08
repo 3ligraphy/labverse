@@ -20,11 +20,11 @@ prerequisites:
   - 'Expo Go on your phone, or the Android emulator'
 troubleshooting:
   - problem: '"Attendance is not open yet" from the real check-in'
-    cause: 'Your TA has not opened the session yet, or has closed it.'
+    cause: 'The attendance server is not set up or not reachable right now.'
     solution: 'Check with your TA, or poll `GET /api/attendance/status` and only show the check-in button when `open` is `true`.'
   - problem: '409 "This student ID is already checked in"'
-    cause: 'You (or a classmate using your ID) already checked in this session.'
-    solution: 'This is correct behaviour, not a bug — a student ID can only check in once per session.'
+    cause: 'You (or a classmate using your ID) already checked in.'
+    solution: 'This is correct behaviour, not a bug — a student ID can only check in once.'
   - problem: '400 "deviceId" error'
     cause: 'The `deviceId` you sent is missing, or shorter than 16 characters.'
     solution: 'Generate one with `crypto.randomUUID()` and send it as-is — do not shorten or edit it.'
@@ -369,7 +369,7 @@ Both screens already handle **loading**, **empty** and **error** states — only
 
 <Cards cols={3} items={[
   { icon: 'link', title: 'REST only', text: 'This project trains REST, not GraphQL — every call below is a plain request to a real URL, nothing more.' },
-  { icon: 'cloud', title: 'A real backend', text: 'You POST and GET against the actual course attendance API — the same one your TA opens for this lab.' },
+  { icon: 'cloud', title: 'A real backend', text: 'You POST and GET against the actual course attendance API — the same one the course uses for attendance.' },
   { icon: 'cmd', title: 'Your choice', text: 'fetch or Axios — pick whichever you installed in Part 5 and use it everywhere below. Both are graded the same.' },
 ]} />
 
@@ -459,9 +459,9 @@ Note the shape of the difference: Axios never reaches the success path on a 409 
 
 </Task>
 
-<Task n="6.2" title="GET — is the session open?" time="15 min">
+<Task n="6.2" title="GET — is attendance open?" time="15 min">
 
-`GET /api/attendance/status` tells you whether the **session** is open — it does **not** tell you whether *you personally* are checked in (the API never reveals names, on purpose). Write an `attendanceOpen()` function, call it when `CheckInScreen` mounts (`useEffect`), and show "Attendance is not open yet" instead of the form when it's `false`. Whether *you* succeeded is answered by Exercise 6.1's own response (`201` vs `409`), not by this endpoint.
+`GET /api/attendance/status` tells you whether **attendance** is open — it does **not** tell you whether *you personally* are checked in (the API never reveals names, on purpose). Write an `attendanceOpen()` function, call it when `CheckInScreen` mounts (`useEffect`), and show "Attendance is not open yet" instead of the form when it's `false`. Whether *you* succeeded is answered by Exercise 6.1's own response (`201` vs `409`), not by this endpoint.
 
 Paste this into `features/attendance/api.ts` to start from:
 
@@ -553,7 +553,7 @@ This lab is practice, not a hand-in — there's nothing to submit. Before you mo
 - You can explain why a synchronous call freezes the UI and an async one doesn't
 - You can explain one reason to pick Clerk and one reason to pick BetterAuth
 - You can explain one real difference between a `fetch` call and its Axios equivalent
-- Exercise 6.1 really checks you into attendance (watch for your TA opening the session)
+- Exercise 6.1 really checks you into attendance
 - Exercise 6.2 correctly hides the form when attendance is closed
 - Exercise 6.3 shows a real Pokémon's sprite, name and types — and handles a typo without crashing
 

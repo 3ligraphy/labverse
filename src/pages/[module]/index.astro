@@ -148,7 +148,7 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
                       {compiled.meta.description && <span class="lab-d">{compiled.meta.description}</span>}
                       <span class="lab-m mono">{[compiled.meta.difficulty, compiled.meta.estimatedTime, `${tasks} task${tasks === 1 ? '' : 's'}`, exercises ? `${exercises} graded exercise${exercises === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')}</span>
                       <span class="session-progress" data-session-progress={labKey(data.module.slug, lab.slug)} data-task-ids={JSON.stringify(compiled.blocks.filter((b) => b.kind === 'task').map((b) => b.kind === 'task' ? b.n : ''))}>
-                        <span class="session-progress-label"><span data-progress-label>{tasks ? 'Task progress · saved in this browser' : 'Reading session · no tracked tasks'}</span><b data-progress-percent></b></span>
+                        <span class="session-progress-label"><span data-progress-label>{tasks ? 'Task progress · saved in this browser' : 'Reading lab · no tracked tasks'}</span><b data-progress-percent></b></span>
                         <progress max={tasks || 1} value="0" aria-label={`Task completion for ${compiled.meta.title}`} hidden={!tasks}></progress>
                       </span>
                     </span>

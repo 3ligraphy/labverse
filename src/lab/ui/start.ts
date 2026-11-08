@@ -53,12 +53,15 @@ export function mountStart(lab: string) {
     // a task's "Done" tick is a visually hidden checkbox: explain under the task header instead
     const block = target.closest<HTMLElement>('.task-head') ?? target.closest<HTMLElement>(GATED) ?? target.closest<HTMLElement>('section, article, .card') ?? target;
     const text = access === 'staff'
-      ? 'Staff preview: hand-ins and check-in are for students in a live session. Everything else runs, and nothing is recorded.'
+      ? (ALWAYS_OPEN ? 'Staff preview: hand-ins and check-in are for students. Everything else runs, and nothing is recorded.' : 'Staff preview: hand-ins and check-in are for students in a live session. Everything else runs, and nothing is recorded.')
       : access === 'practice'
       ? 'Hand-ins and check-in need a live lab session. Exercises and demos work now in practice mode.'
+      : ALWAYS_OPEN
+        // sessions are off: nothing to wait for, the student only has to press Start
+        ? (account ? 'Press Start in Start lab (your name and ID are filled in). Then you can edit, run and check.' : 'Start the lab first: enter your name and student ID in Start lab. Then you can edit, run and check.')
       : sessions.length
         ? (account ? 'Choose your time slot in Start lab and press Start. Then you can edit, run and check.' : 'Join the session first: enter your name and student ID in Start lab. Then you can edit, run and check.')
-        : ALWAYS_OPEN ? 'Connecting to the lab… Try again in a moment.' : 'This opens when your TA starts the lab session. You can read everything until then.';
+        : 'This opens when your TA starts the lab session. You can read everything until then.';
     if (note && note.previousElementSibling === block && note.dataset.text === text && Date.now() - noteAt < 4000) return;
     noteAt = Date.now();
     if (!note) {
@@ -76,7 +79,7 @@ export function mountStart(lab: string) {
       const p = document.createElement('p');
       p.textContent = text;
       note.replaceChildren(p);
-      if (access !== 'practice' && access !== 'staff' && sessions.length) {
+      if (access !== 'practice' && access !== 'staff' && (ALWAYS_OPEN || sessions.length)) {
         const go = document.createElement('button');
         go.type = 'button';
         go.className = 'btn btn-ghost btn-sm';
@@ -131,12 +134,13 @@ export function mountStart(lab: string) {
   const show = () => {
     const student = getStudent();
     const current = Boolean(student && session?.open && student.sessionId === session.id);
-    form.hidden = sessions.length === 0;
+    // with sessions off the form is always there: the server puts the student in the lab, there is nothing to wait for
+    form.hidden = !ALWAYS_OPEN && sessions.length === 0;
     if (labRoot) labRoot.dataset.sessionAccess = current ? 'active' : staff ? 'staff' : practice ? 'practice' : 'readonly';
     formBox.hidden = current;
     signed.hidden = !current;
     root.classList.toggle('is-signed', current);
-    submit.disabled = !session?.open;
+    submit.disabled = !ALWAYS_OPEN && !session?.open;
     markGated();
     if (current && student) {
       signed.querySelector('[data-ls-name]')!.textContent = student.name;
@@ -170,8 +174,8 @@ export function mountStart(lab: string) {
       session = sessions.find((item) => item.id === preferredId) ?? null;
       sessionField.hidden = sessions.length < 2;
       status.textContent = staff && !getStudent()
-        ? 'Staff preview: you can edit, run and check every exercise and demo now, without starting a session. Nothing you do here is recorded.'
-        : selfPaced && session && sessions.length === 1
+        ? `Staff preview: you can edit, run and check every exercise and demo now${ALWAYS_OPEN ? '' : ', without starting a session'}. Nothing you do here is recorded.`
+        : ALWAYS_OPEN || (selfPaced && session && sessions.length === 1)
         ? 'This lab is open any time. Enter your name and student ID to start. Your work is saved.'
         : sessions.length > 1
         ? `${sessions.length} sessions are running. Choose your time slot and TA, then enter your details.`
@@ -203,7 +207,9 @@ export function mountStart(lab: string) {
     // already in as this account; a classmate's guest identity left on a shared PC is replaced
     if (student && student.sessionId === session.id && student.id === who.id) return;
     autoTried.add(session.id);
-    status.textContent = account ? `Joining ${session.ta_name ? `${session.ta_name}’s` : 'the'} session as ${account.name}…` : `Welcome back, ${who.name}. Opening the lab…`;
+    status.textContent = account
+      ? (ALWAYS_OPEN ? `Opening the lab for ${account.name}…` : `Joining ${session.ta_name ? `${session.ta_name}’s` : 'the'} session as ${account.name}…`)
+      : `Welcome back, ${who.name}. Opening the lab…`;
     const group = account ? looseGroup(groupIn.value) : back && back.group !== '—' ? back.group : '';
     const problem = await join(who.name, who.id, group, session.id);
     if (problem) {
@@ -230,6 +236,11 @@ export function mountStart(lab: string) {
       if (!response.ok) return data.message ?? data.error ?? 'Could not start the lab. Try again.';
       // Identity is persisted only after verification, with the session the server put the student in
       const joined = typeof data.sessionId === 'string' && data.sessionId ? data.sessionId : sessionId;
+      // sessions off: the lab's session is the one the server put the student in (even if the page never got it)
+      if (ALWAYS_OPEN && joined && session?.id !== joined) {
+        session = { id: joined, open: true };
+        sessions = [session];
+      }
       setStudent({ name, id, group: group || '—', sessionId: joined });
       setProgressIdentity(name, id, group || '—', joined, sharedDeviceId);
       if (group) rememberGroup(id, group);
@@ -264,15 +275,16 @@ export function mountStart(lab: string) {
     const badId = studentIdError(id);
     if (badId) { hint(badId, idIn); return idIn.focus(); }
     groupIn.value = group;
-    if (!session?.open) {
+    if (!session?.open && !ALWAYS_OPEN) {
       err.textContent = 'Your TA has not started this session yet. You can read the lab content for now.';
       return;
     }
     err.textContent = 'Checking…';
     submit.disabled = true;
-    const problem = await join(name, id, group, session.id);
+    // with sessions off no session is needed: the server puts the student in the lab
+    const problem = await join(name, id, group, session?.open ? session.id : '');
     err.textContent = problem ?? '';
-    submit.disabled = !session?.open;
+    submit.disabled = !ALWAYS_OPEN && !session?.open;
   });
 
   signed.querySelector('[data-ls-change]')?.addEventListener('click', () => {

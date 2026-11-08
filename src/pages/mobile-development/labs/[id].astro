@@ -161,7 +161,7 @@ const sections = [
 
       {isMission && (
         <nav class="plan" data-reveal aria-label="Lab plan">
-          <p class="plan-k mono">Session plan · {totalMin} min</p>
+          <p class="plan-k mono">Lab plan · {totalMin} min</p>
           <ol class="plan-bar">
             {outline.map((p, i) => (
               <li style={`flex:${Math.max(minutes(p.time), 4)}; --c:${PART_COLORS[i % PART_COLORS.length]}; --i:${i}`}>

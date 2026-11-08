@@ -14,6 +14,7 @@ const SKIP = 'progress:skip';
 const MAX_QUEUE = 200;
 const MAX_CODE = 20_000;
 import { ID_HINT, NAME_RE, STUDENT_ID_RE as ID_RE } from '@/lib/identity';
+import { ALWAYS_OPEN } from '@/lib/progress/mode';
 
 const read = <T>(key: string, fallback: T, store: Storage = localStorage): T => {
   try {
@@ -249,17 +250,17 @@ function wireSheet() {
     if (badName || badId || badGroup) return (badName ? field('name') : badId ? field('studentId') : field('group')).focus();
     const lab = labId();
     try {
-      const sessionResponse = await fetch(`/api/progress/session?lab=${encodeURIComponent(lab)}`, { cache: 'no-store' });
-      const session = await sessionResponse.json();
-      if (!session.open || !session.id) return showSheetError('Your TA has not started this lab session yet. You can read the content for now.');
+      // sessions off: there is no session to look up, the server puts the student in the lab
+      const session = ALWAYS_OPEN ? null : await (await fetch(`/api/progress/session?lab=${encodeURIComponent(lab)}`, { cache: 'no-store' })).json();
+      if (session && (!session.open || !session.id)) return showSheetError('Your TA has not started this lab session yet. You can read the content for now.');
       const deviceKeyValue = deviceKey();
       const response = await fetch('/api/progress/start', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, studentId, deviceKey: deviceKeyValue, group, lab, sessionId: session.id }),
+        body: JSON.stringify({ name, studentId, deviceKey: deviceKeyValue, group, lab, sessionId: session?.id ?? '' }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) return showSheetError(data.message ?? 'Could not start the lab. Ask your TA.');
-      closeSheet(setProgressIdentity(name, studentId, group, session.id));
+      closeSheet(setProgressIdentity(name, studentId, group, String(data.session?.id ?? session?.id ?? '')));
     } catch {
       showSheetError('Could not reach the server. Check your connection and try again.');
     }
@@ -336,7 +337,7 @@ function wireCheckin() {
       try {
         const s = await (await fetch(`/api/progress/session?lab=${encodeURIComponent(lab)}`, { cache: 'no-store' })).json();
         if (s.open) render('open', s.closesAt ? `Check-in is open until ${clock(s.closesAt)}.` : 'Check-in is open now.');
-        else render('closed', 'Check-in opens during the lab session. Your TA will tell you when.');
+        else render('closed', ALWAYS_OPEN ? 'Check-in is not available for this lab right now. Try again later.' : 'Check-in opens during the lab session. Your TA will tell you when.');
       } catch {
         render('error', 'Could not reach the server. Try again in a moment.');
       }
