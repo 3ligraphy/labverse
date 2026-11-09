@@ -51,5 +51,5 @@ test('lecture 1 covers every PDF page exactly once, and the module lists it', as
   assert.ok(glossary.length >= 38);
   assert.equal(quickCheck.length, 5);
   assert.deepEqual(lectures.map((l) => [l.week, l.href]), [[1, '/wireless/lectures/lecture-01']]);
-  assert.deepEqual(labs.map((l) => [l.week, l.href]), [[6, '/wireless/labs/sheet-3']]);
+  assert.deepEqual(labs.map((l) => [l.week, l.href]), [[4, '/wireless/labs/sheet-2'], [6, '/wireless/labs/sheet-3']]);
 });

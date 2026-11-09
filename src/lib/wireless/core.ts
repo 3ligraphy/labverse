@@ -79,3 +79,26 @@ export function formatRate(bps: number): string {
   const [scale, unit] = units.find(([s]) => Math.abs(bps) >= s) ?? units[units.length - 1];
   return `${Number((bps / scale).toPrecision(3))} ${unit}`;
 }
+
+/* ------------------------------------------------------------ Sheet 2 helpers: the cellular concept */
+
+/** Cells per cluster for the shift parameters (i, j): N = i² + ij + j². */
+export const clusterSize = (i: number, j: number) => i * i + i * j + j * j;
+/** Reuse ratio Q = D / R = √(3N). */
+export const reuseRatio = (n: number) => Math.sqrt(3 * n);
+/** Reuse distance D = R √(3N), in the unit of R. */
+export const reuseDistance = (radius: number, n: number) => radius * reuseRatio(n);
+/** Distance between the centres of two neighbouring cells: 2R′ = √3 R, where R′ = R cos 30° is the apothem. */
+export const neighbourDistance = (radius: number) => Math.sqrt(3) * radius;
+/** Every (i, j) with i ≥ j ≥ 0 and i ≥ 1 that gives N cells per cluster (empty when N is not a valid cluster size). */
+export function shiftsFor(n: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = 1; i * i <= n; i++) for (let j = 0; j <= i; j++) if (clusterSize(i, j) === n) out.push([i, j]);
+  return out;
+}
+/** The valid cluster sizes up to and including max: 1, 3, 4, 7, 9, 12, 13, … */
+export const validClusterSizes = (max: number) =>
+  Array.from({ length: max }, (_, k) => k + 1).filter((n) => shiftsFor(n).length > 0);
+/** First-tier estimate of the signal-to-interference ratio, S/I ≈ (D/R)ⁿ / i₀, in dB. */
+export const sirDb = (n: number, pathLossExponent: number, interferers: number) =>
+  10 * Math.log10(reuseRatio(n) ** pathLossExponent / interferers);

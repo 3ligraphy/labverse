@@ -35,6 +35,13 @@ export const lectures: ModuleItem[] = [
 
 export const labs: ModuleItem[] = [
   {
+    kind: 'lab', week: 4, slug: 'sheet-2', href: '/wireless/labs/sheet-2', code: 'Sheet 2',
+    title: 'Cells, clusters & frequency reuse',
+    summary: 'Five guided questions on the cellular concept with a live hexagon cluster explorer, a step-by-step proof of N = i² + ij + j², and a sectoring simulator.',
+    topics: ['Frequency reuse', 'Cluster size', 'Reuse distance', 'Proof', 'Sectoring'],
+    meta: '5 questions · cluster explorer',
+  },
+  {
     kind: 'lab', week: 6, slug: 'sheet-3', href: '/wireless/labs/sheet-3', code: 'Sheet 3',
     title: 'Antennas & propagation',
     summary: 'Ten guided questions with checked numerical answers, step-by-step solutions, 21 formulas and a live Friis calculator.',

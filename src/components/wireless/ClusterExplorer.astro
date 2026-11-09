@@ -1,0 +1,41 @@
+---
+/**
+ * A live hexagon grid for Sheet 2: choose the shift (i, j) and see the cluster of N = i² + ij + j² cells, every channel
+ * set, the i-then-j path to the nearest co-channel cell and the six first-tier co-channel cells. Click any cell to follow
+ * its channel set. Wired up by src/scripts/wireless-sheet2.ts.
+ */
+type Props = { i: number; j: number; caption: string; triangle?: boolean; compare?: [number, number]; title?: string };
+const { i, j, caption, triangle = false, compare, title = 'Cluster explorer' } = Astro.props;
+---
+<figure class="cx" data-hexlab data-i={i} data-j={j} data-triangle={triangle ? '1' : undefined} data-compare={compare?.join(',')}>
+  <figcaption class="cx-head">
+    <p class="mono">{title.toUpperCase()}</p>
+    <span>Change the shift, then click any cell to follow its channel set.</span>
+  </figcaption>
+  <div class="cx-bar">
+    <div class="cx-stepper" role="group" aria-label="Shift i">
+      <span class="mono">i</span>
+      <button type="button" data-d="i:-1" aria-label="Decrease i">−</button>
+      <output data-out="i">{i}</output>
+      <button type="button" data-d="i:1" aria-label="Increase i">+</button>
+    </div>
+    <div class="cx-stepper" role="group" aria-label="Shift j">
+      <span class="mono">j</span>
+      <button type="button" data-d="j:-1" aria-label="Decrease j">−</button>
+      <output data-out="j">{j}</output>
+      <button type="button" data-d="j:1" aria-label="Increase j">+</button>
+    </div>
+    {compare && <button type="button" class="cx-swap" data-swap>Swap i ↔ j</button>}
+    <label class="cx-toggle"><input type="checkbox" data-borders checked /><span>Cluster borders</span></label>
+    <label class="cx-toggle"><input type="checkbox" data-labels checked /><span>Channel numbers</span></label>
+    {!triangle && <label class="cx-toggle"><input type="checkbox" data-tier checked /><span>First tier</span></label>}
+  </div>
+  <div class="cx-stage"><svg data-svg viewBox="-300 -300 600 600" role="img" aria-label="Hexagonal cell grid"></svg></div>
+  <dl class="cx-read">
+    <div><dt>N = i² + ij + j²</dt><dd data-read="n">–</dd></div>
+    <div><dt>Q = D / R = √(3N)</dt><dd data-read="q">–</dd></div>
+    <div><dt>Reuse factor 1/N</dt><dd data-read="f">–</dd></div>
+    <div><dt>Selected set</dt><dd data-read="sel">–</dd></div>
+  </dl>
+  <p class="cx-cap" data-cap aria-live="polite">{caption}</p>
+</figure>
