@@ -1,0 +1,119 @@
+---
+/**
+ * AI FOR CODING — the module rubric, as its own tab (/ai-for-coding?tab=rubric). The text lives in
+ * src/content/data/ai-for-coding-rubric.md (the same text as the module team's rubric doc) and is rendered with the
+ * site's markdown pipeline; {{diagram}} in it marks where the agent-communication drawing goes. Static: works on any
+ * browser, with a PDF copy to download. The markdown pipeline gives each ## heading its GitHub-style id, which the
+ * section links use.
+ */
+import { markdown } from '@/lib/platform/render';
+import source from '@/content/data/ai-for-coding-rubric.md?raw';
+
+const RUBRIC_PDF = '/downloads/ai-for-coding-rubric.pdf';
+const [before, after = ''] = source.split('{{diagram}}');
+const [htmlBefore, htmlAfter] = await Promise.all([markdown(before), markdown(after)]);
+const sections = [...source.matchAll(/^## (.+)$/gm)].map((m) => ({ title: m[1], id: m[1].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') }));
+---
+<section class="nx-rb" aria-labelledby="nx-rb-title">
+  <header class="nx-rb-head">
+    <p class="mono nx-rb-k">MODULE RUBRIC</p>
+    <h2 id="nx-rb-title">How the module runs, <span>and how it is marked</span></h2>
+    <div class="nx-rb-actions">
+      <a class="nx-rb-pdf" href={RUBRIC_PDF} download>Download the rubric (PDF) <span aria-hidden="true">↓</span></a>
+    </div>
+    <nav class="nx-rb-toc" aria-label="Rubric sections">
+      {sections.map((s, i) => <a href={`#${s.id}`}><span class="mono">{String(i + 1).padStart(2, '0')}</span>{s.title}</a>)}
+    </nav>
+  </header>
+
+  <div class="nx-rb-body prose">
+    <Fragment set:html={htmlBefore} />
+    <figure class="nx-rb-fig">
+      <svg viewBox="0 0 760 648" role="img" aria-labelledby="nx-rb-dia-t">
+        <title id="nx-rb-dia-t">Agents talk through MCP calls and through the repo's issues and pull requests. The student directs Claude Code and Codex; both open and review pull requests in the shared GitHub repository, and every pull request runs CI.</title>
+        <defs><marker id="nx-rb-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="dia-head" /></marker></defs>
+        <text x="24" y="34" class="dia-title">Agents talk through MCP calls and through the repo's issues and PRs</text>
+        <g class="dia-lines">
+          <path d="M300 112V132H184V152" marker-end="url(#nx-rb-arrow)" /><path d="M460 112V132H576V152" marker-end="url(#nx-rb-arrow)" />
+          <path d="M344 284H432" marker-end="url(#nx-rb-arrow)" />
+          <path d="M184 400V440" marker-end="url(#nx-rb-arrow)" /><path d="M576 400V440" marker-end="url(#nx-rb-arrow)" />
+          <path d="M380 512V552" marker-end="url(#nx-rb-arrow)" />
+        </g>
+        <rect x="220" y="56" width="320" height="56" rx="8" class="dia-main" />
+        <text x="232" y="80" class="dia-name">Student: the engineer</text>
+        <text x="232" y="98" class="dia-line dia-ink">Writes the PRD, approves commands, merges PRs</text>
+
+        <rect x="24" y="152" width="320" height="248" rx="8" class="dia-panel" />
+        <text x="40" y="174" class="dia-name">Claude Code: the orchestrator</text>
+        <rect x="40" y="184" width="288" height="56" rx="8" class="dia-box" />
+        <text x="52" y="208" class="dia-name">Subagents</text><text x="52" y="224" class="dia-line">frontend, backend, tests, security review</text>
+        <rect x="40" y="256" width="288" height="56" rx="8" class="dia-box" />
+        <text x="52" y="280" class="dia-name">Skills, hooks and CLAUDE.md</text><text x="52" y="296" class="dia-line">Team know-how, loaded every session</text>
+        <rect x="40" y="328" width="288" height="56" rx="8" class="dia-box" />
+        <text x="52" y="352" class="dia-name">MCP servers</text><text x="52" y="368" class="dia-line">Database, browser, GitHub, the team's own</text>
+
+        <rect x="416" y="152" width="320" height="248" rx="8" class="dia-panel" />
+        <text x="432" y="174" class="dia-name">Codex: the second engineer</text>
+        <rect x="432" y="184" width="288" height="56" rx="8" class="dia-box" />
+        <text x="444" y="208" class="dia-name">Codex cloud tasks</text><text x="444" y="224" class="dia-line">One issue each, run in parallel</text>
+        <rect x="432" y="256" width="288" height="56" rx="8" class="dia-box" />
+        <text x="444" y="280" class="dia-name">Codex as an MCP server</text><text x="444" y="296" class="dia-line">A second opinion inside Claude Code</text>
+        <rect x="432" y="328" width="288" height="56" rx="8" class="dia-box" />
+        <text x="444" y="352" class="dia-name">AGENTS.md</text><text x="444" y="368" class="dia-line">The same project rules, read by Codex</text>
+
+        <rect x="24" y="440" width="712" height="72" rx="8" class="dia-box" />
+        <text x="40" y="464" class="dia-name">GitHub repository: the shared workspace</text>
+        <text x="40" y="482" class="dia-line">Issues are tasks; branches and worktrees keep parallel work apart</text>
+        <text x="40" y="498" class="dia-line">Pull requests and review comments are how agents hand work to each other</text>
+
+        <rect x="24" y="552" width="712" height="72" rx="8" class="dia-box" />
+        <text x="40" y="576" class="dia-name">CI: GitHub Actions on every pull request</text>
+        <text x="40" y="594" class="dia-line">Headless Claude Code and codex exec review each change and run the tests,</text>
+        <text x="40" y="610" class="dia-line">the security check and the release notes</text>
+
+        <text x="388" y="276" text-anchor="middle" class="dia-line">MCP call</text>
+        <text x="192" y="424" class="dia-line">opens and reviews PRs</text>
+        <text x="584" y="424" class="dia-line">opens and reviews PRs</text>
+        <text x="388" y="536" class="dia-line">every PR runs CI</text>
+      </svg>
+      <figcaption>How the agents communicate: the student, Claude Code, Codex, the repository and CI.</figcaption>
+    </figure>
+    <Fragment set:html={htmlAfter} />
+  </div>
+</section>
+
+<style>
+  .nx-rb { padding-block: 40px 96px; }
+  .nx-rb-head { display: grid; gap: 14px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+  .nx-rb-k { font-size: 12px; letter-spacing: 0.16em; color: var(--accent-text); }
+  .nx-rb-head h2 { font-family: var(--font-display); font-size: clamp(1.8rem, 1rem + 2.6vw, 3rem); line-height: 1.05; text-transform: uppercase; }
+  .nx-rb-head h2 span { display: block; color: var(--text-3); }
+  .nx-rb-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .nx-rb-pdf { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 18px; border: 1px solid var(--accent-text); color: var(--accent-text); font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+  .nx-rb-pdf:hover { background: var(--accent-soft); }
+  .nx-rb-toc { display: flex; flex-wrap: wrap; gap: 6px; }
+  .nx-rb-toc a { display: inline-flex; gap: 8px; align-items: baseline; padding: 8px 12px; border: 1px solid var(--line-2); font-size: 13px; color: var(--text-2); }
+  .nx-rb-toc a:hover { border-color: var(--accent-text); color: var(--text); }
+  .nx-rb-toc .mono { font-size: 11px; color: var(--accent-text); }
+  .nx-rb-body { max-width: none; margin-top: 8px; }
+  .nx-rb-body :global(h2) { scroll-margin-top: calc(var(--nav-h) + 24px); margin-top: 56px; font-family: var(--font-display); text-transform: uppercase; }
+  .nx-rb-body :global(p), .nx-rb-body :global(ol), .nx-rb-body :global(ul) { max-width: 72ch; }
+  /* wide tables (the marking rubric has 8 columns) scroll sideways instead of widening the page */
+  .nx-rb-body :global(table) { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; font-size: 14px; }
+  .nx-rb-body :global(th), .nx-rb-body :global(td) { min-width: 120px; padding: 10px 12px; border: 1px solid var(--line-2); vertical-align: top; text-align: left; }
+  .nx-rb-body :global(th) { background: var(--surface-2); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em; }
+  .nx-rb-body :global(td:first-child) { min-width: 0; font-weight: 600; }
+  .nx-rb-fig { margin: 28px 0; padding: 16px; border: 1px solid var(--line-2); background: var(--surface); }
+  .nx-rb-fig svg { display: block; width: 100%; height: auto; font-family: var(--font-body); font-size: 13px; }
+  .nx-rb-fig figcaption { margin-top: 10px; font-size: 13px; color: var(--text-3); }
+  .dia-title { font-size: 15px; font-weight: 600; fill: var(--text); }
+  .dia-name { font-weight: 600; fill: var(--text); }
+  .dia-line { font-size: 11.5px; fill: var(--text-3); }
+  .dia-ink { fill: var(--text); }
+  .dia-lines path { fill: none; stroke: var(--text-3); stroke-width: 1.25; }
+  .dia-head { fill: var(--text-3); }
+  .dia-box { fill: none; stroke: var(--line-2); stroke-width: 1.25; }
+  .dia-panel { fill: var(--surface-2); stroke: var(--line-2); stroke-width: 1.25; }
+  .dia-main { fill: var(--accent-soft); stroke: var(--accent-text); stroke-width: 2; }
+</style>
+
