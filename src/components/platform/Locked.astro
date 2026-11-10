@@ -1,20 +1,19 @@
 ---
-/** Shown instead of an invitation-only module (or its labs) to someone who isn't enrolled. */
-interface Props { title: string; code?: string; color?: string; description?: string; signedIn: boolean; next: string }
-const { title, code, color = '#7cb1ff', description, signedIn, next } = Astro.props;
+/** Shown instead of a lab whose module staff have locked. Students still see the module and its list of labs. */
+interface Props { title: string; code?: string; color?: string; description?: string; back: string }
+const { title, code, color = '#7cb1ff', description, back } = Astro.props;
 ---
 <section class="lk" style={`--c:${color}`}>
   <div class="lk-sky" aria-hidden="true"></div>
   <div class="container lk-in glass">
     <span class="lk-ic" aria-hidden="true">🔒</span>
-    <p class="lk-k mono">{code || 'Module'} · invitation only</p>
+    <p class="lk-k mono">{code || 'Module'} · locked</p>
     <h1>{title}</h1>
     {description && <p class="lk-d">{description}</p>}
-    <p class="lk-why">You join this module through an <b>invitation from its module leader</b>, or when the teaching team enrols you. {signedIn ? 'Your account is not enrolled yet.' : 'If you were enrolled, sign in with that email.'}</p>
+    <p class="lk-why">Your teaching team has <b>locked this module's labs</b> for now. You can still see the module and its list of labs. Check back later.</p>
     <div class="lk-act">
-      {!signedIn && <a class="btn btn-primary" href={`/login?next=${encodeURIComponent(next)}`}>Sign in</a>}
-      <a class="btn btn-ghost" href="/">Your modules</a>
-      <a class="btn btn-ghost" href="/modules">Find a module</a>
+      <a class="btn btn-primary" href={back}>Back to the module</a>
+      <a class="btn btn-ghost" href="/modules">All modules</a>
     </div>
   </div>
 </section>

@@ -1,8 +1,8 @@
 /** POST /api/progress/start — join the currently active lab session with name, ID and group. */
 import type { APIRoute } from 'astro';
-import { sessionState, validateIdentity } from '@/lib/progress/core';
-import { cleanGroup, groupError } from '@/lib/identity';
-import { getProgressStore, getStructures, json } from '@/lib/progress/server';
+import { validateIdentity } from '@/lib/progress/core';
+import { looseGroup } from '@/lib/identity';
+import { LOCKED_MESSAGE, getProgressStore, getStructures, json, labLocked, liveSession } from '@/lib/progress/server';
 
 export const prerender = false;
 
@@ -12,21 +12,19 @@ export const POST: APIRoute = async ({ request }) => {
   if (!identity.ok) return json({ error: 'invalid', errors: identity.errors }, 400);
   const lab = String(body?.lab ?? '');
   const sessionId = String(body?.sessionId ?? '');
-  const group = cleanGroup(body?.group);
-  if (!(await getStructures()).some((item) => item.lab === lab) || groupError(group) !== null) {
-    return json({ error: 'invalid', message: groupError(group) ?? 'Unknown lab.' }, 400);
-  }
+  const group = looseGroup(body?.group) || '—';
+  if (!(await getStructures()).some((item) => item.lab === lab)) return json({ error: 'invalid', message: 'Unknown lab.' }, 400);
   const store = getProgressStore();
   if (!store) return json({ error: 'closed', message: 'Progress tracking is not set up.' }, 503);
   try {
-    const session = await store.getSessionById(sessionId);
-    if (!session || session.lab !== lab || !sessionState(session, Date.now()).open) {
+    if (await labLocked(lab)) return json({ error: 'locked', message: LOCKED_MESSAGE }, 403);
+    // with sessions off this is always the lab's permanent session when the one asked for has ended
+    const session = await liveSession(store, lab, sessionId);
+    if (!session) {
       return json({ error: 'session-closed', message: 'Your TA has not started this lab session yet. You can still read the content.' }, 403);
     }
-    if ((await store.touchStudent(identity.value)) === 'conflict') {
-      return json({ error: 'device', message: 'This student ID was already used with a different name. Type your name exactly as you did before, or ask your TA to fix it.' }, 409);
-    }
-    await store.joinSession(sessionId, identity.value.studentKey, group);
+    await store.touchStudent(identity.value);
+    await store.joinSession(session.id, identity.value.studentKey, group);
     return json({ ok: true, session });
   } catch (error) {
     console.error('[progress] session start failed', error);

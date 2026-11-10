@@ -14,13 +14,12 @@ export class ProgressLabBackend implements LabBackend {
   }
 
   async record(event: LabEvent) {
-    const identity = await this.store.touchStudent({
+    await this.store.touchStudent({
       studentKey: event.studentKey,
       studentId: event.studentId,
       name: event.name,
       deviceKey: event.deviceId,
     });
-    if (identity === 'conflict') throw new Error('identity-conflict');
     await this.store.joinSession(event.sessionId, event.studentKey, event.group);
 
     if (event.event !== 'check' || !event.exercise) return;

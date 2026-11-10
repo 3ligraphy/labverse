@@ -7,7 +7,8 @@
 import type { APIRoute } from 'astro';
 import { clientIp } from '@/lib/attendance/server';
 import { getProgressStore, json } from '@/lib/progress/server';
-import { ID_RE, canSubmit, describeTypes, extensionsFor, isBlobUrl, isLate, matchesSignature, maxBytes, parseEntry, pastCutoff, safeFileName, typeForName } from '@/lib/project-files/core';
+import { ID_RE, canSubmit, describeTypes, extensionsFor, isBlobUrl, isLate, matchesSignature, maxBytes, needsGroup, parseEntry, pastCutoff, safeFileName, typeForName } from '@/lib/project-files/core';
+import { isLocked } from '@/lib/accounts/enrolment';
 import { deleteStored, entryFolder, getFilesStore, saveLocal, storageMode, verifyUpload } from '@/lib/project-files/server';
 
 export const prerender = false;
@@ -68,7 +69,8 @@ export const POST: APIRoute = async ({ params, request, clientAddress }) => {
     };
 
     if (!canSubmit(file)) return reject(pastCutoff(file, Date.now()) ? 'The cut-off has passed. Hand-ins are closed.' : 'This submission is closed.', 403);
-    const who = parseEntry(fields);
+    if (await isLocked(file.module).catch(() => false)) return reject('This module is locked by your teaching team for now.', 403);
+    const who = parseEntry(fields, needsGroup(file));
     if (!who.ok) return reject(who.error, 400);
     const existing = await store.findEntry(file.id, who.value.studentId);
 

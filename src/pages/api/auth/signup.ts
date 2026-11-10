@@ -1,7 +1,7 @@
 /**
  * POST /api/auth/signup — a student creates an account (optional: students can still just type their
- * name and ID in each lab). { name, email, password, studentId, faculty, year, specialization, modules[] }
- * (faculty: a faculty slug, needed only when the catalogue has more than one)
+ * name and ID in each lab). { name, email, password, studentId } — the module questions (faculty, year,
+ * specialization, optional modules) come right after, on /welcome. Older forms may still send them here.
  */
 import type { APIRoute } from 'astro';
 import { clientIp } from '@/lib/attendance/server';
@@ -21,12 +21,16 @@ export const POST: APIRoute = async ({ request, cookies, url, clientAddress }) =
   const account = parseAccount({ ...body, role: 'student' }, ['student']);
   if (!account.ok) return json({ error: account.error }, 400);
   try {
-    const { settings, optional } = await hubData();
-    const profile = parseProfile(body, settings, optional);
-    if (!profile.ok) return json({ error: profile.error }, 400);
+    let answers;
+    if (body.year) {
+      const { settings, optional } = await hubData();
+      const profile = parseProfile(body, settings, optional);
+      if (!profile.ok) return json({ error: profile.error }, 400);
+      answers = profile.value;
+    }
     const blocked = signupBlock(account.value.email, await store.emailHolds(account.value.email));
     if (blocked) return json({ error: blocked }, 409);
-    const user = await store.create(account.value, profile.value);
+    const user = await store.create(account.value, answers);
     if (!user) return json({ error: 'That email or student ID already has an account. Sign in instead.' }, 409);
     startUserSession(cookies, user, url.protocol === 'https:');
     return json({ user: publicUser(user) }, 201);

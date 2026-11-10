@@ -1,13 +1,12 @@
 /** POST /api/progress/checkin — end-of-lab check-in: { name, studentId, deviceKey, lab }. Only while the admin has it open. */
 import type { APIRoute } from 'astro';
-import { clientIp } from '@/lib/attendance/server';
-import { ATTENDANCE_MIN_ACTIVE_SEC, ATTENDANCE_MIN_SEEN, attendanceEligibility, sessionState, validateCheckin } from '@/lib/progress/core';
-import { getProgressStore, getStructures, json } from '@/lib/progress/server';
+import { ALWAYS_OPEN, ATTENDANCE_MIN_ACTIVE_SEC, ATTENDANCE_MIN_SEEN, attendanceEligibility, sessionState, validateCheckin } from '@/lib/progress/core';
+import { getProgressStore, getStructures, isPermanent, json, liveSession, sessionScope } from '@/lib/progress/server';
 
 export const prerender = false;
 
 const WINDOW_SEC = 10 * 60;
-export const POST: APIRoute = async ({ request, clientAddress }) => {
+export const POST: APIRoute = async ({ request }) => {
   const body = await request.json().catch(() => null);
   const valid = validateCheckin(body, await getStructures());
   if (!valid.ok) return json({ error: 'invalid', errors: valid.errors }, 400);
@@ -18,9 +17,10 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   const sessionId = String((body as Record<string, unknown>)?.sessionId ?? '');
 
   try {
-    const session = sessionId ? await store.getSessionById(sessionId) : null;
-    if (!session || session.lab !== c.lab) return json({ error: 'closed', message: 'This lab session is not active.' }, 403);
-    const existing = await store.studentData(c.lab, c.studentKey, sessionId);
+    const session = await liveSession(store, c.lab, sessionId);
+    if (!session) return json({ error: 'closed', message: 'This lab session is not active.' }, 403);
+    // with sessions off, minutes and sections read in any session of the lab count
+    const existing = await store.studentData(c.lab, c.studentKey, ALWAYS_OPEN ? await sessionScope(store, c.lab, null) : session.id);
     // An accepted check-in is immutable and idempotent, from whichever device asks.
     if (existing.checkin) return json({ ok: true, at: existing.checkin });
     const activeSec = existing.views?.active_sec ?? 0;
@@ -28,23 +28,16 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     const eligible = attendanceEligibility({ student: existing.student, name: c.name, activeSec, seen });
     if (!eligible.ok && eligible.reason === 'identity') {
       return json(
-        { error: 'identity', message: 'This check-in does not match the name and student ID that started the lab. Ask your TA to verify it.' },
+        { error: 'identity', message: 'Start the lab with your name and student ID first (top of the page), then check in.' },
         409,
       );
     }
-    // Count a student-specific attempt only after the immutable name matches.
-    // Otherwise an attacker who knows an ID could lock that student out.
-    const [deviceTries, studentTries, networkTries] = await Promise.all([
-      store.hit(`checkin:${sessionId}:device:${c.deviceKey}`, WINDOW_SEC),
-      store.hit(`checkin:${sessionId}:student:${c.studentKey}`, WINDOW_SEC),
-      store.hit(`checkin:network:${clientIp(request, clientAddress)}`, WINDOW_SEC),
-    ]);
-    // The network ceiling is intentionally high because a whole lab may share campus Wi-Fi.
-    if (deviceTries > 8 || studentTries > 8 || networkTries > 250) {
-      return json({ error: 'slow-down', message: 'Too many check-in attempts. Wait ten minutes or ask your TA.' }, 429);
+    // a flood guard per student only: shared lab PCs and campus Wi-Fi never block anyone
+    if ((await store.hit(`checkin:${session.id}:student:${c.studentKey}`, WINDOW_SEC)) > 30) {
+      return json({ error: 'slow-down', message: 'Too many check-in attempts. Wait a few minutes.' }, 429);
     }
 
-    if (!sessionState(session, Date.now()).open) {
+    if (!sessionState(session, Date.now()).open && !(ALWAYS_OPEN && isPermanent(session))) {
       return json({ error: 'closed', message: 'Check-in for this lab is closed. Ask your TA.' }, 403);
     }
 
@@ -52,14 +45,14 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       return json(
         {
           error: 'participation',
-          message: `Attendance needs at least 5 active minutes and 3 viewed lab sections on this same device. Recorded: ${Math.floor(activeSec / 60)} min and ${seen} sections.`,
+          message: `Attendance needs at least 5 active minutes and 3 viewed lab sections. Recorded: ${Math.floor(activeSec / 60)} min and ${seen} sections.`,
           requirements: { activeSec: ATTENDANCE_MIN_ACTIVE_SEC, seen: ATTENDANCE_MIN_SEEN },
         },
         403,
       );
     }
 
-    return json({ ok: true, at: await store.checkIn(c.studentKey, c.lab, sessionId) });
+    return json({ ok: true, at: await store.checkIn(c.studentKey, c.lab, session.id) });
   } catch (error) {
     console.error('[progress] secure check-in failed', error);
     return json({ error: 'server', message: 'Could not verify attendance. Try again in a moment.' }, 500);

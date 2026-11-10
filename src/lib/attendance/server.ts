@@ -10,6 +10,7 @@
  */
 import type { AstroCookies } from 'astro';
 import { getSecret } from 'astro:env/server';
+import { ALL_STAFF_FULL } from '@/lib/accounts/permissions';
 import { Redis } from '@upstash/redis';
 import {
   AttendanceStore,
@@ -101,10 +102,10 @@ export function isAdmin(cookies: AstroCookies): boolean {
   return r === 'super_admin' || r === 'doctor' || r === 'ta';
 }
 
-/** Doctors only: the master password or a doctor account (module builder, accounts, CMS). */
+/** Doctors only: the master password or a doctor account (module builder, accounts, CMS) — every staff account while ALL_STAFF_FULL is on. */
 export function isDoctor(cookies: AstroCookies): boolean {
   const r = viewer(cookies)?.r;
-  return masterAdmin(cookies) || r === 'super_admin' || r === 'doctor';
+  return masterAdmin(cookies) || r === 'super_admin' || r === 'doctor' || (ALL_STAFF_FULL && r === 'ta');
 }
 
 export function passwordMatches(input: string): boolean {

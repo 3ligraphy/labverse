@@ -31,9 +31,9 @@ export const POST: APIRoute = async ({ request }) => {
       case 'ok':
         return json({ ok: true, entry: r.entry }, 201);
       case 'device':
-        return json({ error: 'device', entry: r.entry ?? null, message: 'This device has already been used to check in.' }, 409);
       case 'id':
-        return json({ error: 'id', errors: { studentId: 'This student ID is already checked in.' } }, 409);
+        // the same student ID again (from any device): they are checked in already, which is what they wanted
+        return json({ ok: true, already: true, entry: 'entry' in r ? r.entry ?? null : null });
       case 'full':
         return json({ error: 'full', message: 'The attendance list is full. Please tell your TA.' }, 503);
     }

@@ -41,10 +41,12 @@ test('identity: valid input is normalised, student key is lower-case', () => {
   }
 });
 
-test('identity: bad name, id and device are rejected with messages', () => {
+test('identity: only the name and the id are checked (the device never blocks)', () => {
   const r = validateIdentity({ name: 'M1', studentId: '!!', deviceKey: 'x' });
   assert.equal(r.ok, false);
-  if (!r.ok) assert.deepEqual(Object.keys(r.errors).sort(), ['deviceKey', 'name', 'studentId']);
+  if (!r.ok) assert.deepEqual(Object.keys(r.errors).sort(), ['name', 'studentId']);
+  const odd = validateIdentity({ name: 'Mariam Ahmed', studentId: '236541', deviceKey: 'x' });
+  assert.ok(odd.ok && odd.value.deviceKey === 'unknown-device-0000');
   assert.equal(validateIdentity(null).ok, false);
 });
 
@@ -156,11 +158,11 @@ test('session details accept normal timetable notation', () => {
 
 const ident = (key: string, device = DEVICE, name = 'Mariam Ahmed') => ({ name, studentId: key.toUpperCase(), studentKey: key, deviceKey: device });
 
-test('store: a student may use any device, but the name stays fixed', async () => {
+test('store: any device, and the name typed last is kept (no locks)', async () => {
   const s = new MemoryStore();
   assert.equal(await s.touchStudent(ident('236541')), 'ok');
-  assert.equal(await s.touchStudent(ident('236541', DEVICE, 'Mariam A. Ahmed')), 'conflict', 'name cannot be changed after identity is set');
-  assert.equal((await s.studentData('lab-02', '236541')).student?.name, 'Mariam Ahmed');
+  assert.equal(await s.touchStudent(ident('236541', DEVICE, 'Mariam A. Ahmed')), 'ok', 'a different spelling is accepted');
+  assert.equal((await s.studentData('lab-02', '236541')).student?.name, 'Mariam A. Ahmed');
   assert.equal(await s.touchStudent(ident('236541', 'dev-bbbbbbbbbbbbbbbbbbbb')), 'ok', 'same student from another device');
   assert.equal(await s.touchStudent(ident('236541')), 'ok', 'and back to the first device');
   assert.equal(await s.touchStudent(ident('999999')), 'ok', 'a shared PC can be used by another student');
@@ -238,12 +240,12 @@ test('sessionState: none, open with and without a limit, expired', () => {
   assert.equal(sessionState({ opens_at: '2026-10-05T11:00:00Z', closes_at: '2026-10-05T11:30:00Z' }, now).open, false);
 });
 
-test('attendance eligibility requires the original identity and meaningful participation, from any device', () => {
+test('attendance eligibility: the student started the lab and took part (any name spelling, any device)', () => {
   const student = { name: 'Mariam Ahmed', device_key: 'dev-bbbbbbbbbbbbbbbbbbbb' };
   const check = (change: object = {}) => attendanceEligibility({ student, name: 'Mariam Ahmed', activeSec: 300, seen: 3, ...change });
   assert.deepEqual(check(), { ok: true });
   assert.deepEqual(check({ student: null }), { ok: false, reason: 'identity' });
-  assert.deepEqual(check({ name: 'Another Student' }), { ok: false, reason: 'identity' });
+  assert.deepEqual(check({ name: 'Mariam A. Ahmed' }), { ok: true });
   assert.deepEqual(check({ activeSec: 299 }), { ok: false, reason: 'participation' });
   assert.deepEqual(check({ seen: 2 }), { ok: false, reason: 'participation' });
 });

@@ -1,5 +1,5 @@
 ---
-/** /attendance — students check in once per device (name + student ID). */
+/** /attendance — students check in with their name and student ID, from any device (shared lab PCs too). */
 import Base from '@/layouts/Base.astro';
 import { course } from '@/site.config';
 ---
@@ -11,7 +11,7 @@ import { course } from '@/site.config';
         <div class="att-head">
           <span class="att-badge mono"><span class="att-dot"></span>{course.code} · Attendance</span>
           <h1 class="att-title">Check in</h1>
-          <p class="att-sub">Type your name and student ID, then press <b>Submit</b>. Each device can check in only once.</p>
+          <p class="att-sub">Type your name and student ID, then press <b>Submit</b>.</p>
         </div>
 
         <form class="att-form" data-att-form novalidate>
@@ -22,7 +22,7 @@ import { course } from '@/site.config';
           </label>
           <label class="fld">
             <span class="fld-l">Student ID</span>
-            <input class="input fld-i mono" name="studentId" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" required placeholder="e.g. 236541" />
+            <input class="input fld-i mono" name="studentId" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="12" required placeholder="e.g. 236541" />
             <span class="fld-e" data-err="studentId"></span>
           </label>
           <p class="form-e" data-err="form" role="alert"></p>
@@ -42,7 +42,7 @@ import { course } from '@/site.config';
             <div><dt>Student ID</dt><dd class="mono" data-done-id></dd></div>
             <div><dt>Checked in</dt><dd class="mono" data-done-time></dd></div>
           </dl>
-          <p class="done-note">This device can't be used to check in again.</p>
+          <button class="btn btn-ghost att-again" type="button" data-att-again>Check in another student</button>
         </div>
       </div>
     </div>
@@ -91,7 +91,7 @@ import { course } from '@/site.config';
   .done-dl > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 14px; background: var(--surface); }
   .done-dl dt { font-size: 12px; color: var(--text-3); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
   .done-dl dd { font-weight: 600; color: var(--text); text-align: right; overflow-wrap: anywhere; }
-  .done-note { font-size: 12.5px; color: var(--text-3); margin-top: 8px; }
+  .att-again { margin-top: 10px; }
   @media (prefers-reduced-motion: reduce) { .done-ic svg { stroke-dashoffset: 0; } }
 </style>
 
@@ -150,10 +150,14 @@ import { course } from '@/site.config';
       root.querySelector('[data-done-msg]')!.textContent = msg;
     };
 
-    const saved = ls.get(LS_ENTRY);
-    if (saved) {
-      try { return showDone(JSON.parse(saved), 'You already checked in on this device.'); } catch {}
-    }
+    // a shared lab PC: the next student checks in on the same page
+    root.querySelector('[data-att-again]')?.addEventListener('click', () => {
+      root.classList.remove('is-done');
+      done.hidden = true;
+      form.hidden = false;
+      form.reset();
+      form.querySelector<HTMLInputElement>('[name="name"]')?.focus();
+    });
 
     const clearErrors = () => {
       for (const k of ['name', 'studentId', 'form']) errEl(k).textContent = '';
@@ -182,13 +186,9 @@ import { course } from '@/site.config';
           ls.set(LS_ENTRY, JSON.stringify(body.entry));
           return showDone(body.entry, "You're checked in.");
         }
-        if (body.error === 'device') {
-          if (body.entry) {
-            ls.set(LS_ENTRY, JSON.stringify(body.entry));
-            return showDone(body.entry, 'This device was already used to check in.');
-          }
-          errEl('form').textContent = body.message || 'This device was already used to check in.';
-          return;
+        if (body.already) {
+          const entry = body.entry ?? { n: 0, name: payload.name.trim(), id: payload.studentId.replace(/\s+/g, ''), at: new Date().toISOString() };
+          return showDone(entry, 'You were already checked in.');
         }
         if (body.errors) return fieldErrors(body.errors);
         errEl('form').textContent = body.message || 'Something went wrong. Please try again.';

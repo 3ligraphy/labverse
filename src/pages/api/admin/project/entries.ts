@@ -15,7 +15,7 @@ import { deleteStored, getFilesStore } from '@/lib/project-files/server';
 export const prerender = false;
 
 export const GET: APIRoute = async ({ url, cookies }) => {
-  if (!(await canManageSubmissions(cookies))) return json({ error: 'Unauthorized' }, 401);
+  if (!isAdmin(cookies)) return json({ error: 'Unauthorized' }, 401);
   const store = getFilesStore();
   if (!store) return json({ error: 'No database is connected.' }, 503);
   try {
@@ -27,6 +27,7 @@ export const GET: APIRoute = async ({ url, cookies }) => {
     }
     const file = await store.get(url.searchParams.get('file') ?? '');
     if (!file) return json({ error: 'Not found.' }, 404);
+    if (!(await canManageSubmissions(cookies, file.module))) return json({ error: 'Unauthorized' }, 401);
     const entries = await store.listEntries(file.id);
     if (url.searchParams.get('format') === 'csv') {
       const name = file.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'submissions';

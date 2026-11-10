@@ -1,20 +1,33 @@
 /**
- * PROJECT SUBMISSIONS — rules. Items the teaching team publishes on /project (e.g. "Project proposal
- * submission"), optionally with a PDF attached, and the files students hand in for them on /submit/[id].
+ * PROJECT SUBMISSIONS — rules. Items the teaching team publishes for a module (e.g. "Project proposal
+ * submission" in Mobile Development, "Flowchart program logic submission" in Introduction to Computing),
+ * optionally with a PDF attached, and the files students hand in for them on <module>/submit/[id].
  * Pure functions only, so they are unit-tested (tests/project-files.test.ts).
  */
 
 /** Admin attachments (briefs, forms) are always PDFs. */
 export const MAX_PDF_BYTES = 20 * 1024 * 1024;
-/** Student hand-ins: default and ceiling per file. 200 students × 4 MB stays under Vercel Blob's free 1 GB. */
+/** Student hand-ins: default and ceiling per file (Vercel Blob's free plan holds 1 GB in all). */
 export const DEFAULT_MAX_MB = 4;
-export const MAX_MB_LIMIT = 10;
+export const MAX_MB_LIMIT = 25;
+/** The built-in course: its items live on /mobile-development/project and ask for a project group number. */
+export const COURSE_MODULE = 'mobile-development';
 /** How long a newly published item is announced (banner + NEW badge). */
 export const NEW_FOR_MS = 14 * 24 * 60 * 60 * 1000;
 
-export const KINDS = ['proposal', 'brief', 'template', 'other'] as const;
+export const KINDS = ['proposal', 'brief', 'template', 'other', 'submission'] as const;
 export type Kind = (typeof KINDS)[number];
-export const KIND_LABEL: Record<Kind, string> = { proposal: 'Proposal submission', brief: 'Brief', template: 'Template', other: 'Document' };
+export const KIND_LABEL: Record<Kind, string> = { proposal: 'Proposal submission', brief: 'Brief', template: 'Template', other: 'Document', submission: 'Submission' };
+
+/** Hand-in items the site ships itself: created once in the database (staff can edit or remove them after). */
+export const SHIPPED_ITEMS = [
+  {
+    id: 'intro-to-computing-flowchart', module: 'intro-to-computing', kind: 'submission' as Kind,
+    title: 'Flowchart program logic submission',
+    description: 'Put your flowchart and your program logic in one ZIP file and hand it in here.\n\nType your full name and your student ID first. The ZIP file can be up to 25 MB. You can hand in again before it closes: the new file replaces the old one.',
+    accept_types: ['zip'] as FileType[], max_mb: 25, accepting: true,
+  },
+];
 
 /* ------------------------------------------------------------- file types */
 
@@ -73,8 +86,10 @@ export type ProjectFile = {
   url: string | null;
   pathname: string | null;
   size: number | null;
-  /** Students can hand in on /submit/[id]. */
+  /** Students can hand in on <module>/submit/[id]. */
   accepting: boolean;
+  /** The module the item belongs to (its page and its staff). */
+  module: string;
   accept_types: FileType[];
   max_mb: number;
   published_by: string;
@@ -189,19 +204,24 @@ export const TEAM_NUMBER_ERROR = 'That looks like a student ID or lab group code
 export type EntryInput = { name: string; studentId: string; group: string; note: string; deviceKey: string };
 
 /** Validates a student's hand-in details. The student ID is the key: one hand-in per student per item. */
-export function parseEntry(input: Record<string, unknown>): Result<EntryInput> {
+/** Only the built-in course's items ask for a project group number. */
+export const needsGroup = (file: Pick<ProjectFile, 'module'>) => file.module === COURSE_MODULE;
+/** Where students hand in for an item. */
+export const submitHref = (file: Pick<ProjectFile, 'id' | 'module'>) => `/${file.module}/submit/${encodeURIComponent(file.id)}`;
+
+export function parseEntry(input: Record<string, unknown>, group = true): Result<EntryInput> {
   const name = text(input.name).normalize('NFC').replace(/\s+/g, ' ');
   const studentId = text(input.studentId).toUpperCase();
-  const group = text(input.group).replace(/\s+/g, ' ');
+  const team = group ? text(input.group).replace(/\s+/g, ' ') : '';
   const note = text(input.note);
   const deviceKey = text(input.deviceKey);
   if (name.length < 2 || name.length > 60 || !NAME_RE.test(name)) return { ok: false, error: 'Please type your full name (letters only).' };
   if (!ID_RE.test(studentId)) return { ok: false, error: 'Your student ID should be 3–20 letters or numbers.' };
-  if (!group || group.length > 30) return { ok: false, error: 'Enter your project group number (for example, 7).' };
-  if (notATeamNumber(group)) return { ok: false, error: TEAM_NUMBER_ERROR };
+  if (group && (!team || team.length > 30)) return { ok: false, error: 'Enter your project group number (for example, 7).' };
+  if (group && notATeamNumber(team)) return { ok: false, error: TEAM_NUMBER_ERROR };
   if (note.length > 500) return { ok: false, error: 'Keep the note under 500 characters.' };
   if (!DEVICE_RE.test(deviceKey)) return { ok: false, error: 'Refresh the page and try again.' };
-  return { ok: true, value: { name, studentId, group, note, deviceKey } };
+  return { ok: true, value: { name, studentId, group: team, note, deviceKey } };
 }
 
 export const maxBytes = (file: Pick<ProjectFile, 'max_mb'>) => file.max_mb * 1024 * 1024;

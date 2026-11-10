@@ -2,24 +2,19 @@
 /**
  * Accounts & roles. Each panel appears only with its permission:
  *   Roles & permissions matrix (super admin) · invite / create staff (accounts.staff) · account list
- *   (accounts.manage) · platform settings (platform.settings) · module teams (module leaders).
+ *   (accounts.manage) · platform settings (platform.settings).
  */
 import Base from '@/layouts/Base.astro';
 import { access } from '@/lib/accounts/access';
-import { MATRIX_ROLES, PERMISSIONS, PERMISSION_KEYS, ROLE_NAMES, modulesWith } from '@/lib/accounts/permissions';
+import { ALL_STAFF_FULL, MATRIX_ROLES, PERMISSIONS, PERMISSION_KEYS, ROLE_NAMES } from '@/lib/accounts/permissions';
 import { getAccountStore } from '@/lib/accounts/server';
-import { BUILT_IN_MODULE, getPlatformStore } from '@/lib/platform/server';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'no-store, max-age=0');
 const a = await access(Astro.cookies);
 const can = Object.fromEntries(PERMISSION_KEYS.map((p) => [p, a.can(p)])) as Record<string, boolean>;
-const teamModules = can['platform.roles']
-  ? [BUILT_IN_MODULE.slug, ...((await getPlatformStore()?.listModules().catch(() => [])) ?? []).map((m) => m.slug).filter((s) => s !== BUILT_IN_MODULE.slug)]
-  : modulesWith(a.matrix, a.who, 'module.invite');
-if (!Object.values(can).some(Boolean) && !teamModules.length) return Astro.redirect('/login?next=/admin/accounts', 303);
+if (!Object.values(can).some(Boolean)) return Astro.redirect('/login?next=/admin/accounts', 303);
 const enabled = Boolean(getAccountStore());
-const titles = new Map([[BUILT_IN_MODULE.slug, BUILT_IN_MODULE.title], ...(((await getPlatformStore()?.listModules().catch(() => [])) ?? []).map((m) => [m.slug, m.title] as [string, string]))]);
 const roleLabel = a.who.platformRole ? ROLE_NAMES[a.who.platformRole] : a.master ? 'Admin password' : '';
 import AdminShell from '@/components/admin/AdminShell.astro';
 ---
@@ -30,7 +25,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       <div>
         <p class="ac-k mono">Admin workspace · {roleLabel}</p>
         <h1>Accounts &amp; roles</h1>
-        <p class="muted">Super admins control roles and permissions. Module leaders build their teams and invite students. Students sign in optionally, or type their name and ID in each lab.</p>
+        <p class="muted">{ALL_STAFF_FULL ? 'For now every staff account can do everything. Create staff accounts and look after accounts here.' : 'Super admins control roles and permissions. Module leaders build their teams and invite students.'} Students sign in optionally, or type their name and ID in each lab.</p>
       </div>
       <div class="ac-links"><a class="btn btn-ghost btn-sm" href="/admin/sessions">Sessions</a><a class="btn btn-ghost btn-sm" href="/admin/builder">Builder</a><a class="btn btn-ghost btn-sm" href="/account">My profile</a></div>
     </header>
@@ -39,15 +34,14 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       <div class="ac-card"><h2>Accounts are off</h2><p class="muted">They need a database plus ADMIN_PASSWORD or SESSION_SECRET.</p></div>
     ) : (
       <>
-        {teamModules.length > 0 && (
+        {can['platform.roles'] && ALL_STAFF_FULL && (
           <section class="ac-card">
-            <h2>Module teams</h2>
-            <p class="muted small">Invite staff and students to a module, or create their accounts.</p>
-            <div class="ac-teams">{teamModules.map((m) => <a class="ac-team" href={`/admin/team/${m}`}><b>{titles.get(m) ?? m}</b><small class="mono">/admin/team/{m} →</small></a>)}</div>
+            <div class="ac-h"><h2>Roles &amp; permissions</h2><span class="mono ac-pill">All staff</span></div>
+            <p class="muted small">For now every staff account (super admin, doctor, TA and module staff) can do everything on the site. The table of permissions per role is kept, and comes back when this is switched off.</p>
           </section>
         )}
 
-        {can['platform.roles'] && (
+        {can['platform.roles'] && !ALL_STAFF_FULL && (
           <section class="ac-card" data-matrix-card>
             <div class="ac-h"><h2>Roles &amp; permissions</h2><span class="mono ac-pill">Super admin</span></div>
             <p class="muted small">Tick what each role may do. Platform roles apply to every module; module roles apply only in the modules where someone holds them. Super admins always have everything.</p>

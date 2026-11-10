@@ -1,0 +1,247 @@
+---
+/**
+ * The setup step right after signing up (and for any student who has no answers yet): faculty → year →
+ * specialization → optional modules; the faculty step only when there is more than one. The answers decide which
+ * modules the student's home page shows; they never give or block access. They can be changed later on the
+ * profile page.
+ */
+import Base from '@/layouts/Base.astro';
+import { hubData } from '@/lib/accounts/hub';
+import { access } from '@/lib/accounts/access';
+
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store, max-age=0');
+const asked = Astro.url.searchParams.get('next');
+const next = asked && asked.startsWith('/') && !asked.startsWith('//') ? asked : '/';
+const { user } = await access(Astro.cookies);
+if (!user) return Astro.redirect(`/login?next=${encodeURIComponent(`/welcome?next=${next}`)}`, 303);
+if (user.role !== 'student') return Astro.redirect('/', 303);
+const { settings, cards } = await hubData();
+const json = JSON.stringify({
+  years: settings.years, faculties: settings.faculties, activeSemester: settings.activeSemester, specFrom: settings.specFrom, cards, next,
+  profile: user.profile?.year ? user.profile : null,
+}).replace(/</g, '\\u003c');
+const multi = settings.faculties.length > 1;
+const steps = [
+  ...(multi ? [{ id: 'faculty', dot: 'Faculty', q: 'Which faculty are you in?' }] : []),
+  { id: 'year', dot: 'Year', q: 'Which year are you in?' },
+  { id: 'specialization', dot: 'Specialization', q: "What's your specialization?" },
+  { id: 'optional', dot: 'Optional modules', q: 'Which optional modules did you choose?' },
+];
+---
+<Base title="Set up your modules" noindex>
+  <section class="hub wl" data-welcome>
+    <script type="application/json" data-welcome-data set:html={json} />
+    <div class="hub-sky" aria-hidden="true">
+      <div class="hub-orb a"></div><div class="hub-orb b"></div>
+      <svg class="hub-rings" viewBox="0 0 600 600"><circle cx="300" cy="300" r="180" /><circle cx="300" cy="300" r="240" /><circle cx="300" cy="300" r="295" /></svg>
+    </div>
+    <div class="container wl-in">
+      <header>
+        <p class="hub-k mono"><span class="hub-dot" aria-hidden="true"></span> Welcome, {user.name.split(' ')[0]}</p>
+        <h1 class="hub-t small">Set up your <span>modules</span></h1>
+        <p class="hub-sub">A few quick questions. Your answers decide which modules your home page shows. You can change them later on your profile page.</p>
+      </header>
+
+      <div class="ob glass" data-ob>
+        <ol class="ob-steps mono" aria-hidden="true">
+          {steps.map((st, i) => <li data-step-dot={st.id}><span>{String(i + 1).padStart(2, '0')}</span> {st.dot}</li>)}
+        </ol>
+        {steps.map((st, i) => (
+          <div class="ob-step" data-step={st.id} hidden={i > 0}>
+            <h2 tabindex="-1"><span class="sr-only">Step {i + 1} of {steps.length}: </span>{st.q}</h2>
+            {st.id === 'optional'
+              ? <><p class="ob-note">Tick the optional modules you registered for.</p><div class="ob-opts" data-opts></div></>
+              : <div class="ob-pills" data-pills={st.id}></div>}
+            {st.id === 'specialization' && <p class="ob-empty" data-spec-general hidden></p>}
+          </div>
+        ))}
+        <div class="ob-foot">
+          <button type="button" class="ob-back" data-ob-back hidden>← Back</button>
+          <span class="ob-msg" data-ob-msg role="status"></span>
+          <button type="button" class="btn btn-primary ob-next" data-ob-next disabled>Next →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style is:global>
+  .hub { --g1: #c8ff4d; --g2: #7cb1ff; position: relative; min-height: 100dvh; overflow: hidden; overflow: clip; isolation: isolate; padding: calc(var(--nav-h) + 48px) 0 96px; background: var(--hero-bg); color: var(--hero-text); }
+  :root[data-theme='light'] .hub { --g1: #9fd400; --g2: #3d7be0; }
+  .hub-sky { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+  .hub-orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .55; animation: hub-float 16s ease-in-out infinite; }
+  .hub-orb.a { width: 520px; height: 520px; right: -120px; top: -160px; background: radial-gradient(circle, color-mix(in oklab, var(--g1) 70%, transparent), transparent 65%); }
+  .hub-orb.b { width: 460px; height: 460px; left: -160px; top: 30%; background: radial-gradient(circle, color-mix(in oklab, var(--g2) 60%, transparent), transparent 65%); animation-delay: -5s; }
+  :root[data-theme='light'] .hub-orb { opacity: .35; }
+  @keyframes hub-float { 50% { transform: translate(30px, -24px) scale(1.06); } }
+  .hub-rings { position: absolute; width: 760px; right: -220px; top: -120px; opacity: .5; animation: hub-spin 60s linear infinite; }
+  .hub-rings circle { fill: none; stroke: var(--hero-line); stroke-width: 1; stroke-dasharray: 2 10; }
+  @keyframes hub-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .hub-orb, .hub-rings, .hub-dot { animation: none !important; } }
+  .hub-k { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: var(--hero-lead); }
+  .hub-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hero-accent); box-shadow: 0 0 12px var(--hero-accent); animation: pulse-ring 2s infinite; }
+  .hub-t { margin-top: 10px; font-size: clamp(2.1rem, 1.3rem + 3.2vw, 3.8rem); line-height: 1; letter-spacing: -.04em; font-weight: 700; text-wrap: balance; }
+  .hub-t span { color: var(--hero-accent); }
+  .hub-sub { margin-top: 14px; max-width: 58ch; font-size: var(--fs-md); color: var(--hero-lead); }
+  .wl-in { display: grid; gap: 30px; }
+
+  .ob { max-width: 900px; padding: clamp(22px, 4vw, 40px); display: grid; gap: 22px; }
+  .ob-steps { list-style: none; padding: 0; display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--hero-dim); }
+  .ob-steps li { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; border: 1px solid var(--hero-line); transition: all var(--t-fast); }
+  .ob-steps li span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: color-mix(in oklab, var(--hero-text) 8%, transparent); }
+  .ob-steps li.on { color: var(--hero-text); border-color: var(--hero-accent); box-shadow: 0 0 20px -6px var(--hero-accent); }
+  .ob-steps li.on span, .ob-steps li.done span { background: var(--hero-accent); color: var(--hero-bg); }
+  .ob-step h2 { font-size: clamp(1.6rem, 1.1rem + 1.6vw, 2.4rem); letter-spacing: -.035em; }
+  .ob-pills { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px; }
+  @media (max-width: 520px) { .ob-pills[data-pills='year'] { display: grid; grid-template-columns: 1fr 1fr; } }
+  .ob-pill { padding: 14px 20px; border-radius: 16px; border: 1px solid var(--hero-line); background: color-mix(in oklab, var(--hero-text) 4%, transparent); color: var(--hero-text); font: 600 15px var(--font-body); cursor: pointer; transition: transform var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast); }
+  .ob-pill:hover { transform: translateY(-2px); border-color: color-mix(in oklab, var(--hero-accent) 60%, var(--hero-line)); }
+  .ob-pill[aria-pressed='true'] { border-color: var(--hero-accent); background: color-mix(in oklab, var(--hero-accent) 16%, transparent); box-shadow: 0 0 0 1px var(--hero-accent), 0 10px 30px -12px var(--hero-accent); }
+  .ob-note { margin-top: 8px; color: var(--hero-lead); font-size: 14px; }
+  .ob-opts { margin-top: 18px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+  .ob-opt { position: relative; display: grid; gap: 4px; text-align: left; padding: 16px 16px 16px 50px; border-radius: 16px; border: 1px solid var(--hero-line); background: color-mix(in oklab, var(--hero-text) 4%, transparent); color: var(--hero-text); cursor: pointer; transition: border-color var(--t-fast), background var(--t-fast); }
+  .ob-opt::before { content: ''; position: absolute; left: 16px; top: 18px; width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--hero-dim); }
+  .ob-opt[aria-pressed='true'] { border-color: var(--c); background: color-mix(in oklab, var(--c) 14%, transparent); }
+  .ob-opt[aria-pressed='true']::before { background: var(--c); border-color: var(--c); box-shadow: inset 0 0 0 3px color-mix(in oklab, var(--hero-bg) 70%, transparent); }
+  .ob-opt b { font-size: 15px; }
+  .ob-opt small { font-size: 12px; color: var(--hero-dim); font-family: var(--font-mono); }
+  .ob-empty { color: var(--hero-lead); font-size: 14.5px; padding: 18px; border-radius: 14px; border: 1px dashed var(--hero-line); }
+  .ob-foot { display: flex; align-items: center; gap: 14px; }
+  .ob-back { border: 0; background: none; color: var(--hero-lead); cursor: pointer; font-size: 14px; }
+  .ob-msg { flex: 1; font-size: 13.5px; color: var(--hero-lead); }
+  .ob-msg.is-err { color: var(--hero-danger); }
+  .ob-step h2:focus { outline: none; }
+  .ob-next { min-width: 140px; }
+</style>
+
+<script>
+  import { GENERAL, facultyOfProfile, fitsStudent, hasSpecialization, type Faculty, type Semester } from '@/lib/accounts/core';
+  type Card = { slug: string; code: string; title: string; term: string; color: string; builtIn: boolean; kind: 'core' | 'elective'; open: boolean; years: string[]; specializations: string[]; faculty: string };
+  type Profile = { year: string; specialization: string; modules: string[]; faculty: string };
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+  function init() {
+    const root = document.querySelector<HTMLElement>('[data-welcome]');
+    if (!root || root.dataset.wired) return;
+    root.dataset.wired = '1';
+    const data = JSON.parse(root.querySelector('[data-welcome-data]')!.textContent!) as { years: string[]; faculties: Faculty[]; activeSemester: Semester; specFrom: { year: string; semester: Semester }; cards: Card[]; next: string; profile: Profile | null };
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+    const multi = data.faculties.length > 1;
+    const specialized = (year: string) => hasSpecialization(data, year, data.activeSemester);
+    const specsOf = (slug: string) => data.faculties.find((f) => f.slug === slug)?.specializations ?? [];
+    /** optional modules a student may add for their faculty, year and specialization */
+    const optionalFor = (p: Pick<Profile, 'year' | 'specialization' | 'faculty'>) => data.cards.filter((m) => m.open && m.kind === 'elective' && fitsStudent(m, p));
+    const STEPS = [...root.querySelectorAll<HTMLElement>('[data-step]')].map((el) => el.dataset.step!);
+
+    const start = data.profile ? { ...data.profile, faculty: multi ? facultyOfProfile(data.profile) : data.faculties[0]?.slug ?? '' } : null;
+    const draft: Profile = { faculty: start?.faculty ?? (multi ? '' : data.faculties[0]?.slug ?? ''), year: start?.year ?? '', specialization: start?.specialization ?? '', modules: [...(start?.modules ?? [])] };
+    let step = 0;
+    const at = () => STEPS[step];
+    const last = () => step === STEPS.length - 1;
+    // first time: the built-in course is the optional module almost every student takes, so it starts ticked
+    let pretick = !start;
+    let confirmNone = false;
+    const next = $<HTMLButtonElement>('[data-ob-next]'), back = $<HTMLButtonElement>('[data-ob-back]'), msg = $('[data-ob-msg]');
+    const say = (text: string, error = false) => { msg.textContent = text; msg.classList.toggle('is-err', error); };
+    const finishLabel = () => {
+      if (!last()) return;
+      const n = draft.modules.length;
+      next.textContent = n ? `Finish · ${n} module${n === 1 ? '' : 's'}` : confirmNone ? 'Finish anyway' : 'Finish';
+    };
+    /** items: values, or [value, label] pairs (faculties are chosen by name, saved by slug) */
+    const pills = (key: 'faculty' | 'year' | 'specialization', items: (string | [string, string])[]) => {
+      const box = root.querySelector<HTMLElement>(`[data-pills="${key}"]`);
+      if (!box) return;
+      box.innerHTML = items.map((it) => { const [v, label] = typeof it === 'string' ? [it, it] : it; return `<button type="button" class="ob-pill" aria-pressed="${draft[key] === v}" data-v="${esc(v)}">${esc(label)}</button>`; }).join('');
+      box.onclick = (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-v]');
+        if (!b) return;
+        if (key === 'specialization' && !specialized(draft.year)) return;
+        draft[key] = b.dataset.v!;
+        box.querySelectorAll('[data-v]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        // another faculty: its own specializations
+        if (key === 'faculty') {
+          if (draft.specialization !== GENERAL && !specsOf(draft.faculty).includes(draft.specialization)) draft.specialization = specialized(draft.year) ? '' : draft.specialization;
+          pills('specialization', specsOf(draft.faculty));
+        }
+        render();
+        // before the specialization starts there is nothing to pick: "General"
+        if (key === 'year') draft.specialization = specialized(draft.year) ? (draft.specialization === GENERAL ? '' : draft.specialization) : GENERAL;
+        setTimeout(() => go(1), 180);
+      };
+    };
+    const opts = () => {
+      const list = optionalFor(draft);
+      draft.modules = draft.modules.filter((m) => list.some((c) => c.slug === m));
+      if (pretick) {
+        pretick = false;
+        draft.modules = [...new Set([...draft.modules, ...list.filter((m) => m.builtIn).map((m) => m.slug)])];
+      }
+      $('[data-opts]').innerHTML = list.length
+        ? list.map((m) => `<button type="button" class="ob-opt" style="--c:${esc(m.color)}" aria-pressed="${draft.modules.includes(m.slug)}" data-m="${esc(m.slug)}"><b>${esc(m.title)}</b><small>${esc(m.code || 'Optional')}${m.term ? ` · ${esc(m.term)}` : ''}</small></button>`).join('')
+        : `<p class="ob-empty">There are no optional modules for your ${multi ? 'faculty, ' : ''}year and specialization yet. Press Finish.</p>`;
+      $('[data-opts]').onclick = (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-m]');
+        if (!b) return;
+        const on = b.getAttribute('aria-pressed') !== 'true';
+        b.setAttribute('aria-pressed', String(on));
+        draft.modules = on ? [...draft.modules, b.dataset.m!] : draft.modules.filter((x) => x !== b.dataset.m);
+        confirmNone = false;
+        say('');
+        finishLabel();
+      };
+    };
+    const render = () => {
+      root.querySelectorAll<HTMLElement>('[data-step]').forEach((s) => (s.hidden = s.dataset.step !== at()));
+      root.querySelectorAll<HTMLElement>('[data-step-dot]').forEach((d) => {
+        const n = STEPS.indexOf(d.dataset.stepDot!);
+        d.classList.toggle('on', n === step);
+        d.classList.toggle('done', n < step);
+      });
+      back.hidden = step === 0;
+      next.textContent = 'Next →';
+      next.disabled = (at() === 'faculty' && !draft.faculty) || (at() === 'year' && !draft.year) || (at() === 'specialization' && !draft.specialization);
+      const has = specialized(draft.year);
+      $('[data-pills="specialization"]').hidden = !has;
+      const general = $('[data-spec-general]');
+      general.hidden = has;
+      general.textContent = draft.year ? `General — specialization starts in ${data.specFrom.year}, ${data.specFrom.semester}.` : 'Choose your year first.';
+      confirmNone = false;
+      if (last()) opts();
+      finishLabel();
+      say('');
+    };
+    const go = (d: number) => {
+      step = Math.max(0, Math.min(STEPS.length - 1, step + d));
+      render();
+      // keyboard and screen-reader users land on the new question
+      root.querySelector<HTMLElement>(`[data-step="${at()}"] h2`)?.focus({ preventScroll: true });
+    };
+    next.addEventListener('click', async () => {
+      if (!last()) return go(1);
+      // finishing with no optional module when there are some: ask once
+      if (!draft.modules.length && optionalFor(draft).length && !confirmNone) {
+        confirmNone = true;
+        finishLabel();
+        say('No optional module ticked. Press again to finish anyway.');
+        return;
+      }
+      next.disabled = true;
+      say('Saving…');
+      const r = await fetch('/api/auth/me', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(draft) }).catch(() => null);
+      const d = r ? await r.json().catch(() => ({})) : {};
+      if (!r?.ok) { say(d.error ?? 'Could not save your answers. Check your connection and try again.', true); next.disabled = false; return; }
+      try { localStorage.removeItem('mdx:profile'); } catch { /* storage off */ }
+      location.assign(data.next || '/');
+    });
+    back.addEventListener('click', () => go(-1));
+    pills('faculty', data.faculties.map((f) => [f.slug, f.name]));
+    pills('year', data.years);
+    pills('specialization', specsOf(draft.faculty));
+    render();
+  }
+  document.addEventListener('astro:page-load', init);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
+</script>

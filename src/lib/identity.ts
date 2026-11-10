@@ -32,6 +32,16 @@ export function studentIdError(id: string): string | null {
   if (!STUDENT_ID_RE.test(id)) return ID_HINT;
   return null;
 }
+/**
+ * The lab start card's group: optional and free. A code with a number is tidied ("12" → "G12"); anything else
+ * is kept as typed (trimmed, at most 20 characters). '' when left empty.
+ */
+export function looseGroup(v: unknown): string {
+  const raw = String(v ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ');
+  if (!raw || raw === '—') return '';
+  const tidy = cleanGroup(raw);
+  return GROUP_RE.test(tidy) ? tidy : raw.slice(0, 20);
+}
 export function groupError(group: string): string | null {
   if (!group) return 'Type your group, e.g. G12.';
   if (!GROUP_RE.test(group)) return GROUP_HINT;

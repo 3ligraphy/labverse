@@ -6,8 +6,11 @@
  * so attendance, sessions, Done ticks, graded exercises and the admin dashboards work unchanged.
  * Pure functions only, so they are unit-tested (tests/platform.test.ts) and shared with the builder UI.
  */
+import { ALWAYS_OPEN } from '../progress/mode.ts';
 import type { Check, Step } from '../../runner/protocol';
 import { DEFAULT_FACULTY } from '../accounts/core.ts';
+import { parseCppChecks, type CppCheck } from '../../lab/cpp/checks.ts';
+import { parseAgentScript, parseDiff, parseRubric, type AgentStep, type DiffLine, type RubricItem } from '../../lab/ai/core.ts';
 
 /* --------------------------------------------------------------- node types */
 
@@ -18,11 +21,56 @@ export type Field = { key: string; label: string; kind: FieldKind; options?: str
  * components its builders see in the palette (mobile: live React Native editor + terminal; web: AI prompts,
  * website previews, a live HTML/CSS sandbox and click paths for no-code website labs).
  */
-export type Kit = 'core' | 'mobile' | 'web';
+export type Kit = 'core' | 'mobile' | 'web' | 'cpp' | 'ai';
 export const KITS: Record<Kit, { label: string; hint: string }> = {
   core: { label: 'Core', hint: 'Parts, tasks, text, media, quizzes and check-in — every module' },
   mobile: { label: 'Mobile development', hint: 'Live React Native editor with phone emulator, terminal, repo link' },
   web: { label: 'No-code web & AI', hint: 'AI prompt cards, website previews, live HTML/CSS sandbox, click paths' },
+  cpp: { label: 'C++ programming', hint: 'Live C++ editor with console and memory view, predict-then-run, order-the-lines puzzles, animated visuals' },
+  ai: { label: 'AI for coding', hint: 'Prompt workbench with a live ingredient scanner, coding-agent run simulator, review-the-AI-diff, animated AI visuals' },
+};
+
+/** The animated AI-for-coding visuals a builder can place (label shown in the builder → id used by the page). */
+export const AI_VISUALS: Record<string, string> = {
+  'The agent loop: gather → plan → act → verify': 'loop',
+  'The context window: what the agent can see': 'context',
+  'Anatomy of a great coding prompt': 'anatomy',
+  'Vague → specific: how many guesses?': 'specificity',
+  'A PRD for the agent: sections → tasks': 'prd',
+};
+/** module page designs: the platform's standard look, or the futuristic neon design (AI for Coding) */
+export const MODULE_SKINS: Record<string, string> = { Standard: '', 'Neon (futuristic)': 'neon' };
+
+/** The animated C++ visuals a builder can place (label shown in the builder → id used by the page). */
+/** how students get into a lab: a session the TA starts, or open any time (a permanent session, still tracked) */
+export const LAB_ACCESS = ['TA starts a session', 'Open any time (no session, still tracked)'] as const;
+/** typed-answer questions: what the student types and how it is checked */
+export const ANSWER_MODES: Record<string, 'output' | 'value' | 'input'> = {
+  'What it prints (the output)': 'output',
+  'A value': 'value',
+  'What the user types (an input)': 'input',
+};
+
+export const CPP_VISUALS: Record<string, string> = {
+  'Program logic → code': 'logic',
+  'cout & cin: data in and out': 'streams',
+  'Which box fits? (data types)': 'types',
+  'Whole-number division and %': 'division',
+  'floor, ceil and round': 'rounding',
+  'x++ or ++x?': 'increment',
+  'Median: where does num3 go?': 'median',
+  'Characters are numbers (ASCII)': 'ascii',
+  'String explorer': 'string',
+  'cin >> vs getline': 'getline',
+  'Is it an email address?': 'email',
+  'Is it a vector <x, y>?': 'vector',
+  'A program, piece by piece': 'anatomy',
+  'Why int main()?': 'main',
+  'The life of a variable': 'variable',
+  'Data types: what is really stored': 'typebox',
+  'Keyboard → program → screen': 'flow',
+  'The toolbox: every function, operator and symbol': 'toolbox',
+  'Your first program, line by line': 'first',
 };
 export type NodeDef = {
   label: string;
@@ -51,8 +99,11 @@ export const LAB_NODES = {
       { key: 'difficulty', label: 'Difficulty', kind: 'select', options: ['Beginner', 'Intermediate', 'Advanced'] },
       { key: 'estimatedTime', label: 'Estimated time', kind: 'text', placeholder: '2 hours', max: 40 },
       { key: 'objectives', label: 'Learning objectives', kind: 'lines', help: 'One per line', max: 2000 },
+      { key: 'access', label: 'Sessions', kind: 'select', options: [...LAB_ACCESS], help: ALWAYS_OPEN
+        ? 'Sessions are off for the whole site: every lab is open any time and tracked. Open any time also lets anyone with the link in, without sign-in or enrolment.'
+        : 'Open any time: anyone with the link opens this lab (no sign-in or enrolment), enters a name and student ID and starts straight away — no TA session needed, and their work is still tracked.' },
     ],
-    defaults: { title: 'New lab', description: '', difficulty: 'Beginner', estimatedTime: '2 hours', objectives: '' },
+    defaults: { title: 'New lab', description: '', difficulty: 'Beginner', estimatedTime: '2 hours', objectives: '', access: LAB_ACCESS[0] },
   },
   part: {
     label: 'Part', hint: 'Big numbered section', color: '#7cb1ff', glyph: '§',
@@ -199,6 +250,115 @@ export const LAB_NODES = {
     ],
     defaults: { title: '', steps: 'Dashboard\nAppearance\nEditor' },
   },
+  cpp: {
+    label: 'C++ exercise', hint: 'Live C++ editor with console and memory view; graded by its checks', color: '#4f8fd6', glyph: 'C++', kit: 'cpp',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'goal', label: 'Goal', kind: 'markdown', max: 3000 },
+      { key: 'starter', label: 'Starter code', kind: 'code', max: 20000 },
+      { key: 'input', label: 'Keyboard input for Run', kind: 'textarea', help: 'Typed for the student when the program asks (one line per Enter). Leave empty to let them type.', max: 2000 },
+      { key: 'checks', label: 'Checks', kind: 'lines', help: 'One per line: name :: in 3 5; expect the product is: 15 — steps: in …, expect …, exact …, not …, code /regex/ message, nocode /regex/ message. No checks = an ungraded playground.', max: 6000 },
+      { key: 'hints', label: 'Hints', kind: 'lines', help: 'One per line; students open them one at a time', max: 3000 },
+      { key: 'paste', label: 'Pasting code', kind: 'select', options: ['Allowed', 'Blocked'], help: 'Blocked: students type the code themselves, as in the lab test' },
+    ],
+    defaults: {
+      title: 'Your program', goal: 'Write a program that …', paste: 'Allowed', input: '', hints: '',
+      starter: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello!\\n";\n    return 0;\n}\n',
+      checks: 'Says hello :: expect Hello!',
+    },
+  },
+  cpppredict: {
+    label: 'Predict, then run', hint: 'Read the code, choose what happens, then step through it in the memory view', color: '#f78c6c', glyph: '?▶', kit: 'cpp',
+    fields: [
+      { key: 'question', label: 'Question', kind: 'textarea', max: 800 },
+      { key: 'code', label: 'C++ code', kind: 'code', help: 'A whole program, or just the lines inside main (they are wrapped for you).', max: 8000 },
+      { key: 'input', label: 'Keyboard input', kind: 'textarea', max: 1000 },
+      { key: 'options', label: 'Options', kind: 'lines', help: 'One per line; start the correct one with *', max: 2000 },
+      { key: 'explain', label: 'Explanation (after answering)', kind: 'markdown', max: 3000 },
+      { key: 'trace', label: 'Step through after answering', kind: 'select', options: ['Yes', 'No'] },
+    ],
+    defaults: { question: 'What does this program print?', code: 'int x = 3;\nx = x + 2;\ncout << x;', input: '', options: '*5\n3\nx + 2', explain: '', trace: 'Yes' },
+  },
+  cppanswer: {
+    label: 'Type the answer', hint: 'The student types the answer (no options): what the code prints, a value, or an input — checked exactly', color: '#ffb547', glyph: '⌨', kit: 'cpp',
+    fields: [
+      { key: 'question', label: 'Question', kind: 'textarea', max: 800 },
+      { key: 'code', label: 'C++ code', kind: 'code', help: 'A whole program, or just the lines inside main (they are wrapped for you).', max: 8000 },
+      { key: 'input', label: 'Keyboard input', kind: 'textarea', help: 'For “what it prints”: what the user types when it runs.', max: 1000 },
+      { key: 'mode', label: 'The student types', kind: 'select', options: Object.keys(ANSWER_MODES), help: 'What it prints: checked against the real output of the code. A value: one of the accepted answers. What the user types: the code runs with it and must print the expected output.' },
+      { key: 'answers', label: 'Accepted answers', kind: 'lines', help: 'A value: every accepted form, one per line (e.g. 6 and 6.0). What the user types: the output it must produce. Not used for “what it prints”.', max: 1000 },
+      { key: 'caps', label: 'Capital letters', kind: 'select', options: ['Count', 'Do not count'], help: 'For “a value” only. Count: A and a are different answers (as in C++). Do not count: for word answers, e.g. ASCII and ascii.' },
+      { key: 'explain', label: 'Explanation (after a right answer)', kind: 'markdown', max: 3000 },
+    ],
+    defaults: { question: 'What does this program print?', code: 'int x = 3;\nx = x + 2;\ncout << x;', input: '', mode: Object.keys(ANSWER_MODES)[0], answers: '', caps: 'Count', explain: '' },
+  },
+  parsons: {
+    label: 'Order the lines', hint: 'Parsons puzzle: put the code blocks in the right order, then run it', color: '#7ce0a3', glyph: '⇅', kit: 'cpp',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'goal', label: 'Goal', kind: 'markdown', max: 2000 },
+      { key: 'code', label: 'The correct program', kind: 'code', help: 'Blank lines split it into cards. Cards that are only #include / using / int main() { / } / return 0; stay fixed.', max: 8000 },
+      { key: 'input', label: 'Keyboard input for the check', kind: 'textarea', max: 1000 },
+    ],
+    defaults: { title: 'Put it in order', goal: '', code: '', input: '' },
+  },
+  cppvisual: {
+    label: 'Visual', hint: 'An animated, interactive explanation: memory, cout/cin, strings, ASCII, rounding…', color: '#5ee0d2', glyph: '◐', kit: 'cpp',
+    fields: [
+      { key: 'visual', label: 'Visual', kind: 'select', options: Object.keys(CPP_VISUALS) },
+      { key: 'text', label: 'Starting value', kind: 'text', help: 'Optional: e.g. the string to explore, or the email to test', max: 200 },
+      { key: 'caption', label: 'Caption', kind: 'markdown', max: 1000 },
+    ],
+    defaults: { visual: Object.keys(CPP_VISUALS)[0], text: '', caption: '' },
+  },
+  aiprompt: {
+    label: 'Prompt workbench', hint: 'Students write a prompt; a live scanner lights up each ingredient it has (graded by the rubric)', color: '#00e5ff', glyph: '⌬', kit: 'ai',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'goal', label: 'Goal', kind: 'markdown', max: 3000 },
+      { key: 'starter', label: 'Starting prompt', kind: 'textarea', help: 'The weak prompt students improve (or leave empty for a blank page).', max: 4000 },
+      { key: 'rubric', label: 'Ingredients (rubric)', kind: 'lines', max: 4000,
+        help: 'One per line: name :: /regex/i :: tip shown while it is missing. Every ingredient found = one check passed.' },
+      { key: 'minWords', label: 'Minimum words', kind: 'text', placeholder: '25', max: 4 },
+      { key: 'example', label: 'Example of a strong prompt (after it passes)', kind: 'textarea', max: 4000 },
+    ],
+    defaults: {
+      title: 'Write the prompt', goal: 'Turn the vague request into a prompt a coding agent can act on.', starter: 'fix the bug', minWords: '25', example: '',
+      rubric: 'Context :: /\\b(file|function|component|src\\/|\\.tsx?|\\.py)\\b/i :: Name the file or function the agent should look at\nGoal :: /\\b(should|must|expected|so that)\\b/i :: Say what should happen when it works',
+    },
+  },
+  agentsim: {
+    label: 'Agent run', hint: 'Step through a coding agent session; students decide at each checkpoint (graded)', color: '#b388ff', glyph: '⟳', kit: 'ai',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'goal', label: 'Goal', kind: 'markdown', max: 2000 },
+      { key: 'script', label: 'Script', kind: 'code', max: 20000,
+        help: 'One step per line — user: · think: · read: path · run: command · out: output · edit: path (then + / - lines) · say: · ask: question, then ok: right option :: why and no: wrong option :: why' },
+    ],
+    defaults: {
+      title: 'Watch the agent work', goal: '',
+      script: 'user: Add a test for formatPrice\nthink: I should look at the function first.\nread: src/price.ts\nask: The agent wants to run `npm test`. Allow it?\nok: Yes — running tests is safe and gives it feedback :: Tests are how the agent checks its own work.\nno: No — never let an agent run commands :: Read-only agents cannot verify anything.\nrun: npm test\nout: ✓ 12 passed\nsay: Done — added 1 test.',
+    },
+  },
+  aidiff: {
+    label: 'Review the AI diff', hint: 'A change an agent made: students flag the lines that are wrong (graded)', color: '#ff4fd8', glyph: '±', kit: 'ai',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'goal', label: 'What the agent was asked', kind: 'markdown', max: 2000 },
+      { key: 'file', label: 'File name', kind: 'text', placeholder: 'src/auth.ts', max: 120 },
+      { key: 'diff', label: 'Diff', kind: 'code', max: 20000,
+        help: 'Lines start with + (added), - (removed) or a space. Put ! in front of a line that is a problem and end it with ## why (the why is shown after the review).' },
+    ],
+    defaults: { title: 'Review the change', goal: '', file: 'src/app.ts', diff: ' function total(items) {\n-  return items.reduce((a, i) => a + i.price, 0);\n!+  return items.reduce((a, i) => a + i.price, 1); ## Starts at 1, so every total is off by one\n }' },
+  },
+  aivisual: {
+    label: 'AI visual', hint: 'Animated, interactive explanation: the agent loop, the context window, prompt anatomy…', color: '#5cf0ff', glyph: '◈', kit: 'ai',
+    fields: [
+      { key: 'visual', label: 'Visual', kind: 'select', options: Object.keys(AI_VISUALS) },
+      { key: 'caption', label: 'Caption', kind: 'markdown', max: 1000 },
+    ],
+    defaults: { visual: Object.keys(AI_VISUALS)[0], caption: '' },
+  },
   checkin: {
     label: 'Check-in', hint: 'End-of-lab attendance card', color: '#c8ff4d', glyph: '⌖', terminal: true,
     fields: [], defaults: {},
@@ -215,14 +375,18 @@ export const MODULE_NODES = {
       { key: 'description', label: 'Description', kind: 'textarea', max: 600 },
       { key: 'color', label: 'Accent colour', kind: 'color' },
       { key: 'faculty', label: 'Faculty', kind: 'text', max: 60, help: 'The faculty whose students this module is for (“all” = every faculty). Choices come from Admin → Catalogue.' },
-      { key: 'leader', label: 'Module leader (doctor email)', kind: 'text', placeholder: 'name@bue.edu.eg', max: 200, help: 'Only this doctor sets the assessment (weights, components). Their doctor account must use this email.' },
-      { key: 'open', label: 'Students may add it themselves', kind: 'select', options: ['No', 'Yes'], help: 'No: students join only by invitation or enrolment.' },
+      { key: 'leader', label: 'Module leader (doctor email)', kind: 'text', placeholder: 'name@bue.edu.eg', max: 200, help: 'Shown on the module page. Their doctor account must use this email.' },
+      { key: 'leaderName', label: 'Module leader (name)', kind: 'text', placeholder: 'Prof. Name Surname', max: 120, help: 'Shown on the module page with the email.' },
+      { key: 'lecturers', label: 'Also teaching', kind: 'text', placeholder: 'Dr. Name Surname, Eng. Name Surname', max: 400, help: 'Comma-separated names, shown on the module page.' },
+      { key: 'open', label: 'Students may pick it as their own module', kind: 'select', options: ['No', 'Yes'], help: 'For optional (elective) modules: Yes lists it in the questions students answer after signing up. Every module is open to everyone either way, unless staff lock its labs (the Lock button on the module page).' },
+      { key: 'public', label: 'Anyone with the link (no longer used)', kind: 'select', options: ['No', 'Yes'], help: 'Not used any more: every module is open to everyone unless staff lock its labs with the Lock button on the module page.' },
       { key: 'category', label: 'Category', kind: 'text', max: 40, placeholder: 'Core', help: 'A category from Admin → Catalogue (core: shown to matching students; elective: only to those who choose or are enrolled).' },
       { key: 'years', label: 'Years', kind: 'text', placeholder: 'Year 2, Year 3', help: 'Comma-separated; empty = every year', max: 200 },
       { key: 'semester', label: 'Semester', kind: 'select', options: ['Semester 1', 'Semester 2', 'Both'], help: 'Students see the active semester’s modules first (the admin switches the active semester).' },
       { key: 'specializations', label: 'Specializations', kind: 'text', placeholder: 'Software Engineering, Artificial Intelligence', help: 'Comma-separated; empty = every specialization', max: 600 },
+      { key: 'skin', label: 'Design', kind: 'select', options: Object.keys(MODULE_SKINS), help: 'Standard: the platform look. Neon (futuristic): a dark sci-fi design with its own hero, fonts and glow, for this module and its labs.' },
     ],
-    defaults: { code: '', title: 'New module', term: '', description: '', color: '#7cb1ff', faculty: DEFAULT_FACULTY, leader: '', category: 'Core', open: 'No', years: '', semester: 'Semester 1', specializations: '' },
+    defaults: { code: '', title: 'New module', term: '', description: '', color: '#7cb1ff', faculty: DEFAULT_FACULTY, leader: '', category: 'Core', open: 'No', public: 'No', years: '', semester: 'Semester 1', specializations: '', skin: 'Standard' },
   },
   lab: {
     label: 'Lab', hint: 'A lab of this module (double-click to build it)', color: '#7cb1ff', glyph: '⚗',
@@ -251,6 +415,8 @@ export const NODE_PRESETS: Record<string, { label: string; nodes: LabNodeType[] 
   all: { label: 'Everything', nodes: LAB_NODE_TYPES },
   mobile: { label: 'Mobile development', nodes: nodesOfKits(['mobile']) },
   web: { label: 'No-code web & AI', nodes: nodesOfKits(['web']) },
+  cpp: { label: 'C++ programming', nodes: nodesOfKits(['cpp']) },
+  ai: { label: 'AI for coding', nodes: nodesOfKits(['ai']) },
 };
 /**
  * A module's allowed lab components, as stored by the admin: known, non-root lab node types in palette order.
@@ -448,7 +614,8 @@ export function parseChecks(text: string): Result<Check[]> {
 
 /* ------------------------------------------------------------- compile a lab */
 
-export type Exercise = { title: string; goal?: string; hint?: string; files: Record<string, string>; solution?: Record<string, string>; checks: Check[] };
+/** A graded item of a lab. RN exercises carry runner checks; C++ items (kind) carry one entry per check, for counting. */
+export type Exercise = { title: string; goal?: string; hint?: string; files: Record<string, string>; solution?: Record<string, string>; checks: Check[]; kind?: 'cpp' | 'cpppredict' | 'cppanswer' | 'parsons' | 'aiprompt' | 'agentsim' | 'aidiff' };
 export type Block =
   | { kind: 'part'; n: string; title: string; time: string }
   | { kind: 'task'; n: string; title: string; time: string; body: string; children: Block[] }
@@ -467,10 +634,20 @@ export type Block =
   | { kind: 'prompt'; id: string; title: string; tool: string; prompt: string; expect: string }
   | { kind: 'browser'; id: string; title: string; url: string; html: string; height: 'Short' | 'Medium' | 'Tall'; caption: string }
   | { kind: 'websandbox'; id: string; title: string; goal: string; hint: string; starter: string }
-  | { kind: 'clickpath'; title: string; steps: string[] };
+  | { kind: 'clickpath'; title: string; steps: string[] }
+  | { kind: 'cpp'; id: string; title: string; goal: string; starter: string; input: string; checks: CppCheck[]; hints: string[]; paste: boolean }
+  | { kind: 'cpppredict'; id: string; question: string; code: string; input: string; options: { text: string; correct: boolean }[]; explain: string; trace: boolean }
+  | { kind: 'cppanswer'; id: string; question: string; code: string; input: string; mode: 'output' | 'value' | 'input'; answers: string[]; ignoreCase: boolean; explain: string }
+  | { kind: 'parsons'; id: string; title: string; goal: string; code: string; input: string }
+  | { kind: 'cppvisual'; id: string; visual: string; text: string; caption: string }
+  | { kind: 'aiprompt'; id: string; title: string; goal: string; starter: string; rubric: RubricItem[]; minWords: number; example: string }
+  | { kind: 'agentsim'; id: string; title: string; goal: string; steps: AgentStep[] }
+  | { kind: 'aidiff'; id: string; title: string; goal: string; file: string; lines: DiffLine[] }
+  | { kind: 'aivisual'; id: string; visual: string; caption: string };
 
 export type CompiledLab = {
-  meta: { title: string; description: string; difficulty: string; estimatedTime: string; objectives: string[] };
+  /** open: students join a permanent session by themselves (no TA session needed) and are still tracked */
+  meta: { title: string; description: string; difficulty: string; estimatedTime: string; objectives: string[]; open: boolean };
   blocks: Block[];
   /** MDX-syntax outline (<Part>/<Task>/<Playground>/<RepoSubmit>) for the progress tracker. */
   outline: string;
@@ -597,11 +774,111 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
         if (steps.length) push({ kind: 'clickpath', title: d.title ?? '', steps });
         break;
       }
+      case 'cpp': {
+        const id = `${key}--${node.id}`;
+        const parsed = parseCppChecks(d.checks ?? '');
+        if (!parsed.ok) warnings.push(`C++ exercise “${d.title}”: ${parsed.error}`);
+        const checks = parsed.ok ? parsed.value : [];
+        const title = d.title || 'C++ exercise';
+        push({
+          kind: 'cpp', id, title, goal: d.goal ?? '', starter: d.starter ?? '', input: d.input ?? '', checks,
+          hints: (d.hints ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean), paste: d.paste !== 'Blocked',
+        });
+        if (checks.length) {
+          exercises[id] = { kind: 'cpp', title, goal: d.goal || undefined, files: { 'main.cpp': d.starter ?? '' }, checks: checks.map((c) => ({ name: c.name, steps: [] })) };
+          outline.push(`<Playground ex="${id}" />`);
+        }
+        break;
+      }
+      case 'cpppredict': {
+        const id = `${key}--${node.id}`;
+        const options = parseQuizOptions(d.options ?? '');
+        if (options.length < 2 || !options.some((o) => o.correct)) { warnings.push(`Predict “${excerptOf(d.question)}” needs 2+ options and one starting with *.`); break; }
+        push({ kind: 'cpppredict', id, question: d.question ?? '', code: d.code ?? '', input: d.input ?? '', options, explain: d.explain ?? '', trace: d.trace !== 'No' });
+        exercises[id] = { kind: 'cpppredict', title: excerptOf(d.question) || 'Predict', files: { 'main.cpp': d.code ?? '' }, checks: [{ name: 'Right prediction', steps: [] }] };
+        outline.push(`<Playground ex="${id}" />`);
+        break;
+      }
+      case 'cppanswer': {
+        const id = `${key}--${node.id}`;
+        const mode = ANSWER_MODES[d.mode ?? ''] ?? 'output';
+        const answers = (d.answers ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        if (!(d.question ?? '').trim()) { warnings.push('A “Type the answer” question has no question text.'); break; }
+        if (mode !== 'output' && !answers.length) { warnings.push(`“${excerptOf(d.question)}” needs at least one accepted answer.`); break; }
+        if (mode !== 'value' && !(d.code ?? '').trim()) { warnings.push(`“${excerptOf(d.question)}” needs the C++ code it is about.`); break; }
+        push({ kind: 'cppanswer', id, question: d.question ?? '', code: d.code ?? '', input: d.input ?? '', mode, answers, ignoreCase: mode === 'value' && d.caps === 'Do not count', explain: d.explain ?? '' });
+        // many questions read “What does this print?”: the first line of their code tells them apart in the TA's statistics
+        const firstLine = (d.code ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+        const title = [excerptOf((d.question ?? '').replace(/[*`]/g, '')), firstLine && excerptOf(firstLine)].filter(Boolean).join(' · ');
+        exercises[id] = { kind: 'cppanswer', title: title || 'Type the answer', files: { 'main.cpp': d.code ?? '' }, checks: [{ name: 'Right answer', steps: [] }] };
+        outline.push(`<Playground ex="${id}" />`);
+        break;
+      }
+      case 'parsons': {
+        const id = `${key}--${node.id}`;
+        if (!(d.code ?? '').trim()) { warnings.push(`Order the lines “${d.title}” has no code.`); break; }
+        const title = d.title || 'Put it in order';
+        push({ kind: 'parsons', id, title, goal: d.goal ?? '', code: d.code ?? '', input: d.input ?? '' });
+        exercises[id] = { kind: 'parsons', title, files: { 'main.cpp': d.code ?? '' }, checks: [{ name: 'Right order', steps: [] }] };
+        outline.push(`<Playground ex="${id}" />`);
+        break;
+      }
+      case 'aiprompt': {
+        const id = `${key}--${node.id}`;
+        const rubric = parseRubric(d.rubric ?? '');
+        if (!rubric.ok) { warnings.push(`Prompt workbench “${d.title}”: ${rubric.error}`); break; }
+        if (!rubric.value.length) { warnings.push(`Prompt workbench “${d.title}” needs at least one ingredient.`); break; }
+        const title = d.title || 'Prompt workbench';
+        const minWords = Math.max(0, Math.min(500, parseInt(d.minWords ?? '', 10) || 0));
+        push({ kind: 'aiprompt', id, title, goal: d.goal ?? '', starter: d.starter ?? '', rubric: rubric.value, minWords, example: d.example ?? '' });
+        exercises[id] = { kind: 'aiprompt', title, files: { 'prompt.md': d.starter ?? '' }, checks: rubric.value.map((r) => ({ name: r.name, steps: [] })) };
+        outline.push(`<Playground ex="${id}" />`);
+        break;
+      }
+      case 'agentsim': {
+        const id = `${key}--${node.id}`;
+        const script = parseAgentScript(d.script ?? '');
+        if (!script.ok) { warnings.push(`Agent run “${d.title}”: ${script.error}`); break; }
+        const title = d.title || 'Agent run';
+        push({ kind: 'agentsim', id, title, goal: d.goal ?? '', steps: script.value });
+        const asks = script.value.filter((s) => s.kind === 'ask');
+        if (asks.length) {
+          exercises[id] = { kind: 'agentsim', title, files: {}, checks: asks.map((a, i) => ({ name: `Decision ${i + 1}`, steps: [] })) };
+          outline.push(`<Playground ex="${id}" />`);
+        }
+        break;
+      }
+      case 'aidiff': {
+        const id = `${key}--${node.id}`;
+        const lines = parseDiff(d.diff ?? '');
+        const bugs = lines.filter((l) => l.bug).length;
+        if (!lines.length) { warnings.push(`Review the AI diff “${d.title}” has no diff.`); break; }
+        if (!bugs) warnings.push(`Review the AI diff “${d.title}” has no line marked with ! — nothing to find.`);
+        const title = d.title || 'Review the change';
+        push({ kind: 'aidiff', id, title, goal: d.goal ?? '', file: d.file ?? '', lines });
+        if (bugs) {
+          exercises[id] = { kind: 'aidiff', title, files: {}, checks: [...lines.filter((l) => l.bug).map((_, i) => ({ name: `Problem ${i + 1}`, steps: [] })), { name: 'No false alarms', steps: [] }] };
+          outline.push(`<Playground ex="${id}" />`);
+        }
+        break;
+      }
+      case 'aivisual': {
+        const visual = AI_VISUALS[d.visual ?? ''];
+        if (!visual) { warnings.push(`AI visual “${d.visual}” is not available.`); break; }
+        push({ kind: 'aivisual', id: `${key}--${node.id}`, visual, caption: d.caption ?? '' });
+        break;
+      }
+      case 'cppvisual': {
+        const visual = CPP_VISUALS[d.visual ?? ''];
+        if (!visual) { warnings.push(`Visual “${d.visual}” is not available.`); break; }
+        push({ kind: 'cppvisual', id: `${key}--${node.id}`, visual, text: d.text ?? '', caption: d.caption ?? '' });
+        break;
+      }
     }
   }
   const objectives = (start.objectives ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   return {
-    meta: { title: start.title || 'Untitled lab', description: start.description ?? '', difficulty: start.difficulty || 'Beginner', estimatedTime: start.estimatedTime ?? '', objectives },
+    meta: { title: start.title || 'Untitled lab', description: start.description ?? '', difficulty: start.difficulty || 'Beginner', estimatedTime: start.estimatedTime ?? '', objectives, open: start.access === LAB_ACCESS[1] },
     blocks, outline: outline.join('\n'), exercises, hasCheckin, warnings,
   };
 }

@@ -1,0 +1,40 @@
+---
+/**
+ * One section of the Wireless Lecture 1 page: its chapter and number, the slides it teaches (each opens the
+ * slide viewer, plus a link that opens the PDF at that page), the content, and a "Got it" tick with the next section.
+ */
+import { chapters, PDF, sections } from '@/lib/wireless/lecture1';
+import { pdfAt } from '@/lib/wireless/module';
+
+interface Props { id: string }
+const { id } = Astro.props;
+const index = sections.findIndex((s) => s.id === id);
+if (index < 0) throw new Error(`Unknown lecture section “${id}”`);
+const sec = sections[index];
+const chapter = chapters.find((c) => c.id === sec.chapter)!;
+const next = sections[index + 1];
+const pageLabel = sec.pages.length > 1 ? `Slides ${sec.pages[0]}–${sec.pages[sec.pages.length - 1]}` : `Slide ${sec.pages[0]}`;
+---
+<section class="wl-sec" id={sec.id} data-sec={sec.id} data-pages={sec.pages.join(',')} aria-labelledby={`${sec.id}-h`}>
+  <header class="wl-sec-head">
+    <p class="wl-eyebrow mono"><span>{chapter.title}</span> · {String(index + 1).padStart(2, '0')}/{sections.length}</p>
+    <h2 id={`${sec.id}-h`}>{sec.title}</h2>
+    <div class="wl-src" aria-label={`Source in the lecture PDF: ${pageLabel}`}>
+      <span class="wl-src-k mono">IN THE PDF</span>
+      {sec.pages.map((p) => (
+        <button type="button" class="wl-slide-btn" data-open-slide={p} aria-label={`Show slide ${p}`}>
+          <img src={`/wireless/lecture-01/slide-${String(p).padStart(2, '0')}.webp`} alt="" width="64" height="36" loading="lazy" decoding="async" />
+          <span>Slide {p}</span>
+        </button>
+      ))}
+      <a class="wl-pdf-link" href={pdfAt(PDF, sec.pages[0])} target="_blank" rel="noopener">Open PDF at p.{sec.pages[0]} ↗</a>
+    </div>
+  </header>
+  <div class="wl-sec-body">
+    <slot />
+  </div>
+  <footer class="wl-sec-foot">
+    <label class="wl-got"><input type="checkbox" data-got={sec.id} /> <span>I’ve got this</span></label>
+    {next ? <a class="wl-next" href={`#${next.id}`}>Next: {next.title} <span aria-hidden="true">↓</span></a> : <a class="wl-next" href="#top">Back to the top <span aria-hidden="true">↑</span></a>}
+  </footer>
+</section>

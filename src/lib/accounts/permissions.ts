@@ -81,6 +81,18 @@ export function permitted(m: StoredMatrix, who: Who, perm: Permission, module?: 
   return Object.values(who.modules).some((mr) => m.module[mr]?.includes(perm));
 }
 
+/**
+ * For now every staff account has every permission: super admin, doctor, TA, and anyone with a module role. The
+ * roles and the matrix are kept as they are, so setting this to false brings the split back unchanged.
+ */
+export const ALL_STAFF_FULL = true;
+
+/** Teaching staff: the admin password, a platform role other than student, or a role in any module. */
+export const isStaffWho = (who: Who) => who.master || (who.platformRole !== null && who.platformRole !== 'student') || Object.keys(who.modules).length > 0;
+
+/** What the site checks: permitted(), with every staff account allowed everything while ALL_STAFF_FULL is on. */
+export const allowed = (m: StoredMatrix, who: Who, perm: Permission, module?: string) => (ALL_STAFF_FULL && isStaffWho(who)) || permitted(m, who, perm, module);
+
 /** Modules where the person has `perm` through a module role. */
 export const modulesWith = (m: StoredMatrix, who: Who, perm: Permission) =>
   Object.entries(who.modules).filter(([, r]) => m.module[r]?.includes(perm)).map(([mod]) => mod);

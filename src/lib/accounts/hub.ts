@@ -10,12 +10,17 @@ let cached: { until: number; value: Promise<HubData> } | null = null;
 async function loadHubData() {
   const store = getAccountStore();
   const settings = store
-    ? await store.getSettings().catch(() => ({ ...DEFAULT_SETTINGS, builtIn: BUILT_IN_AUDIENCE }))
-    : { ...DEFAULT_SETTINGS, builtIn: BUILT_IN_AUDIENCE };
-  const cards = await moduleCards(settings.builtIn, (await getLabs()).length, settings.categories);
-  // Students may choose only open electives themselves (Mobile Development by default); every other module
-  // needs an invitation or enrolment by its staff.
+    ? await store.getSettings().catch(() => ({ ...DEFAULT_SETTINGS, builtIn: BUILT_IN_AUDIENCE, locked: [] as string[] }))
+    : { ...DEFAULT_SETTINGS, builtIn: BUILT_IN_AUDIENCE, locked: [] as string[] };
+  // every module is open to everyone unless staff lock its labs (the Lock button on the module page)
+  const cards = (await moduleCards(settings.builtIn, (await getLabs()).length, settings.categories)).map((c) => ({ ...c, locked: settings.locked.includes(c.slug) }));
+  // electives students may pick as one of their own modules (open ones; Mobile Development by default)
   return { settings, cards, optional: cards.filter((c) => c.kind === 'elective' && c.open).map((c) => c.slug) };
+}
+
+/** After a change (a lock), the next request reads fresh data on this server. */
+export function forgetHubData() {
+  cached = null;
 }
 
 /** Shared, public module catalogue data. A short warm-instance cache removes

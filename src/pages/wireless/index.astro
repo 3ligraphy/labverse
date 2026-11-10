@@ -1,0 +1,166 @@
+---
+import Base from '@/layouts/Base.astro';
+import { byWeek, labs, lectures, wirelessModule as mod, type ModuleItem } from '@/lib/wireless/module';
+
+const tracks: { id: 'lectures' | 'labs'; label: string; items: ModuleItem[]; empty: string }[] = [
+  { id: 'lectures', label: 'Lectures', items: lectures, empty: 'Lectures appear here as they are published.' },
+  { id: 'labs', label: 'Labs', items: labs, empty: 'Labs appear here as they are published.' },
+];
+---
+<Base title="Wireless Networks" description="Wireless Networks module: interactive lectures with their slides, and guided labs. No sign-in needed.">
+  <header class="wm-hero">
+    <div class="wm-air" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="container">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><span aria-current="page">wireless</span></nav>
+      <p class="wm-k mono"><span></span> MODULE · OPEN · NO SIGN-IN</p>
+      <h1>Wireless <em>Networks</em></h1>
+      <p class="wm-lead">Interactive lectures that you can explore, test and replay, each linked slide by slide to its PDF, and guided labs that check your answers as you go.</p>
+      <dl class="wm-facts">
+        <div><dt>Module leader</dt><dd>{mod.leader.name}</dd><dd class="wm-sub"><a href={`mailto:${mod.leader.email}`}>{mod.leader.email}</a> · Office {mod.leader.office}</dd></div>
+        <div><dt>Lectures</dt><dd class="wm-n">{lectures.length}</dd></div>
+        <div><dt>Labs</dt><dd class="wm-n">{labs.length}</dd></div>
+      </dl>
+    </div>
+  </header>
+
+  <div class="container wm-body" data-wm>
+    <div class="wm-tabs" role="tablist" aria-label="Module contents" data-wm-tabs hidden>
+      {tracks.map((t, i) => (
+        <button type="button" role="tab" id={`tab-${t.id}`} aria-controls={t.id} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1} data-tab={t.id}>
+          <span>{t.label}</span><b class="mono">{t.items.length}</b>
+        </button>
+      ))}
+    </div>
+
+    {tracks.map((t) => (
+      <section class="wm-track" id={t.id} role="tabpanel" aria-labelledby={`tab-${t.id}`} data-panel={t.id}>
+        <h2 class="wm-track-h">{t.label}</h2>
+        {t.items.length === 0 && <p class="wm-empty">{t.empty}</p>}
+        <ol class="wm-weeks">
+          {byWeek(t.items).map((w) => (
+            <li class="wm-week">
+              <p class="wm-week-k mono"><span>WEEK</span><b>{String(w.week).padStart(2, '0')}</b></p>
+              <div class="wm-items">
+                {w.items.map((item) => (
+                  <article class:list={['wm-card', item.kind]}>
+                    <p class="wm-card-k mono"><span>{item.kind === 'lecture' ? 'Lecture' : 'Lab'}</span> · {item.code} · Week {item.week}</p>
+                    <h3><a href={item.href}>{item.title}</a></h3>
+                    <p class="wm-card-p">{item.summary}</p>
+                    <ul class="wm-chips mono">{item.topics.map((x) => <li>{x}</li>)}</ul>
+                    <div class="wm-card-foot">
+                      <span class="mono">{item.meta}</span>
+                      <span class="wm-card-actions">
+                        {item.pdf && <a class="btn btn-ghost btn-sm" href={item.pdf.href} target="_blank" rel="noopener">View PDF ↗</a>}
+                        {item.pdf && <a class="btn btn-ghost btn-sm" href={item.pdf.href} download={item.pdf.label}>Download</a>}
+                        <a class="btn btn-primary btn-sm" href={item.href}>{item.kind === 'lecture' ? 'Start lecture →' : 'Open lab →'}</a>
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+    ))}
+  </div>
+</Base>
+
+<script is:inline>
+  // Old links to the Sheet 3 session (/wireless#q3, /wireless#toolbox) now open the lab.
+  (function () {
+    var h = location.hash;
+    if (/^#(q\d+|toolbox)$/.test(h)) location.replace('/wireless/labs/sheet-3' + h);
+  })();
+</script>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+
+  onPageLoad(() => {
+    const root = document.querySelector<HTMLElement>('[data-wm]');
+    const bar = root?.querySelector<HTMLElement>('[data-wm-tabs]');
+    if (!root || !bar) return;
+    const tabs = [...bar.querySelectorAll<HTMLButtonElement>('[data-tab]')];
+    const panels = [...root.querySelectorAll<HTMLElement>('[data-panel]')];
+    root.classList.add('tabbed');
+    bar.hidden = false;
+    const show = (id: string, focus = false) => {
+      tabs.forEach((t) => {
+        const on = t.dataset.tab === id;
+        t.setAttribute('aria-selected', String(on));
+        t.tabIndex = on ? 0 : -1;
+        if (on && focus) t.focus();
+      });
+      panels.forEach((p) => (p.hidden = p.dataset.panel !== id));
+    };
+    const fromHash = () => (location.hash === '#labs' ? 'labs' : 'lectures');
+    show(fromHash());
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => { show(t.dataset.tab!); history.replaceState(null, '', `#${t.dataset.tab}`); });
+      t.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+        show(next.dataset.tab!, true);
+        history.replaceState(null, '', `#${next.dataset.tab}`);
+      });
+    });
+    window.addEventListener('hashchange', () => show(fromHash()));
+  });
+</script>
+
+<style>
+  .wm-hero { --wn:#63e6ff; position:relative; overflow:hidden; isolation:isolate; padding:calc(var(--nav-h) + 48px) 0 48px; background:linear-gradient(145deg,#07111f,#0a1528 60%,#091126); color:#f4f8ff; }
+  .wm-hero .crumbs { color:#9eabc2; }
+  .wm-hero .crumbs a:hover { color:#fff; }
+  .wm-air { position:absolute; inset:0; z-index:-1; opacity:.55; }
+  .wm-air i { position:absolute; right:-14vw; top:-10%; width:56vw; aspect-ratio:1; border:1px solid rgb(99 230 255/.22); border-radius:50%; }
+  .wm-air i:nth-child(2) { right:-4vw; top:20%; width:34vw; }
+  .wm-air i:nth-child(3) { right:8vw; top:42%; width:16vw; }
+  .wm-k { font-size:12px; letter-spacing:.1em; color:#b7c6df; }
+  .wm-k span { display:inline-block; width:8px; height:8px; margin-right:7px; border-radius:50%; background:var(--wn); box-shadow:0 0 16px var(--wn); }
+  .wm-hero h1 { margin-top:14px; font-size:clamp(2.6rem,1.4rem + 5vw,6rem); line-height:.95; letter-spacing:-.05em; }
+  .wm-hero h1 em { font-style:normal; color:var(--wn); }
+  .wm-lead { max-width:60ch; margin-top:20px; color:#b7c6df; font-size:clamp(1rem,.92rem + .4vw,1.2rem); line-height:1.6; }
+  .wm-facts { display:grid; gap:14px; margin-top:30px; padding-top:22px; border-top:1px solid rgb(255 255 255/.1); }
+  .wm-facts dt { color:#8796ad; font:11px var(--font-mono); text-transform:uppercase; letter-spacing:.08em; }
+  .wm-facts dd { margin-top:4px; font-weight:600; }
+  .wm-facts .wm-sub { margin-top:2px; color:#9eabc2; font-weight:400; font-size:13px; }
+  .wm-facts .wm-sub a { color:#cfe9ff; }
+  .wm-facts .wm-n { font:650 28px var(--font-display); }
+  @media (min-width:720px) { .wm-facts { grid-template-columns:2fr 1fr 1fr; } }
+
+  .wm-body { padding-block:40px 100px; }
+  .wm-tabs { display:inline-flex; gap:4px; padding:4px; border:1px solid var(--line); border-radius:14px; background:var(--surface); }
+  .wm-tabs[hidden] { display:none; }
+  .wm-tabs button { display:inline-flex; align-items:center; gap:10px; min-height:44px; padding:0 18px; border-radius:10px; color:var(--text-2); font-weight:600; }
+  .wm-tabs button b { padding:2px 8px; border-radius:999px; background:var(--surface-2); font-size:11px; color:var(--text-3); }
+  .wm-tabs button[aria-selected='true'] { background:var(--accent-soft); color:var(--accent-text); }
+  .wm-tabs button[aria-selected='true'] b { background:var(--accent-text); color:var(--bg); }
+  .wm-track { margin-top:28px; }
+  .wm-track[hidden] { display:none; }
+  .wm-track-h { font-size:clamp(1.5rem,1.2rem + 1vw,2.2rem); letter-spacing:-.03em; }
+  .tabbed .wm-track-h { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  .wm-empty { margin-top:16px; color:var(--text-3); }
+  .wm-weeks { list-style:none; margin:20px 0 0; padding:0; display:grid; gap:22px; }
+  .wm-week { display:grid; gap:14px; }
+  .wm-week-k { display:flex; align-items:baseline; gap:8px; color:var(--text-3); font-size:11px; letter-spacing:.1em; }
+  .wm-week-k b { font-size:28px; color:var(--text); letter-spacing:-.02em; }
+  @media (min-width:860px) { .wm-week { grid-template-columns:110px 1fr; } .wm-week-k { flex-direction:column; gap:0; } }
+  .wm-items { display:grid; gap:14px; }
+  .wm-card { position:relative; display:grid; gap:10px; padding:24px; border:1px solid var(--line); border-radius:22px; background:var(--surface); box-shadow:var(--shadow-sm); transition:border-color var(--t-med) var(--ease-out), transform var(--t-med) var(--ease-out); }
+  .wm-card:hover { border-color:color-mix(in oklab,#63e6ff 45%,var(--line)); transform:translateY(-2px); }
+  .wm-card::before { content:''; position:absolute; inset:0 auto 0 0; width:4px; border-radius:22px 0 0 22px; background:#63e6ff; }
+  .wm-card.lab::before { background:#8b7cff; }
+  .wm-card-k { font-size:11px; color:var(--text-3); letter-spacing:.06em; text-transform:uppercase; }
+  .wm-card-k span { color:var(--accent-text); }
+  .wm-card h3 { font-size:clamp(1.35rem,1.1rem + .8vw,1.9rem); letter-spacing:-.03em; }
+  .wm-card h3 a::after { content:''; position:absolute; inset:0; border-radius:inherit; }
+  .wm-card-p { max-width:70ch; color:var(--text-2); line-height:1.6; }
+  .wm-chips { list-style:none; display:flex; flex-wrap:wrap; gap:6px; padding:0; margin:0; font-size:11px; }
+  .wm-chips li { padding:4px 9px; border:1px solid var(--line-2); border-radius:999px; color:var(--text-2); }
+  .wm-card-foot { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin-top:6px; padding-top:14px; border-top:1px solid var(--line); }
+  .wm-card-foot > .mono { font-size:12px; color:var(--text-3); }
+  .wm-card-actions { position:relative; z-index:1; display:flex; flex-wrap:wrap; gap:8px; }
+  @media (prefers-reduced-motion:reduce) { .wm-card { transition:none; } .wm-card:hover { transform:none; } }
+</style>

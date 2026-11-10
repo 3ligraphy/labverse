@@ -10,6 +10,7 @@ import { clientIp } from '@/lib/attendance/server';
 import { getProgressStore, json } from '@/lib/progress/server';
 import { canSubmit, maxBytes, mimesFor, typeForName } from '@/lib/project-files/core';
 import { blobToken, entryFolder, getFilesStore } from '@/lib/project-files/server';
+import { isLocked } from '@/lib/accounts/enrolment';
 
 export const prerender = false;
 
@@ -29,6 +30,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         const fileId = String((JSON.parse(clientPayload ?? '{}') as { fileId?: unknown }).fileId ?? '');
         const file = fileId ? await store.get(fileId) : null;
         if (!file || !canSubmit(file)) throw new Error('This submission is closed.');
+        if (await isLocked(file.module).catch(() => false)) throw new Error('This module is locked by your teaching team for now.');
         if (!pathname.startsWith(`${entryFolder(file.id)}/`)) throw new Error('Invalid file path.');
         if (!typeForName(pathname, file.accept_types)) throw new Error('That file type is not accepted here.');
         const tries = (await getProgressStore()?.hit(`submit-upload:${clientIp(request, clientAddress)}`, WINDOW_SEC).catch(() => 0)) ?? 0;

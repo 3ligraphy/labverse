@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   acceptAttr, canSubmit, describeTypes, entriesCsv, isBlobUrl, isLate, isNew, looksLikePdf, matchesSignature, mimesFor, parseEntry, parseMeta,
   parseSettings, safePdfName, typeForName, zipPath, type Entry, type ProjectFile,
+  MAX_MB_LIMIT, SHIPPED_ITEMS, needsGroup, submitHref,
 } from '../src/lib/project-files/core.ts';
 
 /** A fixed clock, so date rules don't start failing once real time passes the test dates. */
@@ -26,7 +27,7 @@ test('a due date or cut-off being set must be in the future', () => {
 
 const published: ProjectFile = {
   id: 'f1', title: 'Proposal', description: 'Old', kind: 'proposal', due_at: '2026-10-04T20:59:00.000Z', cutoff_at: null,
-  url: null, pathname: null, size: null, accepting: true, accept_types: ['pdf'], max_mb: 4, published_by: '', created_at: '2026-10-01T00:00:00.000Z',
+  url: null, pathname: null, size: null, accepting: true, accept_types: ['pdf'], max_mb: 4, module: 'mobile-development', published_by: '', created_at: '2026-10-01T00:00:00.000Z',
 };
 
 test('parseSettings (editing) keeps omitted fields and an unchanged past due date', () => {
@@ -49,7 +50,8 @@ test('parseSettings rejects a cut-off before the due date, no file types, unknow
   assert.equal(parseSettings({ acceptTypes: [] }, published, NOW).ok, false);
   assert.equal(parseSettings({ acceptTypes: ['exe'] }, published, NOW).ok, false);
   assert.equal(parseSettings({ maxMb: 0 }, published, NOW).ok, false);
-  assert.equal(parseSettings({ maxMb: 11 }, published, NOW).ok, false);
+  assert.equal(parseSettings({ maxMb: 26 }, published, NOW).ok, false, 'the ceiling is 25 MB');
+  assert.equal(parseSettings({ maxMb: 11 }, published, NOW).ok, true);
   assert.equal(parseSettings({ maxMb: 2.5 }, published, NOW).ok, false);
   assert.equal(parseSettings({ dueAt: '' }, published, NOW).ok, true, 'clearing the due date is allowed');
 });
@@ -119,6 +121,31 @@ const device = 'abcdefghijklmnop1234';
 test('parseEntry cleans a valid hand-in and upper-cases the student ID', () => {
   const r = parseEntry({ name: '  Sara   Ali ', studentId: ' 23cs0042 ', group: ' G1 ', note: ' hi ', deviceKey: device });
   assert.deepEqual(r, { ok: true, value: { name: 'Sara Ali', studentId: '23CS0042', group: 'G1', note: 'hi', deviceKey: device } });
+});
+
+test('hand-ins per module: no group number outside the course, its own page, ZIPs up to 25 MB', () => {
+  const intro = { ...published, id: 'intro-to-computing-flowchart', module: 'intro-to-computing', accept_types: ['zip'] as ProjectFile['accept_types'], max_mb: 25 };
+  assert.equal(needsGroup(published), true);
+  assert.equal(needsGroup(intro), false);
+  assert.equal(submitHref(intro), '/intro-to-computing/submit/intro-to-computing-flowchart');
+  assert.equal(submitHref(published), '/mobile-development/submit/f1');
+  // name and student ID are still required; the group is not asked (and not kept)
+  const who = { name: 'Mona Adel', studentId: '240001', note: '', deviceKey: device };
+  assert.deepEqual(parseEntry(who, false), { ok: true, value: { ...who, group: '' } });
+  assert.equal(parseEntry({ ...who, name: '' }, false).ok, false);
+  assert.equal(parseEntry({ ...who, studentId: '' }, false).ok, false);
+  assert.equal(parseEntry({ ...who, group: '245793' }, false).ok, true, 'a group typed anyway is ignored');
+  assert.equal(parseEntry(who).ok, false, 'the course still needs its group number');
+  // ZIP only, real ZIP files, up to 25 MB
+  assert.deepEqual(typeForName('flowchart.zip', intro.accept_types), { type: 'zip', ext: 'zip', mime: 'application/zip' });
+  assert.equal(typeForName('flowchart.pdf', intro.accept_types), null);
+  assert.equal(MAX_MB_LIMIT, 25);
+  assert.equal(parseSettings({ maxMb: 25 }, intro, NOW).ok, true);
+  assert.equal(parseSettings({ maxMb: 26 }, intro, NOW).ok, false);
+  // the item the site ships for Introduction to Computing
+  const shipped = SHIPPED_ITEMS.find((i) => i.module === 'intro-to-computing')!;
+  assert.equal(shipped.title, 'Flowchart program logic submission');
+  assert.deepEqual([shipped.accept_types, shipped.max_mb, shipped.accepting], [['zip'], 25, true]);
 });
 
 test('parseEntry rejects bad names, IDs, groups, long notes and missing device keys', () => {

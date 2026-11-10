@@ -2,8 +2,8 @@
  * The signed-in account (or null), for the nav chip, the module hub, the profile page and lab sign-in.
  *   GET    { user, staff, doctor, accounts, enrolled[], staffModules{}, builderModules[] }
  *   PATCH  { name?, faculty?, year?, specialization?, modules?, currentPassword?, newPassword? }   edit your own profile
- * Students choose only the self-enrolment optional modules (Mobile Development); every other module needs an
- * invitation or enrolment by its staff.
+ * Students pick the optional modules that show on their home page (Mobile Development by default); every module is
+ * open to everyone anyway, unless staff lock its labs.
  */
 import type { APIRoute } from 'astro';
 import { isAdmin, isDoctor } from '@/lib/attendance/server';

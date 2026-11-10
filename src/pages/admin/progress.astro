@@ -31,7 +31,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       <>
         <header class="pa-head" data-reveal>
           <div>
-            <p class="pa-k mono">Progress · <a href="/admin/sessions">Sessions</a> · <a href="/admin/cms">CMS</a></p>
+            <p class="pa-k mono">Admin workspace · live</p>
             <h1 class="pa-h">Lab progress</h1>
           </div>
           <div class="pa-tools">
@@ -52,7 +52,6 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             <div class="pa-ci" data-pa-ci></div>
             <span class="pa-live mono" data-pa-live>connecting…</span>
             <a class="btn btn-ghost btn-sm" data-pa-csv href="#" download>Export CSV</a>
-            <form method="post" action="/api/admin/logout"><button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
           </div>
         </header>
 
@@ -128,11 +127,11 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .pa-k { font-size: 12px; color: var(--accent-text); }
   .pa-k a { color: var(--text-3); text-decoration: underline; text-underline-offset: 3px; }
   .pa-k a:hover { color: var(--text); }
-  .pa-h { font-size: var(--fs-2xl); letter-spacing: -0.04em; }
+  .pa-h { font-size: var(--fs-xl); letter-spacing: -0.03em; }
   .pa-t { font-size: var(--fs-lg); letter-spacing: -0.02em; }
 
   .pa-head { display: grid; gap: 18px; }
-  .pa-tools { display: grid; grid-template-columns: minmax(260px, 380px) minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px; }
+  .pa-tools { display: grid; grid-template-columns: minmax(260px, 380px) minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
   .pa-select { grid-column: 1; min-width: 0; }
   .pa-pick { display: flex; flex-wrap: wrap; gap: 8px; }
   .pa-pick label[hidden] { display: none; }
@@ -140,7 +139,6 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .pa-ci { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; border-radius: var(--r-lg); border: 1px solid var(--line-2); background: var(--surface); }
   .pa-tools > .pa-live { grid-column: 3; grid-row: 1; }
   .pa-tools > [data-pa-csv] { grid-column: 4; grid-row: 1; }
-  .pa-tools > form { grid-column: 5; grid-row: 1; }
   .pa-ci :global(.ci-state) { font-size: 12px; color: var(--text-3); display: inline-flex; align-items: center; gap: 6px; }
   .pa-ci :global(.ci-state)::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
   .pa-ci :global(.ci-state.on) { color: var(--ok); font-weight: 600; }
@@ -157,7 +155,6 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     .pa-select select { max-width: none; }
     .pa-tools > .pa-live { grid-column: 1; grid-row: 2; }
     .pa-tools > [data-pa-csv] { grid-column: 2; grid-row: 2; }
-    .pa-tools > form { grid-column: 3; grid-row: 2; }
     .pa-ci { grid-row: 3; }
     .pa-ci :global(.ci-len) { flex-basis: 100%; }
     .pa-ci :global(.ci-action) { width: 100%; }
@@ -175,7 +172,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   .pa-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-block: 28px; }
   @media (min-width: 700px) { .pa-stats { grid-template-columns: repeat(3, 1fr); } }
   @media (min-width: 1100px) { .pa-stats { grid-template-columns: repeat(5, 1fr); } }
-  .pa-stat { display: grid; gap: 6px; padding: 18px; border-radius: var(--r-lg); border: 1px solid var(--line); background: linear-gradient(160deg, var(--accent-soft), var(--surface) 65%); }
+  .pa-stat { display: grid; gap: 6px; padding: 18px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
   .pa-stat span { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
   .pa-stat b { font-family: var(--font-display); font-size: 2.4rem; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
   .pa-stat b i { font-style: normal; }
@@ -323,6 +320,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     totals: { active: number; avgPercent: number; solved: number; submitted: number; checkedIn: number };
     session: (Session & { open: boolean; closesAt: string | null }) | { open: false; closesAt: null };
     sessions: Session[];
+    /** sessions are off: every lab is always open, and the first choice adds up every session ("All students") */
+    alwaysOpen?: boolean;
     live: {
       rows: { key: string; status: Live; working: string | null; fails: number; lastActive: string | null; why: string }[];
       counts: Record<Live, number>;
@@ -418,8 +417,12 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         if (!root!.isConnected) return; // navigated away: stop polling
         if (document.visibilityState === 'visible') await load();
         schedule();
-      }, 5000);
+      }, 4000);
     }
+    // back on this tab: show the latest at once instead of after the next tick
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && root!.isConnected && data) { void load(); schedule(); }
+    });
 
     const picker = () => ({ faculty: $<HTMLSelectElement>('[data-pa-faculty]'), module: $<HTMLSelectElement>('[data-pa-module]'), lab: $<HTMLSelectElement>('[data-pa-lab]') });
     function render() {
@@ -514,7 +517,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
       const title = (id: string | null) => d.structure.exercises.find((e) => e.id === id)?.title ?? '';
       const open = 'id' in d.session && d.session.open;
       $('[data-lc-sum]').textContent = !rows.length
-        ? 'No one has joined this session yet.'
+        ? d.alwaysOpen ? 'No one has started this lab yet.' : 'No one has joined this session yet.'
         : `${open ? 'Live now' : 'Session closed, last known state'} · ${counts.active} working · ${counts.help} need help · ${counts.idle} quiet · ${counts.away} away · ${counts.done} done`;
       document.title = counts.help && open ? `(${counts.help}) need help · ${baseTitle}` : baseTitle;
 
@@ -538,7 +541,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             bar(s.percent, false), // the status colour carries the meaning here
             r.status === 'done' ? null : h('span', { class: 'lc-on', title: title(r.working) }, r.working ? h('b', {}, short(r.working)) : null, r.working ? title(r.working) : d.structure.exercises.length ? 'All exercises solved · tasks left' : 'Reading the tasks'),
             h('span', { class: 'lc-why' }, r.status === 'active' && r.lastActive ? `${r.why} · ${ago(r.lastActive)}` : r.why));
-        }) : [h('p', { class: 'lc-empty' }, rows.length ? `No one is in “${LIVE_LABEL[liveFilter as Live]}” right now.` : 'Students appear here as soon as they join the session.')]),
+        }) : [h('p', { class: 'lc-empty' }, rows.length ? `No one is in “${LIVE_LABEL[liveFilter as Live]}” right now.` : d.alwaysOpen ? 'Students appear here as soon as they start the lab.' : 'Students appear here as soon as they join the session.')]),
       );
       for (const r of rows) liveWas.set(r.key, r.status);
 
@@ -580,12 +583,18 @@ import AdminShell from '@/components/admin/AdminShell.astro';
             seen.clear();
             liveWas.clear();
             load();
-          }}, ...d.sessions.map((session) => h('option', { value: session.id, selected: 'id' in d.session && session.id === d.session.id }, `${session.time_slot} - ${session.ta_name}${session.open ? ' - LIVE' : ''}`))) as HTMLSelectElement);
+          }}, ...d.sessions.map((session) => h('option', { value: session.id, selected: 'id' in d.session && session.id === d.session.id },
+            session.id === 'all' ? 'All students · always open' : `${session.time_slot} - ${session.ta_name}${session.open ? ' - LIVE' : ''}`))) as HTMLSelectElement);
           const active = 'id' in d.session && d.session.open ? d.session : null;
-          children.push(active
-            ? h('span', { class: 'ci-state on mono', 'data-ci-left': '' })
-            : h('span', { class: 'ci-state mono' }, 'No active session'));
-          children.push(h('a', { class: 'btn btn-ghost btn-sm ci-action', href: '/admin#sessions' }, 'Manage sessions'));
+          if (d.alwaysOpen) {
+            // sessions are off: nothing to start or end
+            children.push(h('span', { class: 'ci-state on mono' }, 'Always open · students start any time'));
+          } else {
+            children.push(active
+              ? h('span', { class: 'ci-state on mono', 'data-ci-left': '' })
+              : h('span', { class: 'ci-state mono' }, 'No active session'));
+            children.push(h('a', { class: 'btn btn-ghost btn-sm ci-action', href: '/admin#sessions' }, 'Manage sessions'));
+          }
           box.replaceChildren(...children);
         }
         countdown();

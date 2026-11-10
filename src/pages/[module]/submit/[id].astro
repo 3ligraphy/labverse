@@ -1,0 +1,45 @@
+---
+/**
+ * A hand-in for a builder module (e.g. Introduction to Computing → "Flowchart program logic submission"): the
+ * shared hand-in page, inside the module (its navbar row and trail). Staff locked the module → the Locked screen.
+ */
+import Base from '@/layouts/Base.astro';
+import EmptyState from '@/components/EmptyState.astro';
+import Locked from '@/components/platform/Locked.astro';
+import HandIn from '@/components/project/HandIn.astro';
+import { submitHref } from '@/lib/project-files/core';
+import { getFilesStore } from '@/lib/project-files/server';
+import { hubData } from '@/lib/accounts/hub';
+import { moduleAccess } from '@/lib/accounts/enrolment';
+import { loadModule } from '@/lib/platform/server';
+import { MODULE_SKINS } from '@/lib/platform/core';
+import { moduleTrail } from '@/lib/platform/trail';
+
+export const prerender = false;
+// staff see more (a locked module's hand-in): depends on who is viewing, so never cached publicly
+Astro.response.headers.set('cache-control', 'private, no-store');
+
+const slug = Astro.params.module ?? '';
+const store = getFilesStore();
+const file = store ? await store.get(Astro.params.id ?? '').catch(() => null) : null;
+// an item of another module opens on that module's page
+if (file && file.module !== slug) return Astro.redirect(submitHref(file), 302);
+const data = file ? await loadModule(slug).catch(() => null) : null;
+if (!file || !data) Astro.response.status = 404;
+const gate = await moduleAccess(Astro.cookies, slug);
+const color = data?.meta.color || '#7cb1ff';
+const skin = MODULE_SKINS[data?.meta.skin ?? ''] || '';
+const title = data ? data.meta.title || data.module.title : '';
+const trail = data ? moduleTrail(data.meta, (await hubData()).settings.faculties) : [];
+---
+<Base title={file ? file.title : 'Submission not found'} description={file?.description || undefined} module={data ? { slug, title, color, skin } : undefined} noindex>
+  {!file || !data ? (
+    <div class="container" style="padding-block: 160px 120px">
+      <EmptyState title="This submission doesn't exist." body="It may have been removed. Check the module page for what's open." path="modules/" />
+    </div>
+  ) : !gate.ok ? (
+    <Locked title={title} code={data.meta.code} color={color} description={data.meta.description} back={`/${slug}`} />
+  ) : (
+    <HandIn file={file} admin={gate.staff} crumbs={[...trail, { label: title, href: `/${slug}` }]} />
+  )}
+</Base>

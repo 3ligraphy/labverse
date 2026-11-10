@@ -6,6 +6,7 @@
  */
 import { KITS, kitOf, nodeDefs, type Kit } from '@/lib/platform/core';
 import type { CanvasConfig } from '@/scripts/builder/canvas';
+import Icon from '@/components/Icon.astro';
 
 interface Props { config: CanvasConfig; heading: string; kicker: string; back: { href: string; label: string } }
 const { config, heading, kicker, back } = Astro.props;
@@ -24,6 +25,8 @@ const json = JSON.stringify(config).replace(/</g, '\\u003c');
     <div class="cv-title"><p class="mono">{kicker}</p><h1>{heading}</h1></div>
     <span class="cv-status mono" data-cv-status>Loading…</span>
     <div class="cv-tools">
+      <!-- admin pages have no site navbar, so the builder carries its own light/dark switch -->
+      <button type="button" class="cv-ic" data-theme-toggle title="Light or dark" aria-label="Switch between light and dark"><Icon name="sun" class="i-sun" size={16} /><Icon name="moon" class="i-moon" size={16} /></button>
       <button type="button" class="cv-ic" data-cv-zoom-out title="Zoom out">−</button>
       <span class="cv-zoom mono" data-cv-zoom>100%</span>
       <button type="button" class="cv-ic" data-cv-zoom-in title="Zoom in">+</button>

@@ -1,7 +1,7 @@
 // Run with: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_STORED, modulesWith, parseMatrix, permitted, type Who } from '../src/lib/accounts/permissions.ts';
+import { ALL_STAFF_FULL, DEFAULT_STORED, allowed, modulesWith, parseMatrix, permitted, type Who } from '../src/lib/accounts/permissions.ts';
 import { AUTH_LIMITS, GENERAL, SUPER_ADMINS, checkPasswordRules, fitsStudent, hasSpecialization, inSemester, isForStudent, loginThrottle, parseAccount, parseProfile, parseSettings, signupBlock, teamAccountBlock, upgradeYears, DEFAULT_SETTINGS } from '../src/lib/accounts/core.ts';
 import { hashPassword, signToken, verifyPassword, verifyToken } from '../src/lib/accounts/tokens.ts';
 
@@ -30,6 +30,19 @@ test('platform roles grant across modules; students get nothing by default', () 
   assert.equal(permitted(DEFAULT_STORED, who({ platformRole: 'doctor' }), 'accounts.staff'), false, 'only super admins create staff by default');
   assert.equal(permitted(DEFAULT_STORED, who({ platformRole: 'ta' }), 'module.sessions', 'web-development'), true);
   assert.equal(permitted(DEFAULT_STORED, who({ platformRole: 'student' }), 'module.progress', 'x'), false);
+});
+
+test('for now every staff account can do everything; students still get nothing', () => {
+  assert.equal(ALL_STAFF_FULL, true);
+  for (const staff of [who({ platformRole: 'ta' }), who({ platformRole: 'doctor' }), who({ modules: { 'web-development': 'ta' } }), who({ master: true })]) {
+    for (const p of ['platform.roles', 'accounts.manage', 'modules.create', 'module.build', 'module.assessment'] as const) {
+      assert.equal(allowed(DEFAULT_STORED, staff, p, 'intro-to-computing'), true, `${JSON.stringify(staff)} ${p}`);
+    }
+  }
+  assert.equal(allowed(DEFAULT_STORED, who({ platformRole: 'student' }), 'module.progress', 'x'), false);
+  assert.equal(allowed(DEFAULT_STORED, who({}), 'module.build', 'x'), false);
+  // the matrix itself is kept unchanged for when the switch goes off
+  assert.equal(permitted(DEFAULT_STORED, who({ platformRole: 'ta' }), 'module.build', 'x'), false);
 });
 
 test('parseMatrix keeps known permissions, refuses fixed ones and platform-only ones on module roles', () => {

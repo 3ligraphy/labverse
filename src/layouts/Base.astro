@@ -5,17 +5,35 @@ import Footer from '@/components/Footer.astro';
 import SearchPalette from '@/components/SearchPalette.astro';
 import Announce from '@/components/Announce.astro';
 import ModuleAnnounce from '@/components/ModuleAnnounce.astro';
+import StaffBar from '@/components/platform/StaffBar.astro';
 import { platform } from '@/site.config';
 import '@/styles/global.css';
 
 /** `module`: the builder module this page belongs to (its sections replace the course nav). */
-interface Props { title?: string; description?: string; noindex?: boolean; module?: { slug: string; title: string; color?: string } }
+/** `module.skin`: the module's design ('neon' = the futuristic AI for Coding look); sets data-skin on <html>. */
+interface Props { title?: string; description?: string; noindex?: boolean; module?: { slug: string; title: string; color?: string; skin?: string } }
 const { title, description = platform.tagline, noindex = false, module } = Astro.props;
 const fullTitle = title ? `${title} · ${platform.name}` : `${platform.name} — ${platform.tagline}`;
 const builtInCourse = /^\/mobile-development(\/|$)/.test(Astro.url.pathname);
+// the admin workspace has its own menu and a Back button instead of the site navbar
+const adminArea = /^\/admin(\/|$)/.test(Astro.url.pathname);
+// inside a module the navbar has a second row with the module's sections (pages leave room for it via --nav-h)
+const modbar = !adminArea && (Boolean(module) || builtInCourse);
+// staff tools on module and lab pages (lock the labs, edit, progress, statistics), with this page's links
+const page = Astro.url.pathname.replace(/\/$/, '');
+const builderLab = module && page.startsWith(`/${module.slug}/`) ? page.slice(module.slug.length + 2) : '';
+const courseLab = builtInCourse && /^\/mobile-development\/labs\/[^/]+$/.test(page);
+const staffBar = adminArea ? null
+  : module ? {
+    module: module.slug, back: `/${module.slug}`, stats: `/admin/stats?module=${module.slug}`,
+    edit: builderLab ? `/admin/builder/${module.slug}/${builderLab}` : `/admin/builder/${module.slug}`,
+    progress: builderLab ? `/admin/progress?lab=${module.slug}--${builderLab}` : `/admin/progress?module=${module.slug}`,
+  }
+  : builtInCourse ? { module: 'mobile-development', back: '/mobile-development/labs', edit: '/admin/cms', progress: '/admin/progress?module=mobile-development', stats: '/admin/stats?module=mobile-development', overlay: courseLab }
+  : null;
 ---
 <!doctype html>
-<html lang="en" class="no-js">
+<html lang="en" class:list={['no-js', { 'no-site-nav': adminArea, 'has-modbar': modbar }]} data-skin={module?.skin || undefined}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -33,6 +51,9 @@ const builtInCourse = /^\/mobile-development(\/|$)/.test(Astro.url.pathname);
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap"
     />
+    {module?.skin === 'neon' && (
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400..700&display=swap" />
+    )}
     <script is:inline>
       // Theme before paint (no flash). Re-applied after each client-side navigation.
       (function () {
@@ -51,7 +72,7 @@ const builtInCourse = /^\/mobile-development(\/|$)/.test(Astro.url.pathname);
   </head>
   <body>
     <a href="#main" class="skip-link">Skip to content</a>
-    <Nav module={module} />
+    {!adminArea && <Nav module={module} />}
     <main id="main" tabindex="-1" transition:name="main">
       <slot />
     </main>
@@ -60,6 +81,7 @@ const builtInCourse = /^\/mobile-development(\/|$)/.test(Astro.url.pathname);
     {builtInCourse && <Announce />}
     {builtInCourse && <ModuleAnnounce module="mobile-development" color="#c8ff4d" />}
     {module && <ModuleAnnounce module={module.slug} color={module.color} />}
+    {staffBar && <StaffBar {...staffBar} />}
     <script>
       import '@/scripts/app';
     </script>

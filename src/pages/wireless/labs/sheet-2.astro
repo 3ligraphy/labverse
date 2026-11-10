@@ -1,0 +1,265 @@
+---
+import Base from '@/layouts/Base.astro';
+import ClusterExplorer from '@/components/wireless/ClusterExplorer.astro';
+import { clusterTable, formulas, keyIdeas, questions } from '@/lib/wireless/sheet2';
+import { validClusterSizes } from '@/lib/wireless/core';
+import '@/styles/wireless-lab.css';
+
+Astro.response.headers.set('cache-control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=600');
+const nav = [{ href: '#ideas', label: 'Key ideas' }, ...questions.map((q) => ({ href: `#q${q.id}`, label: `Q${q.part} · ${q.topic}` }))];
+// The sorting task lists advantages and disadvantages mixed, in a fixed order.
+const sortOrder = [4, 0, 2, 5, 1, 3];
+const sectorSizes = validClusterSizes(21).filter((n) => n > 1);
+---
+<Base title="Wireless Networks · Week 4 Lab · Sheet 2" description="A no-login, interactive Sheet 2 session on the cellular concept: frequency reuse, cluster size N = i² + ij + j², reuse distance, its proof, and cell sectoring.">
+  <header class="wn-hero">
+    <div class="wn-air" aria-hidden="true"><i></i><i></i><i></i><span></span></div>
+    <div class="container wn-hero-in">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><a href="/wireless">wireless</a><span aria-hidden="true">/</span><a href="/wireless#labs">labs</a><span aria-hidden="true">/</span><span aria-current="page">sheet-2</span></nav>
+      <div class="wn-hero-grid">
+        <div>
+          <p class="wn-k mono"><span></span> WEEK 4 · LAB · SHEET 2 · NO SIGN-IN</p>
+          <h1><span class="wn-title-word">Wireless</span> <span class="wn-title-word">Networks</span><br /><em>Cells, clusters &amp; reuse</em></h1>
+          <p class="wn-lead">Build clusters on a live hexagon grid, find the shift that makes them repeat, prove N = i² + ij + j² one line at a time, and see what sectoring does to interference.</p>
+          <div class="wn-actions"><a class="btn btn-primary" href="#ideas">Start with the key ideas ↓</a><a class="btn btn-ghost" href="#toolbox">Open reuse toolbox</a></div>
+          <p class="wn-private"><span aria-hidden="true">◉</span> Progress stays in this browser. No account, attendance session, or database record.</p>
+        </div>
+        <aside class="wn-signal" aria-label="Session overview">
+          <div class="wn-dial"><span data-progress-ring></span><b data-progress>0%</b><small>complete</small></div>
+          <dl><div><dt>Questions</dt><dd>{questions.length}</dd></div><div><dt>Formulas</dt><dd>{formulas.length}</dd></div><div><dt>Mode</dt><dd>Guided</dd></div></dl>
+          <button type="button" class="wn-reset" data-reset>Reset my progress</button>
+        </aside>
+      </div>
+      <ol class="wn-route" aria-label="Session route">
+        <li><span>01</span><b>Solve for i, j</b><small>Write N as i² + ij + j²</small></li>
+        <li><span>02</span><b>Shift</b><small>i cells, turn 60°, j cells</small></li>
+        <li><span>03</span><b>Measure</b><small>D = R√(3N) and Q = √(3N)</small></li>
+        <li><span>04</span><b>Sense-check</b><small>Same shift works from every cell</small></li>
+      </ol>
+    </div>
+  </header>
+
+  <div class="container wn-layout" data-wireless>
+    <main class="wn-main">
+      <section class="wn-start" aria-labelledby="how-title">
+        <p class="wn-eyebrow mono">HOW TO USE THIS SESSION</p>
+        <h2 id="how-title">Attempt first. Reveal only what you need.</h2>
+        <div class="wn-how"><div><b>1</b><span>Read the task and play with the grid.</span></div><div><b>2</b><span>Enter your answer and check it.</span></div><div><b>3</b><span>Open one solution step when you get stuck.</span></div></div>
+      </section>
+
+      <section class="wn-ideas" id="ideas" aria-labelledby="ideas-title">
+        <p class="wn-eyebrow mono">KEY IDEAS · BEFORE QUESTION 1</p>
+        <h2 id="ideas-title">One set of frequencies, reused far enough away</h2>
+        <p>A <b>cellular network</b> is a wireless network spread over land areas called <b>cells</b>, each served by at least one transceiver, the <b>base station</b>. A cell uses a different set of frequencies from its neighbours to avoid interference.</p>
+        <p><b>Frequency reuse</b> is the ability to use the same frequencies again to increase both coverage and capacity. Adjacent cells use different frequencies, but two cells that are <b>far enough apart</b> can use the same ones. A group of N cells that together use every frequency set once is a <b>cluster</b>.</p>
+        <div class="wn-idea-grid">
+          {keyIdeas.map((k) => <div class="wn-idea"><span>{k.name}</span><code>{k.formula}</code><small>{k.note}</small></div>)}
+        </div>
+        <form class="wn-idea-calc" data-reuse-mini>
+          <p class="mono">TRY IT</p>
+          <label><span>Cells per cluster N</span><input name="n" type="number" min="1" step="1" value="7" /></label>
+          <label><span>Cell radius R (km)</span><input name="r" type="number" min="0" step="any" value="2" /></label>
+          <output data-reuse-mini-out><span>D <b>9.165 km</b></span><span>Q <b>4.583</b></span><span>1/N <b>0.1429</b></span></output>
+        </form>
+      </section>
+
+      {questions.map((q) => (
+        <article class="wn-question" id={`q${q.id}`} data-question={q.id} data-topic={q.topic}>
+          <header class="wn-q-head">
+            <div><p class="wn-eyebrow mono">QUESTION {q.part.toUpperCase()} · {q.topic}</p><h2>{q.title}</h2></div>
+            <span class="wn-status" data-q-status>Not started</span>
+          </header>
+
+          <p class="wn-task"><b>Task.</b> {q.task}</p>
+          {q.given && <div class="wn-given"><p class="mono">GIVEN</p><ul>{q.given.map((v) => <li>{v}</li>)}</ul></div>}
+
+          {q.shift && (
+            <section class="wn-practice" aria-label="Find the shift parameters">
+              <div class="wn-practice-title"><p class="mono">FIND THE SHIFT</p><span>Whole numbers only</span></div>
+              <div class="wn-shift" data-shift={q.shift}>
+                <span class="wn-shift-eq">i² + ij + j² = <b>{q.shift}</b></span>
+                <span class="wn-shift-in">
+                  <label><span class="mono">i</span><input type="number" min="0" step="1" inputmode="numeric" aria-label="Shift parameter i" /></label>
+                  <label><span class="mono">j</span><input type="number" min="0" step="1" inputmode="numeric" aria-label="Shift parameter j" /></label>
+                  <button type="button">Check</button>
+                </span>
+                <small data-feedback>Try j = 0, 1, 2, … and solve the quadratic for i.</small>
+              </div>
+            </section>
+          )}
+
+          {q.explorer && <div class="wn-explore"><ClusterExplorer {...q.explorer} /></div>}
+
+          {q.concept && (
+            <div class="wn-concept" data-concept data-answer={q.concept.answer} data-retry={q.concept.retry}>
+              <p>{q.concept.prompt}</p>
+              <div>{q.concept.choices.map((c) => <button type="button" data-choice={c.id}>{c.label}</button>)}</div><span data-concept-msg></span>
+            </div>
+          )}
+
+          {q.sectors && (
+            <div class="wn-explore">
+              <figure class="sx" data-sectors>
+                <figcaption class="cx-head"><p class="mono">SECTORING SIMULATOR</p><span>Replace the omni antenna with directional ones and watch the interferers drop.</span></figcaption>
+                <div class="sx-modes" role="group" aria-label="Antenna layout">
+                  <button type="button" data-mode="1" aria-pressed="true">360° · omni</button>
+                  <button type="button" data-mode="3" aria-pressed="false">120° · 3 sectors</button>
+                  <button type="button" data-mode="6" aria-pressed="false">60° · 6 sectors</button>
+                </div>
+                <div class="sx-body">
+                  <svg data-sector-svg viewBox="-150 -150 300 300" role="img" aria-label="Base station antenna layout"></svg>
+                  <div class="sx-side">
+                    <div class="sx-controls">
+                      <label><span>Cluster size N</span><select data-sx-n>{sectorSizes.map((n) => <option value={n} selected={n === 7}>{n}</option>)}</select></label>
+                      <label><span>Path-loss exponent n <b data-sx-n-out>4</b></span><input data-sx-exp type="range" min="2" max="5" step="0.1" value="4" /></label>
+                      <label><span>Channels in the cell</span><input data-sx-ch type="number" min="1" step="1" value="60" /></label>
+                    </div>
+                    <dl class="sx-read">
+                      <div><dt>Antennas at the BS</dt><dd data-sx="ant">1</dd></div>
+                      <div><dt>First-tier interferers i₀</dt><dd data-sx="i0">6</dd></div>
+                      <div><dt>S/I ≈ (D/R)ⁿ / i₀</dt><dd data-sx="sir">18.7 dB</dd></div>
+                      <div><dt>Channels per sector</dt><dd data-sx="ch">60</dd></div>
+                    </dl>
+                  </div>
+                </div>
+                <p class="cx-cap" data-sx-cap aria-live="polite">One omnidirectional antenna hears all six first-tier co-channel cells.</p>
+                <p class="sx-note">Beyond the sheet: the S/I estimate uses only the first tier of co-channel cells, all at distance D. It shows the trend; real layouts differ by a few dB.</p>
+              </figure>
+            </div>
+          )}
+
+          {q.sort && (
+            <section class="wn-practice" aria-label="Sort advantages and disadvantages">
+              <div class="wn-practice-title"><p class="mono">SORT THEM</p><span data-sort-score>0 of {q.sort.length} sorted</span></div>
+              <ul class="wn-sort" data-sort>
+                {sortOrder.map((k) => q.sort![k]).map((s) => (
+                  <li data-side={s.side}>
+                    <span>{s.label}</span>
+                    <span class="wn-sort-btns"><button type="button" data-pick="advantage">Advantage</button><button type="button" data-pick="disadvantage">Disadvantage</button></span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {q.practice && <section class="wn-practice" aria-label="Check your answers">
+            <div class="wn-practice-title"><p class="mono">TRY THE NUMBERS</p><span>Decimals or fractions as decimals: <code>0.0526</code></span></div>
+            <div class="wn-answer-grid">
+              {q.practice.map((p) => (
+                <label class="wn-answer" data-check data-answer={p.answer} data-tolerance={p.tolerance ?? .02} data-unit={p.unit === 'ratio' || p.unit === 'value' ? '' : p.unit}>
+                  <span>{p.label}</span>
+                  <span class="wn-input"><input type="number" step="any" inputmode="decimal" aria-label={`${p.label} in ${p.unit}`} /><b>{p.unit}</b><button type="button">Check</button></span>
+                  <small data-feedback>{p.hint}</small>
+                </label>
+              ))}
+            </div>
+          </section>}
+
+          <section class="wn-solution">
+            <div class="wn-solution-head"><div><p class="mono">GUIDED SOLUTION</p><span>Reveal the reasoning yourself or play it as a guided walkthrough.</span></div><button type="button" class="btn btn-ghost btn-sm" data-show-all>Show full solution</button></div>
+            <div class="wn-playback" data-playback>
+              <div class="wn-playback-controls">
+                <button type="button" class="wn-play" data-play aria-label={`Play solution for question ${q.part}`}><span aria-hidden="true" data-play-icon>▶</span><b data-play-label>Play solution</b></button>
+                <button type="button" class="wn-restart" data-restart aria-label="Restart solution playback"><span aria-hidden="true">↺</span> Restart</button>
+                <label class="wn-speed"><span>Speed</span><select data-speed aria-label="Playback speed"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+                <label class="wn-narrate"><input type="checkbox" data-narrate /><span>Read aloud</span></label>
+              </div>
+              <div class="wn-timeline" aria-live="polite"><span><i data-play-progress></i></span><small data-play-count>Step 1 of {q.steps.length}</small></div>
+            </div>
+            <ol>
+              {q.steps.map((step, i) => (
+                <li class:list={['wn-step', { shown: i === 0 }]} data-step>
+                  <span>{i + 1}</span><div><h3>{step.title}</h3><p set:html={step.body} /></div>
+                </li>
+              ))}
+            </ol>
+            <button type="button" class="wn-next-step" data-next-step>{q.steps.length > 1 ? 'Reveal next step ↓' : 'Solution shown'}</button>
+          </section>
+
+          <footer class="wn-take"><span aria-hidden="true">→</span><p><b>Remember:</b> {q.takeaway}</p><label><input type="checkbox" data-done /> I can solve this</label></footer>
+        </article>
+      ))}
+
+      <section class="wn-finish" data-finish>
+        <p class="wn-eyebrow mono">SESSION CHECKPOINT</p><h2>Five questions. One shift rule.</h2>
+        <p>Solve i² + ij + j² = N → shift i, turn 60°, shift j → D = R√(3N) → sectorize when interference is the limit. Mark each question when you can reproduce it without opening the solution.</p>
+        <a class="btn btn-primary" href="#q1a">Review from question 1 ↑</a>
+      </section>
+    </main>
+
+    <aside class="wn-aside">
+      <nav class="wn-nav" aria-label="Questions"><p class="mono">QUESTIONS</p>{nav.map((n) => <a href={n.href}>{n.label}</a>)}</nav>
+      <a class="wn-tool-link" href="#toolbox">Reuse toolbox <span>{formulas.length} formulas →</span></a>
+    </aside>
+  </div>
+
+  <section class="wn-tools" id="toolbox">
+    <div class="container">
+      <header class="wn-tools-head"><div><p class="wn-eyebrow mono">REUSE TOOLBOX</p><h2>Shift first. Distance second.</h2></div><p>Use these tools to check your arithmetic and your drawings, not to skip the reasoning.</p></header>
+      <div class="wn-calc-grid">
+        <form class="wn-calc" data-reuse>
+          <p class="mono">CLUSTER FINDER</p><h3>Is N a valid cluster size?</h3>
+          <div class="wn-mini-grid">
+            <label><span>Cells per cluster N</span><input name="n" type="number" min="1" step="1" value="19" /></label>
+            <label><span>Cell radius R (km)</span><input name="r" type="number" min="0" step="any" value="1" /></label>
+          </div>
+          <output data-reuse-out><span>Shift <b>i = 3, j = 2</b></span><span>D <b>7.55 km</b></span><span>Q <b>7.55</b></span></output>
+        </form>
+        <div class="wn-calc wn-calc-wide">
+          <ClusterExplorer i={2} j={1} title="Free explorer" caption="Any shift you like. Try (1, 1), (2, 0), (2, 1), (3, 1) and compare N and Q." />
+        </div>
+      </div>
+
+      <details class="wn-reference" open><summary><span>Valid cluster sizes</span><small>N ≤ 37 · {clusterTable.length} sizes</small></summary><div class="table-wrap"><table><thead><tr><th>N</th><th>Shift (i, j)</th><th>Q = D / R</th><th>Reuse factor</th></tr></thead><tbody>{clusterTable.map((r) => <tr><td>{r.n}</td><td>{r.shifts.map(([i, j]) => `(${i}, ${j})${i !== j && j > 0 ? ` or (${j}, ${i})` : ''}`).join(' · ')}</td><td>{r.q.toFixed(3)}</td><td>1/{r.n}</td></tr>)}</tbody></table></div></details>
+      <details class="wn-reference"><summary><span>All Sheet 2 formulas</span><small>{formulas.length} formulas</small></summary><div class="table-wrap"><table><thead><tr><th>Formula</th><th>Expression</th><th>Use</th><th>Units / warning</th></tr></thead><tbody>{formulas.map((r) => <tr><td>{r[0]}</td><td><code>{r[1]}</code></td><td>{r[2]}</td><td>{r[3]}</td></tr>)}</tbody></table></div></details>
+      <div class="wn-rule"><b>Golden rule</b><span>A cluster is valid only when one i-then-j shift works from every cell. D = R√(3N) depends only on N, not on the shape you draw.</span></div>
+    </div>
+  </section>
+</Base>
+
+<style is:global>
+  .wn-task{padding:18px 26px 0;color:var(--text-2);line-height:1.6}.wn-task b{color:var(--text)}.wn-task+.wn-given{margin-top:18px;border-top:1px solid var(--line)}
+  .wn-ideas{scroll-margin-top:calc(var(--nav-h) + 20px);margin-top:30px;padding:26px;border:1px solid var(--line);border-radius:26px;background:var(--surface);box-shadow:var(--shadow-sm)}.wn-ideas h2{margin-top:5px;font-size:clamp(1.55rem,1.2rem + 1vw,2.2rem);letter-spacing:-.035em}.wn-ideas>p:not(.wn-eyebrow){max-width:72ch;margin-top:12px;color:var(--text-2);line-height:1.65}.wn-ideas>p b{color:var(--text)}
+  .wn-idea-grid{display:grid;gap:12px;margin-top:20px}.wn-idea{display:grid;gap:6px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}.wn-idea>span{font-size:12px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.05em}.wn-idea code{font:650 20px var(--font-mono);color:var(--accent-text)}.wn-idea small{color:var(--text-2);line-height:1.5}@media(min-width:760px){.wn-idea-grid{grid-template-columns:repeat(3,1fr)}}
+  .wn-idea-calc{display:grid;gap:10px;margin-top:14px;padding:16px;border-radius:14px;background:#07111f;color:#c9d6ea}.wn-idea-calc>p{font-size:11px;color:#63e6ff}.wn-idea-calc label{display:grid;gap:5px}.wn-idea-calc label span{font-size:12px;color:#91a1b8}.wn-idea-calc input{height:40px;padding:0 12px;border:1px solid #2a3a55;border-radius:9px;background:#0d1b30;color:#f4f8ff;font:14px var(--font-mono)}.wn-idea-calc output{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px}.wn-idea-calc output span{display:grid;color:#91a1b8}.wn-idea-calc output b{color:#63e6ff;font:600 15px var(--font-mono)}@media(min-width:760px){.wn-idea-calc{grid-template-columns:auto 1fr 1fr 1.6fr;align-items:end}.wn-idea-calc>p{align-self:center}}
+  .wn-shift{display:grid;gap:10px;margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}.wn-shift-eq{font:15px var(--font-mono);color:var(--text-2)}.wn-shift-eq b{color:var(--text)}.wn-shift-in{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.wn-shift-in label{display:flex;align-items:center;border:1px solid var(--line-2);border-radius:9px;overflow:hidden;background:var(--surface)}.wn-shift-in label span{display:grid;place-items:center;width:34px;height:42px;background:var(--surface-2);color:var(--accent-text);font-size:14px;border-right:1px solid var(--line-2)}.wn-shift-in input{width:72px;height:42px;padding:0 10px;border:0;background:transparent;color:var(--text);font:15px var(--font-mono)}.wn-shift-in button{height:42px;padding:0 16px;border-radius:9px;background:var(--text);color:var(--bg);font-weight:650}.wn-shift small{color:var(--text-3);line-height:1.4}.wn-shift.ok{border-color:color-mix(in oklab,var(--ok) 55%,var(--line));background:var(--ok-soft)}.wn-shift.ok small{color:var(--ok)}.wn-shift.bad{border-color:color-mix(in oklab,var(--warn) 55%,var(--line));background:var(--warn-soft)}.wn-shift.bad small{color:var(--warn)}
+  .wn-explore{padding:22px 26px;border-bottom:1px solid var(--line)}
+  .cx,.sx{margin:0;display:grid;gap:12px;padding:16px;border:1px solid color-mix(in oklab,#63e6ff 30%,var(--line));border-radius:18px;background:linear-gradient(160deg,color-mix(in oklab,#63e6ff 6%,var(--surface)),var(--surface-2))}
+  .cx-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap}.cx-head p{font-size:11px;color:var(--accent-text);letter-spacing:.1em}.cx-head span{font-size:12.5px;color:var(--text-3)}
+  .cx-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.cx-stepper{display:inline-flex;align-items:center;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);overflow:hidden}.cx-stepper>span{display:grid;place-items:center;width:30px;height:38px;color:var(--accent-text);border-right:1px solid var(--line);font-size:14px}.cx-stepper button{width:36px;height:38px;color:var(--text);font-size:18px}.cx-stepper button:hover{background:var(--surface-2)}.cx-stepper button:disabled{opacity:.35}.cx-stepper output{min-width:26px;text-align:center;font:650 16px var(--font-mono)}
+  .cx-swap{height:38px;padding:0 13px;border:1px solid var(--accent-text);border-radius:10px;background:var(--accent-soft);color:var(--accent-text);font-weight:600;font-size:13px}
+  .cx-toggle{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:12px;color:var(--text-2)}.cx-toggle input{width:16px;height:16px;accent-color:var(--accent-text)}
+  .cx-stage{border-radius:14px;background:#07111f;overflow:hidden}.cx-stage svg{display:block;width:100%;height:auto;max-height:520px;touch-action:manipulation}
+  .cx-stage .cell{stroke:rgb(150 180 220/.28);stroke-width:1;cursor:pointer;transition:fill .25s}.cx-stage .cell:hover{stroke:#fff;stroke-width:1.5}.cx-stage .cell.co{stroke:#63e6ff;stroke-width:2}.cx-stage .cell.sel{stroke:#fff;stroke-width:2.5}
+  .cx-stage .lbl{fill:rgb(220 232 250/.6);font:600 10px var(--font-mono);text-anchor:middle;dominant-baseline:central;pointer-events:none}.cx-stage .lbl.co{fill:#07111f}
+  .cx-stage .border{stroke:#e8f2ff;stroke-width:2.6;stroke-linecap:round;pointer-events:none}
+  .cx-stage .path{fill:none;stroke:#ffd166;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}.cx-stage .dline{stroke:#ff7ab6;stroke-width:2.5;stroke-dasharray:7 5;pointer-events:none}.cx-stage .tier{stroke:#63e6ff;stroke-width:1.2;stroke-dasharray:3 4;opacity:.7;pointer-events:none}
+  .cx-stage .tag{font:700 15px var(--font-mono);text-anchor:middle;dominant-baseline:central;pointer-events:none;paint-order:stroke;stroke:#07111f;stroke-width:4px}.cx-stage .tag.y{fill:#ffd166}.cx-stage .tag.p{fill:#ff7ab6}.cx-stage .tag.w{fill:#fff}.cx-stage .arc{fill:none;stroke:#fff;stroke-width:1.5;pointer-events:none}
+  .cx-read{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.cx-read div{padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface)}.cx-read dt{font-size:11px;color:var(--text-3)}.cx-read dd{margin-top:2px;font:650 17px var(--font-mono)}.cx-read dd.bad{color:var(--warn)}@media(min-width:760px){.cx-read{grid-template-columns:repeat(4,1fr)}}
+  .cx-cap{font-size:13px;color:var(--text-2);line-height:1.5}
+  .sx-modes{display:flex;flex-wrap:wrap;gap:6px}.sx-modes button{height:38px;padding:0 13px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);color:var(--text-2);font-size:13px;font-weight:600}.sx-modes button[aria-pressed='true']{border-color:var(--accent-text);background:var(--accent-soft);color:var(--accent-text)}
+  .sx-body{display:grid;gap:14px}.sx-body svg{width:100%;max-width:320px;margin:auto;display:block;border-radius:14px;background:#07111f}@media(min-width:760px){.sx-body{grid-template-columns:300px 1fr;align-items:center}}
+  .sx-side{display:grid;gap:12px}.sx-controls{display:grid;gap:10px}.sx-controls label{display:grid;gap:5px}.sx-controls label>span{font-size:12px;color:var(--text-3)}.sx-controls b{color:var(--accent-text);font-family:var(--font-mono)}.sx-controls select,.sx-controls input[type=number]{height:40px;padding:0 10px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--text)}.sx-controls input[type=range]{accent-color:var(--accent-text)}
+  .sx-read{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.sx-read div{padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface)}.sx-read dt{font-size:11px;color:var(--text-3)}.sx-read dd{margin-top:2px;font:650 17px var(--font-mono)}
+  .sx-note{font-size:12px;color:var(--text-3);line-height:1.5}
+  .sx .sec{stroke:#07111f;stroke-width:2;transition:opacity .3s}.sx .beam{fill:#63e6ff;opacity:.22}.sx .hexo{fill:none;stroke:#cfe9ff;stroke-width:2}.sx .bs{fill:#fff}.sx .sl{fill:#c9d6ea;font:600 11px var(--font-mono);text-anchor:middle;dominant-baseline:central}
+  .wn-sort{list-style:none;display:grid;gap:8px;margin:14px 0 0;padding:0}.wn-sort li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 14px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}.wn-sort li>span:first-child{font-weight:600}.wn-sort-btns{display:flex;gap:6px}.wn-sort button{height:34px;padding:0 11px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--text-2);font-size:12px}.wn-sort button.on{border-color:var(--accent-text);background:var(--accent-soft);color:var(--accent-text)}.wn-sort li.ok{border-color:color-mix(in oklab,var(--ok) 55%,var(--line));background:var(--ok-soft)}.wn-sort li.bad{border-color:color-mix(in oklab,var(--warn) 55%,var(--line));background:var(--warn-soft)}
+  .wn-calc-wide{padding:0;border:0;background:none}.wn-calc[data-reuse]>output{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font:12px var(--font-body)}.wn-calc[data-reuse]>output span{display:grid;color:#91a1b8}.wn-calc[data-reuse]>output b{color:#63e6ff;font:600 13px var(--font-mono)}.wn-calc[data-reuse]>output.bad b{color:#ffb86b}
+  @media(min-width:820px){.wn-tools .wn-calc-grid{grid-template-columns:.75fr 1.25fr;align-items:start}}
+  @media(max-width:640px){.wn-task,.wn-explore{padding-inline:18px}.wn-ideas{padding:20px;border-radius:18px}.wn-idea-calc output,.wn-calc[data-reuse]>output{grid-template-columns:1fr}.cx-head{display:grid}}
+  @media(prefers-reduced-motion:reduce){.cx-stage .cell,.sx .sec{transition:none}}
+  @media print{.wn-explore,.wn-idea-calc,.wn-sort-btns{display:none!important}}
+</style>
+
+<script>
+  import { initLab } from '@/scripts/wireless-lab';
+  import { initSheet2 } from '@/scripts/wireless-sheet2';
+  import { onPageLoad } from '@/scripts/page-load';
+
+  onPageLoad(() => {
+    const root = document.querySelector<HTMLElement>('[data-wireless]');
+    if (!root || root.dataset.wired) return;
+    initLab(root, { key: 'buenova:wireless-sheet2', resetPrompt: 'Reset all Wireless Sheet 2 progress in this browser?' });
+    initSheet2(document);
+  });
+</script>

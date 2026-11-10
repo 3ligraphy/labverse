@@ -1,0 +1,173 @@
+---
+import Base from '@/layouts/Base.astro';
+import { conversions, formulas, questions } from '@/lib/wireless/sheet3';
+import '@/styles/wireless-lab.css';
+
+Astro.response.headers.set('cache-control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=600');
+const nav = questions.map((q) => ({ href: `#q${q.id}`, label: `Q${q.id} · ${q.topic}` }));
+---
+<Base title="Wireless Networks · Week 6 Lab · Sheet 3" description="A no-login, interactive Sheet 3 session for antennas, propagation, Doppler, path loss, formulas and conversions.">
+  <header class="wn-hero">
+    <div class="wn-air" aria-hidden="true"><i></i><i></i><i></i><span></span></div>
+    <div class="container wn-hero-in">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">~</a><span aria-hidden="true">/</span><a href="/modules">modules</a><span aria-hidden="true">/</span><a href="/wireless">wireless</a><span aria-hidden="true">/</span><a href="/wireless#labs">labs</a><span aria-hidden="true">/</span><span aria-current="page">sheet-3</span></nav>
+      <div class="wn-hero-grid">
+        <div>
+          <p class="wn-k mono"><span></span> WEEK 6 · LAB · SHEET 3 · NO SIGN-IN</p>
+          <h1><span class="wn-title-word">Wireless</span> <span class="wn-title-word">Networks</span><br /><em>Antennas &amp; propagation</em></h1>
+          <p class="wn-lead">Solve every question with the numbers in front of you. Try an answer, check it instantly, then reveal the reasoning one small step at a time.</p>
+          <div class="wn-actions"><a class="btn btn-primary" href="#q1">Start question 1 ↓</a><a class="btn btn-ghost" href="#toolbox">Open formula toolbox</a></div>
+          <p class="wn-private"><span aria-hidden="true">◉</span> Progress stays in this browser. No account, attendance session, or database record.</p>
+        </div>
+        <aside class="wn-signal" aria-label="Session overview">
+          <div class="wn-dial"><span data-progress-ring></span><b data-progress>0%</b><small>complete</small></div>
+          <dl><div><dt>Questions</dt><dd>10</dd></div><div><dt>Formulas</dt><dd>21</dd></div><div><dt>Mode</dt><dd>Guided</dd></div></dl>
+          <button type="button" class="wn-reset" data-reset>Reset my progress</button>
+        </aside>
+      </div>
+      <ol class="wn-route" aria-label="Session route">
+        <li><span>01</span><b>Convert</b><small>Put every value in the right unit</small></li>
+        <li><span>02</span><b>Choose</b><small>Pick the formula from the target</small></li>
+        <li><span>03</span><b>Substitute</b><small>Keep units visible beside numbers</small></li>
+        <li><span>04</span><b>Sense-check</b><small>Verify sign, scale, and reference</small></li>
+      </ol>
+    </div>
+  </header>
+
+  <div class="container wn-layout" data-wireless>
+    <main class="wn-main">
+      <section class="wn-start" aria-labelledby="how-title">
+        <p class="wn-eyebrow mono">HOW TO USE THIS SESSION</p>
+        <h2 id="how-title">Attempt first. Reveal only what you need.</h2>
+        <div class="wn-how"><div><b>1</b><span>Read the given values and target.</span></div><div><b>2</b><span>Enter your numerical answer with the displayed unit.</span></div><div><b>3</b><span>Open one solution step when you get stuck.</span></div></div>
+      </section>
+
+      {questions.map((q) => (
+        <article class="wn-question" id={`q${q.id}`} data-question={q.id} data-topic={q.topic}>
+          <header class="wn-q-head">
+            <div><p class="wn-eyebrow mono">QUESTION {String(q.id).padStart(2, '0')} · {q.topic}</p><h2>{q.title}</h2></div>
+            <span class="wn-status" data-q-status>Not started</span>
+          </header>
+
+          {q.given && <div class="wn-given"><p class="mono">GIVEN</p><ul>{q.given.map((v) => <li>{v}</li>)}</ul></div>}
+
+          {q.id === 3 && (
+            <div class="wn-concept" data-concept data-answer="fast" data-retry="Try again: focus on how quickly the channel changes.">
+              <p>Which type changes rapidly because multipath components add and cancel?</p>
+              <div><button type="button" data-choice="slow">Slow fading</button><button type="button" data-choice="fast">Fast fading</button></div><span data-concept-msg></span>
+            </div>
+          )}
+          {q.id === 5 && (
+            <div class="wn-concept" data-concept data-answer="smaller" data-retry="Try again: focus on how quickly the channel changes.">
+              <p>If Doppler shift increases, what happens to coherence time?</p>
+              <div><button type="button" data-choice="larger">It becomes larger</button><button type="button" data-choice="smaller">It becomes smaller</button></div><span data-concept-msg></span>
+            </div>
+          )}
+
+          {q.practice && <section class="wn-practice" aria-label="Check your answers">
+            <div class="wn-practice-title"><p class="mono">TRY THE NUMBERS</p><span>Scientific notation works: <code>4.52e-11</code></span></div>
+            <div class="wn-answer-grid">
+              {q.practice.map((p) => (
+                <label class="wn-answer" data-check data-answer={p.answer} data-tolerance={p.tolerance ?? .02}>
+                  <span>{p.label}</span>
+                  <span class="wn-input"><input type="number" step="any" inputmode="decimal" aria-label={`${p.label} in ${p.unit}`} /><b>{p.unit}</b><button type="button">Check</button></span>
+                  <small data-feedback>{p.hint}</small>
+                </label>
+              ))}
+            </div>
+          </section>}
+
+          <section class="wn-solution">
+            <div class="wn-solution-head"><div><p class="mono">GUIDED SOLUTION</p><span>Reveal the reasoning yourself or play it as a guided walkthrough.</span></div><button type="button" class="btn btn-ghost btn-sm" data-show-all>Show full solution</button></div>
+            <div class="wn-playback" data-playback>
+              <div class="wn-playback-controls">
+                <button type="button" class="wn-play" data-play aria-label={`Play solution for question ${q.id}`}><span aria-hidden="true" data-play-icon>▶</span><b data-play-label>Play solution</b></button>
+                <button type="button" class="wn-restart" data-restart aria-label="Restart solution playback"><span aria-hidden="true">↺</span> Restart</button>
+                <label class="wn-speed"><span>Speed</span><select data-speed aria-label="Playback speed"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+                <label class="wn-narrate"><input type="checkbox" data-narrate /><span>Read aloud</span></label>
+              </div>
+              <div class="wn-timeline" aria-live="polite"><span><i data-play-progress></i></span><small data-play-count>Step 1 of {q.steps.length}</small></div>
+            </div>
+            <ol>
+              {q.steps.map((step, i) => (
+                <li class:list={['wn-step', { shown: i === 0 }]} data-step>
+                  <span>{i + 1}</span><div><h3>{step.title}</h3><p set:html={step.body} /></div>
+                </li>
+              ))}
+            </ol>
+            <button type="button" class="wn-next-step" data-next-step>{q.steps.length > 1 ? 'Reveal next step ↓' : 'Solution shown'}</button>
+          </section>
+
+          <footer class="wn-take"><span aria-hidden="true">→</span><p><b>Remember:</b> {q.takeaway}</p><label><input type="checkbox" data-done /> I can solve this</label></footer>
+        </article>
+      ))}
+
+      <section class="wn-finish" data-finish>
+        <p class="wn-eyebrow mono">SESSION CHECKPOINT</p><h2>Ten questions. One repeatable method.</h2>
+        <p>Convert → choose → substitute → sense-check. Mark each question when you can reproduce it without opening the solution.</p>
+        <a class="btn btn-primary" href="#q1">Review from question 1 ↑</a>
+      </section>
+    </main>
+
+    <aside class="wn-aside">
+      <nav class="wn-nav" aria-label="Questions"><p class="mono">QUESTIONS</p>{nav.map((n) => <a href={n.href}>{n.label}</a>)}</nav>
+      <a class="wn-tool-link" href="#toolbox">Formula toolbox <span>21 formulas →</span></a>
+    </aside>
+  </div>
+
+  <section class="wn-tools" id="toolbox">
+    <div class="container">
+      <header class="wn-tools-head"><div><p class="wn-eyebrow mono">FORMULA TOOLBOX</p><h2>Units first. Formula second.</h2></div><p>Use these tools to check arithmetic, not to skip the reasoning.</p></header>
+      <div class="wn-calc-grid">
+        <form class="wn-calc" data-converter>
+          <p class="mono">UNIT CONVERTER</p><h3>Convert without losing the reference</h3>
+          <label><span>Conversion</span><select>
+            <option value="w-dbm">W → dBm</option><option value="dbm-w">dBm → W</option><option value="mw-dbm">mW → dBm</option><option value="dbm-mw">dBm → mW</option><option value="db-linear">dB gain → linear</option><option value="kmh-ms">km/h → m/s</option><option value="mph-ms">mph → m/s</option><option value="ghz-hz">GHz → Hz</option><option value="mhz-hz">MHz → Hz</option><option value="cm-m">cm → m</option>
+          </select></label>
+          <label><span>Value</span><input type="number" step="any" value="40" /></label>
+          <output data-convert-out>46.0206 dBm</output>
+        </form>
+        <form class="wn-calc" data-friis>
+          <p class="mono">LIVE LINK BUDGET</p><h3>Free-space Friis calculator</h3>
+          <div class="wn-mini-grid">
+            <label><span>Pₜ (W)</span><input name="power" type="number" step="any" value="40" /></label>
+            <label><span>f (MHz)</span><input name="frequency" type="number" step="any" value="900" /></label>
+            <label><span>d (m)</span><input name="distance" type="number" step="any" value="1000" /></label>
+            <label><span>Gₜ (dB)</span><input name="gt" type="number" step="any" value="0" /></label>
+            <label><span>Gᵣ (dB)</span><input name="gr" type="number" step="any" value="0" /></label>
+          </div>
+          <output data-friis-out><span>λ <b>0.3333 m</b></span><span>FSPL <b>91.53 dB</b></span><span>Pᵣ <b>28.14 nW</b></span></output>
+        </form>
+      </div>
+
+      <details class="wn-reference" open><summary><span>Conversion rules</span><small>{conversions.length} essentials</small></summary><div class="table-wrap"><table><thead><tr><th>Category</th><th>Rule</th><th>Example</th></tr></thead><tbody>{conversions.map((r) => <tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td></tr>)}</tbody></table></div></details>
+      <details class="wn-reference"><summary><span>All Sheet 3 formulas</span><small>{formulas.length} formulas</small></summary><div class="table-wrap"><table><thead><tr><th>Formula</th><th>Expression</th><th>Use</th><th>Units / warning</th></tr></thead><tbody>{formulas.map((r) => <tr><td>{r[0]}</td><td><code>{r[1]}</code></td><td>{r[2]}</td><td>{r[3]}</td></tr>)}</tbody></table></div></details>
+      <div class="wn-rule"><b>Golden rule</b><span>Linear formula → linear values. Logarithmic link budget → dB/dBm/dBW values. Do not mix the two columns.</span></div>
+    </div>
+  </section>
+</Base>
+
+
+<script>
+  import { convert, dbToLinear, freeSpacePathLossDb, friisWatts, wavelength, wattsToDbm, type Conversion } from '@/lib/wireless/core';
+  import { format, initLab } from '@/scripts/wireless-lab';
+  import { onPageLoad } from '@/scripts/page-load';
+
+  onPageLoad(() => {
+    const root = document.querySelector<HTMLElement>('[data-wireless]');
+    if (!root || root.dataset.wired) return;
+    initLab(root, { key: 'buenova:wireless-sheet3', resetPrompt: 'Reset all Wireless Sheet 3 progress in this browser?' });
+
+    const converter = document.querySelector<HTMLFormElement>('[data-converter]');
+    const runConvert = () => { if (!converter) return; const kind = converter.querySelector('select')!.value as Conversion, value = Number(converter.querySelector('input')!.value); const r = convert(value, kind); converter.querySelector('output')!.textContent = Number.isFinite(r.value) ? `${format(r.value)} ${r.unit}` : 'Enter a valid value'; };
+    converter?.addEventListener('input', runConvert); runConvert();
+
+    const friis = document.querySelector<HTMLFormElement>('[data-friis]');
+    const runFriis = () => {
+      if (!friis) return; const fd = new FormData(friis); const p = Number(fd.get('power')), f = Number(fd.get('frequency')) * 1e6, d = Number(fd.get('distance')), gt = dbToLinear(Number(fd.get('gt'))), gr = dbToLinear(Number(fd.get('gr')));
+      const pr = friisWatts(p, gt, gr, f, d), fspl = freeSpacePathLossDb(d, f), l = wavelength(f), scaled = pr >= 1e-6 ? `${format(pr * 1e6)} µW` : pr >= 1e-9 ? `${format(pr * 1e9)} nW` : `${format(pr)} W`;
+      friis.querySelector('output')!.innerHTML = `<span>λ <b>${format(l)} m</b></span><span>FSPL <b>${format(fspl)} dB</b></span><span>Pᵣ <b>${scaled} · ${format(wattsToDbm(pr))} dBm</b></span>`;
+    };
+    friis?.addEventListener('input', runFriis); runFriis();
+  });
+</script>

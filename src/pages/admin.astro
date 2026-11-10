@@ -11,6 +11,7 @@ import { access } from '@/lib/accounts/access';
 import { ROLE_NAMES } from '@/lib/accounts/permissions';
 import { getAccountStore } from '@/lib/accounts/server';
 import { hubData } from '@/lib/accounts/hub';
+import { getFilesStore } from '@/lib/project-files/server';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'no-store, max-age=0');
@@ -21,6 +22,8 @@ const status = setupStatus();
 let manyFaculties = false;
 let view: null | {
   greeting: string; role: string; semester: string; invites: number; accounts: number;
+  /** hand-ins no staff member has opened yet (also the red badge on Submissions in the menu) */
+  handIns: { count: number; where: string; href: string };
   modules: { slug: string; title: string; code: string; faculty: string; facultyName: string; color: string; href: string; builtIn: boolean; category: string; semester: string; years: string[]; labs: number; myRole: string; tools: { label: string; href: string; primary?: boolean }[] }[];
   platformTools: { label: string; href: string; desc: string; icon: string }[];
 } = null;
@@ -42,17 +45,22 @@ if (staff) {
     role: a.who.platformRole ? ROLE_NAMES[a.who.platformRole] : 'Full access (admin password)',
     semester: settings.activeSemester,
     invites: invites.length,
+    handIns: await (async () => {
+      const rows = (await getFilesStore()?.unseen().catch(() => [])) ?? [];
+      const count = rows.reduce((n, r) => n + r.count, 0);
+      const where = [...new Set(rows.map((r) => cards.find((c) => c.slug === r.module)?.title ?? r.module))].join(', ');
+      return { count, where, href: rows.length === 1 ? `/admin/project/${encodeURIComponent(rows[0].file_id)}` : `/admin/project?module=${encodeURIComponent(rows[0]?.module ?? '')}` };
+    })(),
     accounts: users.length,
     modules: mine.map((c) => {
       const mr = a.who.modules[c.slug];
       const tools: { label: string; href: string; primary?: boolean }[] = [];
-      if (a.can('module.sessions', c.slug) || a.can('module.progress', c.slug)) tools.push({ label: 'Sessions', href: `/admin/sessions?module=${encodeURIComponent(c.slug)}`, primary: true });
-      if (a.can('module.progress', c.slug)) tools.push({ label: 'Progress', href: `/admin/progress?module=${encodeURIComponent(c.slug)}` });
-      if (a.can('module.invite', c.slug)) tools.push({ label: 'Team & invites', href: `/admin/team/${c.slug}` });
-      tools.push({ label: 'Assessment', href: `/admin/assessment/${c.slug}` });
+      if (a.can('module.progress', c.slug)) tools.push({ label: 'Progress', href: `/admin/progress?module=${encodeURIComponent(c.slug)}`, primary: true });
+      if (a.can('module.progress', c.slug)) tools.push({ label: 'Statistics', href: `/admin/stats?module=${encodeURIComponent(c.slug)}` });
+      if (a.can('module.sessions', c.slug) || a.can('module.progress', c.slug)) tools.push({ label: 'Attendance', href: `/admin/sessions?module=${encodeURIComponent(c.slug)}` });
       if (a.can('module.build', c.slug) || a.can('module.submissions', c.slug)) tools.push({ label: 'Banners', href: `/admin/banner/${c.slug}` });
       if (a.can('module.build', c.slug)) tools.push({ label: 'Canvas', href: `/admin/builder/${c.slug}` });
-      if (c.builtIn && a.can('module.submissions', c.slug)) tools.push({ label: 'Submissions', href: '/admin/project' });
+      if (a.can('module.submissions', c.slug)) tools.push({ label: 'Submissions', href: `/admin/project?module=${encodeURIComponent(c.slug)}` });
       if (c.builtIn && a.can('cms.edit')) tools.push({ label: 'Content', href: '/admin/cms' });
       const facultyName = c.faculty === 'all' ? 'All faculties' : settings.faculties.find((f) => f.slug === c.faculty)?.name ?? c.faculty;
       return { ...c, facultyName, href: !c.builtIn && a.can('module.build', c.slug) ? `/admin/builder/${c.slug}` : c.href, myRole: a.who.platformRole === 'super_admin' ? ROLE_NAMES.super_admin : mr ? ROLE_NAMES[mr] : a.who.platformRole ? ROLE_NAMES[a.who.platformRole] : 'Admin', tools };
@@ -60,7 +68,7 @@ if (staff) {
     platformTools: [
       a.can('modules.create') && { label: 'Modules & lab builder', href: '/admin/builder', desc: 'Create modules and visually build their labs and exercises', icon: '⬡' },
       a.can('platform.settings') && { label: 'Catalogue', href: '/admin/catalogue', desc: 'Years, specializations, categories, active semester', icon: '▦' },
-      (a.can('accounts.manage') || a.can('accounts.staff')) && { label: 'Accounts & roles', href: '/admin/accounts', desc: 'Staff and student accounts, invitations, permissions', icon: '⚿' },
+      (a.can('accounts.manage') || a.can('accounts.staff')) && { label: 'Accounts & roles', href: '/admin/accounts', desc: 'Staff and student accounts', icon: '⚿' },
       a.can('cms.edit') && { label: 'Course content', href: '/admin/cms', desc: 'Edit the built-in course’s lists and info', icon: '✎' },
     ].filter(Boolean) as { label: string; href: string; desc: string; icon: string }[],
   };
@@ -70,6 +78,7 @@ if (staff) {
   {!view ? (
     <section class="ah-gate">
       <div class="ah-sky" aria-hidden="true"></div>
+      <a class="ah-back" href="/">← Back to the site</a>
       <div class="glass ah-login">
         <p class="ah-k mono">Admin workspace</p>
         <h1>Sign in to manage your modules</h1>
@@ -98,6 +107,7 @@ if (staff) {
           <div class="ah-stat"><span class="mono">Modules</span><b>{view.modules.length}</b><small>you work on</small></div>
           <div class="ah-stat"><span class="mono">Active semester</span><b>{view.semester.replace('Semester ', 'S')}</b><small>{view.semester}</small></div>
           {view.accounts > 0 && <div class="ah-stat"><span class="mono">Accounts</span><b>{view.accounts}</b><small>on the platform</small></div>}
+          {view.handIns.count > 0 && <a class="ah-stat warn" href={view.handIns.href}><span class="mono">New hand-ins</span><b>{view.handIns.count}</b><small>on {view.handIns.where} →</small></a>}
           {view.invites > 0 && <a class="ah-stat warn" href="/admin/accounts"><span class="mono">Pending invites</span><b>{view.invites}</b><small>waiting to be accepted →</small></a>}
         </div>
 
@@ -136,6 +146,7 @@ if (staff) {
 </Base>
 
 <style>
+  .ah-back { position: absolute; top: 18px; left: 18px; z-index: 1; display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--hero-text) 25%, transparent); color: var(--hero-text); font-size: 13px; font-weight: 600; }
   .ah-gate { position: relative; min-height: 100dvh; display: grid; place-items: center; padding: calc(var(--nav-h) + 40px) 16px 80px; background: var(--hero-bg); color: var(--hero-text); isolation: isolate; overflow: hidden; overflow: clip; }
   .ah-sky { position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 20% 0%, color-mix(in oklab, var(--hero-accent) 16%, transparent), transparent 45%); }
   .ah-login { width: min(100%, 520px); padding: clamp(26px, 5vw, 44px); display: grid; gap: 16px; }

@@ -88,11 +88,39 @@ test('module statistics: attendance, per-lab progress, spread, exercise difficul
   await check('240002', 'e1', 1);
   await check('240002', 'e1', 3); // second try
   const st = moduleStats([lab], await store.statsRaw(['lab-03']));
-  assert.deepEqual(st.totals, { students: 3, sessions: 1, attendancePct: 67, checks: 4, solved: 3, firstTryPct: 67 });
+  assert.deepEqual(st.totals, { students: 3, sessions: 1, attendancePct: 67, attendanceTaken: true, checks: 4, solved: 3, firstTryPct: 67 });
   assert.equal(st.sessions[0].joined, 3);
   const l = st.labs[0];
   assert.equal(l.students, 3);
   assert.deepEqual(l.exercises.map((e) => [e.solvedPct, e.tried, e.avgTries, e.firstTryPct]), [[67, 2, 1.5, 50], [33, 1, 1, 100]]);
   assert.equal(l.spread.reduce((a, b) => a + b, 0), 3);
   assert.deepEqual(st.groups.map((g) => [g.group, g.entries]), [['G1', 2], ['G2', 1]]);
+});
+
+test('module statistics: time to solve, and how long students try before giving up (long gaps are breaks)', async () => {
+  const { moduleStats } = await import('../src/lib/progress/core.ts');
+  let t = NOW;
+  const store = new MemoryStore(() => t);
+  const s = await store.createSession('lab-03', 'TA', 'Sun 10:00', 90);
+  for (const key of ['a', 'b']) {
+    await store.touchStudent({ studentKey: key, studentId: key, name: key, deviceKey: 'd' });
+    await store.joinSession(s.id, key, 'G1');
+  }
+  const check = async (at: number, key: string, exercise: string, passed: number) => {
+    t = NOW + at * 1000;
+    await store.addAttempt({ studentKey: key, lab: 'lab-03', exercise, passed, total: 3, code: '', sessionId: s.id });
+  };
+  // a: e1 solved at once; e2 from the end of e1 (0 s) to its solve at 300 s, through two wrong tries
+  await check(0, 'a', 'e1', 3);
+  await check(60, 'a', 'e2', 0);
+  await check(180, 'a', 'e2', 1);
+  await check(300, 'a', 'e2', 3);
+  // b: never solves e2 — 120 s to the first try, then an hour away counts as a 15-minute break
+  await check(0, 'b', 'e1', 3);
+  await check(120, 'b', 'e2', 0);
+  await check(3720, 'b', 'e2', 0);
+  const st = moduleStats([lab], await store.statsRaw(['lab-03']));
+  const e2 = st.labs[0].exercises.find((e) => e.id === 'e2')!;
+  assert.deepEqual([e2.solveSec, e2.gaveUp, e2.giveUpSec], [300, 1, 120 + 900]);
+  assert.deepEqual(st.labs[0].people.map((p) => [p.name, p.seconds]).sort(), [['a', 300], ['b', 1020]]);
 });

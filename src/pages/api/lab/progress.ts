@@ -5,13 +5,13 @@
 import type { APIRoute } from 'astro';
 import { validateLabEvent } from '@/lib/lab/core';
 import { getLabBackend } from '@/lib/lab/server';
-import { sessionState } from '@/lib/progress/core';
-import { getProgressStore, getStructures } from '@/lib/progress/server';
+import { ALWAYS_OPEN } from '@/lib/progress/core';
+import { LOCKED_MESSAGE, getProgressStore, getStructures, labLocked, liveSession } from '@/lib/progress/server';
 import { noStore } from '@/lib/attendance/server';
 
 export const prerender = false;
 
-const MAX_EVENTS = 300; // per device
+const MAX_EVENTS = 600; // per student: a flood guard only (shared lab PCs and campus Wi-Fi are fine)
 const WINDOW_SEC = 10 * 60; // per 10 minutes
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...noStore } });
@@ -26,25 +26,32 @@ export const POST: APIRoute = async ({ request }) => {
   if (!v.ok) return json({ ok: false, error: v.error }, 400);
 
   const progress = getProgressStore();
-  const session = progress ? await progress.getSessionById(v.event.sessionId).catch(() => null) : null;
-  if (!session || session.lab !== v.event.lab || !sessionState(session, Date.now()).open) {
+  if (await labLocked(v.event.lab).catch(() => false)) return json({ ok: false, error: 'locked', message: LOCKED_MESSAGE }, 403);
+  let session;
+  try {
+    // with sessions off: the lab's permanent session when the student's own has ended (their work is never refused)
+    session = progress ? await liveSession(progress, v.event.lab, v.event.sessionId) : null;
+  } catch (error) {
+    console.error('[lab] could not read the session', error);
+    return json({ ok: false, error: 'Could not save progress.' }, 503); // the browser keeps the event and sends it again
+  }
+  if (!session) {
     return json({ ok: false, error: 'session-closed', message: 'Your TA has not started this lab session yet. You can read the content, but you cannot start or record attendance.' }, 403);
   }
-  if (v.event.event !== 'start' && !(await progress!.isSessionStudent(v.event.sessionId, v.event.studentKey))) {
+  if (!ALWAYS_OPEN && v.event.event !== 'start' && !(await progress!.isSessionStudent(session.id, v.event.studentKey))) {
     return json({ ok: false, error: 'not-started', message: 'Enter your name, ID and group at the top of the lab first.' }, 403);
   }
+  // record() joins the student to this session (with sessions off, a student who was not in it yet)
+  v.event.sessionId = session.id;
 
-  const tries = await backend.hit(`device:${v.event.deviceId}`, WINDOW_SEC).catch(() => 0);
+  const tries = await backend.hit(`student:${v.event.studentKey}`, WINDOW_SEC).catch(() => 0);
   if (tries > MAX_EVENTS) return json({ ok: false, error: 'Too many events — slow down a little.' }, 429);
 
   try {
     await backend.record(v.event);
   } catch (error) {
-    if (error instanceof Error && error.message === 'identity-conflict') {
-      return json({ ok: false, error: 'identity-conflict', message: 'This student ID was already used with a different name. Type your name exactly as you did before, or ask your TA to fix it.' }, 409);
-    }
     console.error('[lab] could not record progress', error);
     return json({ ok: false, error: 'Could not save progress.' }, 500);
   }
-  return json({ ok: true });
+  return json({ ok: true, sessionId: session.id });
 };

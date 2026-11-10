@@ -1,6 +1,7 @@
 ---
 /** Required name + student ID gate at the beginning of every lab. */
 import '@/styles/lab-interactive.css';
+import { ALWAYS_OPEN } from '@/lib/progress/mode';
 interface Props { id: string; lab?: string }
 const { id, lab = 'this lab' } = Astro.props;
 ---
@@ -8,12 +9,12 @@ const { id, lab = 'this lab' } = Astro.props;
   <div class="ls-in" data-ls-form>
     <p class="ls-k mono">Before you start</p>
     <h2>Who’s doing {lab}?</h2>
-    <p data-ls-status>Waiting for your TA to start this lab session. You can read the content in the meantime.</p>
+    <p data-ls-status>{ALWAYS_OPEN ? 'This lab is open any time. Enter your name and student ID to start. Your work is saved.' : 'Waiting for your TA to start this lab session. You can read the content in the meantime.'}</p>
     <form novalidate>
       <label class="ls-session" data-ls-session hidden>Teaching session<select class="input" name="sessionId" aria-label="Choose your teaching session"></select></label>
       <label>Full name<input class="input" name="name" autocomplete="name" placeholder="e.g. Mariam Ahmed" required maxlength="60" /></label>
       <label>Student ID<input class="input mono" name="studentId" autocomplete="off" inputmode="numeric" pattern="[0-9 ]{5,11}" placeholder="e.g. 236541" required maxlength="11" title="5–9 digits, numbers only" /></label>
-      <label>Group<input class="input" name="group" autocomplete="off" autocapitalize="characters" placeholder="e.g. G12" required maxlength="12" /></label>
+      <label>Group <small>(optional)</small><input class="input" name="group" autocomplete="off" autocapitalize="characters" placeholder="e.g. G12" maxlength="20" /></label>
       <button class="btn btn-primary btn-lg" type="submit">Start →</button>
     </form>
     <p class="ls-err" data-ls-error role="alert"></p>

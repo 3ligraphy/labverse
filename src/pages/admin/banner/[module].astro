@@ -5,6 +5,8 @@ import AdminShell from '@/components/admin/AdminShell.astro';
 import { access } from '@/lib/accounts/access';
 import { compileModule } from '@/lib/platform/core';
 import { BUILT_IN_MODULE, getPlatformStore } from '@/lib/platform/server';
+import { hubData } from '@/lib/accounts/hub';
+import ModulePicker from '@/components/admin/ModulePicker.astro';
 
 export const prerender = false;
 Astro.response.headers.set('cache-control', 'no-store, max-age=0');
@@ -20,13 +22,15 @@ const meta = row ? compileModule(row.flow).meta : BUILT_IN_MODULE;
 const banners = await store.listBanners(slug);
 const data = JSON.stringify({ banners }).replace(/</g, '\\u003c');
 const view = slug === BUILT_IN_MODULE.slug ? '/mobile-development' : `/${slug}`;
+// the module is chosen on the page (the admin menu has no module switcher)
+const pickable = (await hubData()).cards.filter((c) => a.can('module.build', c.slug) || a.can('module.submissions', c.slug)).map((c) => ({ slug: c.slug, title: c.title }));
 ---
 <Base title={`Banners · ${meta.title}`} noindex>
   <AdminShell active="banner">
     <section class="bn container" data-bn data-module={slug} style={`--mc:${meta.color || BUILT_IN_MODULE.color}`}>
       <script type="application/json" data-bn-data set:html={data} />
       <header class="bn-head">
-        <div><p class="bn-k mono">{meta.code || 'Module'} · announcement banners</p><h1>{meta.title}</h1><p class="muted">Create announcements for this module. Only one banner can be published at a time.</p></div>
+        <div><p class="bn-k mono">{meta.code || 'Module'} · announcement banners</p><h1>{meta.title}</h1><p class="muted">Create announcements for this module. Only one banner can be published at a time.</p><ModulePicker modules={pickable} current={slug} href="/admin/banner/__M__" /></div>
         <a class="btn btn-ghost btn-sm" href={view} target="_blank" rel="noopener">View module ↗</a>
       </header>
 

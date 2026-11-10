@@ -8,9 +8,10 @@ import { getSecret } from 'astro:env/server';
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
 import { course } from '@/site.config';
-import { compileLab, compileModule, emptyFlow, flowLeader, labKey, parseNodeList, type AssessmentItem, type CompiledLab, type Flow, type LabNodeType } from './core';
+import { compileLab, compileModule, emptyFlow, flowLeader, labKey, orderFlow, parseNodeList, type AssessmentItem, type CompiledLab, type Flow, type LabNodeType } from './core';
 import { DEFAULT_FACULTY, DEFAULT_SETTINGS, kindOf, listOf, moduleFaculty, type Audience, type Category } from '@/lib/accounts/core';
 import type { ModuleBannerInput } from './banner';
+import { shippedSeeds } from './seeds/index';
 
 const env = (key: string) => getSecret(key) || undefined;
 const onVercel = () => Boolean(env('VERCEL'));
@@ -48,6 +49,7 @@ class PlatformStore {
   private labs: string;
   private assessment: string;
   private banners: string;
+  private seeds: string;
 
   constructor(url: string, prefix: string, driver: 'neon' | 'postgres') {
     if (driver === 'postgres') {
@@ -61,6 +63,7 @@ class PlatformStore {
     this.labs = `${prefix}_labs`;
     this.assessment = `${prefix}_assessment`;
     this.banners = `${prefix}_banners`;
+    this.seeds = `${prefix}_seeds`;
   }
 
   private async migrate() {
@@ -83,7 +86,90 @@ class PlatformStore {
       `create index if not exists ${this.banners}_module_idx on ${this.banners} (module, updated_at desc)`,
       // the lab components the admin allows per module (Admin → Canvas components); null = every component
       `alter table ${this.modules} add column if not exists lab_nodes jsonb`,
+      // the modules that ship with the code (seeds/index.ts) already applied to this database
+      `create table if not exists ${this.seeds} (id text primary key, applied_at timestamptz not null default now())`,
     ]) await this.run(s);
+    // a seed that fails must never take the platform down with it
+    await this.applySeeds().catch((e) => console.error('[platform] applying the shipped modules failed', e));
+  }
+
+  /**
+   * Creates each shipped module (and its labs) once per database: it never overwrites one that already exists,
+   * and once a seed is recorded it never runs again, so a module staff edit or delete stays that way. An update
+   * seed rewrites its labs' content once, and only while they still exist. An extend seed adds new labs to a module
+   * that already exists: it creates the missing labs and appends their nodes to the end of the module canvas,
+   * keeping everything staff changed on it. A patch seed sets a few fields on the module node and keeps the rest.
+   * A publish seed shows or hides labs (hidden labs are kept, and staff still open them in the builder).
+   */
+  private async applySeeds() {
+    for (const seed of shippedSeeds()) {
+      if ((await this.run(`select 1 from ${this.seeds} where id = $1`, [seed.id])).length) continue;
+      const m = seed.module;
+      if (seed.publish) {
+        for (const [slug, on] of Object.entries(seed.publish)) {
+          await this.run(`update ${this.labs} set published = $3, updated_at = now() where module = $1 and slug = $2`, [m.slug, slug, on]);
+        }
+        await this.run(`insert into ${this.seeds} (id) values ($1) on conflict (id) do nothing`, [seed.id]);
+        console.info(`[platform] shipped lab visibility applied to ${m.slug} (${seed.id})`);
+        continue;
+      }
+      if (seed.patch) {
+        const [row] = await this.run(`select flow from ${this.modules} where slug = $1`, [m.slug]);
+        if (row) {
+          const flow = json(row.flow) as Flow;
+          const root = orderFlow(flow, 'module')[0];
+          if (root) {
+            const nodes = flow.nodes.map((n) => (n.id === root.id ? { ...n, data: { ...n.data, ...seed.patch } } : n));
+            await this.run(`update ${this.modules} set flow = $2::jsonb, updated_at = now() where slug = $1`, [m.slug, JSON.stringify({ ...flow, nodes })]);
+          }
+        }
+        await this.run(`insert into ${this.seeds} (id) values ($1) on conflict (id) do nothing`, [seed.id]);
+        console.info(`[platform] shipped settings applied to ${m.slug} (${seed.id})`);
+        continue;
+      }
+      if (seed.extend) {
+        const [row] = await this.run(`select flow from ${this.modules} where slug = $1`, [m.slug]);
+        if (row) {
+          for (const lab of seed.labs) {
+            await this.run(`insert into ${this.labs} (module, slug, title, published, flow) values ($1, $2, $3, true, $4::jsonb) on conflict (module, slug) do nothing`,
+              [m.slug, lab.slug, lab.title, JSON.stringify(lab.flow)]);
+          }
+          const flow = json(row.flow) as Flow;
+          const have = new Set(flow.nodes.map((n) => n.id));
+          const add = m.flow.nodes.filter((n) => !have.has(n.id));
+          const last = orderFlow(flow, 'module').at(-1);
+          if (add.length && last) {
+            const nodes = [...flow.nodes, ...add.map((n, i) => ({ ...n, x: last.x, y: last.y + 150 * (i + 1) }))];
+            const edges = [...flow.edges, { from: last.id, to: add[0].id }, ...add.slice(1).map((n, i) => ({ from: add[i].id, to: n.id }))];
+            await this.run(`update ${this.modules} set flow = $2::jsonb, updated_at = now() where slug = $1`, [m.slug, JSON.stringify({ nodes, edges })]);
+          }
+        }
+        await this.run(`insert into ${this.seeds} (id) values ($1) on conflict (id) do nothing`, [seed.id]);
+        console.info(`[platform] shipped labs added to ${m.slug} (${seed.id})`);
+        continue;
+      }
+      if (seed.update) {
+        for (const lab of seed.labs) {
+          await this.run(`update ${this.labs} set title = $3, flow = $4::jsonb, updated_at = now() where module = $1 and slug = $2`,
+            [m.slug, lab.slug, lab.title, JSON.stringify(lab.flow)]);
+        }
+        await this.run(`insert into ${this.seeds} (id) values ($1) on conflict (id) do nothing`, [seed.id]);
+        console.info(`[platform] shipped update applied to ${m.slug} (${seed.id})`);
+        continue;
+      }
+      await this.run(
+        `insert into ${this.modules} (slug, title, published, flow, lab_nodes) values ($1, $2, true, $3::jsonb, $4::jsonb) on conflict (slug) do nothing`,
+        [m.slug, m.title, JSON.stringify(m.flow), JSON.stringify(m.labNodes)],
+      );
+      for (const lab of seed.labs) {
+        await this.run(
+          `insert into ${this.labs} (module, slug, title, published, flow) values ($1, $2, $3, true, $4::jsonb) on conflict (module, slug) do nothing`,
+          [m.slug, lab.slug, lab.title, JSON.stringify(lab.flow)],
+        );
+      }
+      await this.run(`insert into ${this.seeds} (id) values ($1) on conflict (id) do nothing`, [seed.id]);
+      console.info(`[platform] shipped module ${m.slug} applied (${seed.id})`);
+    }
   }
 
   private async q(text: string, params: unknown[] = []) {
@@ -296,4 +382,22 @@ export async function leaderEmail(module: string): Promise<string> {
   if (module === BUILT_IN_MODULE.slug) return (course.contact ?? '').toLowerCase();
   const m = await getPlatformStore()?.getModule(module);
   return m ? flowLeader(m.flow) : '';
+}
+
+const openLabs = new Map<string, { open: boolean; at: number }>();
+/**
+ * Builder labs marked "Open any time" (Lab node → Sessions): students join a permanent session by themselves,
+ * so no TA has to start one, and their work is still tracked. Cached for a minute (the session status is polled).
+ */
+export async function isOpenLab(lab: string): Promise<boolean> {
+  const hit = openLabs.get(lab);
+  if (hit && Date.now() - hit.at < 60_000) return hit.open;
+  const i = lab.indexOf('--');
+  const s = getPlatformStore();
+  if (i < 1 || !s) return false;
+  // a failed lookup is not cached: the next status check tries again
+  const row = await s.getLab(lab.slice(0, i), lab.slice(i + 2));
+  const open = Boolean(row?.published && compileLab(row.flow, lab).meta.open);
+  openLabs.set(lab, { open, at: Date.now() });
+  return open;
 }

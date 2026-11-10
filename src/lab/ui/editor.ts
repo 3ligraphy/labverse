@@ -134,3 +134,6 @@ export function createEditor(opts: {
 }
 
 export type LabEditor = ReturnType<typeof createEditor>;
+
+/** the editor look, shared with the C++ editor (src/lab/cpp/ui) */
+export { theme as labEditorTheme };

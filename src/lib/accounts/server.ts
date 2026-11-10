@@ -332,7 +332,7 @@ class AccountStore {
     await this.q(`insert into ${this.settings} (key, value) values ('matrix', $1) on conflict (key) do update set value = excluded.value, updated_at = now()`, [JSON.stringify(m)]);
   }
 
-  async getSettings(): Promise<Settings & { builtIn: { category: string; years: string; specializations: string; semester: string; open: boolean; faculty: string } }> {
+  async getSettings(): Promise<Settings & { builtIn: { category: string; years: string; specializations: string; semester: string; open: boolean; faculty: string }; locked: string[] }> {
     const rows = await this.q(`select key, value from ${this.settings}`);
     const get = (k: string) => rows.find((r) => r.key === k)?.value;
     // before faculties, only the flat specialization list was stored (it becomes the default faculty's)
@@ -344,9 +344,11 @@ class AccountStore {
       activeSemester: get('activeSemester') ?? DEFAULT_SETTINGS.activeSemester,
       categories: get('categories') ?? DEFAULT_SETTINGS.categories,
       builtIn: { ...BUILT_IN_AUDIENCE, ...(get('builtIn') ?? {}) },
+      // modules whose labs staff have locked (the Lock button on the module page); every other module is open
+      locked: Array.isArray(get('locked')) ? (get('locked') as unknown[]).map(String) : [],
     };
   }
-  async setSetting(key: 'years' | 'specializations' | 'faculties' | 'builtIn' | 'activeSemester' | 'specFrom' | 'categories', value: unknown) {
+  async setSetting(key: 'years' | 'specializations' | 'faculties' | 'builtIn' | 'activeSemester' | 'specFrom' | 'categories' | 'locked', value: unknown) {
     await this.q(`insert into ${this.settings} (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value, updated_at = now()`, [key, JSON.stringify(value)]);
   }
 
