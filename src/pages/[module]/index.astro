@@ -12,7 +12,8 @@ import { loadModule } from '@/lib/platform/server';
 import NeonHero from '@/components/platform/NeonHero.astro';
 import NeonOverview from '@/components/platform/NeonOverview.astro';
 import PsychologyWorkspace from '@/components/platform/PsychologyWorkspace.astro';
-import { moduleSections, moduleSectionHref, PSYCHOLOGY_MODULE } from '@/lib/platform/module-sections';
+import AiRubric from '@/components/platform/AiRubric.astro';
+import { moduleSections, moduleSectionHref, PSYCHOLOGY_MODULE, AI_FOR_CODING_MODULE } from '@/lib/platform/module-sections';
 import { labKey, MODULE_SKINS } from '@/lib/platform/core';
 import '@/styles/skin-neon.css';
 
@@ -123,6 +124,7 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
           </section>
         )}
         {psychology && activeTab !== 'labs' && <PsychologyWorkspace section={activeTab} />}
+        {data.module.slug === AI_FOR_CODING_MODULE && activeTab === 'rubric' && <AiRubric />}
         {!psychology && activeTab === 'overview' && skin === 'neon' && <NeonOverview labsHref={`${sectionHref('labs')}#workspace`} />}
         {!psychology && activeTab === 'overview' && skin !== 'neon' && <div class="module-intro"><h2>Your module workspace</h2><p>Follow the practical labs in order and use the task checkboxes to keep track of your learning.</p><a class="btn btn-primary" href={`${sectionHref('labs')}#workspace`}>Explore the labs →</a></div>}
       </div>

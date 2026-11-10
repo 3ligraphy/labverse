@@ -1,4 +1,5 @@
-import { moduleSections, moduleSectionHref, PSYCHOLOGY_MODULE } from './module-sections.ts';
+import { moduleSections, moduleSectionHref, PSYCHOLOGY_MODULE, AI_FOR_CODING_MODULE } from './module-sections.ts';
+import aiRubric from '../../content/data/ai-for-coding-rubric.md?raw';
 import { psychologySetup } from './psychology-guide.ts';
 import type { CompiledLab } from './core.ts';
 export type SearchItem = { k: string; t: string; d: string; u: string; s?: string; m?: string };
@@ -19,5 +20,11 @@ export function moduleSearchItems(slug: string, title: string, labs: { slug: str
     k: 'Setup', t: step.title, d: step.check, s: [...step.steps, step.help].join(' '),
     u: `${moduleSectionHref(slug, 'setup', preview)}#setup-${i + 1}`, m: step.time,
   }));
+  // the module rubric: one result per section, so "viva", "marking" or "capstone" lead to it
+  if (slug === AI_FOR_CODING_MODULE) for (const part of aiRubric.split(/^## /m).slice(1)) {
+    const [heading, ...body] = part.split('\n');
+    const id = heading.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    items.push({ k: 'Rubric', t: heading.trim(), d: `${title} · Rubric`, s: body.join(' ').replace(/[|*`#-]+/g, ' ').replace(/\s+/g, ' ').trim(), u: `${moduleSectionHref(slug, 'rubric', preview)}#${id}` });
+  }
   return items;
 }
