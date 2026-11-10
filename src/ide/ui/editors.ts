@@ -27,7 +27,7 @@ const tsApi: any = (monaco as any).typescript ?? (monaco.languages as any).types
 if (tsApi) {
   const opts = {
     target: tsApi.ScriptTarget.ESNext, module: tsApi.ModuleKind.ESNext, moduleResolution: tsApi.ModuleResolutionKind.NodeJs,
-    jsx: tsApi.JsxEmit.ReactJSX, allowJs: true, checkJs: false, allowNonTsExtensions: true, esModuleInterop: true, allowSyntheticDefaultImports: true, strict: false, noEmit: true,
+    jsx: tsApi.JsxEmit.ReactJSX, allowJs: true, checkJs: false, allowNonTsExtensions: true, esModuleInterop: true, allowSyntheticDefaultImports: true, strict: false, noEmit: true, baseUrl: 'file:///', paths: { '@/*': ['*', 'src/*'] }, skipLibCheck: true,
   };
   tsApi.typescriptDefaults.setCompilerOptions(opts);
   tsApi.javascriptDefaults.setCompilerOptions(opts);
@@ -178,8 +178,10 @@ export class Editors {
   }
   /** Loads source files as models so IntelliSense and Go to Definition work across the project. */
   async preload() {
-    const files = (await this.fs.walk('/')).filter((p) => /\.(tsx?|jsx?|mjs|cjs|d\.ts|json)$/.test(p)).slice(0, 400);
-    for (const p of files) { try { await this.getModel(p); } catch { /* unreadable: skip */ } }
+    const files = (await this.fs.walk('/')).filter((p) => /\.(tsx?|jsx?|mjs|cjs|d\.ts)$/.test(p) && !/(^|\/)(dist|build|\.expo|\.next|coverage|vendor)\//.test(p)).slice(0, 80);
+    for (const p of files) {
+      try { if ((await this.fs.readBytes(p)).length < 200_000) await this.getModel(p); } catch { /* unreadable: skip */ }
+    }
   }
   isDirty(path: string) { const r = this.models.get(path); return Boolean(r && !r.model.isDisposed() && r.model.getAlternativeVersionId() !== r.saved); }
   dirtyPaths() { return [...this.models.keys()].filter((p) => this.isDirty(p)); }
@@ -314,6 +316,10 @@ export class Editors {
 
   async openFile(path: string, opts: { line?: number; column?: number; endLine?: number; endColumn?: number; side?: boolean; preview?: boolean; focus?: boolean } = {}) {
     if (!(await this.fs.exists(path))) { notify(`File not found: ${path}`, 'warning'); return; }
+    if (!this.models.has(path) && !isBinaryPath(path) && !IMAGE.has(extname(path))) {
+      const size = (await this.fs.readBytes(path)).length;
+      if (size > 5_000_000 && !(await confirmBox(`${basename(path)} is ${(size / 1_048_576).toFixed(1)} MB.`, 'Opening very large files in the editor uses a lot of memory and can crash the tab.', ['Open Anyway']))) return;
+    }
     let g = this.activeGroup;
     if (opts.side) { if (this.groups.length < 3) g = this.addGroup(g); else g = this.groups[(this.groups.indexOf(g) + 1) % this.groups.length]; this.focusGroup(g); }
     const ext = extname(path);

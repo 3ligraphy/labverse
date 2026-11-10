@@ -2,6 +2,7 @@
  * Code exercises and live demos: editor (file tabs) + live preview (phone or browser frame) + console.
  * The preview updates as you type; Check runs the exercise's checks against the running app.
  */
+import { openInEditor } from './open-in-editor.ts';
 import { compileAll } from '../engine/compile.ts';
 import { evaluate, lintFiles, type AppRunner } from '../engine/checks.ts';
 import { LabPreview } from '../engine/preview.ts';
@@ -89,6 +90,11 @@ export class Workbench {
         checklist: opts.ex.checks.map((c) => ({ id: c.id, label: c.label })),
         onCheck: () => this.check(),
         onReset: () => this.reset(),
+        onOpenEditor: () => {
+          this.sync();
+          const title = document.querySelector('.lh-no')?.textContent?.replace(/\s+/g, ' ').trim() || 'Lab';
+          void openInEditor(opts.ex, { ...this.files }, title.replace(/^LAB\s*/i, 'Lab ')).catch((e) => console.error('[lab] could not open the code editor', e));
+        },
       });
     } else {
       const d = opts.demo;

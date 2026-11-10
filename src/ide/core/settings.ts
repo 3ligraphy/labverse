@@ -75,14 +75,15 @@ export const memo = {
 };
 
 /* ------------------------------------------------------------------ workspaces */
-export type Workspace = { id: string; name: string; created: number; opened: number; cloudId?: string };
+/** `kind` is the language or framework chosen when the project was made (see core/project.ts): it decides ▶ Run. */
+export type Workspace = { id: string; name: string; created: number; opened: number; kind?: string; cloudId?: string };
 
 export const workspaces = {
   all: (): Workspace[] => read<Workspace[]>('ide:workspaces', []).sort((a, b) => b.opened - a.opened),
   save(list: Workspace[]) { write('ide:workspaces', list); },
   get(id: string) { return this.all().find((w) => w.id === id) ?? null; },
-  create(name: string): Workspace {
-    const ws = { id: uid(), name: name.trim() || 'Untitled', created: Date.now(), opened: Date.now() };
+  create(name: string, kind?: string): Workspace {
+    const ws: Workspace = { id: uid(), name: name.trim() || 'Untitled', created: Date.now(), opened: Date.now(), ...(kind ? { kind } : {}) };
     this.save([...this.all(), ws]);
     return ws;
   },

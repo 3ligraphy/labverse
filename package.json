@@ -32,7 +32,6 @@
     "@supabase/supabase-js": "^2.117.2",
     "@upstash/redis": "^1.39.0",
     "@vercel/blob": "^2.8.1",
-    "@webcontainer/api": "^1.6.4",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "astro": "^7.3.5",
@@ -40,7 +39,6 @@
     "codemirror": "^6.0.2",
     "fflate": "^0.8.3",
     "gsap": "^3.15.0",
-    "isomorphic-git": "^1.44.12",
     "monaco-editor": "^0.57.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.3.289",
@@ -48,6 +46,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-native-web": "^0.21.3",
+    "sql.js": "^1.16.0",
     "sucrase": "^3.35.1",
     "yaml": "^2.9.1"
   },

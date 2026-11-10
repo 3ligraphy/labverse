@@ -1,27 +1,29 @@
-/** Integrated terminal: xterm.js sessions connected to real shells (jsh) inside the WebContainer runtime. */
+/**
+ * The Terminal panel: one tab per program you run (▶ Run). It shows the program's output and sends what you type
+ * to it (cin in C++, input() in Python, prompt() in JavaScript). There is no shell: nothing is installed and no
+ * commands run here, so nothing can use up the browser's memory.
+ */
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import type { WebContainerProcess } from '@webcontainer/api';
 import { clear, h, icon, uid } from '../core/dom';
 import { register } from '../core/commands';
 import type { IDE } from '../core/ide';
 import { settings } from '../core/settings';
 import { currentTheme, themeApplied } from '../core/themes';
 import { iconButton } from '../ui/workbench';
-import { notify, pick, showMenu } from '../ui/widgets';
-import type { Runtime } from './runtime';
+import { pick } from '../ui/widgets';
 
 export type Session = {
-  id: string; name: string; key?: string; term: Terminal; fit: FitAddon; el: HTMLElement;
-  proc: WebContainerProcess | null; writer: WritableStreamDefaultWriter<string> | null;
-  /** pseudo terminals (built-in runners) take the typed input themselves */
+  id: string; name: string; key: string; term: Terminal; fit: FitAddon; el: HTMLElement;
+  /** the running program reads what is typed */
   onInput?: (data: string) => void;
+  /** stops the program (Stop, closing the tab, running again) */
   onKill?: () => void;
-  busy: boolean;
 };
 
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const WELCOME = '\x1b[2mThis terminal shows the output of your program. Open a file and press \x1b[0m\x1b[1m▶ Run\x1b[0m\x1b[2m (F5).\r\nWhen the program asks for input, type here and press Enter. Nothing needs to be installed.\x1b[0m\r\n';
 
 export class Terminals {
   readonly el = h('div', { class: 'ide-term' });
@@ -30,23 +32,14 @@ export class Terminals {
   sessions: Session[] = [];
   active: Session | null = null;
 
-  constructor(private ide: IDE, private runtime: Runtime) {
+  constructor(private ide: IDE) {
     this.el.append(this.host, this.list);
     ide.wb.addPanelView({
       id: 'terminal', title: 'Terminal', el: this.el,
-      onShow: () => { if (!this.sessions.length) void this.create(); else this.fit(); this.active?.term.focus(); },
+      onShow: () => { if (!this.sessions.length) this.welcome(); else this.fit(); this.active?.term.focus(); },
       actions: () => [
-        iconButton('add', 'New Terminal (Ctrl+Shift+`)', () => this.create()),
-        iconButton('chevron-down', 'Launch Profile…', (e) => {
-          const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-          showMenu(r.left, r.bottom, [
-            { label: 'jsh (shell)', run: () => this.create() },
-            { label: 'Node.js REPL', run: () => this.create({ name: 'node', command: 'node', args: [] }) },
-            'sep', { label: 'Run npm Script…', run: () => import('../core/commands').then((c) => c.run('run.script')) },
-          ]);
-        }),
         iconButton('clear-all', 'Clear Terminal', () => this.active?.term.clear()),
-        iconButton('trash', 'Kill Terminal', () => this.active && this.kill(this.active)),
+        iconButton('trash', 'Close Terminal', () => this.active && this.kill(this.active)),
       ],
     });
     new ResizeObserver(() => this.fit()).observe(this.host);
@@ -55,23 +48,9 @@ export class Terminals {
     settings.changed.on((k) => { if (k.startsWith('terminal.')) for (const s of this.sessions) { s.term.options.fontSize = settings.get<number>('terminal.fontSize'); s.term.options.cursorBlink = settings.get<boolean>('terminal.cursorBlink'); this.fit(); } });
 
     register(
-      { id: 'terminal.new', title: 'New Terminal', category: 'Terminal', key: 'ctrl+shift+`', run: () => { ide.wb.showPanel('terminal'); return this.create(); } },
-      { id: 'terminal.split', title: 'New Node.js REPL', category: 'Terminal', run: () => { ide.wb.showPanel('terminal'); return this.create({ name: 'node', command: 'node', args: [] }); } },
       { id: 'view.terminal', title: 'Toggle Terminal', category: 'View', key: 'ctrl+`', run: () => ide.wb.togglePanel('terminal') },
-      { id: 'terminal.kill', title: 'Kill Active Terminal', category: 'Terminal', enabled: () => Boolean(this.active), run: () => this.active && this.kill(this.active) },
+      { id: 'terminal.kill', title: 'Close Active Terminal', category: 'Terminal', enabled: () => Boolean(this.active), run: () => this.active && this.kill(this.active) },
       { id: 'terminal.clear', title: 'Clear Terminal', category: 'Terminal', enabled: () => Boolean(this.active), run: () => this.active?.term.clear() },
-      { id: 'terminal.runSelection', title: 'Run Selected Text in Terminal', category: 'Terminal', enabled: () => Boolean(ide.editors.activeEditor), run: async () => {
-        const ed = ide.editors.activeEditor!;
-        const sel = ed.getSelection();
-        const text = sel && !sel.isEmpty() ? ed.getModel()!.getValueInRange(sel) : ed.getModel()!.getLineContent(ed.getPosition()!.lineNumber);
-        await this.send(text.trim());
-      } },
-      { id: 'terminal.rename', title: 'Rename Terminal…', category: 'Terminal', enabled: () => Boolean(this.active), run: async () => {
-        const { ask } = await import('../ui/widgets');
-        const name = this.active && (await ask('Terminal name', this.active.name));
-        if (name && this.active) { this.active.name = name; this.paintList(); }
-      } },
-      { id: 'terminal.focus', title: 'Focus Terminal', category: 'Terminal', run: () => { ide.wb.showPanel('terminal'); this.active?.term.focus(); } },
       { id: 'terminal.pick', title: 'Switch Terminal…', category: 'Terminal', enabled: () => this.sessions.length > 1, run: async () => { const s = await pick(this.sessions.map((x) => ({ label: x.name, value: x })), 'Switch terminal'); if (s) this.show(s); } },
     );
   }
@@ -87,96 +66,67 @@ export class Terminals {
   private fit() {
     const s = this.active;
     if (!s || !this.host.offsetWidth || this.el.hidden) return;
-    try { s.fit.fit(); s.proc?.resize({ cols: s.term.cols, rows: s.term.rows }); } catch { /* not visible yet */ }
+    try { s.fit.fit(); s.term.refresh(0, s.term.rows - 1); } catch { /* not visible yet */ }
   }
 
-  private make(name: string, key?: string): Session {
+  private make(name: string, key: string): Session {
     const term = new Terminal({
       fontFamily: "'Cascadia Code', 'JetBrains Mono', Consolas, 'Courier New', monospace", fontSize: settings.get<number>('terminal.fontSize'),
-      cursorBlink: settings.get<boolean>('terminal.cursorBlink'), scrollback: settings.get<number>('terminal.scrollback'), convertEol: true, theme: this.theme(), allowProposedApi: true,
+      cursorBlink: settings.get<boolean>('terminal.cursorBlink'), scrollback: settings.get<number>('terminal.scrollback'), convertEol: true, theme: this.theme(),
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
     const el = h('div', { class: 'ide-term-pane' });
     this.host.append(el);
     term.open(el);
-    const s: Session = { id: uid(), name, key, term, fit, el, proc: null, writer: null, busy: false };
-    term.onData((data) => { if (s.onInput) s.onInput(data); else void s.writer?.write(data); });
+    const s: Session = { id: uid(), name, key, term, fit, el };
+    term.onData((data) => s.onInput?.(data));
     this.sessions.push(s);
     this.show(s);
     return s;
   }
+  private welcome() { const s = this.make('Terminal', 'welcome'); s.term.write(WELCOME); }
 
-  /** A terminal running a real process in the runtime (default: the jsh shell). */
-  async create(opts: { name?: string; command?: string; args?: string[]; key?: string; env?: Record<string, string> } = {}): Promise<Session | null> {
-    const n = this.sessions.filter((x) => x.name.startsWith(opts.name ?? 'jsh')).length;
-    const s = this.make(`${opts.name ?? 'jsh'}${n ? ` ${n + 1}` : ''}`, opts.key);
-    if (this.runtime.state !== 'ready') s.term.writeln('\x1b[2mStarting the runtime (Node.js in your browser)…\x1b[0m');
-    try {
-      this.fit();
-      const proc = await this.runtime.spawn(opts.command ?? 'jsh', opts.args ?? [], { cols: s.term.cols, rows: s.term.rows, env: opts.env });
-      s.proc = proc;
-      s.writer = proc.input.getWriter();
-      void proc.output.pipeTo(new WritableStream({ write: (data) => s.term.write(data) })).catch(() => {});
-      void proc.exit.then((code) => {
-        if (!this.sessions.includes(s)) return;
-        s.proc = null; s.writer = null;
-        s.term.writeln(`\r\n\x1b[2m[process exited with code ${code}] Press any key to close.\x1b[0m`);
-        s.onInput = () => this.kill(s);
-      });
-      this.fit();
-      return s;
-    } catch (e) {
-      s.term.writeln(`\x1b[31m${e instanceof Error ? e.message : String(e)}\x1b[0m`);
-      s.term.writeln('\x1b[2mThe editor, the phone emulator, the C++ runner and Git still work without the runtime.\x1b[0m');
-      return null;
-    }
-  }
-  /** A terminal without a process: a built-in runner writes to it and reads what is typed. */
+  /**
+   * The terminal of one runner (C++, Python, JavaScript…): reused for every run of that kind, cleared first.
+   * The previous program in it is stopped.
+   */
   pseudo(name: string, key: string): Session {
+    this.ide.wb.showPanel('terminal');
+    for (const w of this.sessions.filter((x) => x.key === 'welcome')) this.kill(w, false);
     const old = this.sessions.find((x) => x.key === key);
-    if (old) { old.onKill?.(); old.onKill = undefined; old.onInput = undefined; old.term.reset(); this.show(old); return old; }
+    if (old) {
+      old.onKill?.(); old.onKill = undefined; old.onInput = undefined;
+      old.name = name;
+      old.term.reset();
+      this.show(old);
+      return old;
+    }
     return this.make(name, key);
   }
-
-  /** Types a command into a shell terminal (the active one, or a new one) and runs it. */
-  async send(command: string, opts: { key?: string; name?: string; fresh?: boolean } = {}): Promise<Session | null> {
-    this.ide.wb.showPanel('terminal');
-    let s = opts.key ? this.sessions.find((x) => x.key === opts.key && x.writer) ?? null : this.active?.writer && !this.active.key ? this.active : this.sessions.find((x) => x.writer && !x.key) ?? null;
-    if (s && opts.fresh) { this.kill(s); s = null; }
-    if (!s) {
-      s = await this.create({ name: opts.name, key: opts.key });
-      if (!s) return null;
-      await new Promise((r) => setTimeout(r, 400)); // let the shell print its prompt
-    }
-    this.show(s);
-    await s.writer?.write(`${command}\r`);
-    s.term.focus();
-    return s;
-  }
-  interrupt(s: Session) { void s.writer?.write('\x03'); }
 
   show(s: Session) {
     this.active = s;
     for (const x of this.sessions) x.el.hidden = x !== s;
     this.paintList();
-    requestAnimationFrame(() => { this.fit(); });
+    requestAnimationFrame(() => { this.fit(); s.term.scrollToBottom(); });
   }
-  kill(s: Session) {
+  kill(s: Session, hidePanel = true) {
     s.onKill?.();
-    try { s.proc?.kill(); } catch { /* already gone */ }
     s.term.dispose(); s.el.remove();
     this.sessions = this.sessions.filter((x) => x !== s);
     if (this.active === s) { this.active = null; const next = this.sessions[this.sessions.length - 1]; if (next) this.show(next); }
     this.paintList();
-    if (!this.sessions.length) this.ide.wb.togglePanel();
+    if (!this.sessions.length && hidePanel) this.ide.wb.togglePanel();
   }
+  /** Stops whatever runs in the active terminal (the Stop button). */
+  stopActive() { const s = this.active; if (s?.onKill) { s.onKill(); s.onKill = undefined; s.onInput = undefined; s.term.writeln('\r\n\x1b[2m[stopped]\x1b[0m'); } }
   private paintList() {
     clear(this.list);
     this.list.hidden = this.sessions.length < 2;
     for (const s of this.sessions) {
-      const row = h('div', { class: `ide-row${s === this.active ? ' sel' : ''}`, title: s.name }, icon(s.proc || !s.key ? 'terminal' : 'play'), h('span', { class: 'ide-row-name' }, s.name),
-        h('button', { class: 'ide-icon-btn', type: 'button', title: 'Kill Terminal', onclick: (e: Event) => { e.stopPropagation(); this.kill(s); } }, icon('trash')));
+      const row = h('div', { class: `ide-row${s === this.active ? ' sel' : ''}`, title: s.name }, icon('play'), h('span', { class: 'ide-row-name' }, s.name),
+        h('button', { class: 'ide-icon-btn', type: 'button', title: 'Close Terminal', onclick: (e: Event) => { e.stopPropagation(); this.kill(s); } }, icon('trash')));
       row.addEventListener('click', () => { this.show(s); s.term.focus(); });
       this.list.append(row);
     }
@@ -184,8 +134,6 @@ export class Terminals {
   }
 }
 
-export function installTerminal(ide: IDE, runtime: Runtime) {
-  const terminals = new Terminals(ide, runtime);
-  void notify;
-  return terminals;
+export function installTerminal(ide: IDE) {
+  return new Terminals(ide);
 }

@@ -14,26 +14,25 @@ import { Output, Problems } from './ui/panels';
 import { SearchView } from './ui/search';
 import { ask, confirmBox, fuzzyFilter, notify, pick, quickInput, type QuickItem } from './ui/widgets';
 import { Workbench, iconButton, type MenuDef } from './ui/workbench';
-import { Runtime } from './services/runtime';
 import { installTerminal } from './services/terminal';
 import { installRun } from './services/run';
+import { installIntellisense } from './services/intellisense';
+import { renderStart } from './ui/start';
 
 export const go = (ws: string) => { location.href = `/ide?ws=${encodeURIComponent(ws)}`; };
 
-async function currentWorkspace(): Promise<{ ws: Workspace; fresh: boolean }> {
+/** The project in the address (/ide?ws=…), or null: then the start screen lets the student choose or make one. */
+function currentWorkspace(): Workspace | null {
   const asked = new URLSearchParams(location.search).get('ws');
-  const hit = (asked && workspaces.get(asked)) || (!asked && workspaces.all()[0]) || null;
-  if (hit) { workspaces.touch(hit.id); if (!asked) history.replaceState(null, '', `/ide?ws=${hit.id}`); return { ws: hit, fresh: false }; }
-  const ws = workspaces.create('My Expo App');
-  history.replaceState(null, '', `/ide?ws=${ws.id}`);
-  return { ws, fresh: true };
+  const hit = asked ? workspaces.get(asked) : null;
+  if (hit) workspaces.touch(hit.id);
+  return hit;
 }
 
 export async function boot(mount: HTMLElement, user: IdeUser | null) {
-  const { ws, fresh } = await currentWorkspace();
+  const ws = currentWorkspace();
+  if (!ws) { renderStart(mount, user); return null; }
   const fs = new WorkspaceFS(ws.id);
-  // the first workspace is a React Native app: mobile development is what this IDE is used for first
-  if (fresh) await applyTemplate(fs, TEMPLATES.find((t) => t.id === 'expo')!);
   document.title = `${ws.name} — BUENOVA Code`;
 
   applyTheme();
@@ -44,7 +43,8 @@ export async function boot(mount: HTMLElement, user: IdeUser | null) {
   const output = new Output(wb);
   const problems = new Problems(wb, editors);
   const ide: IDE = { ws, fs, editors, explorer, wb, output, problems, search, user };
-  (window as any).__ide = ide; (window as any).__ideRun = run;
+  (window as any).__ide = ide;
+  addEventListener('pagehide', () => { void fs.flush(); }); (window as any).__ideRun = run; (window as any).__monaco = monaco;
 
   onCommandError((m) => notify(m, 'error'));
   settings.changed.on((k) => { if (k === 'workbench.colorTheme') applyTheme(); });
@@ -181,18 +181,8 @@ export async function boot(mount: HTMLElement, user: IdeUser | null) {
     { id: 'file.close', title: 'Close Editor', category: 'View', key: 'alt+w', run: () => editors.closeActive() },
     { id: 'file.closeAll', title: 'Close All Editors', category: 'View', key: 'ctrl+k w', run: () => editors.closeAll() },
     // Workspace
-    { id: 'workspace.new', title: 'New Workspace…', category: 'Workspace', run: async () => {
-      const t = await pick(TEMPLATES.map((x) => ({ label: x.name, description: x.description, iconName: x.iconName, value: x })), 'Choose a template for the new workspace');
-      if (!t) return;
-      const name = await ask('Workspace name', t.id === 'empty' ? 'My Project' : t.name, (v) => (v.trim() ? null : 'Type a name.'));
-      if (!name) return;
-      const nw = workspaces.create(name);
-      const nfs = new WorkspaceFS(nw.id);
-      await applyTemplate(nfs, t);
-      if (t.open) memo.set(`tabs:${nw.id}`, [{ tabs: [t.open], active: t.open }]);
-      go(nw.id);
-    } },
-    { id: 'workspace.open', title: 'Open Workspace…', category: 'Workspace', run: async () => {
+    { id: 'workspace.new', title: 'New Project…', category: 'File', run: () => { location.href = '/ide'; } },
+    { id: 'workspace.open', title: 'Open Recent Project…', category: 'File', run: async () => {
       const id = await pick(workspaces.all().map((w) => ({ label: w.name, description: `${w.id === ws.id ? 'current · ' : ''}last opened ${new Date(w.opened).toLocaleString()}`, iconName: 'folder', value: w.id })), 'Open a workspace');
       if (id && id !== ws.id) go(id);
     } },
@@ -217,7 +207,9 @@ export async function boot(mount: HTMLElement, user: IdeUser | null) {
       const name = await ask('Workspace name', 'Imported project', (v) => (v.trim() ? null : 'Type a name.'));
       if (!name) return;
       const nw = workspaces.create(name);
-      await importZip(new WorkspaceFS(nw.id), bytes);
+      const nfs = new WorkspaceFS(nw.id);
+      await importZip(nfs, bytes);
+      await nfs.flush();
       go(nw.id);
     } },
     { id: 'workspace.exportZip', title: 'Export Workspace as ZIP', category: 'Workspace', run: () => exportWs('/') },
@@ -326,25 +318,29 @@ export async function boot(mount: HTMLElement, user: IdeUser | null) {
 
   /* ---------------------------------------------------------------- menus */
   const menus: { label: string; items: () => MenuDef[] }[] = [
-    { label: 'File', items: () => ['file.new', 'file.newFolder', 'file.newUntitledLang', 'sep', 'workspace.new', 'workspace.open', 'sep', 'file.upload', 'file.uploadFolder', 'workspace.importZip', 'workspace.importZipNew', 'git.clone', 'sep', 'file.save', 'file.saveAll', { label: 'Auto Save', checked: () => settings.get('files.autoSave') !== 'off', run: () => run('file.autoSave') }, 'sep', 'file.download', 'workspace.exportZip', 'sync.push', 'sync.pull', 'sep', { label: 'Preferences', submenu: ['prefs.settings', 'prefs.keys', 'prefs.theme'] }, 'sep', 'workspace.rename', 'workspace.delete', 'sep', 'file.close', 'file.closeAll'] },
-    { label: 'Edit', items: () => ['edit.undo', 'edit.redo', 'sep', 'edit.cut', 'edit.copy', 'edit.paste', 'sep', 'edit.find', 'edit.replace', 'view.search', 'sep', 'edit.comment', 'edit.blockComment', 'edit.format', 'edit.formatSelection', 'edit.rename', 'edit.quickFix'] },
+    { label: 'File', items: () => ['workspace.new', 'workspace.open', 'sep', 'file.new', 'file.newFolder', 'file.newUntitledLang', 'sep', 'file.upload', 'file.uploadFolder', 'workspace.importZip', 'sep', 'file.save', 'file.saveAll', { label: 'Auto Save', checked: () => settings.get('files.autoSave') !== 'off', run: () => run('file.autoSave') }, 'sep', 'file.download', 'workspace.exportZip', 'sep', { label: 'Preferences', submenu: ['prefs.settings', 'prefs.keys', 'prefs.theme'] }, 'sep', 'workspace.rename', 'workspace.delete', 'sep', 'file.close', 'file.closeAll'] },
+    { label: 'Edit', items: () => ['edit.undo', 'edit.redo', 'sep', 'edit.cut', 'edit.copy', 'edit.paste', 'sep', 'edit.find', 'edit.replace', 'view.search', 'sep', 'edit.comment', 'edit.blockComment', 'edit.format', 'edit.formatSelection', 'edit.rename', 'edit.quickFix', 'markdown.preview', 'types.refresh'] },
     { label: 'Selection', items: () => ['sel.all', 'sel.expand', 'sel.shrink', 'sep', 'sel.copyUp', 'sel.copyDown', 'sel.moveUp', 'sel.moveDown', 'sep', 'sel.cursorAbove', 'sel.cursorBelow', 'sel.cursorsLineEnds', 'sel.nextMatch', 'sel.allMatches'] },
-    { label: 'View', items: () => ['palette.commands', 'sep', 'view.explorer', 'view.search', 'view.scm', 'view.debug', 'view.extensions', 'sep', 'view.problems', 'view.output', 'view.debugConsole', 'view.terminal', 'preview.open', 'sep', 'view.side', 'view.panel', 'view.panelMax', 'view.sideRight', 'view.split', 'sep', 'view.wordWrap', 'view.minimap', 'view.whitespace', 'view.foldAll', 'view.unfoldAll', 'sep', 'view.zoomIn', 'view.zoomOut', 'view.zoomReset', 'view.fullscreen'] },
+    { label: 'View', items: () => ['palette.commands', 'sep', 'view.explorer', 'view.search', 'sep', 'view.problems', 'view.output', 'view.terminal', 'preview.open', 'sep', 'view.side', 'view.panel', 'view.panelMax', 'view.sideRight', 'view.split', 'sep', 'view.wordWrap', 'view.minimap', 'view.whitespace', 'view.foldAll', 'view.unfoldAll', 'sep', 'view.zoomIn', 'view.zoomOut', 'view.zoomReset', 'view.fullscreen'] },
     { label: 'Go', items: () => ['palette.files', 'go.symbol', 'go.line', 'sep', 'go.definition', 'go.peek', 'go.references', 'go.bracket', 'sep', 'go.nextProblem', 'go.prevProblem', 'sep', 'view.nextTab', 'view.prevTab', 'view.group1', 'view.group2', 'view.group3'] },
-    { label: 'Run', items: () => ['run.start', 'debug.start', 'run.stop', 'run.restart', 'sep', 'debug.continue', 'debug.stepOver', 'debug.stepInto', 'debug.stepOut', 'sep', 'debug.toggleBreakpoint', 'debug.clearBreakpoints', 'sep', 'emulator.open', 'emulator.reload', 'preview.open', 'sep', 'run.script', 'run.install'] },
-    { label: 'Terminal', items: () => ['terminal.new', 'terminal.split', 'terminal.kill', 'terminal.clear', 'sep', 'run.script', 'terminal.runSelection', 'terminal.runFile'] },
+    { label: 'Run', items: () => ['run.start', 'run.file', 'run.stop', 'run.restart', 'sep', 'emulator.open', 'emulator.reload'] },
+    { label: 'Terminal', items: () => ['view.terminal', 'terminal.clear', 'terminal.kill'] },
     { label: 'Help', items: () => ['view.welcome', 'palette.commands', 'prefs.keys', 'sep', 'help.about', { label: 'Back to BUENOVA', run: () => { location.href = '/'; } }] },
   ];
-  const runtime = new Runtime(ide);
-  const terminals = installTerminal(ide, runtime);
-  const runner = installRun(ide, runtime, terminals);
+  const terminals = installTerminal(ide);
+  (window as any).__ideTerms = terminals;
+  const runner = installRun(ide, terminals);
+  installIntellisense(ide);
   wb.setMenus(menus);
 
   installKeyboard();
   await editors.restore();
-  if (fresh) await editors.openFile('/app/index.tsx');
   // a React Native project always comes up with its phone emulator next to the code
-  if (await runner.isReactNative()) await runner.openEmulator();
+  // the app of a mobile or web project opens next to the code: Run is one click away for the others
+  const kind = await runner.kindOf();
+  if (kind === 'react-native') await runner.openEmulator();
+  else if (kind === 'react') await runner.openReact();
+  else if (kind === 'web') await runner.openPage();
   if (!memo.get('welcome.seen', false) && settings.get('workbench.startupEditor') === 'welcome') await run('view.welcome');
   memo.set('welcome.seen', true);
   paintStatus();

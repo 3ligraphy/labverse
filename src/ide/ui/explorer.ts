@@ -6,6 +6,10 @@ import { fileIcon, type Editors } from './editors';
 import { confirmBox, notify, showMenu, type MenuItem } from './widgets';
 
 const BAD_NAME = /[\\/:*?"<>|]/;
+/** Folders that are never useful to upload (they are rebuilt by tools) and files too large for browser storage. */
+const SKIP_DIR = /(^|\/)(node_modules|\.git|\.expo|\.next|dist|build|android\/app\/build|ios\/Pods|\.gradle|__pycache__)(\/|$)/;
+const MAX_UPLOAD = 50 * 1_048_576;
+const tooBig = (name: string, size: number) => `${name} (${(size / 1_048_576).toFixed(0)} MB)`;
 
 export class Explorer {
   readonly el = h('div', { class: 'ide-tree', role: 'tree', tabIndex: 0 });
@@ -158,14 +162,17 @@ export class Explorer {
     input.addEventListener('change', async () => {
       const dir = into ?? (await this.targetDir());
       let n = 0;
+      const big: string[] = [];
       for (const f of Array.from(input.files ?? [])) {
         const rel = (f as any).webkitRelativePath || f.name;
-        if (/(^|\/)(node_modules|\.git)\//.test(rel)) continue;
+        if (SKIP_DIR.test(rel)) continue;
+        if (f.size > MAX_UPLOAD) { big.push(tooBig(f.name, f.size)); continue; }
         await this.fs.write(join(dir, rel), new Uint8Array(await f.arrayBuffer()));
         n++;
       }
       this.open.add(dir);
       notify(`${n} file${n === 1 ? '' : 's'} added.`);
+      if (big.length) notify(`Not added, larger than 50 MB: ${big.join(', ')}.\nVery large files do not fit in browser storage. Keep them on your computer or link to them online.`, 'warning', [], true);
     });
     input.click();
   }
@@ -240,10 +247,12 @@ export class Explorer {
         }
         const items = Array.from(e.dataTransfer!.items).map((i) => (i as any).webkitGetAsEntry?.()).filter(Boolean);
         let n = 0;
+        const big: string[] = [];
         const take = async (entry: any, base: string): Promise<void> => {
-          if (entry.name === 'node_modules' || entry.name === '.git') return;
+          if (SKIP_DIR.test(`/${entry.name}/`)) return;
           if (entry.isFile) {
             const file: File = await new Promise((res, rej) => entry.file(res, rej));
+            if (file.size > MAX_UPLOAD) { big.push(tooBig(file.name, file.size)); return; }
             await this.fs.write(join(base, entry.name), new Uint8Array(await file.arrayBuffer()));
             n++;
           } else if (entry.isDirectory) {
@@ -258,6 +267,7 @@ export class Explorer {
         };
         for (const it of items) await take(it, dir);
         if (n) { this.open.add(dir); this.persistOpen(); notify(`${n} file${n === 1 ? '' : 's'} added.`); }
+        if (big.length) notify(`Not added, larger than 50 MB: ${big.join(', ')}.\nVery large files do not fit in browser storage.`, 'warning', [], true);
       } catch (err) { notify(err instanceof Error ? err.message : String(err), 'error'); }
     });
   }

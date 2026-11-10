@@ -16,6 +16,8 @@ export type ShellOptions = {
   checklist?: { id: string; label: string }[];
   onCheck: () => Promise<Outcome>;
   onReset?: () => void;
+  /** code exercises: open a copy in BUENOVA Code */
+  onOpenEditor?: () => void;
   /** ids of all exercises in order, for Prev / Next */
   order: string[];
   checkLabel?: string;
@@ -75,6 +77,7 @@ export class ExerciseShell {
         this.checkBtn,
         opts.onReset ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => opts.onReset!() }, '↺ Reset') : null,
         this.hintBtn,
+        opts.onOpenEditor ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', title: 'Open a copy of this exercise in BUENOVA Code, the full code editor', onclick: () => opts.onOpenEditor!() }, 'Open in Code Editor ↗') : null,
         h('span', { class: 'ex-spacer' }),
         index > 0 ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: go(-1), 'aria-label': 'Previous exercise' }, '← Prev') : null,
         index < opts.order.length - 1 ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: go(1), 'aria-label': 'Next exercise' }, 'Next →') : null,

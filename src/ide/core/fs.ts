@@ -28,6 +28,9 @@ export class WorkspaceFS {
     await new Promise<void>((res) => { const r = indexedDB.deleteDatabase(`ide-ws-${id}`); r.onsuccess = r.onerror = r.onblocked = () => res(); });
   }
 
+  /** Waits until every write is stored in IndexedDB (call it before leaving the page). */
+  flush() { return this.p.flush(); }
+
   async exists(path: string) { try { await this.p.stat(path); return true; } catch { return false; } }
   async isDir(path: string) { try { return (await this.p.stat(path)).isDirectory(); } catch { return false; } }
   async readBytes(path: string): Promise<Uint8Array> { return (await this.p.readFile(path)) as Uint8Array; }
