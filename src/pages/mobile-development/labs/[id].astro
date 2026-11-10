@@ -22,6 +22,7 @@ import '@/styles/lab.css';
 import Part from '@/components/lab/Part.astro';
 import Task from '@/components/lab/Task.astro';
 import Checkpoint from '@/components/lab/Checkpoint.astro';
+import Hints from '@/components/lab/Hints.astro';
 import Terminal from '@/components/lab/Terminal.astro';
 import Explain from '@/components/lab/Explain.astro';
 import Cards from '@/components/lab/Cards.astro';
@@ -72,13 +73,18 @@ import NestedNav from '@/components/lab/interactive/NestedNav.astro';
 import StoreFlow from '@/components/lab/interactive/StoreFlow.astro';
 import ZustandLiveDemo from '@/components/lab/interactive/ZustandLiveDemo.astro';
 import ReduxLiveDemo from '@/components/lab/interactive/ReduxLiveDemo.astro';
+import RestLiveDemo from '@/components/lab/interactive/RestLiveDemo.astro';
+import GraphqlLiveDemo from '@/components/lab/interactive/GraphqlLiveDemo.astro';
+import AsyncFlow from '@/components/lab/interactive/AsyncFlow.astro';
+import AuthCompareDemo from '@/components/lab/interactive/AuthCompareDemo.astro';
 import { INTERACTIVE_LABS } from '@/lab/exercises/registry';
 
 const components = {
-  Part, Task, Checkpoint, Terminal, Explain, Cards, ToolGrid, TeamCards, Timeline, FileTree, AppPhone, AppWalkthrough, MockScreen, BeforeAfter,
+  Part, Task, Checkpoint, Hints, Terminal, Explain, Cards, ToolGrid, TeamCards, Timeline, FileTree, AppPhone, AppWalkthrough, MockScreen, BeforeAfter,
   GitFlow, BranchPerMember, ClickPath, SplitBar, GhSignup, GhNewRepo, GhQuickSetup, GhToken, GcmDialog, GhPullRequest, VsCode,
   RepoSubmit, Exercise, Demo, AppStartFlow, ComponentTree, PropsFlow, StateLoop, EffectTimeline, RnMap, FlexAxes, FlatListWindow, ClassMap,
   NavPatterns, EnvSwitcher, BriefBuilder, ImportPaths, ImportJourney, ParamsShop, NavFlow, TypedRoutes, NestedNav, StoreFlow, ZustandLiveDemo, ReduxLiveDemo,
+  RestLiveDemo, GraphqlLiveDemo, AsyncFlow, AuthCompareDemo,
 };
 
 
@@ -283,7 +289,10 @@ const sections = [
     <div class="doc-aside">
       {isMission ? (
         <nav class="toc tracker" aria-label="Lab tracker">
-          <p class="toc-title">Lab {pad(d.number)} tracker</p>
+          <div class="tr-head">
+            <p class="toc-title" style="margin-bottom:0">Lab {pad(d.number)} tracker</p>
+            {!interactive && <button type="button" class="tr-hide" data-tracker-hide aria-label="Hide tracker, center the content"><Icon name="close" size={14} /></button>}
+          </div>
           <div class="tr-bar" aria-hidden="true"><i data-track-bar></i></div>
           <ol>
             {outline.map((p) => (
@@ -307,6 +316,9 @@ const sections = [
         <button class="btn btn-ghost btn-sm w-full mt-2" data-search-open data-search-query=""><Icon name="search" /> Search</button>
       </div>
     </div>
+    {isMission && !interactive && (
+      <button type="button" class="btn btn-ghost btn-sm tr-show" data-tracker-show><Icon name="menu" size={14} /> Tracker</button>
+    )}
   </div>
   <LabRuntime />
 </Base>
@@ -409,4 +421,24 @@ const sections = [
   .submit { padding: 24px; border-color: color-mix(in oklab, var(--accent-text) 40%, var(--line)); }
   .challenge { display: grid; gap: 12px; justify-items: start; padding: 28px; border-radius: var(--r-lg); border: 1.5px dashed color-mix(in oklab, var(--info) 45%, var(--line)); background: var(--info-soft); color: var(--text-2); }
   .aside-card { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+
+  /* close the dead gap between the capped prose width and the tracker: this template's blocks
+     (Cards, live demos, code) read fine wider than --w-read, unlike plain prose pages.
+     Interactive labs (02/03) already have their own, different-purpose layout in
+     lab-interactive.css — left untouched here so their exercise workbench doesn't shift. */
+  .doc:not(.is-interactive) .doc-main { max-width: none; }
+  .doc:not(.is-interactive) .lab-prose > :where(p, ul, ol, blockquote, h2, h3, h4) { max-width: var(--w-read); }
+  .doc:not(.is-interactive) .brief { max-width: 980px; }
+
+  /* tracker hide/show toggle — persisted in localStorage, see LabRuntime.astro */
+  .tr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .tr-hide { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--line-2); background: transparent; color: var(--text-3); flex: none; }
+  .tr-hide:hover { color: var(--text); border-color: var(--text-3); }
+  .tr-show { display: none; position: fixed; right: 20px; bottom: 20px; z-index: 20; }
+  @media (min-width: 1080px) {
+    .doc.tracker-hidden:not(.is-interactive) { grid-template-columns: 1fr; }
+    .doc.tracker-hidden:not(.is-interactive) .doc-aside { display: none; }
+    .doc.tracker-hidden:not(.is-interactive) .doc-main { max-width: 900px; margin-inline: auto; }
+    .doc.tracker-hidden:not(.is-interactive) .tr-show { display: inline-flex; }
+  }
 </style>

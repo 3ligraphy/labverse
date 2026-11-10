@@ -1,0 +1,265 @@
+---
+/**
+ * A real, running mini REST API — GET/POST/PUT/DELETE against an in-memory `todos` resource,
+ * plus a query-param filter (?done=true). The "server" is a plain JS object on this page;
+ * every tap really calls fetchApi(), the fetch wrapper shown in the code pane.
+ * The code pane itself toggles fetch <-> Axios so the two can be read side by side.
+ * Same code+phone-preview layout as the Lab 02–04 live demos.
+ * <RestLiveDemo />
+ */
+import { Code } from 'astro:components';
+import Device from '@/components/Device.astro';
+
+const CODE_FETCH = `// plain fetch — built in, no install
+const BASE = 'https://api.example.com/todos';
+
+const getTodos   = (q = '') => fetch(\`\${BASE}\${q}\`).then(r => r.json());
+const addTodo    = (title) => fetch(BASE, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ title }),
+}).then(r => r.json());
+const toggleTodo = (id, done) => fetch(\`\${BASE}/\${id}\`, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ done }),
+}).then(r => r.json());
+const deleteTodo = (id) => fetch(\`\${BASE}/\${id}\`, { method: 'DELETE' });`;
+
+const CODE_AXIOS = `// Axios — npm install axios
+import axios from 'axios';
+const api = axios.create({ baseURL: 'https://api.example.com' });
+
+const getTodos   = (q = '') => api.get(\`/todos\${q}\`).then(r => r.data);
+const addTodo    = (title) => api.post('/todos', { title }).then(r => r.data);
+const toggleTodo = (id, done) => api.put(\`/todos/\${id}\`, { done }).then(r => r.data);
+const deleteTodo = (id) => api.delete(\`/todos/\${id}\`);
+// no JSON.stringify, no headers, no res.ok check — Axios does all three for you`;
+
+const themes = { light: 'github-light', dark: 'github-dark-default' } as const;
+---
+<section class="rl" data-rl data-reveal aria-label="Live demo: REST todos API">
+  <header class="rl-head">
+    <span class="rl-kind mono"><span class="rl-live-dot" aria-hidden="true"></span> Live demo</span>
+    <h4 class="rl-title">A real REST API, running on this page</h4>
+    <div class="rl-toggle" role="tablist" aria-label="Library">
+      <button type="button" class="rl-pill" data-rl-lib="fetch" aria-selected="true">fetch</button>
+      <button type="button" class="rl-pill" data-rl-lib="axios" aria-selected="false">Axios</button>
+    </div>
+  </header>
+
+  <div class="rl-body">
+    <div class="rl-code">
+      <div class="rl-tabs"><span class="rl-tab mono" data-rl-tab>api.ts (fetch)</span></div>
+      <div class="rl-editor" data-rl-fetch><Code code={CODE_FETCH} lang="ts" themes={themes} defaultColor={false} /></div>
+      <div class="rl-editor" data-rl-axios hidden><Code code={CODE_AXIOS} lang="ts" themes={themes} defaultColor={false} /></div>
+      <div class="rl-wire" data-rl-wire aria-hidden="true">
+        <span class="rl-pulse" data-rl-pulse></span>
+      </div>
+      <div class="rl-log-wrap">
+        <p class="rl-code-k mono">Request / response log</p>
+        <ol class="rl-log" data-rl-log></ol>
+      </div>
+    </div>
+    <div class="rl-phone">
+      <Device light interactive label="Mini todos preview">
+        <div class="rl-screen" data-rl-screen>
+          <form class="rl-add" data-rl-add-form>
+            <input class="rl-input" type="text" placeholder="New todo…" data-rl-new maxlength="28" />
+            <button type="submit" class="rl-add-btn" title="POST /todos">+</button>
+          </form>
+          <div class="rl-filter" role="tablist" aria-label="Filter">
+            <button type="button" class="rl-chip" data-rl-filter="" aria-selected="true">All</button>
+            <button type="button" class="rl-chip" data-rl-filter="?done=true" aria-selected="false">Done</button>
+            <button type="button" class="rl-chip" data-rl-filter="?done=false" aria-selected="false">Not done</button>
+          </div>
+          <ul class="rl-list" data-rl-list></ul>
+        </div>
+      </Device>
+    </div>
+  </div>
+  <p class="rl-note">Tapping the box sends a real <code>PUT</code>, the <code>+</code> sends a real <code>POST</code>, the ✕ a real <code>DELETE</code>, and each filter chip a real <code>GET</code> with a query string — watch the log. Flip the <b>fetch</b> / <b>Axios</b> switch above: same four calls, written two ways.</p>
+</section>
+
+<script>
+  import { gsap } from 'gsap';
+
+  type Todo = { id: number; title: string; done: boolean };
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-rl]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+
+      /** The in-memory "server" this page's fetch wrapper talks to. */
+      let todos: Todo[] = [
+        { id: 1, title: 'Read REST docs', done: true },
+        { id: 2, title: 'Build the todos screen', done: false },
+      ];
+      let nextId = 3;
+
+      const list = root.querySelector<HTMLElement>('[data-rl-list]')!;
+      const log = root.querySelector<HTMLElement>('[data-rl-log]')!;
+      const pulse = root.querySelector<HTMLElement>('[data-rl-pulse]')!;
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const flash = () => {
+        if (reduced) return;
+        gsap.fromTo(pulse, { autoAlpha: 1, x: 0 }, { x: '100%', duration: 0.5, ease: 'power1.inOut', onComplete: () => gsap.set(pulse, { autoAlpha: 0 }) });
+      };
+
+      const logLine = (verb: string, path: string, status: number) => {
+        const entry = document.createElement('li');
+        const time = new Date().toLocaleTimeString([], { hour12: false });
+        entry.innerHTML = `<span class="rl-log-t mono">${time}</span><code class="rl-log-v" data-v="${verb}">${verb}</code><code class="rl-log-p">${path}</code><span class="rl-log-s" data-ok="${status < 300}">${status}</span>`;
+        log.prepend(entry);
+        while (log.children.length > 6) log.lastElementChild?.remove();
+      };
+
+      /** Mirrors the fetch() calls in the code pane 1:1 — same verbs, same query string. */
+      const fetchApi = (verb: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<unknown> =>
+        new Promise((resolve) => {
+          flash();
+          setTimeout(() => {
+            let status = 200;
+            let data: unknown = null;
+            if (verb === 'GET') {
+              const q = new URLSearchParams(path.split('?')[1] ?? '');
+              const done = q.get('done');
+              data = done === null ? todos : todos.filter((t) => String(t.done) === done);
+            } else if (verb === 'POST') {
+              const t: Todo = { id: nextId++, title: String((body as { title: string }).title), done: false };
+              todos = [...todos, t];
+              status = 201;
+              data = t;
+            } else if (verb === 'PUT') {
+              const id = Number(path.split('/').pop());
+              todos = todos.map((t) => (t.id === id ? { ...t, done: Boolean((body as { done: boolean }).done) } : t));
+              data = todos.find((t) => t.id === id);
+            } else if (verb === 'DELETE') {
+              const id = Number(path.split('/').pop());
+              todos = todos.filter((t) => t.id !== id);
+              status = 204;
+            }
+            logLine(verb, path, status);
+            resolve(data);
+          }, 320);
+        });
+
+      const paint = () => {
+        list.innerHTML = '';
+        for (const t of todos) {
+          const li = document.createElement('li');
+          li.className = 'rl-row';
+          li.innerHTML = `<label class="rl-check"><input type="checkbox" ${t.done ? 'checked' : ''} data-rl-toggle="${t.id}" /><span>${t.title}</span></label><button type="button" class="rl-del" data-rl-del="${t.id}" aria-label="Delete">✕</button>`;
+          list.appendChild(li);
+        }
+        list.querySelectorAll<HTMLInputElement>('[data-rl-toggle]').forEach((cb) =>
+          cb.addEventListener('change', async () => {
+            const id = Number(cb.dataset.rlToggle);
+            await fetchApi('PUT', `/todos/${id}`, { done: cb.checked });
+            paint();
+          }),
+        );
+        list.querySelectorAll<HTMLButtonElement>('[data-rl-del]').forEach((b) =>
+          b.addEventListener('click', async () => {
+            const id = Number(b.dataset.rlDel);
+            await fetchApi('DELETE', `/todos/${id}`);
+            paint();
+          }),
+        );
+      };
+
+      root.querySelector<HTMLFormElement>('[data-rl-add-form]')!.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = root.querySelector<HTMLInputElement>('[data-rl-new]')!;
+        const title = input.value.trim();
+        if (!title) return;
+        await fetchApi('POST', '/todos', { title });
+        input.value = '';
+        paint();
+      });
+
+      root.querySelectorAll<HTMLButtonElement>('[data-rl-filter]').forEach((chip) =>
+        chip.addEventListener('click', async () => {
+          root.querySelectorAll<HTMLButtonElement>('[data-rl-filter]').forEach((b) => b.setAttribute('aria-selected', String(b === chip)));
+          const q = chip.dataset.rlFilter ?? '';
+          const filtered = (await fetchApi('GET', `/todos${q}`)) as Todo[];
+          list.innerHTML = '';
+          for (const t of filtered) {
+            const li = document.createElement('li');
+            li.className = 'rl-row';
+            li.innerHTML = `<label class="rl-check"><input type="checkbox" ${t.done ? 'checked' : ''} disabled /><span>${t.title}</span></label>`;
+            list.appendChild(li);
+          }
+        }),
+      );
+
+      const tab = root.querySelector<HTMLElement>('[data-rl-tab]')!;
+      root.querySelectorAll<HTMLButtonElement>('[data-rl-lib]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const lib = b.dataset.rlLib as 'fetch' | 'axios';
+          root.querySelectorAll<HTMLButtonElement>('[data-rl-lib]').forEach((btn) => btn.setAttribute('aria-selected', String(btn === b)));
+          root.querySelector<HTMLElement>('[data-rl-fetch]')!.hidden = lib !== 'fetch';
+          root.querySelector<HTMLElement>('[data-rl-axios]')!.hidden = lib !== 'axios';
+          tab.textContent = `api.ts (${lib})`;
+        }),
+      );
+
+      paint();
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .rl { margin: 24px 0 32px; container-type: inline-size; }
+  .rl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-bottom: 10px; }
+  .rl-kind { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-text); font-weight: 600; }
+  .rl-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: rl-live 1.6s ease-in-out infinite; }
+  @keyframes rl-live { 50% { opacity: 0.25; } }
+  .rl-title { margin: 0 !important; flex: 1; font-family: var(--font-display); font-size: 1.05rem; letter-spacing: -0.01em; color: var(--text); }
+  .rl-toggle { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--r-full); background: var(--bg-2); border: 1px solid var(--line); }
+  .rl-pill { padding: 5px 12px; border-radius: var(--r-full); border: 0; background: transparent; font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer; font-family: var(--font-mono); }
+  .rl-pill[aria-selected='true'] { background: var(--accent); color: var(--accent-ink); }
+  .rl-body { display: grid; gap: 1px; grid-template-columns: minmax(0, 1fr); background: var(--line); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
+  @container (min-width: 760px) { .rl-body { grid-template-columns: minmax(0, 1fr) 260px; } }
+  .rl-code { display: flex; flex-direction: column; min-width: 0; background: var(--surface); position: relative; }
+  .rl-tabs { padding: 8px 12px 0; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+  .rl-tab { display: inline-block; padding: 6px 10px; font-size: 12px; color: var(--text); background: var(--code-bg); border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; margin-bottom: -1px; }
+  .rl-editor { height: 400px; overflow: auto; background: var(--code-bg); }
+  .rl-editor :global(.astro-code) { margin: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; padding: 20px 24px !important; font-size: 13.5px !important; line-height: 1.75 !important; white-space: pre-wrap !important; word-break: break-word !important; }
+  .rl-wire { position: relative; height: 3px; background: var(--line); overflow: visible; }
+  .rl-pulse { position: absolute; top: 50%; left: 0; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--accent); opacity: 0; box-shadow: 0 0 0 4px var(--accent-soft); pointer-events: none; }
+  .rl-log-wrap { padding: 10px 14px 14px; border-top: 1px solid var(--line); background: var(--surface); }
+  .rl-code-k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 6px !important; }
+  .rl-log { list-style: none; margin: 0 !important; padding: 0; display: grid; gap: 4px; max-height: 120px; overflow-y: auto; }
+  .rl-log li { display: flex; gap: 8px; align-items: baseline; padding: 5px 9px; border-radius: 8px; background: var(--bg-2); font-size: 11.5px; color: var(--text-2); animation: rl-in 300ms var(--ease-out); }
+  .rl-log-t { color: var(--text-3); font-size: 11px; }
+  .rl-log-v { font-weight: 700; padding: 1px 5px; border-radius: 5px; }
+  .rl-log-v[data-v='GET'] { background: color-mix(in oklab, #3b82f6 22%, transparent); color: #3b82f6; }
+  .rl-log-v[data-v='POST'] { background: color-mix(in oklab, var(--ok) 22%, transparent); color: var(--ok); }
+  .rl-log-v[data-v='PUT'] { background: color-mix(in oklab, #f59e0b 25%, transparent); color: #f59e0b; }
+  .rl-log-v[data-v='DELETE'] { background: color-mix(in oklab, var(--danger) 20%, transparent); color: var(--danger); }
+  .rl-log-p { color: var(--text-3); }
+  .rl-log-s { margin-left: auto; font-weight: 700; }
+  .rl-log-s[data-ok='false'] { color: var(--danger); }
+  .rl-phone { display: grid; place-items: center; padding: 20px 12px; background: radial-gradient(circle at 50% 40%, var(--accent-soft), transparent 62%), var(--bg-2); }
+  .rl-phone :global(.device) { --w: 220px; }
+  .rl-screen { position: absolute; inset: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 14px 12px; }
+  .rl-add { display: flex; gap: 6px; }
+  .rl-input { flex: 1; min-width: 0; padding: 7px 9px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 12px; }
+  .rl-add-btn { width: 30px; flex: none; border-radius: 8px; border: 0; background: #0f172a; color: #fff; font-weight: 700; }
+  .rl-filter { display: flex; gap: 6px; }
+  .rl-chip { padding: 4px 9px; border-radius: 999px; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: 11px; font-weight: 600; }
+  .rl-chip[aria-selected='true'] { background: #0f172a; color: #fff; border-color: #0f172a; }
+  .rl-list { list-style: none; margin: 0 !important; padding: 0; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+  .rl-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 8px; border-radius: 8px; background: #f1f5f9; font-size: 12px; color: #0f172a; }
+  .rl-check { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .rl-check input:checked + span { text-decoration: line-through; color: #94a3b8; }
+  .rl-del { color: #dc2626; font-weight: 700; border: 0; background: none; padding: 2px 4px; flex: none; }
+  .rl-note { margin: 10px 0 0 !important; font-size: 13px; color: var(--text-3); }
+  .rl-note code { font-size: 12.5px; }
+  @keyframes rl-in { from { opacity: 0; transform: translateY(-4px); } }
+  @media (prefers-reduced-motion: reduce) { .rl-live-dot { animation: none; } .rl-log li { animation: none; } }
+</style>

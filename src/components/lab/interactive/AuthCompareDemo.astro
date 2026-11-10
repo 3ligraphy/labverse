@@ -1,0 +1,160 @@
+---
+/**
+ * Clerk vs BetterAuth, same sign-in flow, animated with GSAP — same toggle+lane+code
+ * layout as StoreFlow (Lab 04): UI event -> sign-in call -> session stored -> protected screen.
+ * <AuthCompareDemo />
+ */
+const NODES = ['Sign-in call', 'Session created', 'useUser() / useSession()', 'Protected screen'];
+
+const VARIANTS = {
+  clerk: {
+    label: 'Clerk',
+    action: "const { signIn } = useSignIn();\nawait signIn.create({ identifier: email, password });",
+    update: "// Clerk's own servers create and store the session\nconst { isSignedIn, user } = useUser();",
+    note: 'A few lines, zero server code — Clerk hosts and manages the session for you.',
+  },
+  betterauth: {
+    label: 'BetterAuth',
+    action: 'await authClient.signIn.email({ email, password });',
+    update: '// your server verifies the session cookie it just set\nconst { data: session } = authClient.useSession();',
+    note: 'Same shape call — but your own server and database hold the session, not a third party.',
+  },
+} as const;
+---
+<figure class="ac" data-ac data-reveal data-free aria-label="Live demo: Clerk vs BetterAuth sign-in">
+  <div class="ac-head">
+    <p class="ac-k mono">Live demo — sign-in flow</p>
+    <div class="ac-toggle" role="tablist" aria-label="Auth library">
+      <button type="button" class="ac-pill" data-ac-variant="clerk" aria-selected="true">Clerk</button>
+      <button type="button" class="ac-pill" data-ac-variant="betterauth" aria-selected="false">BetterAuth</button>
+    </div>
+  </div>
+
+  <div class="ac-lane" data-ac-lane>
+    {NODES.map((label, i) => (
+      <div class="ac-node" data-ac-node={i}>
+        <span class="ac-dot" aria-hidden="true">{i + 1}</span>
+        <span class="ac-label">{label}</span>
+      </div>
+    ))}
+    <span class="ac-pulse" data-ac-pulse aria-hidden="true"></span>
+  </div>
+
+  <div class="ac-code">
+    <div class="ac-code-col">
+      <p class="ac-code-k mono">sign-in call</p>
+      <pre class="ac-pre" data-ac-action></pre>
+    </div>
+    <div class="ac-code-col">
+      <p class="ac-code-k mono">reading the session</p>
+      <pre class="ac-pre" data-ac-update></pre>
+    </div>
+  </div>
+  <p class="ac-note" data-ac-note></p>
+
+  <button type="button" class="btn btn-primary btn-sm ac-play" data-ac-play>▶ Play the flow</button>
+
+  <script type="application/json" data-ac-variants set:html={JSON.stringify(VARIANTS)} />
+</figure>
+
+<script>
+  import { gsap } from 'gsap';
+
+  type Variant = { label: string; action: string; update: string; note: string };
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-ac]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const variants = JSON.parse(root.querySelector('[data-ac-variants]')!.textContent!) as Record<'clerk' | 'betterauth', Variant>;
+      const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+      const nodes = Array.from(root.querySelectorAll<HTMLElement>('[data-ac-node]'));
+      const pulse = $('[data-ac-pulse]');
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let current: 'clerk' | 'betterauth' = 'clerk';
+      let playing = false;
+
+      const paintVariant = () => {
+        const v = variants[current];
+        $('[data-ac-action]').textContent = v.action;
+        $('[data-ac-update]').textContent = v.update;
+        $('[data-ac-note]').textContent = v.note;
+        root.querySelectorAll<HTMLButtonElement>('[data-ac-variant]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.acVariant === current)));
+      };
+
+      const play = () => {
+        if (playing) return;
+        playing = true;
+        nodes.forEach((n) => n.classList.remove('on'));
+        const btn = $('[data-ac-play]') as HTMLButtonElement;
+        btn.disabled = true;
+        const done = () => {
+          playing = false;
+          btn.disabled = false;
+          btn.textContent = '↺ Replay the flow';
+        };
+        if (reduced) {
+          nodes.forEach((n) => n.classList.add('on'));
+          gsap.set(pulse, { autoAlpha: 1, x: '100%' });
+          done();
+          return;
+        }
+        gsap.set(nodes, { autoAlpha: 0, y: 8 });
+        gsap.set(pulse, { autoAlpha: 0, x: 0 });
+        const tl = gsap.timeline({ onComplete: done });
+        tl.to(nodes, { autoAlpha: 1, y: 0, duration: 0.32, ease: 'power2.out', stagger: 0.09 });
+        nodes.forEach((n, i) => {
+          tl.add(() => n.classList.add('on'));
+          if (i < nodes.length - 1) {
+            const from = n.getBoundingClientRect();
+            const to = nodes[i + 1].getBoundingClientRect();
+            const laneLeft = root.querySelector('[data-ac-lane]')!.getBoundingClientRect().left;
+            tl.set(pulse, { autoAlpha: 1, x: from.left - laneLeft + from.width / 2 });
+            tl.to(pulse, { x: to.left - laneLeft + to.width / 2, duration: 0.45, ease: 'power1.inOut' });
+          }
+        });
+        tl.to(pulse, { autoAlpha: 0, duration: 0.2 });
+      };
+
+      root.querySelectorAll<HTMLButtonElement>('[data-ac-variant]').forEach((b) =>
+        b.addEventListener('click', () => {
+          current = b.dataset.acVariant as 'clerk' | 'betterauth';
+          paintVariant();
+        }),
+      );
+      $('[data-ac-play]').addEventListener('click', play);
+      paintVariant();
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .ac { margin: 24px 0 32px; display: grid; gap: 16px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .ac-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .ac-k { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 !important; }
+  .ac-toggle { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--r-full); background: var(--bg-2); border: 1px solid var(--line); }
+  .ac-pill { padding: 5px 12px; border-radius: var(--r-full); border: 0; background: transparent; font-size: 12.5px; font-weight: 600; color: var(--text-2); cursor: pointer; transition: background .2s var(--ease-out), color .2s; }
+  .ac-pill[aria-selected='true'] { background: var(--accent); color: var(--accent-ink); }
+
+  .ac-lane { position: relative; display: flex; gap: 10px; flex-wrap: wrap; }
+  .ac-node { flex: 1; min-width: 130px; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); transition: border-color .25s var(--ease-out), background .25s var(--ease-out); }
+  .ac-node.on { border-color: var(--accent-text); background: var(--accent-soft); }
+  .ac-dot { width: 20px; height: 20px; flex: none; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--font-mono); background: var(--surface-3); color: var(--text-2); }
+  .ac-node.on .ac-dot { background: var(--accent); color: var(--accent-ink); }
+  .ac-label { font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; }
+  .ac-pulse { position: absolute; top: 50%; left: 0; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--accent); opacity: 0; box-shadow: 0 0 0 4px var(--accent-soft); pointer-events: none; }
+
+  .ac-code { display: grid; gap: 12px; }
+  @media (min-width: 640px) { .ac-code { grid-template-columns: 1fr 1fr; } }
+  .ac-code-col { display: grid; gap: 6px; }
+  .ac-code-k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 !important; }
+  .ac-pre { margin: 0; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); font: 13.5px/1.65 var(--font-mono); color: var(--accent-text); white-space: pre-wrap; overflow-wrap: anywhere; min-height: 72px; }
+  .ac-note { margin: 0 !important; font-size: 13px; color: var(--text-3); }
+  .ac-play { justify-self: start; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ac-node { transition: none; }
+    .ac-pulse { transition: none; }
+  }
+</style>

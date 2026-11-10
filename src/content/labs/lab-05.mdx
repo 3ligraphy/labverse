@@ -1,0 +1,566 @@
+---
+number: 5
+title: 'REST & GraphQL, Async JS, and Auth — Build a Real Attendance App'
+description: 'Learn REST and GraphQL (every HTTP verb, query params), sync vs async JavaScript, and Clerk vs BetterAuth — then build a small Expo app that checks you into the real class attendance system.'
+difficulty: Intermediate
+estimatedTime: '4 hours 15 min'
+skills: [REST APIs, GraphQL, HTTP methods, Async JavaScript, Authentication, fetch, Axios]
+roadmapStage: data
+objectives:
+  - Explain every HTTP verb (GET, POST, PUT, PATCH, DELETE) and when to use each
+  - Read and write a query string (?key=value) and know what it's for
+  - Compare REST and GraphQL and choose the right one for a given use case
+  - Explain the difference between synchronous and asynchronous code, and when each fits
+  - Compare Clerk and BetterAuth and choose the right one for a given app
+  - Call a real backend from an Expo app with fetch, or with Axios if you prefer it — POST, GET, and an external API
+prerequisites:
+  - 'Lab 04 completed: Expo Router, feature-first folders, global state'
+  - 'A **new, empty folder** for this lab — this is a standalone project'
+  - 'Node.js, VS Code and Git installed ([Setup](/mobile-development/setup))'
+  - 'Expo Go on your phone, or the Android emulator'
+troubleshooting:
+  - problem: '"Attendance is not open yet" from the real check-in'
+    cause: 'Your TA has not opened the session yet, or has closed it.'
+    solution: 'Check with your TA, or poll `GET /api/attendance/status` and only show the check-in button when `open` is `true`.'
+  - problem: '409 "This student ID is already checked in"'
+    cause: 'You (or a classmate using your ID) already checked in this session.'
+    solution: 'This is correct behaviour, not a bug — a student ID can only check in once per session.'
+  - problem: '400 "deviceId" error'
+    cause: 'The `deviceId` you sent is missing, or shorter than 16 characters.'
+    solution: 'Generate one with `crypto.randomUUID()` and send it as-is — do not shorten or edit it.'
+  - problem: 'The PokeAPI request returns a 404'
+    cause: 'The Pokémon name was misspelled, or had a capital letter.'
+    solution: 'PokeAPI names are lowercase, e.g. `pikachu` not `Pikachu`. Trim and lowercase whatever the student typed before building the URL.'
+  - problem: 'fetch() "Network request failed" on a phone'
+    cause: 'The real attendance API is an HTTPS endpoint, so this is almost always Wi-Fi, not localhost — but if you point this at your own machine later, remember `localhost` means the phone itself.'
+    solution: 'Use your computer''s LAN IP, or test on the emulator first.'
+extraChallenge: 'Add a small retry with exponential backoff around the attendance POST (useful on flaky classroom Wi-Fi) — or build a tiny client-side cache so the PokeAPI screen does not re-fetch a Pokémon you already looked up this session.'
+resources:
+  - { label: 'MDN — HTTP request methods', href: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods' }
+  - { label: 'GraphQL — official docs', href: 'https://graphql.org/learn/' }
+  - { label: 'MDN — Using Promises', href: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises' }
+  - { label: 'Clerk', href: 'https://clerk.com' }
+  - { label: 'BetterAuth', href: 'https://www.better-auth.com' }
+  - { label: 'PokeAPI', href: 'https://pokeapi.co/docs/v2' }
+  - { label: 'Axios', href: 'https://axios-http.com/docs/intro' }
+draft: false
+---
+
+<Part n="1" title="REST APIs — HTTP verbs & query params" time="45 min" />
+
+A **REST API** is a set of URLs ("resources") you talk to with plain HTTP. The verb says *what kind of thing* you're doing to that resource; the URL says *which* resource.
+
+<Cards cols={3} items={[
+  { tag: 'read', icon: 'search', title: 'GET', text: 'Read a resource. Never changes anything on the server — safe to call as often as you like.' },
+  { tag: 'create', icon: 'sparkle', title: 'POST', text: 'Create a new resource, or run an action that is not a simple update (like "check in").' },
+  { tag: 'replace', icon: 'file', title: 'PUT', text: 'Replace a resource with a full, new version. Send every field, even the ones that did not change.' },
+  { tag: 'update', icon: 'wrench', title: 'PATCH', text: 'Update part of a resource — just the fields that changed. (Not used much in this lab, but you should recognise it.)' },
+  { tag: 'remove', icon: 'close', title: 'DELETE', text: 'Remove a resource.' },
+]} />
+
+### Query parameters
+
+A query string is the part of a URL after `?` — `key=value` pairs, joined with `&`. It never changes *which* resource you're asking for, only *how much of it*, or *which part*.
+
+<Explain parts={[['GET', 'read, never changes anything'], ['/todos', 'the resource'], ['?done=true', 'a filter'], ['&limit=5', 'a page size']]} />
+
+Common uses: **filtering** (`?done=true`), **search** (`?q=shoes`), and **pagination** (`?page=2&limit=20`). The server reads them off `request.url` — nothing about the verb or the body changes.
+
+### fetch vs Axios
+
+`fetch` is built into JavaScript — no install, but you handle JSON parsing and error status yourself. **Axios** is a small library (`npm install axios`) that does both automatically and reads a little shorter. They do the exact same job; this lab lets you pick either one.
+
+<Cards cols={2} items={[
+  { icon: 'cmd', title: 'fetch', points: ['+ Built in — nothing to install', '+ One fewer dependency to update', '- You call `JSON.stringify()` and `res.json()` yourself', '- `fetch` does not reject on a 404/500 — you must check `res.ok`'] },
+  { icon: 'download', title: 'Axios', points: ['+ `res.data` is already parsed JSON', '+ Rejects automatically on a bad status — one `catch` handles it', '+ `axios.create({ baseURL })` avoids repeating the full URL', '- One more package in `node_modules`'] },
+]} />
+
+<RestLiveDemo />
+
+<Checkpoint>
+
+In the demo above: tick a todo (that's a real `PUT`), add one (a real `POST`), delete one (a real `DELETE`), then tap "Done" — that's a real `GET` with `?done=true` in the query string. Read the log after each tap.
+
+</Checkpoint>
+
+<Part n="2" title="GraphQL vs REST" time="20 min" />
+
+**GraphQL** is a different way to ask a server for data: one URL (usually `/graphql`), and the client says exactly which fields it wants in a **query** (read) or a **mutation** (write).
+
+<Cards cols={2} items={[
+  { tone: 'good', icon: 'link', title: 'REST', points: ['+ Simple: a URL + a verb, works with plain fetch()', '+ Easy to cache (the URL is the cache key)', '- Over/under-fetching: you get whatever shape the endpoint returns'] },
+  { tone: 'good', icon: 'sparkle', title: 'GraphQL', points: ['+ Ask for exactly the fields you need, nothing more', '+ One request can gather data that would be several REST calls', '- More setup: a schema, resolvers, a GraphQL client'] },
+]} />
+
+Rule of thumb: a small app with a handful of simple resources (this lab's attendance app included) → **REST**. A large app with many related, nested resources and picky mobile data usage → **GraphQL** starts paying for itself.
+
+<GraphqlLiveDemo />
+
+<Part n="3" title="Synchronous vs asynchronous code" time="30 min" />
+
+**Synchronous** code runs one line at a time; each line waits for the one before it to finish. **Asynchronous** code lets a slow operation (a network call, a file read, a timer) run in the background while the rest of your program keeps going.
+
+<Cards cols={2} items={[
+  { icon: 'clock', title: 'Use sync for', text: 'Fast, in-memory work: math, string formatting, array transforms — anything that finishes in microseconds.' },
+  { icon: 'cloud', title: 'Use async for', text: 'Anything that waits on something outside the CPU: `fetch()`, reading a file, a timer, a database query.' },
+]} />
+
+On a phone, the UI thread is the same thread your JavaScript runs on. A synchronous call that takes 3 seconds freezes the whole screen for 3 seconds — no scrolling, no taps. An async call frees the thread while it waits, so the UI stays alive.
+
+<AsyncFlow />
+
+<Checkpoint>
+
+Run both modes above. In "Synchronous" the UI-thread dot freezes solid until all three bars finish. In "Asynchronous" it keeps beating the entire time — that beat is your app staying responsive.
+
+</Checkpoint>
+
+<Part n="4" title="Authentication — Clerk vs BetterAuth" time="35 min" />
+
+Both are ways to add sign-up, sign-in and sessions to an app without writing that logic yourself.
+
+<Cards cols={2} items={[
+  { icon: 'cloud', title: 'Clerk', text: 'A fully hosted auth service. You install their SDK and drop in prebuilt UI; Clerk runs the servers, the database and the dashboard.' },
+  { icon: 'key', title: 'BetterAuth', text: 'An open-source auth library you self-host. You own the database and the server; BetterAuth gives you the logic, not the infrastructure.' },
+]} />
+
+```ts title="Clerk — initialize (Expo)"
+// npm install @clerk/clerk-expo
+import { ClerkProvider } from '@clerk/clerk-expo';
+
+export default function RootLayout() {
+  return (
+    <ClerkProvider publishableKey={process.env.EXPO_PUBLIC_CLERK_KEY}>
+      {/* your app */}
+    </ClerkProvider>
+  );
+}
+```
+
+```ts title="BetterAuth — initialize (server)"
+// npm install better-auth
+import { betterAuth } from 'better-auth';
+
+export const auth = betterAuth({
+  database: { provider: 'postgres', url: process.env.DATABASE_URL },
+  emailAndPassword: { enabled: true },
+});
+```
+
+| | Clerk | BetterAuth |
+| --- | --- | --- |
+| Hosting | Clerk's servers | Your own server/database |
+| Cost | Free tier, then per monthly active user | Free (you pay only for your own hosting) |
+| Setup speed | Minutes — prebuilt UI components | Longer — you build the UI yourself |
+| Control | Limited to what Clerk exposes | Full control over data and logic |
+| Best for | Shipping fast, small teams, don't want to run servers | Full control, data residency rules, cost at large scale |
+
+**Pick Clerk** when speed to launch matters more than owning the stack — most student projects and early-stage startups. **Pick BetterAuth** when you must self-host (cost at scale, data residency, or you already run your own backend).
+
+<AuthCompareDemo />
+
+<Part n="5" title="Project setup" time="15 min" />
+
+Same Expo setup as Lab 04 — you already know this part.
+
+<Terminal title="Terminal — create" lines={[
+  '$ npx create-expo-app@latest attendance-app',
+  '$ cd attendance-app',
+  '$ npm run reset-project',
+]} />
+
+<Terminal title="Terminal — Axios (optional)" lines={[
+  '# only run this if you want to use Axios instead of fetch — either is fine for every exercise',
+  '$ npm install axios',
+]} />
+
+<Terminal title="Terminal — NativeWind" lines={[
+  '$ npx expo install nativewind tailwindcss react-native-reanimated react-native-safe-area-context',
+  '# then follow the NativeWind install guide for your installed version (tailwind.config.js, global.css, babel/metro)',
+]} />
+
+```js title="tailwind.config.js"
+module.exports = {
+  content: ['./app/**/*.{js,jsx,ts,tsx}', './features/**/*.{js,jsx,ts,tsx}'],
+  presets: [require('nativewind/preset')],
+  theme: { extend: {} },
+  plugins: [],
+};
+```
+
+<FileTree title="attendance-app" lines={[
+  'app/',
+  '  _layout.tsx',
+  '  (tabs)/',
+  '    _layout.tsx',
+  '    index.tsx # Check in -> CheckInScreen',
+  '    lookup.tsx # External API -> PokemonScreen',
+  'features/',
+  '  attendance/',
+  '    api.ts * STUB',
+  '    screens/',
+  '      CheckInScreen.tsx * STUB',
+  '  external/',
+  '    api.ts * STUB',
+  '    screens/',
+  '      PokemonScreen.tsx * STUB',
+  'shared/',
+  '  device.ts # generates and stores the deviceId once',
+]} />
+
+Quick folders + starter files (Git Bash / macOS / Linux):
+
+<Terminal lines={[
+  '$ mkdir -p features/attendance/screens features/external/screens shared',
+  '$ touch features/attendance/api.ts features/attendance/screens/CheckInScreen.tsx features/external/api.ts features/external/screens/PokemonScreen.tsx shared/device.ts',
+]} />
+
+On Windows PowerShell:
+
+```powershell
+"features/attendance/screens","features/external/screens","shared" | ForEach-Object { New-Item -ItemType Directory -Force $_ }
+"features/attendance/api.ts","features/attendance/screens/CheckInScreen.tsx","features/external/api.ts","features/external/screens/PokemonScreen.tsx","shared/device.ts" | ForEach-Object { New-Item -ItemType File -Force $_ }
+```
+
+### Starter UI — paste before you touch the REST API
+
+The exercises in Part 6 are about **fetch/Axios, not layout**. Paste these two screens into `app/(tabs)/index.tsx` and `app/(tabs)/lookup.tsx` now, run the app once to see them render, then come back and fill in the `TODO`s inside `submit()` / `search()` as you work through Part 6.
+
+```tsx title="app/(tabs)/index.tsx — starter UI"
+import { useState } from 'react';
+import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
+
+type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'success'; message: string } | { kind: 'error'; message: string };
+
+export default function CheckInScreen() {
+  const [name, setName] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [status, setStatus] = useState<Status>({ kind: 'idle' });
+
+  const submit = async () => {
+    setStatus({ kind: 'loading' });
+    // TODO (Exercise 6.1): call checkIn(name, studentId) from '@/features/attendance/api'
+    // and turn the result into setStatus({ kind: 'success', message } | { kind: 'error', message }).
+  };
+
+  const disabled = !name.trim() || !studentId.trim() || status.kind === 'loading';
+
+  return (
+    <View className="flex-1 bg-slate-50 px-6 pt-20">
+      <View className="mb-8">
+        <Text className="text-xs font-bold tracking-widest text-emerald-600">ATTENDANCE</Text>
+        <Text className="mt-1.5 text-3xl font-bold text-slate-900">Check in</Text>
+        <Text className="mt-2 text-base leading-snug text-slate-500">Type your name and student ID, then submit.</Text>
+      </View>
+
+      <View className="gap-4">
+        <View className="gap-2">
+          <Text className="text-sm font-semibold text-slate-700">Full name</Text>
+          <TextInput
+            className="h-14 rounded-2xl border border-slate-200 bg-white px-4 text-base text-slate-900"
+            value={name}
+            onChangeText={setName}
+            placeholder="Mariam Ahmed"
+            placeholderTextColor="#94a3b8"
+            autoCapitalize="words"
+          />
+        </View>
+
+        <View className="gap-2">
+          <Text className="text-sm font-semibold text-slate-700">Student ID</Text>
+          <TextInput
+            className="h-14 rounded-2xl border border-slate-200 bg-white px-4 text-base text-slate-900"
+            value={studentId}
+            onChangeText={setStudentId}
+            placeholder="236541"
+            placeholderTextColor="#94a3b8"
+            keyboardType="number-pad"
+          />
+        </View>
+
+        <Pressable
+          className={`mt-1.5 h-14 items-center justify-center rounded-2xl ${disabled ? 'bg-emerald-300' : 'bg-emerald-600 active:scale-[0.98] active:opacity-90'}`}
+          onPress={submit}
+          disabled={disabled}
+        >
+          {status.kind === 'loading' ? <ActivityIndicator color="#ffffff" /> : <Text className="text-base font-bold text-white">Submit</Text>}
+        </Pressable>
+
+        {status.kind === 'success' && (
+          <View className="rounded-2xl bg-emerald-100 p-3.5"><Text className="text-sm font-semibold text-slate-900">{status.message}</Text></View>
+        )}
+        {status.kind === 'error' && (
+          <View className="rounded-2xl bg-red-100 p-3.5"><Text className="text-sm font-semibold text-slate-900">{status.message}</Text></View>
+        )}
+      </View>
+    </View>
+  );
+}
+```
+
+```tsx title="app/(tabs)/lookup.tsx — starter UI"
+import { useState } from 'react';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Image } from 'react-native';
+
+type Pokemon = { name: string; sprite: string; types: string[] };
+type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'success'; data: Pokemon } | { kind: 'error'; message: string };
+
+export default function PokemonScreen() {
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<Status>({ kind: 'idle' });
+
+  const search = async () => {
+    if (!query.trim()) return;
+    setStatus({ kind: 'loading' });
+    // TODO (Exercise 6.3): call getPokemon(query) from '@/features/external/api'
+    // and turn the result into setStatus({ kind: 'success', data } | { kind: 'error', message }).
+  };
+
+  return (
+    <View className="flex-1 bg-slate-50 px-6 pt-20">
+      <View className="mb-7">
+        <Text className="text-xs font-bold tracking-widest text-emerald-600">EXTERNAL API</Text>
+        <Text className="mt-1.5 text-3xl font-bold text-slate-900">Pokémon lookup</Text>
+        <Text className="mt-2 text-base text-slate-500">Type a name, e.g. pikachu.</Text>
+      </View>
+
+      <View className="flex-row gap-2.5">
+        <TextInput
+          className="h-14 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-base text-slate-900"
+          value={query}
+          onChangeText={setQuery}
+          placeholder="pikachu"
+          placeholderTextColor="#94a3b8"
+          autoCapitalize="none"
+          autoCorrect={false}
+          onSubmitEditing={search}
+        />
+        <Pressable className="h-14 items-center justify-center rounded-2xl bg-emerald-600 px-6 active:scale-[0.98] active:opacity-90" onPress={search}>
+          <Text className="text-[15px] font-bold text-white">Search</Text>
+        </Pressable>
+      </View>
+
+      <View className="mt-8 items-center">
+        {status.kind === 'idle' && <Text className="text-sm text-slate-400">Results show up here.</Text>}
+        {status.kind === 'loading' && <ActivityIndicator color="#059669" />}
+        {status.kind === 'error' && <Text className="text-sm font-semibold text-red-600">{status.message}</Text>}
+        {status.kind === 'success' && (
+          <View className="w-full items-center rounded-2xl border border-slate-200 bg-white p-6">
+            <Image source={{ uri: status.data.sprite }} className="h-32 w-32" />
+            <Text className="mt-2 text-xl font-bold capitalize text-slate-900">{status.data.name}</Text>
+            <View className="mt-3 flex-row gap-2">
+              {status.data.types.map((t) => (
+                <View key={t} className="rounded-full bg-emerald-100 px-3 py-1.5">
+                  <Text className="text-xs font-bold capitalize text-emerald-700">{t}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+```
+
+Both screens already handle **loading**, **empty** and **error** states — only the network call itself (the `TODO`) is left for Part 6.
+
+<Part n="6" title="Exercises — a real attendance app" time="1 hour 15 min" />
+
+<Cards cols={3} items={[
+  { icon: 'link', title: 'REST only', text: 'This project trains REST, not GraphQL — every call below is a plain request to a real URL, nothing more.' },
+  { icon: 'cloud', title: 'A real backend', text: 'You POST and GET against the actual course attendance API — the same one your TA opens for this lab.' },
+  { icon: 'cmd', title: 'Your choice', text: 'fetch or Axios — pick whichever you installed in Part 5 and use it everywhere below. Both are graded the same.' },
+]} />
+
+These three exercises talk to the **real** course attendance API — the same one your TA uses to open check-in for this lab. There is nothing to fake here: a correct Exercise 6.1 really checks you in.
+
+Each solution below is hidden behind three hints — try it yourself first, open a hint if you're stuck, and only press **Show solution** once you've genuinely tried.
+
+<Task n="6.1" title="POST — check in for real" time="30 min">
+
+`shared/device.ts` — every device needs one stable ID, generated once and reused:
+
+```ts title="shared/device.ts"
+let cached: string | null = null;
+export function getDeviceId() {
+  if (!cached) cached = crypto.randomUUID(); // 36 chars — well within the 16–64 range the API requires
+  return cached;
+}
+```
+
+`features/attendance/api.ts` — write a `checkIn(name, studentId)` function that POSTs `{ name, studentId, deviceId }` to `https://<your-course-site-domain>/api/attendance`, using `fetch` or Axios (your choice from Part 5). `studentId` must be 5–9 digits (letters get rejected). It should return something your screen can switch on: a clear success case, an "already checked in" case, and a "closed" case.
+
+Build `CheckInScreen` with a name field, a student ID field, and a submit button that calls `checkIn()` and shows the result.
+
+Paste this into `features/attendance/api.ts` to start from, then fill in the `TODO`s:
+
+```ts title="features/attendance/api.ts — starter"
+import { getDeviceId } from '@/shared/device';
+
+const BASE = 'https://<your-course-site-domain>/api/attendance';
+
+export async function checkIn(name: string, studentId: string) {
+  // TODO: POST { name, studentId, deviceId: getDeviceId() } to BASE as JSON
+  // TODO: 201 -> { ok: true, entry }
+  // TODO: 409 -> { ok: false, reason: 'device' | 'id' }
+  // TODO: 503 -> { ok: false, reason: 'closed' }
+  // TODO: anything else -> { ok: false, reason: 'error' }
+}
+```
+
+<Hints hints={[
+  'Generate the device ID once with `getDeviceId()` and build the request body from `{ name, studentId, deviceId }`.',
+  'With `fetch`, set `Content-Type: application/json` and `body: JSON.stringify(body)` — Axios does both for you if you just pass the object.',
+  'Check the response: `201` is success (read `.entry`), `409` is a conflict (device or id already used), `503` means closed — anything else is a generic error.',
+]}>
+
+```ts title="features/attendance/api.ts — fetch version"
+import { getDeviceId } from '@/shared/device';
+
+const BASE = 'https://<your-course-site-domain>/api/attendance';
+
+export async function checkIn(name: string, studentId: string) {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, studentId, deviceId: getDeviceId() }),
+  });
+  const data = await res.json();
+  if (res.status === 201) return { ok: true as const, entry: data.entry };
+  if (res.status === 409) return { ok: false as const, reason: data.error as 'device' | 'id' };
+  if (res.status === 503) return { ok: false as const, reason: 'closed' as const };
+  return { ok: false as const, reason: 'error' as const };
+}
+```
+
+```ts title="features/attendance/api.ts — Axios version"
+import axios from 'axios';
+import { getDeviceId } from '@/shared/device';
+
+const api = axios.create({ baseURL: 'https://<your-course-site-domain>/api' });
+
+export async function checkIn(name: string, studentId: string) {
+  try {
+    const res = await api.post('/attendance', { name, studentId, deviceId: getDeviceId() });
+    return { ok: true as const, entry: res.data.entry };
+  } catch (err: any) {
+    const status = err.response?.status;
+    if (status === 409) return { ok: false as const, reason: err.response.data.error as 'device' | 'id' };
+    if (status === 503) return { ok: false as const, reason: 'closed' as const };
+    return { ok: false as const, reason: 'error' as const };
+  }
+}
+```
+
+Note the shape of the difference: Axios never reaches the success path on a 409 or 503 — a non-2xx status throws, so that logic moves into `catch`.
+
+</Hints>
+
+</Task>
+
+<Task n="6.2" title="GET — is the session open?" time="15 min">
+
+`GET /api/attendance/status` tells you whether the **session** is open — it does **not** tell you whether *you personally* are checked in (the API never reveals names, on purpose). Write an `attendanceOpen()` function, call it when `CheckInScreen` mounts (`useEffect`), and show "Attendance is not open yet" instead of the form when it's `false`. Whether *you* succeeded is answered by Exercise 6.1's own response (`201` vs `409`), not by this endpoint.
+
+Paste this into `features/attendance/api.ts` to start from:
+
+```ts title="features/attendance/api.ts (add) — starter"
+export async function attendanceOpen() {
+  // TODO: GET `${BASE}/status`
+  // TODO: return the `open` field off the parsed JSON, as a boolean
+}
+```
+
+<Hints hints={[
+  'This is a plain GET — no body, no headers to set.',
+  'Call it once, right when the screen mounts: `useEffect(() => { ... }, [])`.',
+  'The response JSON has one field you care about, `open` — wrap it in `Boolean()` in case it is ever missing.',
+]}>
+
+```ts title="features/attendance/api.ts (add) — fetch version"
+export async function attendanceOpen() {
+  const res = await fetch('https://<your-course-site-domain>/api/attendance/status');
+  const data = await res.json();
+  return Boolean(data.open);
+}
+```
+
+```ts title="features/attendance/api.ts (add) — Axios version"
+export async function attendanceOpen() {
+  const res = await api.get('/attendance/status'); // same `api` instance as Exercise 6.1
+  return Boolean(res.data.open);
+}
+```
+
+</Hints>
+
+</Task>
+
+<Task n="6.3" title="External API — look up a Pokémon" time="30 min">
+
+A REST API you don't control at all: [PokeAPI](https://pokeapi.co/docs/v2), no key required. Write `getPokemon(name)`, then build `PokemonScreen`: a text input, a search button, and — on success — the sprite image, the name, and its types. On a bad name, show an error message instead of crashing.
+
+Paste this into `features/external/api.ts` to start from:
+
+```ts title="features/external/api.ts — starter"
+export async function getPokemon(name: string) {
+  // TODO: GET https://pokeapi.co/api/v2/pokemon/<name, trimmed + lowercased>
+  // TODO: not found -> throw a friendly Error
+  // TODO: return { name, sprite, types } pulled from the response
+}
+```
+
+<Hints hints={[
+  'Build the URL from whatever the student typed, trimmed and lowercased — PokeAPI only accepts lowercase names.',
+  '`fetch` does not throw on a 404 — check `res.ok` yourself and throw your own error. Axios does throw on a bad status, so wrap that call in `try`/`catch` instead.',
+  'Pull `name`, `sprites.front_default` and the `types` array off the parsed JSON — map each type entry to its `.type.name`.',
+]}>
+
+```ts title="features/external/api.ts — fetch version"
+export async function getPokemon(name: string) {
+  const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${name.trim().toLowerCase()}`);
+  if (!res.ok) throw new Error('Not found — check the spelling.');
+  const data = await res.json();
+  return { name: data.name as string, sprite: data.sprites.front_default as string, types: data.types.map((t: any) => t.type.name as string) };
+}
+```
+
+```ts title="features/external/api.ts — Axios version"
+import axios from 'axios';
+
+export async function getPokemon(name: string) {
+  try {
+    const res = await axios.get(`https://pokeapi.co/api/v2/pokemon/${name.trim().toLowerCase()}`);
+    return { name: res.data.name as string, sprite: res.data.sprites.front_default as string, types: res.data.types.map((t: any) => t.type.name as string) };
+  } catch {
+    throw new Error('Not found — check the spelling.');
+  }
+}
+```
+
+</Hints>
+
+</Task>
+
+<Task n="6.4" title="Review your work" time="10 min">
+
+This lab is practice, not a hand-in — there's nothing to submit. Before you move on, check it against the live demos earlier in this part:
+
+- You can explain every HTTP verb and name one real use for each
+- You can explain what a query string is for
+- You know one reason to pick REST and one reason to pick GraphQL
+- You can explain why a synchronous call freezes the UI and an async one doesn't
+- You can explain one reason to pick Clerk and one reason to pick BetterAuth
+- You can explain one real difference between a `fetch` call and its Axios equivalent
+- Exercise 6.1 really checks you into attendance (watch for your TA opening the session)
+- Exercise 6.2 correctly hides the form when attendance is closed
+- Exercise 6.3 shows a real Pokémon's sprite, name and types — and handles a typo without crashing
+
+</Task>
+
+<Checkpoint title="Lab 05 complete">
+
+🌐 You can now explain and use REST, GraphQL, async JavaScript and two real auth options — and you built an app that talks to the real course attendance system.
+
+</Checkpoint>

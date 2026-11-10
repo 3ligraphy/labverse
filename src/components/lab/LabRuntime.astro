@@ -65,6 +65,24 @@
     update();
   }
 
+  /** "Hide tracker" / floating "Tracker" button: collapses the right-hand nav so the content re-centers wider. */
+  function trackerToggle() {
+    const doc = document.querySelector<HTMLElement>('.doc');
+    // interactive labs (02/03): .doc-aside IS the exercise tracker, not an optional ToC — never touch it here
+    if (!doc || doc.classList.contains('is-interactive')) return;
+    const hideBtn = document.querySelector<HTMLButtonElement>('[data-tracker-hide]');
+    const showBtn = document.querySelector<HTMLButtonElement>('[data-tracker-show]');
+    if (!hideBtn || !showBtn) return;
+    const KEY = 'lab-tracker-hidden';
+    const set = (hidden: boolean) => {
+      doc.classList.toggle('tracker-hidden', hidden);
+      try { localStorage.setItem(KEY, hidden ? '1' : '0'); } catch {}
+    };
+    set(localStorage.getItem(KEY) === '1');
+    hideBtn.addEventListener('click', () => set(true));
+    showBtn.addEventListener('click', () => set(false));
+  }
+
   /** hovering a legend item highlights the matching numbered marker (and vice versa) */
   function legends() {
     document.querySelectorAll<HTMLOListElement>('.mock-fig + ol, .legend-host + ol').forEach((ol) => {
@@ -83,4 +101,5 @@
   }
   onPageLoad( init);
   onPageLoad( initProgressUi);
+  onPageLoad( trackerToggle);
 </script>

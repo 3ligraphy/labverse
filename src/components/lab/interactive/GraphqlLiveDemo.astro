@@ -1,0 +1,150 @@
+---
+/**
+ * A lighter live demo than RestLiveDemo: one `query` (read) and one `mutation` (write),
+ * run against the same in-memory `todos` list — so the REST vs GraphQL comparison is apples-to-apples.
+ * Same code+phone-preview layout as the other Lab 02–05 live demos.
+ * <GraphqlLiveDemo />
+ */
+import { Code } from 'astro:components';
+import Device from '@/components/Device.astro';
+
+const QUERY_CODE = `query GetTodos {
+  todos {
+    id
+    title
+    done
+  }
+}`;
+
+const MUTATION_CODE = `mutation AddTodo($title: String!) {
+  addTodo(title: $title) {
+    id
+    title
+    done
+  }
+}`;
+
+const themes = { light: 'github-light', dark: 'github-dark-default' } as const;
+---
+<section class="gl" data-gl data-reveal aria-label="Live demo: GraphQL todos API">
+  <header class="gl-head">
+    <span class="gl-kind mono"><span class="gl-live-dot" aria-hidden="true"></span> Live demo</span>
+    <h4 class="gl-title">The same data, asked for in GraphQL</h4>
+    <div class="gl-toggle" role="tablist" aria-label="Operation">
+      <button type="button" class="gl-pill" data-gl-op="query" aria-selected="true">query</button>
+      <button type="button" class="gl-pill" data-gl-op="mutation" aria-selected="false">mutation</button>
+    </div>
+  </header>
+
+  <div class="gl-body">
+    <div class="gl-code">
+      <div class="gl-tabs"><span class="gl-tab mono" data-gl-tab>query.graphql</span></div>
+      <div class="gl-editor" data-gl-query><Code code={QUERY_CODE} lang="graphql" themes={themes} defaultColor={false} /></div>
+      <div class="gl-editor" data-gl-mutation hidden><Code code={MUTATION_CODE} lang="graphql" themes={themes} defaultColor={false} /></div>
+    </div>
+    <div class="gl-phone">
+      <Device light interactive label="Mini todos preview">
+        <div class="gl-screen" data-gl-screen>
+          <form class="gl-add" data-gl-add-form>
+            <input class="gl-input" type="text" placeholder="New todo…" data-gl-new maxlength="28" />
+            <button type="submit" class="gl-add-btn" title="mutation AddTodo">+</button>
+          </form>
+          <button type="button" class="gl-run" data-gl-run>▶ Run query</button>
+          <ul class="gl-list" data-gl-list></ul>
+        </div>
+      </Device>
+    </div>
+  </div>
+  <p class="gl-note">One endpoint, <code>/graphql</code>, answers both — you ask for exactly the fields you want. REST instead gives you whatever shape <code>/todos</code> returns.</p>
+</section>
+
+<script>
+  type Todo = { id: number; title: string; done: boolean };
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-gl]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      let todos: Todo[] = [
+        { id: 1, title: 'Read GraphQL docs', done: true },
+        { id: 2, title: 'Compare to REST', done: false },
+      ];
+      let nextId = 3;
+      let op: 'query' | 'mutation' = 'query';
+
+      const list = root.querySelector<HTMLElement>('[data-gl-list]')!;
+      const tab = root.querySelector<HTMLElement>('[data-gl-tab]')!;
+      const run = root.querySelector<HTMLButtonElement>('[data-gl-run]')!;
+
+      const paint = () => {
+        list.innerHTML = '';
+        for (const t of todos) {
+          const li = document.createElement('li');
+          li.className = 'gl-row';
+          li.innerHTML = `<span class="${t.done ? 'done' : ''}">${t.title}</span>`;
+          list.appendChild(li);
+        }
+      };
+
+      const setOp = (next: 'query' | 'mutation') => {
+        op = next;
+        root.querySelectorAll<HTMLButtonElement>('[data-gl-op]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.glOp === op)));
+        root.querySelector<HTMLElement>('[data-gl-query]')!.hidden = op !== 'query';
+        root.querySelector<HTMLElement>('[data-gl-mutation]')!.hidden = op !== 'mutation';
+        tab.textContent = op === 'query' ? 'query.graphql' : 'mutation.graphql';
+        run.textContent = op === 'query' ? '▶ Run query' : '▶ Send a title above to run the mutation';
+        run.hidden = op === 'mutation';
+      };
+
+      root.querySelectorAll<HTMLButtonElement>('[data-gl-op]').forEach((b) => b.addEventListener('click', () => setOp(b.dataset.glOp as 'query' | 'mutation')));
+      run.addEventListener('click', () => paint());
+
+      root.querySelector<HTMLFormElement>('[data-gl-add-form]')!.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = root.querySelector<HTMLInputElement>('[data-gl-new]')!;
+        const title = input.value.trim();
+        if (!title) return;
+        setOp('mutation');
+        todos = [...todos, { id: nextId++, title, done: false }];
+        input.value = '';
+        paint();
+      });
+
+      setOp('query');
+      paint();
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .gl { margin: 24px 0 32px; container-type: inline-size; }
+  .gl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-bottom: 10px; }
+  .gl-kind { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-text); font-weight: 600; }
+  .gl-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: gl-live 1.6s ease-in-out infinite; }
+  @keyframes gl-live { 50% { opacity: 0.25; } }
+  .gl-title { margin: 0 !important; flex: 1; font-family: var(--font-display); font-size: 1.05rem; letter-spacing: -0.01em; color: var(--text); }
+  .gl-toggle { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--r-full); background: var(--bg-2); border: 1px solid var(--line); }
+  .gl-pill { padding: 5px 12px; border-radius: var(--r-full); border: 0; background: transparent; font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer; font-family: var(--font-mono); }
+  .gl-pill[aria-selected='true'] { background: var(--accent); color: var(--accent-ink); }
+  .gl-body { display: grid; gap: 1px; grid-template-columns: minmax(0, 1fr); background: var(--line); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
+  @container (min-width: 760px) { .gl-body { grid-template-columns: minmax(0, 1fr) 260px; } }
+  .gl-code { display: flex; flex-direction: column; min-width: 0; background: var(--surface); }
+  .gl-tabs { padding: 8px 12px 0; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+  .gl-tab { display: inline-block; padding: 6px 10px; font-size: 12px; color: var(--text); background: var(--code-bg); border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; margin-bottom: -1px; }
+  .gl-editor { height: 360px; overflow: auto; background: var(--code-bg); }
+  .gl-editor :global(.astro-code) { margin: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; padding: 20px 24px !important; font-size: 13.5px !important; line-height: 1.75 !important; white-space: pre-wrap !important; word-break: break-word !important; }
+  .gl-phone { display: grid; place-items: center; padding: 20px 12px; background: radial-gradient(circle at 50% 40%, var(--accent-soft), transparent 62%), var(--bg-2); }
+  .gl-phone :global(.device) { --w: 220px; }
+  .gl-screen { position: absolute; inset: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 14px 12px; }
+  .gl-add { display: flex; gap: 6px; }
+  .gl-input { flex: 1; min-width: 0; padding: 7px 9px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 12px; }
+  .gl-add-btn { width: 30px; flex: none; border-radius: 8px; border: 0; background: #e535ab; color: #fff; font-weight: 700; }
+  .gl-run { padding: 7px 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; color: #0f172a; font-size: 12px; font-weight: 600; text-align: left; }
+  .gl-list { list-style: none; margin: 0 !important; padding: 0; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+  .gl-row { padding: 6px 8px; border-radius: 8px; background: #f1f5f9; font-size: 12px; color: #0f172a; }
+  .gl-row .done { text-decoration: line-through; color: #94a3b8; }
+  .gl-note { margin: 10px 0 0 !important; font-size: 13px; color: var(--text-3); }
+  .gl-note code { font-size: 12.5px; }
+  @media (prefers-reduced-motion: reduce) { .gl-live-dot { animation: none; } }
+</style>

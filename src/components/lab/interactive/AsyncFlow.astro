@@ -1,0 +1,152 @@
+---
+/**
+ * Sync vs async, animated with GSAP: three "tasks" run either back-to-back on one blocking
+ * lane, or concurrently while the UI heartbeat keeps beating. Same toggle+lane+code layout
+ * as StoreFlow (Lab 04).
+ * <AsyncFlow />
+ */
+const TASKS = ['Read file', 'Call API', 'Resize image'];
+
+const VARIANTS = {
+  sync: {
+    label: 'Synchronous',
+    code: "const a = readFileSync('a');   // blocks\nconst b = callApiSync('b');     // blocks\nconst c = resizeSync('c');       // blocks\n// UI is frozen for all three, back to back",
+    note: 'Each task blocks the thread — nothing else (not even a tap or a redraw) can happen until it finishes.',
+  },
+  async: {
+    label: 'Asynchronous',
+    code: 'const [a, b, c] = await Promise.all([\n  readFile(\'a\'),\n  callApi(\'b\'),\n  resize(\'c\'),\n]);\n// the thread is free while all three wait',
+    note: 'Each task hands off the wait (to the OS, the network, a worker) and the thread stays free — the UI keeps responding.',
+  },
+} as const;
+---
+<figure class="af" data-af data-reveal data-free>
+  <div class="af-head">
+    <p class="af-k mono">Sync vs async</p>
+    <div class="af-toggle" role="tablist" aria-label="Mode">
+      <button type="button" class="af-pill" data-af-mode="sync" aria-selected="true">Synchronous</button>
+      <button type="button" class="af-pill" data-af-mode="async" aria-selected="false">Asynchronous</button>
+    </div>
+  </div>
+
+  <div class="af-lane-wrap">
+    <div class="af-lane" data-af-lane>
+      {TASKS.map((label, i) => (
+        <div class="af-track" data-af-track={i}>
+          <span class="af-tlabel mono">{label}</span>
+          <div class="af-bar-rail"><span class="af-bar" data-af-bar={i}></span></div>
+        </div>
+      ))}
+    </div>
+    <div class="af-ui">
+      <span class="af-ui-dot" data-af-ui aria-hidden="true"></span>
+      <span class="af-ui-label mono">UI thread — keeps beating only if it's free</span>
+    </div>
+  </div>
+
+  <pre class="af-pre" data-af-code></pre>
+  <p class="af-note" data-af-note></p>
+
+  <button type="button" class="btn btn-primary btn-sm af-play" data-af-play>▶ Run</button>
+
+  <script type="application/json" data-af-variants set:html={JSON.stringify(VARIANTS)} />
+</figure>
+
+<script>
+  import { gsap } from 'gsap';
+
+  type Variant = { label: string; code: string; note: string };
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-af]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const variants = JSON.parse(root.querySelector('[data-af-variants]')!.textContent!) as Record<'sync' | 'async', Variant>;
+      const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+      const bars = Array.from(root.querySelectorAll<HTMLElement>('[data-af-bar]'));
+      const uiDot = $('[data-af-ui]');
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let mode: 'sync' | 'async' = 'sync';
+      let playing = false;
+      let heartbeat: ReturnType<typeof gsap.to> | null = null;
+
+      const paintVariant = () => {
+        const v = variants[mode];
+        $('[data-af-code]').textContent = v.code;
+        $('[data-af-note]').textContent = v.note;
+        root.querySelectorAll<HTMLButtonElement>('[data-af-mode]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.afMode === mode)));
+      };
+
+      const play = () => {
+        if (playing) return;
+        playing = true;
+        const btn = $('[data-af-play]') as HTMLButtonElement;
+        btn.disabled = true;
+        const done = () => {
+          playing = false;
+          btn.disabled = false;
+          btn.textContent = '↺ Run again';
+          heartbeat?.kill();
+          gsap.set(uiDot, { opacity: 1 });
+        };
+
+        gsap.set(bars, { scaleX: 0 });
+        if (reduced) {
+          gsap.set(bars, { scaleX: 1 });
+          done();
+          return;
+        }
+
+        const dur = 0.8;
+        heartbeat = gsap.to(uiDot, { opacity: 0.25, duration: 0.45, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+
+        if (mode === 'sync') {
+          // one task at a time; the UI heartbeat is paused for the whole run — frozen, not beating.
+          heartbeat.pause();
+          gsap.set(uiDot, { opacity: 1 });
+          const tl = gsap.timeline({ onComplete: done });
+          bars.forEach((b, i) => tl.to(b, { scaleX: 1, duration: dur, ease: 'power1.inOut' }, i === 0 ? 0 : '>'));
+        } else {
+          // all three start together; the heartbeat keeps running the whole time.
+          const tl = gsap.timeline({ onComplete: done });
+          bars.forEach((b, i) => tl.to(b, { scaleX: 1, duration: dur * (1 + i * 0.25), ease: 'power1.inOut' }, 0));
+        }
+      };
+
+      root.querySelectorAll<HTMLButtonElement>('[data-af-mode]').forEach((b) =>
+        b.addEventListener('click', () => {
+          if (playing) return;
+          mode = b.dataset.afMode as 'sync' | 'async';
+          gsap.set(bars, { scaleX: 0 });
+          paintVariant();
+        }),
+      );
+      $('[data-af-play]').addEventListener('click', play);
+      paintVariant();
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .af { margin: 24px 0 32px; display: grid; gap: 16px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .af-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .af-k { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 !important; }
+  .af-toggle { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--r-full); background: var(--bg-2); border: 1px solid var(--line); }
+  .af-pill { padding: 5px 12px; border-radius: var(--r-full); border: 0; background: transparent; font-size: 12.5px; font-weight: 600; color: var(--text-2); cursor: pointer; transition: background .2s var(--ease-out), color .2s; }
+  .af-pill[aria-selected='true'] { background: var(--accent); color: var(--accent-ink); }
+
+  .af-lane-wrap { display: grid; gap: 10px; }
+  .af-lane { display: grid; gap: 8px; }
+  .af-track { display: grid; grid-template-columns: 100px 1fr; align-items: center; gap: 10px; }
+  .af-tlabel { font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .af-bar-rail { height: 16px; border-radius: 6px; background: var(--bg-2); border: 1px solid var(--line-2); overflow: hidden; }
+  .af-bar { display: block; height: 100%; width: 100%; transform-origin: left; transform: scaleX(0); border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent-text)); }
+  .af-ui { display: flex; align-items: center; gap: 8px; padding-top: 4px; border-top: 1px dashed var(--line-2); }
+  .af-ui-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); flex: none; }
+  .af-ui-label { font-size: 11px; color: var(--text-3); }
+
+  .af-pre { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); font: 12px/1.6 var(--font-mono); color: var(--accent-text); white-space: pre-wrap; overflow-wrap: anywhere; min-height: 44px; }
+  .af-note { margin: 0 !important; font-size: 13px; color: var(--text-3); }
+  .af-play { justify-self: start; }
+</style>

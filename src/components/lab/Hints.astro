@@ -1,0 +1,77 @@
+---
+/**
+ * Progressive hints + a hidden solution — same UX as the Lab 02/03 interactive hint button
+ * ("💡 Hint X of N", unlocked one at a time) plus a separate "Show solution" reveal for the
+ * code the student would otherwise see immediately. The solution goes in the default slot.
+ * <Hints hints={['…', '…', '…']}>
+ *   ```ts
+ *   // the answer
+ *   ```
+ * </Hints>
+ */
+interface Props { hints: string[] }
+const { hints } = Astro.props;
+---
+<div class="hr" data-hr data-reveal>
+  <div class="hr-row">
+    <button type="button" class="btn btn-ghost btn-sm hr-hint-btn" data-hr-hint-btn>💡 Hint 1 of {hints.length}</button>
+    <button type="button" class="btn btn-ghost btn-sm hr-solution-btn" data-hr-solution-btn>Show solution</button>
+  </div>
+  <ol class="hr-hints" data-hr-hints></ol>
+  <div class="hr-solution" data-hr-solution hidden>
+    <slot />
+  </div>
+  <script type="application/json" data-hr-hints-data set:html={JSON.stringify(hints)} />
+</div>
+
+<script>
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-hr]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const hints = JSON.parse(root.querySelector('[data-hr-hints-data]')!.textContent!) as string[];
+      const hintBtn = root.querySelector<HTMLButtonElement>('[data-hr-hint-btn]')!;
+      const solutionBtn = root.querySelector<HTMLButtonElement>('[data-hr-solution-btn]')!;
+      const hintsEl = root.querySelector<HTMLElement>('[data-hr-hints]')!;
+      const solution = root.querySelector<HTMLElement>('[data-hr-solution]')!;
+      let shown = 0;
+
+      const updateHintBtn = () => {
+        hintBtn.textContent = shown >= hints.length ? 'All hints shown' : `💡 Hint ${shown + 1} of ${hints.length}`;
+        hintBtn.disabled = shown >= hints.length;
+      };
+
+      hintBtn.addEventListener('click', () => {
+        if (shown >= hints.length) return;
+        const li = document.createElement('li');
+        li.className = 'hr-hint';
+        li.innerHTML = `<span class="hr-num" aria-hidden="true">${shown + 1}</span><span class="hr-text">${hints[shown]}</span>`;
+        hintsEl.appendChild(li);
+        shown += 1;
+        updateHintBtn();
+      });
+
+      solutionBtn.addEventListener('click', () => {
+        solution.hidden = !solution.hidden;
+        solutionBtn.textContent = solution.hidden ? 'Show solution' : 'Hide solution';
+      });
+
+      updateHintBtn();
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .hr { margin: 16px 0; display: grid; gap: 10px; }
+  .hr-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hr-hints { list-style: none; padding: 0 !important; margin: 0 !important; display: grid; gap: 8px; }
+  .hr-hints:empty { display: none; }
+  .hr-hint { display: grid; grid-template-columns: 26px 1fr; gap: 12px; align-items: baseline; margin: 0 !important; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent-text) 25%, transparent); font-size: 14px; color: var(--text); animation: hr-in 350ms var(--ease-out); }
+  .hr-num { align-self: start; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 700 12px var(--font-mono); background: var(--accent); color: var(--accent-ink); }
+  .hr-text { padding-top: 2px; }
+  .hr-solution { padding-top: 2px; }
+  .hr-solution[hidden] { display: none; }
+  @keyframes hr-in { from { opacity: 0; transform: translateY(-4px); } }
+  @media (prefers-reduced-motion: reduce) { .hr-hint { animation: none; } }
+</style>
