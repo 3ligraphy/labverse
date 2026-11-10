@@ -1,0 +1,42 @@
+---
+/**
+ * BUENOVA Code — the browser IDE. A standalone application page (no site navbar or footer).
+ * The page is cross-origin isolated (COOP + COEP) because the in-browser runtime (WebContainers) and the
+ * debuggers need SharedArrayBuffer. Client code lives in src/ide.
+ */
+import '@/ide/ide.css';
+
+export const prerender = false;
+Astro.response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+Astro.response.headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="color-scheme" content="dark light" />
+    <title>BUENOVA Code</title>
+    <link rel="icon" href="/favicon.svg" />
+  </head>
+  <body>
+    <div class="ide-loading" id="ide-loading" role="status"><b>B</b><span>Loading BUENOVA Code…</span></div>
+    <div id="ide"></div>
+    <noscript>BUENOVA Code needs JavaScript.</noscript>
+    <script>
+      import { boot } from '@/ide/app';
+      const loading = document.getElementById('ide-loading')!;
+      try {
+        const me = await fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const u = me?.user ? { name: String(me.user.name ?? ''), email: String(me.user.email ?? ''), role: String(me.user.role ?? 'student') } : null;
+        await boot(document.getElementById('ide')!, u);
+        loading.remove();
+      } catch (error) {
+        console.error(error);
+        loading.querySelector('span')!.textContent = `BUENOVA Code could not start: ${error instanceof Error ? error.message : error}`;
+      }
+    </script>
+  </body>
+</html>

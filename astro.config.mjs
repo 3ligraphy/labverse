@@ -32,7 +32,28 @@ export default defineConfig({
   // Static site; only /admin and /api/* run on the server (they set `prerender = false`).
   adapter: vercel({ maxDuration: 60 }),
   // builds public/lab-runtime/runtime.js (the interactive labs' preview) and rebuilds it in dev
-  vite: { plugins: [labRuntime()] },
+  vite: {
+    plugins: [
+      labRuntime(),
+      {
+        // dev only: the IDE page is cross-origin isolated, so its scripts and workers need the same headers
+        // (in production vercel.json sets them on /ide and /_astro/*)
+        name: 'ide-isolation-headers',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            const dest = req.headers['sec-fetch-dest'];
+            const page = dest === 'document' || dest === 'iframe';
+            if (!page || (req.url ?? '').startsWith('/ide')) {
+              res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+              res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+            }
+            next();
+          });
+        },
+      },
+    ],
+    optimizeDeps: { exclude: ['@webcontainer/api', 'monaco-editor'] },
+  },
   markdown: {
     shikiConfig: {
       themes: { light: 'github-light', dark: 'github-dark-default' },
