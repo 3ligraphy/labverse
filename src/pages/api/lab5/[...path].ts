@@ -5,6 +5,7 @@
  *   GET  /api/lab5/students?present=true    → only the present ones (a query string filters)
  *   GET  /api/lab5/students/2               → one student, or 404 { error: 'not-found' }
  *   POST /api/lab5/echo  { …any JSON… }      → 201 { ok: true, received: <your JSON>, at }
+ *                        (415 without the Content-Type: application/json header, 400 when the body is not JSON)
  *   anything else                           → 404 { error: 'not-found' }
  */
 import type { APIRoute } from 'astro';
@@ -44,6 +45,10 @@ export const POST: APIRoute = async ({ params, request }) => {
   if (path !== 'echo') return notFound(`/api/lab5/${path}`);
   const text = await request.text();
   if (text.length > 20_000) return json({ error: 'too-large', message: 'Send less than 20 KB.' }, 413);
+  // like most APIs: the body is read as JSON only when the request says it is JSON
+  if (!/application\/json/i.test(request.headers.get('content-type') ?? '')) {
+    return json({ error: 'not-json', message: "Add the header 'Content-Type': 'application/json' so the server reads the body as JSON.", receivedText: text.slice(0, 200) }, 415);
+  }
   let received: unknown;
   try {
     received = JSON.parse(text);

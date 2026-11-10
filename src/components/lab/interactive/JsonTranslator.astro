@@ -1,0 +1,157 @@
+---
+/**
+ * Lab 05 · Part 5 — the same student as a JavaScript object and as JSON text. Pick a kind of value to light it up
+ * in both, run JSON.stringify / JSON.parse, and read `.name` from each to see why text must be parsed first.
+ * <JsonTranslator />
+ */
+type Tok = { t: string; k?: 'key' | 'string' | 'number' | 'boolean' | 'array' | 'object' | 'p' };
+const P = (t: string): Tok => ({ t, k: 'p' });
+const OBJ: Tok[][] = [
+  [{ t: 'const ' }, { t: 'student' }, { t: ' = ' }, { t: '{', k: 'object' }],
+  [{ t: '  ' }, { t: 'name', k: 'key' }, P(': '), { t: "'Mona Adel'", k: 'string' }, P(',')],
+  [{ t: '  ' }, { t: 'year', k: 'key' }, P(': '), { t: '2', k: 'number' }, P(',')],
+  [{ t: '  ' }, { t: 'present', k: 'key' }, P(': '), { t: 'true', k: 'boolean' }, P(',')],
+  [{ t: '  ' }, { t: 'courses', k: 'key' }, P(': '), { t: "['Mobile', 'Web']", k: 'array' }, P(',')],
+  [{ t: '  ' }, { t: 'address', k: 'key' }, P(': '), { t: "{ city: 'Cairo' }", k: 'object' }, P(',')],
+  [{ t: '}', k: 'object' }, { t: ';' }],
+];
+const JSON_TOKS: Tok[] = [
+  { t: '{', k: 'object' }, { t: '"name"', k: 'key' }, P(':'), { t: '"Mona Adel"', k: 'string' }, P(','),
+  { t: '"year"', k: 'key' }, P(':'), { t: '2', k: 'number' }, P(','),
+  { t: '"present"', k: 'key' }, P(':'), { t: 'true', k: 'boolean' }, P(','),
+  { t: '"courses"', k: 'key' }, P(':'), { t: '["Mobile","Web"]', k: 'array' }, P(','),
+  { t: '"address"', k: 'key' }, P(':'), { t: '{"city":"Cairo"}', k: 'object' }, { t: '}', k: 'object' },
+];
+const KINDS = [
+  { k: 'key', label: 'key', text: 'The label of a value. In JSON it is always in double quotes. You read the value with a dot: `student.name`.' },
+  { k: 'string', label: 'string', text: 'Text. JSON uses double quotes only; JavaScript code may use single quotes.' },
+  { k: 'number', label: 'number', text: 'A number, written without quotes, so you can calculate with it.' },
+  { k: 'boolean', label: 'boolean', text: '`true` or `false`, without quotes: a yes / no answer.' },
+  { k: 'array', label: 'array', text: 'A list in square brackets. `student.courses[0]` is the first item (counting starts at 0).' },
+  { k: 'object', label: 'object', text: 'Keys and values in curly braces. An object can hold other objects: `student.address.city`.' },
+];
+---
+<figure class="jt" data-jt data-reveal data-free>
+  <div class="jt-head">
+    <p class="jt-k mono">One student, two forms</p>
+    <p class="jt-sub">Choose a kind of value: it lights up in both forms.</p>
+  </div>
+
+  <div class="jt-kinds" role="toolbar" aria-label="Kinds of values">
+    {KINDS.map((x) => <button type="button" class={`jt-kind k-${x.k}`} data-jt-kind={x.k} aria-pressed="false">{x.label}</button>)}
+  </div>
+  <p class="jt-explain" data-jt-explain aria-live="polite">Every value in JSON is one of six kinds. Choose one above.</p>
+
+  <div class="jt-panes">
+    <section class="jt-pane" data-jt-pane="obj" aria-label="JavaScript object">
+      <p class="jt-pane-k mono">In your code: a JavaScript <b>object</b></p>
+      <pre class="jt-pre">{OBJ.map((line) => <span class="jt-line">{line.map((tok) => tok.k && tok.k !== 'p' ? <span class={`jt-tok k-${tok.k}`} data-kind={tok.k}>{tok.t}</span> : tok.t)}{'\n'}</span>)}</pre>
+    </section>
+    <div class="jt-mid" aria-hidden="true">
+      <span class="jt-arrow" data-jt-arrow>⇄</span>
+    </div>
+    <section class="jt-pane" data-jt-pane="json" aria-label="JSON text">
+      <p class="jt-pane-k mono">On the network: <b>JSON text</b> (one string)</p>
+      <pre class="jt-pre jt-wrap">{JSON_TOKS.map((tok) => tok.k && tok.k !== 'p' ? <span class={`jt-tok k-${tok.k}`} data-kind={tok.k}>{tok.t}</span> : tok.t)}</pre>
+    </section>
+  </div>
+
+  <div class="jt-actions">
+    <button type="button" class="btn btn-sm jt-act" data-jt-run="stringify"><code>JSON.stringify(student)</code> → text</button>
+    <button type="button" class="btn btn-sm jt-act" data-jt-run="parse">text → <code>JSON.parse(text)</code></button>
+    <button type="button" class="btn btn-sm jt-act" data-jt-run="read-obj"><code>student.name</code></button>
+    <button type="button" class="btn btn-sm jt-act" data-jt-run="read-text"><code>text.name</code></button>
+  </div>
+  <pre class="jt-console" data-jt-console aria-live="polite">// press a button to run it</pre>
+
+  <script type="application/json" data-jt-kinds set:html={JSON.stringify(KINDS)} />
+</figure>
+
+<script>
+  import { gsap } from 'gsap';
+
+  const RUNS: Record<string, { pane: 'obj' | 'json'; lines: string[] }> = {
+    stringify: { pane: 'json', lines: ['> const text = JSON.stringify(student)', '> typeof text', "'string'", '// one line of text: double quotes around every key and string, no spaces'] },
+    parse: { pane: 'obj', lines: ['> const student = JSON.parse(text)', '> typeof student', "'object'", '// keys and values again: now the dot works'] },
+    'read-obj': { pane: 'obj', lines: ['> student.name', "'Mona Adel'", '> student.courses[1]', "'Web'", '> student.address.city', "'Cairo'"] },
+    'read-text': { pane: 'json', lines: ['> text.name', 'undefined', '// text is a string: it has no key called name.', '// Parse it first: JSON.parse(text).name → \'Mona Adel\''] },
+  };
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-jt]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const kinds = JSON.parse(root.querySelector('[data-jt-kinds]')!.textContent!) as { k: string; label: string; text: string }[];
+      const explain = root.querySelector<HTMLElement>('[data-jt-explain]')!;
+      const out = root.querySelector<HTMLElement>('[data-jt-console]')!;
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const md = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      root.querySelectorAll<HTMLButtonElement>('[data-jt-kind]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const k = b.dataset.jtKind!;
+          const on = b.getAttribute('aria-pressed') !== 'true';
+          root.querySelectorAll<HTMLButtonElement>('[data-jt-kind]').forEach((x) => x.setAttribute('aria-pressed', String(on && x === b)));
+          root.querySelectorAll<HTMLElement>('.jt-tok').forEach((t) => t.classList.toggle('lit', on && t.dataset.kind === k));
+          root.classList.toggle('dim', on);
+          const x = kinds.find((y) => y.k === k)!;
+          explain.innerHTML = on ? `<b>${x.label}</b>: ${md(x.text)}` : 'Every value in JSON is one of six kinds. Choose one above.';
+          if (on && !reduced) gsap.fromTo(root.querySelectorAll(`.jt-tok[data-kind="${k}"]`), { y: -3 }, { y: 0, duration: 0.35, ease: 'back.out(3)', stagger: 0.04 });
+        }),
+      );
+
+      let typing: ReturnType<typeof setTimeout>[] = [];
+      root.querySelectorAll<HTMLButtonElement>('[data-jt-run]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const run = RUNS[b.dataset.jtRun!];
+          typing.forEach(clearTimeout);
+          typing = [];
+          const pane = root.querySelector<HTMLElement>(`[data-jt-pane="${run.pane}"]`)!;
+          if (!reduced) {
+            gsap.fromTo(pane, { boxShadow: '0 0 0 0 var(--accent)' }, { boxShadow: '0 0 0 3px var(--accent)', duration: 0.25, yoyo: true, repeat: 1 });
+            gsap.fromTo(root.querySelector('[data-jt-arrow]'), { rotate: 0 }, { rotate: run.pane === 'json' ? 180 : -180, duration: 0.5, ease: 'power2.out' });
+          }
+          out.textContent = '';
+          run.lines.forEach((line, i) => {
+            const show = () => { out.textContent += (out.textContent ? '\n' : '') + line; };
+            if (reduced) show();
+            else typing.push(setTimeout(show, i * 280));
+          });
+        }),
+      );
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .jt { margin: 24px 0 32px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .jt-head { display: grid; gap: 2px; }
+  .jt-k { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 !important; }
+  .jt-sub { margin: 0 !important; color: var(--text-2); font-size: 14px; }
+  .jt-kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+  .jt-kind { padding: 5px 12px; border-radius: var(--r-full); border: 1px solid var(--c); background: transparent; color: var(--c); font: 600 12.5px/1 var(--font-mono); cursor: pointer; transition: background .2s, color .2s; }
+  .jt-kind[aria-pressed='true'] { background: var(--c); color: #0a0c0f; }
+  .jt-explain { margin: 0 !important; min-height: 22px; font-size: 14px; color: var(--text-2); }
+  .jt-panes { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 8px; align-items: stretch; }
+  .jt-pane { display: grid; align-content: start; gap: 6px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); min-width: 0; }
+  .jt-pane-k { margin: 0 !important; font-size: 11px; color: var(--text-3); }
+  .jt-pane-k b { color: var(--text); }
+  .jt-pre { margin: 0; font: 12.5px/1.65 var(--font-mono); color: var(--text-2); white-space: pre; overflow-x: auto; }
+  .jt-wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .jt-mid { display: grid; place-items: center; }
+  .jt-arrow { font-size: 22px; color: var(--accent-text); display: inline-block; }
+  .jt-tok { color: var(--c); border-radius: 4px; transition: background .2s, opacity .2s, color .2s; }
+  .jt.dim .jt-tok:not(.lit) { opacity: 0.35; }
+  .jt-tok.lit { background: color-mix(in srgb, var(--c) 22%, transparent); outline: 1px solid color-mix(in srgb, var(--c) 60%, transparent); }
+  .k-key { --c: #ff8ad8; } .k-string { --c: #c8ff4d; } .k-number { --c: #ffb547; } .k-boolean { --c: #5ee0d2; } .k-array { --c: #7cb1ff; } .k-object { --c: #b69cff; }
+  :root[data-theme='light'] .k-key { --c: #b5179e; } :root[data-theme='light'] .k-string { --c: #3f7d0a; } :root[data-theme='light'] .k-number { --c: #b45309; }
+  :root[data-theme='light'] .k-boolean { --c: #0f766e; } :root[data-theme='light'] .k-array { --c: #1d4ed8; } :root[data-theme='light'] .k-object { --c: #6d28d9; }
+  .jt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .jt-act code { font-size: 12px; }
+  .jt-console { margin: 0; min-height: 96px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: #0c0f13; color: #c8ff4d; font: 12.5px/1.6 var(--font-mono); white-space: pre-wrap; }
+  @media (max-width: 720px) {
+    .jt-panes { grid-template-columns: minmax(0, 1fr); }
+    .jt-mid { transform: rotate(90deg); height: 28px; }
+  }
+</style>

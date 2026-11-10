@@ -53,6 +53,8 @@ export default defineConfig({
       },
     ],
     optimizeDeps: { exclude: ['@webcontainer/api', 'monaco-editor'] },
+    // dev only: the lab previews (sandboxed iframes, origin "null") can call the local APIs, as they call the real ones
+    server: { cors: { origin: '*' } },
   },
   markdown: {
     shikiConfig: {

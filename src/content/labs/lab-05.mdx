@@ -1,11 +1,12 @@
 ---
 number: 5
 title: 'REST & GraphQL, Async JS, and Auth — Build a Real Attendance App'
-description: 'Learn REST and GraphQL (every HTTP verb, query params), sync vs async JavaScript, and Clerk vs BetterAuth — then build a small Expo app that checks you into the real class attendance system.'
+description: 'Learn REST and GraphQL (every HTTP verb, query params), sync vs async JavaScript, and Clerk vs BetterAuth — then build a small Expo app that checks you into the real class attendance system. Before the Expo app, 13 checked exercises in the browser take you step by step from JSON to a real check-in.'
 difficulty: Intermediate
-estimatedTime: '4 hours 15 min'
+estimatedTime: '6 hours 50 min'
 skills: [REST APIs, GraphQL, HTTP methods, Async JavaScript, Authentication, fetch, Axios]
 roadmapStage: data
+interactive: true
 objectives:
   - Explain every HTTP verb (GET, POST, PUT, PATCH, DELETE) and when to use each
   - Read and write a query string (?key=value) and know what it's for
@@ -13,6 +14,7 @@ objectives:
   - Explain the difference between synchronous and asynchronous code, and when each fits
   - Compare Clerk and BetterAuth and choose the right one for a given app
   - Call a real backend from an Expo app with fetch, or with Axios if you prefer it — POST, GET, and an external API
+  - Read JSON, send GET and POST requests, and show loading and error states, step by step in 13 checked exercises — the last one checks you in for real
 prerequisites:
   - 'Lab 04 completed: Expo Router, feature-first folders, global state'
   - 'A **new, empty folder** for this lab — this is a standalone project'
@@ -159,7 +161,341 @@ export const auth = betterAuth({
 
 <AuthCompareDemo />
 
-<Part n="5" title="Project setup" time="15 min" />
+<Part n="5" title="Data your app can read: objects and JSON" time="35 min" />
+
+Parts 5 to 8 build the attendance check-in step by step: first the data a server sends, then a request, then waiting for the answer, then sending data. Every exercise runs here in the browser, in the phone preview, and is checked automatically. Your progress is saved. **The last exercise (13) checks you in for real.**
+
+### Objects: values with names
+
+An **object** groups values under names. Each name is a **key**, and each key has a **value**. You read a value with a dot: `object.key`.
+
+```tsx title="an object"
+const student = { name: 'Mona Adel', year: 2, present: true };
+
+student.name;     // 'Mona Adel'  ← the value stored under the key "name"
+student.year;     // 2
+student.present;  // true
+student.age;      // undefined   ← this key does not exist
+```
+
+### Arrays: lists of values
+
+An **array** is a list in square brackets. Each item has a position, called its **index**. Counting starts at 0.
+
+```tsx title="an array"
+const courses = ['Mobile', 'Web', 'AI'];
+
+courses[0];      // 'Mobile'  ← index 0 is the first item
+courses[2];      // 'AI'
+courses.length;  // 3         ← how many items
+```
+
+An array can hold objects. This is the shape of almost every list an API sends: a class list, a list of products, a list of messages.
+
+```tsx title="an array of objects"
+const students = [
+  { id: 1, name: 'Mona Adel', present: true },
+  { id: 2, name: 'Omar Khaled', present: false },
+];
+
+students[1].name;  // 'Omar Khaled'
+students.length;   // 2
+```
+
+### JSON: an object written as text
+
+A server cannot send a JavaScript object over the internet. It sends **text**. **JSON** (JavaScript Object Notation) is the format of that text. It looks like an object, with stricter rules:
+
+<Cards cols={3} items={[
+  { icon: 'file', title: 'Keys in double quotes', text: '`{"name": "Mona"}`, never `{name: "Mona"}`.' },
+  { icon: 'file', title: 'Strings in double quotes', text: '`"Mona"`, never `\'Mona\'`. Single quotes make the text invalid.' },
+  { icon: 'close', title: 'No comments, no extra commas', text: 'JSON is only data: nothing after the last item, no `// notes`.' },
+]} />
+
+Two functions move between the two forms:
+
+- `JSON.stringify(object)` turns an object into JSON **text**. Your app uses it to **send** data.
+- `JSON.parse(text)` turns JSON text into an **object**. Your app uses it to **read** data it received.
+
+<JsonTranslator />
+
+```tsx title="the two directions"
+const student = { name: 'Mona Adel', present: true };
+
+const text = JSON.stringify(student);  // '{"name":"Mona Adel","present":true}'  ← a string
+text.name;                             // undefined: a string has no keys
+
+const again = JSON.parse(text);        // an object again
+again.name;                            // 'Mona Adel'
+```
+
+Try it in a live example. Change the code: the phone updates as you type.
+
+<Demo id="json-to-screen" />
+
+Now three small exercises, then a bigger one.
+
+<Exercise id="lab-05--json-parts" />
+
+<Exercise id="lab-05--json-predict" />
+
+<Exercise id="lab-05--json-parse" />
+
+### Many objects on the screen: FlatList
+
+To show an array of objects, React Native uses **`FlatList`** (you met it in Lab 02). It needs three props:
+
+```tsx title="FlatList, prop by prop"
+<FlatList
+  data={students}                                       // the array to show
+  keyExtractor={(s) => String(s.id)}                    // a unique text for each row
+  renderItem={({ item }) => <Text>{item.name}</Text>}  // draws ONE row; item is one student
+/>
+```
+
+`renderItem` runs once for every item in `data`. Whatever it returns is one row on the screen.
+
+<Exercise id="lab-05--json-list" />
+
+<Checkpoint>
+
+You can now read an object (`student.name`), an array (`students[0]`) and JSON text (`JSON.parse(text)`), and draw a list. Next: get that JSON from a real server.
+
+</Checkpoint>
+
+<Part n="6" title="What is an API? Requests and responses" time="40 min" />
+
+### What an API is
+
+Your app does not keep the class list itself. The list lives on a **server**: a computer on the internet that keeps data and runs code. Your app asks the server for data, or sends data to it.
+
+An **API** (Application Programming Interface) is the list of addresses (URLs) a server offers, and the rules for each one: what to send, and what comes back.
+
+<Cards cols={3} items={[
+  { icon: 'cmd', title: 'Client', text: 'Your app. It sends **requests** and shows the answers.' },
+  { icon: 'cloud', title: 'Server', text: 'A computer on the internet. It keeps the data and sends **responses**.' },
+  { icon: 'link', title: 'API', text: 'The URLs the server offers and the rules for each one.' },
+]} />
+
+### One API call, step by step
+
+Press **Next** to follow one request from the phone to the server and back. The code line that runs at each step lights up.
+
+<ApiCallFlow />
+
+### The parts of a request
+
+A request has a **method**, a **URL**, and sometimes **headers** and a **body**.
+
+<Explain parts={[['GET', 'the method: read data and change nothing'], ['https://labverse-indol.vercel.app', 'the server'], ['/api/lab5/students', 'the path: which data'], ['?present=true', 'the query string: a filter (Part 1)']]} />
+
+- **Method**: what kind of action. `GET` reads, `POST` sends (Part 1 has all of them).
+- **URL**: the full address: the server, then the path, then an optional query string.
+- **Headers**: extra information about the request, for example "the body is JSON".
+- **Body**: the data you send. A `GET` has no body. A `POST` usually has one.
+
+This lab has a **practice API** on the course server. It never stores anything, so call it as often as you like:
+
+<Cards cols={2} items={[
+  { tag: 'GET', icon: 'search', title: '/api/lab5/students', text: 'All 5 students, as a JSON array.' },
+  { tag: 'GET', icon: 'search', title: '/api/lab5/students?present=true', text: 'Only the present students. `?present=false` gives the absent ones.' },
+  { tag: 'GET', icon: 'search', title: '/api/lab5/students/2', text: 'One student by id. An id that does not exist gives 404.' },
+  { tag: 'POST', icon: 'sparkle', title: '/api/lab5/echo', text: 'Send any JSON: the server answers with exactly what it received.' },
+]} />
+
+The full address starts with `https://labverse-indol.vercel.app`, for example `https://labverse-indol.vercel.app/api/lab5/students`. Open it in a new browser tab: you see the JSON the server sends.
+
+### The parts of a response
+
+The server always answers with a **status code** (a three-digit number that says how the request went) and usually a **body** (the data, as JSON text).
+
+<Cards cols={3} items={[
+  { tone: 'good', icon: 'sparkle', title: '2xx — success', points: ['**200** OK: here is what you asked for', '**201** Created: something new was saved'] },
+  { icon: 'wrench', title: '4xx — fix your request', points: ['**400** Bad request: the data is wrong', '**404** Not found: nothing at this URL'] },
+  { icon: 'close', title: '5xx — the server has a problem', points: ['**500** Server error: the server broke', '**503** Unavailable: closed for now'] },
+]} />
+
+<Exercise id="lab-05--call-order" />
+
+<Exercise id="lab-05--status-match" />
+
+### fetch: your first request in code
+
+`fetch` is built into JavaScript. It sends a request and gives you the response. Read this code line by line:
+
+```tsx title="a GET request with fetch"
+async function loadAll() {
+  const res = await fetch('https://labverse-indol.vercel.app/api/lab5/students'); // 1
+  const data = await res.json();                                                // 2
+  setStudents(data);                                                            // 3
+}
+```
+
+1. `fetch(url)` sends a **GET** request to the URL. `await` waits until the response arrives. `res` is the response: `res.status` is the status code, `res.ok` is `true` for 200–299.
+2. `res.json()` reads the body and turns the JSON text into an array. Reading takes time too, so it also needs `await`. (It does the `JSON.parse` step of Part 5 for you.)
+3. `setStudents(data)` saves the array in state. React draws the screen again, now with the list.
+
+To load the data once when the screen opens, call the function inside `useEffect` with an empty list `[]` (Lab 02):
+
+```tsx title="load once, when the screen opens"
+useEffect(() => {
+  loadAll();
+}, []);
+```
+
+<Demo id="first-fetch" />
+
+<Exercise id="lab-05--first-get" />
+
+<Checkpoint>
+
+Your app now talks to a real server: method + URL out, status code + JSON back. Next: what happens while it waits, and when something goes wrong.
+
+</Checkpoint>
+
+<Part n="7" title="Waiting for the answer: await and errors" time="35 min" />
+
+### async and await
+
+A request takes time: often 0.1 to 2 seconds, sometimes more on slow Wi-Fi. `fetch` does not give you the response at once. It gives you a **promise**: a value that arrives later.
+
+- `await` waits for a promise and gives you its value.
+- You can write `await` only inside a function marked `async`.
+- While one function waits, the rest of the app keeps working: buttons and scrolling still respond (you saw this in Part 3).
+
+```tsx title="what await changes"
+const res = fetch(url);         // no await: res is a promise, not the response yet
+const res = await fetch(url);   // await: res is the response
+```
+
+### Two kinds of failure
+
+A request can fail in two different ways, and your code must handle both:
+
+<Cards cols={2} items={[
+  { icon: 'wrench', title: 'The server answered with an error', points: ['A wrong URL (404), bad data (400), a server problem (500)', '`fetch` does **not** throw: check `res.ok` yourself'] },
+  { icon: 'close', title: 'There was no answer at all', points: ['No internet, or a wrong server name', '`fetch` **throws** an error: catch it with `try` / `catch`'] },
+]} />
+
+```tsx title="safe request: both failures handled"
+async function load() {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {                  // the server answered with an error (404, 500, …)
+      setMessage(`Error ${res.status}`);
+      return;                       // stop: do not read the body
+    }
+    const data = await res.json();  // only for a good answer
+    setMessage(`Hello, ${data.name}`);
+  } catch {                         // no answer at all
+    setMessage('No connection. Try again.');
+  }
+}
+```
+
+### The states of a screen that waits
+
+A screen that waits for a server is always in one of a few **states**. Keep the state in `useState` and draw something different for each one:
+
+<RequestStates />
+
+<Exercise id="lab-05--await-predict" />
+
+<Exercise id="lab-05--catch-error" />
+
+### The real attendance API: is it open?
+
+The course server has a real attendance API. This address tells you whether check-in is open:
+
+<Explain parts={[['GET', 'read only'], ['https://labverse-indol.vercel.app', 'the course server'], ['/api/attendance/status', 'the attendance status']]} />
+
+```json title="the answer"
+{ "open": true, "database": "connected", "password": true }
+```
+
+You only need `open`: `true` means students can check in now. The next exercise puts everything from this part together: loading, the answer, and errors.
+
+<Exercise id="lab-05--status-screen" />
+
+<Checkpoint>
+
+You can now wait for an answer, show a spinner while waiting, and show a clear message for both kinds of failure. Next: send data.
+
+</Checkpoint>
+
+<Part n="8" title="Sending data: POST and the real check-in" time="45 min" />
+
+### GET reads, POST sends
+
+To **send** data, the request needs three things that a GET does not have:
+
+```tsx title="a POST request"
+const res = await fetch('https://labverse-indol.vercel.app/api/lab5/echo', {
+  method: 'POST',                                  // 1. send data
+  headers: { 'Content-Type': 'application/json' }, // 2. the body is JSON
+  body: JSON.stringify({ name: 'Mona' }),          // 3. the body, as JSON text
+});
+const data = await res.json();                     // the server's answer
+```
+
+1. `method: 'POST'`: this request sends data. Without it, `fetch` makes a GET, and a GET cannot carry a body.
+2. `headers`: extra information. `'Content-Type': 'application/json'` tells the server how to read the body.
+3. `body`: the data. It must be text, so `JSON.stringify` turns the object into JSON text.
+
+Build a request below and send it to the echo server. Turn off one piece at a time and read what goes wrong:
+
+<RequestBuilder />
+
+<Demo id="post-echo" />
+
+<Exercise id="lab-05--post-echo" />
+
+### The attendance API: check in
+
+This is the real API your TA uses for attendance:
+
+<Explain parts={[['POST', 'send data'], ['https://labverse-indol.vercel.app', 'the course server'], ['/api/attendance', 'check in']]} />
+
+```json title="the body you send"
+{ "name": "Mona Adel", "studentId": "240001", "deviceId": "lab05-k3j2h1g4f5d6s7a8" }
+```
+
+- `name`: your full name, letters only.
+- `studentId`: your student ID, digits only.
+- `deviceId`: any text of 16–64 letters, digits, dots or dashes that names your device. The starter code makes one for you.
+
+It answers in one of these ways:
+
+<Cards cols={2} items={[
+  { tone: 'good', icon: 'sparkle', title: '201 — checked in', text: '`{ "ok": true, "entry": { "name", "studentId", "at" } }`. `at` is the time of your check-in.' },
+  { tone: 'good', icon: 'sparkle', title: '200 — already checked in', text: '`{ "ok": true, "already": true, … }`. Your first check-in is kept.' },
+  { icon: 'wrench', title: '400 — wrong data', text: '`{ "error": "invalid", "errors": { "name": "…" } }` says which field is wrong.' },
+  { icon: 'close', title: '503 — closed', text: '`{ "error": "closed" }`. Check-in is not open right now.' },
+]} />
+
+<Exercise id="lab-05--response-match" />
+
+### Put it all together: the check-in screen
+
+The last exercise is the core of this lab. Your screen will:
+
+1. Check that the name and the ID are not empty. If one is empty, show a red message and send nothing.
+2. Set the state to `'sending'` and show a spinner.
+3. Send the POST with `{ name, studentId, deviceId }`.
+4. Read the answer and show it: checked in, already checked in, wrong data, or an error.
+5. Catch a lost connection.
+
+When you press **Check**, the checker types the name and ID you gave in **Start lab** and presses your **Check in** button. That request is real: **your attendance for Lab 05 is saved, and your TA sees it.**
+
+<Exercise id="lab-05--check-in" />
+
+<Checkpoint title="Parts 5–8 complete">
+
+When Exercise 13 shows **Solved**, you are checked in for Lab 05. In Parts 9 and 10 you build the same check-in as a real Expo app on your computer and your phone.
+
+</Checkpoint>
+
+<Part n="9" title="Project setup" time="15 min" />
 
 Same Expo setup as Lab 04 — you already know this part.
 
@@ -224,7 +560,7 @@ On Windows PowerShell:
 
 ### Starter UI — paste before you touch the REST API
 
-The exercises in Part 6 are about **fetch/Axios, not layout**. Paste these two screens into `app/(tabs)/index.tsx` and `app/(tabs)/lookup.tsx` now, run the app once to see them render, then come back and fill in the `TODO`s inside `submit()` / `search()` as you work through Part 6.
+The exercises in Part 10 are about **fetch/Axios, not layout**. Paste these two screens into `app/(tabs)/index.tsx` and `app/(tabs)/lookup.tsx` now, run the app once to see them render, then come back and fill in the `TODO`s inside `submit()` / `search()` as you work through Part 10.
 
 ```tsx title="app/(tabs)/index.tsx — starter UI"
 import { useState } from 'react';
@@ -239,7 +575,7 @@ export default function CheckInScreen() {
 
   const submit = async () => {
     setStatus({ kind: 'loading' });
-    // TODO (Exercise 6.1): call checkIn(name, studentId) from '@/features/attendance/api'
+    // TODO (Exercise 10.1): call checkIn(name, studentId) from '@/features/attendance/api'
     // and turn the result into setStatus({ kind: 'success', message } | { kind: 'error', message }).
   };
 
@@ -312,7 +648,7 @@ export default function PokemonScreen() {
   const search = async () => {
     if (!query.trim()) return;
     setStatus({ kind: 'loading' });
-    // TODO (Exercise 6.3): call getPokemon(query) from '@/features/external/api'
+    // TODO (Exercise 10.3): call getPokemon(query) from '@/features/external/api'
     // and turn the result into setStatus({ kind: 'success', data } | { kind: 'error', message }).
   };
 
@@ -363,21 +699,21 @@ export default function PokemonScreen() {
 }
 ```
 
-Both screens already handle **loading**, **empty** and **error** states — only the network call itself (the `TODO`) is left for Part 6.
+Both screens already handle **loading**, **empty** and **error** states — only the network call itself (the `TODO`) is left for Part 10.
 
-<Part n="6" title="Exercises — a real attendance app" time="1 hour 15 min" />
+<Part n="10" title="Exercises — a real attendance app" time="1 hour 15 min" />
 
 <Cards cols={3} items={[
   { icon: 'link', title: 'REST only', text: 'This project trains REST, not GraphQL — every call below is a plain request to a real URL, nothing more.' },
   { icon: 'cloud', title: 'A real backend', text: 'You POST and GET against the actual course attendance API — the same one the course uses for attendance.' },
-  { icon: 'cmd', title: 'Your choice', text: 'fetch or Axios — pick whichever you installed in Part 5 and use it everywhere below. Both are graded the same.' },
+  { icon: 'cmd', title: 'Your choice', text: 'fetch or Axios — pick whichever you installed in Part 9 and use it everywhere below. Both are graded the same.' },
 ]} />
 
-These three exercises talk to the **real** course attendance API — the same one your TA uses to open check-in for this lab. There is nothing to fake here: a correct Exercise 6.1 really checks you in.
+These three exercises talk to the **real** course attendance API — the same one your TA uses to open check-in for this lab. There is nothing to fake here: a correct Exercise 10.1 really checks you in.
 
 Each solution below is hidden behind three hints — try it yourself first, open a hint if you're stuck, and only press **Show solution** once you've genuinely tried.
 
-<Task n="6.1" title="POST — check in for real" time="30 min">
+<Task n="10.1" title="POST — check in for real" time="30 min">
 
 `shared/device.ts` — every device needs one stable ID, generated once and reused:
 
@@ -389,7 +725,7 @@ export function getDeviceId() {
 }
 ```
 
-`features/attendance/api.ts` — write a `checkIn(name, studentId)` function that POSTs `{ name, studentId, deviceId }` to `https://<your-course-site-domain>/api/attendance`, using `fetch` or Axios (your choice from Part 5). `studentId` must be 5–9 digits (letters get rejected). It should return something your screen can switch on: a clear success case, an "already checked in" case, and a "closed" case.
+`features/attendance/api.ts` — write a `checkIn(name, studentId)` function that POSTs `{ name, studentId, deviceId }` to `https://<your-course-site-domain>/api/attendance`, using `fetch` or Axios (your choice from Part 9). `studentId` must be 5–9 digits (letters get rejected). It should return something your screen can switch on: a clear success case, an "already checked in" case, and a "closed" case.
 
 Build `CheckInScreen` with a name field, a student ID field, and a submit button that calls `checkIn()` and shows the result.
 
@@ -459,9 +795,9 @@ Note the shape of the difference: Axios never reaches the success path on a 409 
 
 </Task>
 
-<Task n="6.2" title="GET — is attendance open?" time="15 min">
+<Task n="10.2" title="GET — is attendance open?" time="15 min">
 
-`GET /api/attendance/status` tells you whether **attendance** is open — it does **not** tell you whether *you personally* are checked in (the API never reveals names, on purpose). Write an `attendanceOpen()` function, call it when `CheckInScreen` mounts (`useEffect`), and show "Attendance is not open yet" instead of the form when it's `false`. Whether *you* succeeded is answered by Exercise 6.1's own response (`201` vs `409`), not by this endpoint.
+`GET /api/attendance/status` tells you whether **attendance** is open — it does **not** tell you whether *you personally* are checked in (the API never reveals names, on purpose). Write an `attendanceOpen()` function, call it when `CheckInScreen` mounts (`useEffect`), and show "Attendance is not open yet" instead of the form when it's `false`. Whether *you* succeeded is answered by Exercise 10.1's own response (`201` vs `409`), not by this endpoint.
 
 Paste this into `features/attendance/api.ts` to start from:
 
@@ -488,7 +824,7 @@ export async function attendanceOpen() {
 
 ```ts title="features/attendance/api.ts (add) — Axios version"
 export async function attendanceOpen() {
-  const res = await api.get('/attendance/status'); // same `api` instance as Exercise 6.1
+  const res = await api.get('/attendance/status'); // same `api` instance as Exercise 10.1
   return Boolean(res.data.open);
 }
 ```
@@ -497,7 +833,7 @@ export async function attendanceOpen() {
 
 </Task>
 
-<Task n="6.3" title="External API — look up a Pokémon" time="30 min">
+<Task n="10.3" title="External API — look up a Pokémon" time="30 min">
 
 A REST API you don't control at all: [PokeAPI](https://pokeapi.co/docs/v2), no key required. Write `getPokemon(name)`, then build `PokemonScreen`: a text input, a search button, and — on success — the sprite image, the name, and its types. On a bad name, show an error message instead of crashing.
 
@@ -543,7 +879,7 @@ export async function getPokemon(name: string) {
 
 </Task>
 
-<Task n="6.4" title="Review your work" time="10 min">
+<Task n="10.4" title="Review your work" time="10 min">
 
 This lab is practice, not a hand-in — there's nothing to submit. Before you move on, check it against the live demos earlier in this part:
 
@@ -553,9 +889,9 @@ This lab is practice, not a hand-in — there's nothing to submit. Before you mo
 - You can explain why a synchronous call freezes the UI and an async one doesn't
 - You can explain one reason to pick Clerk and one reason to pick BetterAuth
 - You can explain one real difference between a `fetch` call and its Axios equivalent
-- Exercise 6.1 really checks you into attendance
-- Exercise 6.2 correctly hides the form when attendance is closed
-- Exercise 6.3 shows a real Pokémon's sprite, name and types — and handles a typo without crashing
+- Exercise 10.1 really checks you into attendance
+- Exercise 10.2 correctly hides the form when attendance is closed
+- Exercise 10.3 shows a real Pokémon's sprite, name and types — and handles a typo without crashing
 
 </Task>
 

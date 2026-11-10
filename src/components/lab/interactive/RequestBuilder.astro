@@ -1,0 +1,115 @@
+---
+/**
+ * Lab 05 · Part 8 — build a POST request piece by piece and see the fetch code and the exact HTTP request it makes.
+ * "Send" really sends it to the practice echo server (/api/lab5/echo, nothing is saved) and shows the answer,
+ * so students see what happens when the method, the header or JSON.stringify is missing.
+ * <RequestBuilder />
+ */
+---
+<figure class="rb" data-rb data-reveal data-free>
+  <div class="rb-head">
+    <p class="rb-k mono">Build a POST request</p>
+    <p class="rb-sub">Change the pieces. Watch the code and the request change. Then send it for real.</p>
+  </div>
+  <div class="rb-grid">
+    <div class="rb-form">
+      <label>Name <input class="input" data-rb-name value="Mona Adel" maxlength="40" /></label>
+      <label>Student ID <input class="input mono" data-rb-id value="240001" maxlength="11" /></label>
+      <fieldset class="rb-toggles">
+        <legend class="mono">The pieces</legend>
+        <label class="rb-check"><input type="checkbox" data-rb-post checked /> <span><code>method: 'POST'</code><small>send data (GET can't carry a body)</small></span></label>
+        <label class="rb-check"><input type="checkbox" data-rb-header checked /> <span><code>Content-Type: application/json</code><small>tells the server the body is JSON</small></span></label>
+        <label class="rb-check"><input type="checkbox" data-rb-stringify checked /> <span><code>JSON.stringify(body)</code><small>turns the object into JSON text</small></span></label>
+      </fieldset>
+      <button type="button" class="btn btn-primary btn-sm" data-rb-send>Send it to the echo server</button>
+    </div>
+    <div class="rb-out">
+      <p class="rb-pane-k mono">Your code</p>
+      <pre class="rb-pre" data-rb-code></pre>
+      <p class="rb-pane-k mono">What travels over the network</p>
+      <pre class="rb-pre rb-http" data-rb-http></pre>
+      <p class="rb-pane-k mono">The server's answer</p>
+      <pre class="rb-pre rb-answer" data-rb-answer aria-live="polite">Press “Send”.</pre>
+    </div>
+  </div>
+</figure>
+
+<script>
+  const ECHO = '/api/lab5/echo';
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-rb]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+      const nameIn = $<HTMLInputElement>('[data-rb-name]');
+      const idIn = $<HTMLInputElement>('[data-rb-id]');
+      const post = $<HTMLInputElement>('[data-rb-post]');
+      const header = $<HTMLInputElement>('[data-rb-header]');
+      const stringify = $<HTMLInputElement>('[data-rb-stringify]');
+      const answer = $('[data-rb-answer]');
+
+      const body = () => ({ name: nameIn.value, studentId: idIn.value });
+      const paint = () => {
+        const b = body();
+        const objText = `{ name: '${b.name}', studentId: '${b.studentId}' }`;
+        $('[data-rb-code]').textContent = [
+          `const res = await fetch('${location.origin}${ECHO}', {`,
+          `  method: '${post.checked ? 'POST' : 'GET'}',`,
+          ...(header.checked ? ["  headers: { 'Content-Type': 'application/json' },"] : []),
+          `  body: ${stringify.checked ? `JSON.stringify(${objText})` : objText},`,
+          '});',
+          'const data = await res.json();',
+        ].join('\n');
+        const sent = stringify.checked ? JSON.stringify(b) : '[object Object]';
+        $('[data-rb-http]').textContent = !post.checked
+          ? `GET ${ECHO}\n\n✗ A GET request cannot have a body: fetch stops before anything is sent.`
+          : [`POST ${ECHO} HTTP/1.1`, `Host: ${location.host}`, header.checked ? 'Content-Type: application/json' : 'Content-Type: text/plain   ← the default: not JSON', '', sent].join('\n');
+      };
+
+      $('[data-rb-send]').addEventListener('click', async () => {
+        answer.textContent = 'Sending…';
+        try {
+          const init: RequestInit = { method: post.checked ? 'POST' : 'GET' };
+          if (header.checked) init.headers = { 'Content-Type': 'application/json' };
+          init.body = stringify.checked ? JSON.stringify(body()) : (String(body()) as BodyInit);
+          const res = await fetch(ECHO, init);
+          const text = await res.text();
+          let shown = text;
+          try { shown = JSON.stringify(JSON.parse(text), null, 2); } catch { /* not JSON */ }
+          answer.textContent = `${res.status} ${res.statusText || (res.ok ? 'OK' : '')}\n${shown}`;
+          answer.classList.toggle('bad', !res.ok);
+        } catch (error) {
+          answer.textContent = `fetch threw an error (no request was sent):\n${error instanceof Error ? error.message : error}`;
+          answer.classList.add('bad');
+        }
+      });
+      for (const el of [nameIn, idIn, post, header, stringify]) el.addEventListener('input', paint);
+      paint();
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .rb { margin: 24px 0 32px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .rb-k { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 !important; }
+  .rb-sub { margin: 2px 0 0 !important; color: var(--text-2); font-size: 14px; }
+  .rb-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 16px; }
+  .rb-form { display: grid; align-content: start; gap: 10px; }
+  .rb-form > label { display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+  .rb-toggles { border: 1px solid var(--line-2); border-radius: 12px; padding: 8px 10px 10px; display: grid; gap: 8px; margin: 0; }
+  .rb-toggles legend { font-size: 11px; color: var(--text-3); padding: 0 4px; }
+  .rb-check { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+  .rb-check input { margin-top: 3px; accent-color: var(--accent); }
+  .rb-check span { display: grid; gap: 1px; }
+  .rb-check code { font-size: 12.5px; }
+  .rb-check small { color: var(--text-3); font-size: 12px; }
+  .rb-out { display: grid; align-content: start; gap: 6px; min-width: 0; }
+  .rb-pane-k { margin: 4px 0 0 !important; font-size: 11px; color: var(--text-3); }
+  .rb-pre { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: #0c0f13; color: #c8ff4d; font: 12px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .rb-http { color: #7cb1ff; }
+  .rb-answer { color: #e2e8f0; min-height: 60px; }
+  .rb-answer.bad { color: #ffb4b4; }
+  @media (max-width: 720px) { .rb-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>

@@ -1,0 +1,163 @@
+---
+/**
+ * Lab 05 · Part 6 — one API call in five steps: the phone, the network and the server, with the code line that
+ * runs at each step and the exact request / response that travels. Back / Next / Play.
+ * <ApiCallFlow />
+ */
+const CODE = [
+  'async function loadAll() {',
+  '  const res = await fetch(`${API}/students`);',
+  '  const data = await res.json();',
+  '  setStudents(data);',
+  '}',
+];
+const STEPS = [
+  { line: 1, at: 'phone', title: '1 · The app builds a request', text: '`fetch(url)` makes a request: the method **GET** (read, do not change anything) and the **URL**: which server and which data.', packet: 'GET /api/lab5/students\nHost: labverse-indol.vercel.app' },
+  { line: 1, at: 'wire-right', title: '2 · The request travels to the server', text: 'The request goes over the internet. `await` waits for the answer; the screen keeps working while it waits.', packet: 'GET /api/lab5/students\nHost: labverse-indol.vercel.app' },
+  { line: 1, at: 'server', title: '3 · The server reads it and finds the data', text: 'The server looks at the method and the path, and runs its own code to find the students.', packet: '' },
+  { line: 1, at: 'wire-left', title: '4 · The server sends a response', text: 'The answer has a **status code** (200 = OK) and a **body**: the data, written as JSON text.', packet: 'HTTP/1.1 200 OK\nContent-Type: application/json\n\n[{"id":1,"name":"Mona Adel",…}, …]' },
+  { line: 2, at: 'phone', title: '5 · The app reads the JSON and draws it', text: '`await res.json()` turns the JSON text into an array. `setStudents(data)` saves it in state, so the screen draws the list.', packet: '' },
+] as const;
+---
+<figure class="acf" data-acf data-reveal data-free>
+  <div class="acf-head">
+    <p class="acf-k mono">One API call</p>
+    <p class="acf-step mono" data-acf-count>Step 1 / {STEPS.length}</p>
+  </div>
+
+  <div class="acf-stage">
+    <div class="acf-phone" aria-label="The app">
+      <div class="acf-screen" data-acf-screen>
+        <b>Class list</b>
+        <span class="acf-loading" data-acf-loading>Loading…</span>
+        <ul class="acf-list" data-acf-list hidden>
+          <li>Mona Adel</li><li>Omar Khaled</li><li>Salma Hassan</li><li>Youssef Ali</li><li>Nour Samir</li>
+        </ul>
+      </div>
+      <span class="acf-cap mono">the app (client)</span>
+    </div>
+    <div class="acf-wire" aria-hidden="true">
+      <span class="acf-line"></span>
+      <span class="acf-packet" data-acf-packet></span>
+      <span class="acf-cap mono">the internet</span>
+    </div>
+    <div class="acf-server" data-acf-server aria-label="The server">
+      <span class="acf-led"></span><span class="acf-led"></span><span class="acf-led"></span>
+      <span class="acf-cap mono">the server</span>
+    </div>
+  </div>
+
+  <div class="acf-body">
+    <pre class="acf-code" aria-label="The code">{CODE.map((l, i) => <span class="acf-cl" data-acf-line={i}>{l}{'\n'}</span>)}</pre>
+    <div class="acf-say">
+      <b data-acf-title></b>
+      <p data-acf-text></p>
+      <pre class="acf-wire-text" data-acf-wiretext hidden></pre>
+    </div>
+  </div>
+
+  <div class="acf-ctrl">
+    <button type="button" class="btn btn-sm" data-acf-back>◀ Back</button>
+    <button type="button" class="btn btn-primary btn-sm" data-acf-next>Next ▶</button>
+    <button type="button" class="btn btn-sm" data-acf-play>▶ Play all</button>
+  </div>
+  <script type="application/json" data-acf-steps set:html={JSON.stringify(STEPS)} />
+</figure>
+
+<script>
+  import { gsap } from 'gsap';
+
+  type Step = { line: number; at: 'phone' | 'wire-right' | 'server' | 'wire-left'; title: string; text: string; packet: string };
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-acf]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const steps = JSON.parse(root.querySelector('[data-acf-steps]')!.textContent!) as Step[];
+      const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+      const packet = $('[data-acf-packet]');
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const md = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+      let i = 0;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      const show = (n: number) => {
+        i = Math.max(0, Math.min(steps.length - 1, n));
+        const s = steps[i];
+        $('[data-acf-count]').textContent = `Step ${i + 1} / ${steps.length}`;
+        $('[data-acf-title]').textContent = s.title;
+        $('[data-acf-text]').innerHTML = md(s.text);
+        const wt = $('[data-acf-wiretext]');
+        wt.hidden = !s.packet;
+        wt.textContent = s.packet;
+        root.querySelectorAll<HTMLElement>('[data-acf-line]').forEach((l) => l.classList.toggle('on', Number(l.dataset.acfLine) === s.line || (i === 4 && Number(l.dataset.acfLine) === 3)));
+        const done = i === steps.length - 1;
+        $('[data-acf-loading]').hidden = done;
+        $('[data-acf-list]').hidden = !done;
+        $('[data-acf-server]').classList.toggle('busy', s.at === 'server');
+        // the packet: request (going right) or response (coming back)
+        const x = { phone: '0%', 'wire-right': '100%', server: '100%', 'wire-left': '0%' }[s.at];
+        const from = { phone: '0%', 'wire-right': '0%', server: '100%', 'wire-left': '100%' }[s.at];
+        packet.textContent = s.at === 'wire-left' ? '200 · JSON' : 'GET';
+        packet.classList.toggle('resp', s.at === 'wire-left');
+        packet.style.visibility = s.at === 'server' || done ? 'hidden' : 'visible';
+        if (reduced) gsap.set(packet, { left: x });
+        else gsap.fromTo(packet, { left: from }, { left: x, duration: 0.9, ease: 'power2.inOut' });
+        if (done && !reduced) gsap.from(root.querySelectorAll('[data-acf-list] li'), { opacity: 0, x: -8, stagger: 0.07, duration: 0.3 });
+        ($('[data-acf-back]') as HTMLButtonElement).disabled = i === 0;
+        ($('[data-acf-next]') as HTMLButtonElement).disabled = done;
+      };
+      const stop = () => { clearTimeout(timer); timer = undefined; $('[data-acf-play]').textContent = '▶ Play all'; };
+      $('[data-acf-back]').addEventListener('click', () => { stop(); show(i - 1); });
+      $('[data-acf-next]').addEventListener('click', () => { stop(); show(i + 1); });
+      $('[data-acf-play]').addEventListener('click', () => {
+        if (timer) return stop();
+        $('[data-acf-play]').textContent = '■ Stop';
+        show(0);
+        const tick = () => { if (i < steps.length - 1) { show(i + 1); timer = setTimeout(tick, 2200); } else stop(); };
+        timer = setTimeout(tick, 2200);
+      });
+      show(0);
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .acf { margin: 24px 0 32px; display: grid; gap: 16px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .acf-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .acf-k, .acf-step { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 !important; }
+  .acf-stage { display: grid; grid-template-columns: 150px minmax(80px, 1fr) 110px; align-items: center; gap: 10px; }
+  .acf-cap { display: block; margin-top: 6px; font-size: 10.5px; color: var(--text-3); text-align: center; }
+  .acf-phone { display: grid; justify-items: center; }
+  .acf-screen { width: 132px; height: 200px; padding: 14px 10px; border-radius: 22px; border: 6px solid #1b1f26; background: #f8fafc; color: #0f172a; font: 12px/1.4 system-ui, sans-serif; display: grid; align-content: start; gap: 6px; box-sizing: border-box; }
+  .acf-screen b { font-size: 13px; }
+  .acf-loading { color: #64748b; }
+  .acf-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+  .acf-list li { background: #fff; border-radius: 6px; padding: 4px 6px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); font-size: 11px; }
+  .acf-wire { position: relative; height: 60px; display: grid; align-items: center; }
+  .acf-line { height: 2px; background: repeating-linear-gradient(90deg, var(--line-2) 0 6px, transparent 6px 12px); }
+  .acf-packet { position: absolute; top: 50%; translate: -50% -50%; left: 0%; padding: 4px 8px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font: 700 11px/1 var(--font-mono); white-space: nowrap; box-shadow: 0 4px 14px rgb(0 0 0 / 0.25); }
+  .acf-packet.resp { background: #7cb1ff; color: #0a0c0f; }
+  .acf-wire .acf-cap { position: absolute; bottom: -2px; left: 0; right: 0; }
+  .acf-server { justify-self: center; display: grid; gap: 6px; padding: 12px 10px 8px; width: 92px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); }
+  .acf-led { height: 10px; border-radius: 4px; background: var(--line-2); transition: background .3s; }
+  .acf-server.busy .acf-led { background: var(--ok); animation: acf-blink .6s infinite alternate; }
+  .acf-server.busy .acf-led:nth-child(2) { animation-delay: .2s; } .acf-server.busy .acf-led:nth-child(3) { animation-delay: .4s; }
+  @keyframes acf-blink { to { opacity: .35; } }
+  .acf-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; }
+  .acf-code { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: #0c0f13; color: #aab1bd; font: 12.5px/1.7 var(--font-mono); overflow-x: auto; }
+  .acf-cl { display: block; border-radius: 4px; padding: 0 4px; transition: background .25s, color .25s; }
+  .acf-cl.on { background: rgb(200 255 77 / 0.14); color: #c8ff4d; }
+  .acf-say { display: grid; align-content: start; gap: 6px; }
+  .acf-say b { font-size: 15px; }
+  .acf-say p { margin: 0 !important; color: var(--text-2); font-size: 14px; }
+  .acf-wire-text { margin: 0; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--line-2); background: var(--bg-2); font: 11.5px/1.5 var(--font-mono); color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .acf-ctrl { display: flex; gap: 8px; flex-wrap: wrap; }
+  @media (max-width: 720px) {
+    .acf-stage { grid-template-columns: 1fr; justify-items: center; }
+    .acf-wire { width: 70%; }
+    .acf-body { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { .acf-server.busy .acf-led { animation: none; } }
+</style>

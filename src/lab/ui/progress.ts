@@ -45,7 +45,7 @@ export function initProgress(lab: string, meta: ExerciseMeta[], blocks: readonly
       const el = document.getElementById(`ex-${m.id}`);
       if (el && el.getBoundingClientRect().top < mid) ex = m;
     }
-    bar.querySelector('[data-lp-where]')!.textContent = `Part ${block.part} · Block ${block.n}/${blocks.length}`;
+    bar.querySelector('[data-lp-where]')!.textContent = `Part ${block.part} · Block ${blocks.indexOf(block) + 1}/${blocks.length}`;
     bar.querySelector('[data-lp-title]')!.textContent = block.title;
     bar.querySelector('[data-lp-ex]')!.textContent = `Ex ${ex.n}/${meta.length}`;
     document.querySelectorAll<HTMLElement>('[data-sq]').forEach((sq) => sq.classList.toggle('is-here', sq.dataset.sq === ex.id));

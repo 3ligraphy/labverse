@@ -1,0 +1,125 @@
+---
+/**
+ * Lab 05 · Part 7 — the states of a screen that waits for a server. Pick what the network does (fast, slow, a 404,
+ * no internet): the phone shows each state as it happens, `state` changes, and the code path that ran lights up.
+ * <RequestStates />
+ */
+const CODE = [
+  "async function check() {",
+  "  setState('loading');",
+  "  try {",
+  "    const res = await fetch(`${API}/attendance/status`);",
+  "    if (!res.ok) {",
+  "      setState('error');      // the server answered with an error",
+  "      return;",
+  "    }",
+  "    const data = await res.json();",
+  "    setState(data.open ? 'open' : 'closed');",
+  "  } catch {",
+  "    setState('error');        // no answer at all",
+  "  }",
+  "}",
+];
+const CASES = [
+  { id: 'fast', label: 'Fast answer', wait: 700, path: [1, 3, 4, 8, 9], state: 'open', note: 'Status 200: `res.ok` is true, the JSON says `open: true`.' },
+  { id: 'slow', label: 'Slow answer', wait: 2600, path: [1, 3, 4, 8, 9], state: 'open', note: 'Same answer, but the spinner shows longer. Without a loading state the screen would look broken while it waits.' },
+  { id: '404', label: 'Wrong URL (404)', wait: 800, path: [1, 3, 4, 5, 6], state: 'error', note: 'The server answered 404. `fetch` did not throw, so `if (!res.ok)` catches it and stops with `return`.' },
+  { id: 'offline', label: 'No internet', wait: 1200, path: [1, 3, 10, 11], state: 'error', note: 'There was no answer at all, so `fetch` threw and the `catch` block ran.' },
+];
+---
+<figure class="rs" data-rs data-reveal data-free>
+  <div class="rs-head">
+    <p class="rs-k mono">Four states of one screen</p>
+    <div class="rs-cases" role="toolbar" aria-label="What the network does">
+      {CASES.map((c) => <button type="button" class="rs-case" data-rs-case={c.id}>{c.label}</button>)}
+    </div>
+  </div>
+  <div class="rs-grid">
+    <div class="rs-phone">
+      <div class="rs-screen" data-rs-screen data-state="idle">
+        <span class="rs-title">Lab 05 attendance</span>
+        <span class="rs-spin" aria-hidden="true"></span>
+        <b class="rs-open">Attendance is OPEN</b>
+        <b class="rs-err">Could not check. Try again.</b>
+        <span class="rs-idle">Choose what the network does ↑</span>
+      </div>
+      <p class="rs-state mono" aria-live="polite">state = <b data-rs-state>'idle'</b></p>
+    </div>
+    <div class="rs-right">
+      <pre class="rs-code">{CODE.map((l, i) => <span class="rs-cl" data-rs-line={i}>{l}{'\n'}</span>)}</pre>
+      <p class="rs-note" data-rs-note>Each button replays the same code with a different answer from the network.</p>
+    </div>
+  </div>
+  <script type="application/json" data-rs-cases set:html={JSON.stringify(CASES)} />
+</figure>
+
+<script>
+  type Case = { id: string; label: string; wait: number; path: number[]; state: string; note: string };
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-rs]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const cases = JSON.parse(root.querySelector('[data-rs-cases]')!.textContent!) as Case[];
+      const screen = root.querySelector<HTMLElement>('[data-rs-screen]')!;
+      const stateEl = root.querySelector<HTMLElement>('[data-rs-state]')!;
+      const note = root.querySelector<HTMLElement>('[data-rs-note]')!;
+      const lines = Array.from(root.querySelectorAll<HTMLElement>('[data-rs-line]'));
+      const md = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/`([^`]+)`/g, '<code>$1</code>');
+      let timers: ReturnType<typeof setTimeout>[] = [];
+      const setState = (s: string) => { screen.dataset.state = s; stateEl.textContent = `'${s}'`; };
+      const light = (upTo: number[]) => lines.forEach((l, i) => l.classList.toggle('on', upTo.includes(i)));
+
+      root.querySelectorAll<HTMLButtonElement>('[data-rs-case]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const c = cases.find((x) => x.id === b.dataset.rsCase)!;
+          timers.forEach(clearTimeout);
+          timers = [];
+          root.querySelectorAll('[data-rs-case]').forEach((x) => x.classList.toggle('on', x === b));
+          // loading first: the lines up to the fetch
+          setState('loading');
+          light(c.path.filter((n) => n <= 3));
+          note.innerHTML = md('Waiting for the answer… `await` pauses only this function: the screen keeps working.');
+          timers.push(setTimeout(() => {
+            setState(c.state);
+            light(c.path);
+            note.innerHTML = md(c.note);
+          }, c.wait));
+        }),
+      );
+    });
+
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .rs { margin: 24px 0 32px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 24px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .rs-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .rs-k { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 !important; }
+  .rs-cases { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rs-case { padding: 6px 12px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text-2); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .rs-case.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .rs-grid { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 16px; align-items: start; }
+  .rs-phone { display: grid; justify-items: center; gap: 8px; }
+  .rs-screen { width: 150px; height: 230px; border-radius: 24px; border: 6px solid #1b1f26; background: #fff; color: #0f172a; display: grid; place-items: center; align-content: center; gap: 12px; padding: 10px; box-sizing: border-box; font: 13px/1.35 system-ui, sans-serif; text-align: center; }
+  .rs-title { color: #64748b; font-size: 12px; }
+  .rs-spin { width: 26px; height: 26px; border-radius: 50%; border: 3px solid #cbd5e1; border-top-color: #4f46e5; animation: rs-spin .8s linear infinite; }
+  .rs-open { color: #16a34a; font-size: 15px; }
+  .rs-err { color: #dc2626; }
+  .rs-idle { color: #94a3b8; font-size: 11.5px; }
+  .rs-screen > .rs-spin, .rs-screen > .rs-open, .rs-screen > .rs-err, .rs-screen > .rs-idle { display: none; }
+  .rs-screen[data-state='loading'] > .rs-spin { display: block; }
+  .rs-screen[data-state='open'] > .rs-open { display: block; }
+  .rs-screen[data-state='error'] > .rs-err { display: block; }
+  .rs-screen[data-state='idle'] > .rs-idle { display: block; }
+  .rs-state { margin: 0 !important; font-size: 12px; color: var(--text-3); }
+  .rs-state b { color: var(--accent-text); }
+  .rs-right { display: grid; gap: 10px; min-width: 0; }
+  .rs-code { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: #0c0f13; color: #6b7482; font: 12px/1.65 var(--font-mono); overflow-x: auto; }
+  .rs-cl { display: block; padding: 0 4px; border-radius: 4px; transition: background .25s, color .25s; }
+  .rs-cl.on { color: #c8ff4d; background: rgb(200 255 77 / 0.12); }
+  .rs-note { margin: 0 !important; font-size: 14px; color: var(--text-2); }
+  @keyframes rs-spin { to { transform: rotate(360deg); } }
+  @media (max-width: 720px) { .rs-grid { grid-template-columns: minmax(0, 1fr); justify-items: center; } }
+  @media (prefers-reduced-motion: reduce) { .rs-spin { animation-duration: 2.4s; } }
+</style>
