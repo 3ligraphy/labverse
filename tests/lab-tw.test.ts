@@ -49,3 +49,12 @@ test('unknown or misspelled classes are reported', () => {
   assert.deepEqual(r.style, { padding: 16 });
   assert.deepEqual(r.unknown, ['bg-blu-500', 'text-hugeish', 'p-13']);
 });
+
+test('scale: the Tailwind steps and an exact value, also on press (active:)', () => {
+  assert.deepEqual(style('scale-95').transform, [{ scale: 0.95 }]);
+  assert.deepEqual(style('scale-[0.98]').transform, [{ scale: 0.98 }]);
+  const r = classToStyle('h-14 active:scale-[0.98] active:opacity-90');
+  assert.deepEqual(r.active?.transform, [{ scale: 0.98 }]);
+  assert.equal(r.active?.opacity, 0.9);
+  assert.deepEqual(r.unknown, []);
+});

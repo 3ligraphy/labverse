@@ -9,6 +9,7 @@ import { createElement } from 'react';
 import { Image, Text, View } from 'react-native-web';
 import * as Navigation from './navigation.tsx';
 import { PREVIEW_ENV } from '../engine/guard.ts';
+import { axios } from './axios.ts';
 
 type AnyProps = Record<string, any>;
 
@@ -135,6 +136,8 @@ export function createPackages(rn: { SafeAreaView: unknown; insets: Record<strin
       useSafeAreaInsets: () => ({ ...rn.insets }),
       initialWindowMetrics: { insets: rn.insets, frame: { x: 0, y: 0, width: 390, height: 844 } },
     },
+    // HTTP requests the Axios way (Lab 05), on top of fetch
+    axios: { default: axios, ...axios },
     nativewind: { useColorScheme: () => ({ colorScheme: 'light', setColorScheme: noop, toggleColorScheme: noop }), cssInterop: noop, remapProps: noop },
   };
 }
@@ -143,6 +146,6 @@ export function createPackages(rn: { SafeAreaView: unknown; insets: Record<strin
 export const PACKAGE_NAMES = [
   'react', 'react-native', 'expo-router', '@react-navigation/native', '@react-navigation/native-stack', '@react-navigation/bottom-tabs',
   '@react-navigation/drawer', '@expo/vector-icons', 'expo-linear-gradient', '@react-native-async-storage/async-storage', 'expo-constants',
-  'expo-haptics', 'expo-image', 'react-native-safe-area-context', 'nativewind',
+  'expo-haptics', 'expo-image', 'react-native-safe-area-context', 'nativewind', 'axios',
 ];
 

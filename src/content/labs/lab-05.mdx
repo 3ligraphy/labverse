@@ -491,11 +491,25 @@ When you press **Check**, the checker types the name and ID you gave in **Start 
 
 <Checkpoint title="Parts 5–8 complete">
 
-When Exercise 13 shows **Solved**, you are checked in for Lab 05. In Parts 9 and 10 you build the same check-in as a real Expo app on your computer and your phone.
+When Exercise 13 shows **Solved**, you are checked in for Lab 05. In Parts 9 and 10 you build the same check-in as a real Expo app: in the Code Editor (Option A, in the lab) or on your own computer (Option B).
 
 </Checkpoint>
 
 <Part n="9" title="Project setup" time="15 min" />
+
+There are two ways to set up the attendance app. In the lab, use **Option A**.
+
+### Option A · In the Code Editor (in the lab)
+
+The **Code Editor** on this site has the project ready for you: the folders, the two starter screens, `shared/device.ts` and the two `api.ts` files of Part 10. Nothing to install. The app runs in a phone emulator next to your code and updates as you type. A **Guide** panel on the left lists every step, and a click on a file name opens that file.
+
+<OpenInCodeEditor project="lab05-attendance" />
+
+- The project is saved in this browser. The same button opens it again. You also find it in the Code editor's start screen, under **Lab projects**.
+- `fetch` and Axios both work there. You do not install anything.
+- Skip the commands below and go straight to Part 10.
+
+### Option B · On your own computer
 
 Same Expo setup as Lab 04 — you already know this part.
 
@@ -709,6 +723,12 @@ Both screens already handle **loading**, **empty** and **error** states — only
   { icon: 'cmd', title: 'Your choice', text: 'fetch or Axios — pick whichever you installed in Part 9 and use it everywhere below. Both are graded the same.' },
 ]} />
 
+<OpenInCodeEditor project="lab05-attendance" compact />
+
+**The real address.** The course site is `labverse-indol.vercel.app`, so `BASE` is `https://labverse-indol.vercel.app/api/attendance`. In the Code Editor project it is already filled in.
+
+**The real answers.** `POST /api/attendance` answers **201** `{ ok: true, entry }` for a new check-in, **200** `{ ok: true, already: true, entry }` when you were checked in before (for example in Exercise 13), **400** when the name or the student ID is wrong, and **503** when attendance is closed. Handle the **200** too, or a second check-in shows an error.
+
 These three exercises talk to the **real** course attendance API — the same one your TA uses to open check-in for this lab. There is nothing to fake here: a correct Exercise 10.1 really checks you in.
 
 Each solution below is hidden behind three hints — try it yourself first, open a hint if you're stuck, and only press **Show solution** once you've genuinely tried.
@@ -739,6 +759,7 @@ const BASE = 'https://<your-course-site-domain>/api/attendance';
 export async function checkIn(name: string, studentId: string) {
   // TODO: POST { name, studentId, deviceId: getDeviceId() } to BASE as JSON
   // TODO: 201 -> { ok: true, entry }
+  // TODO: 200 with data.already -> { ok: true, entry, already: true }
   // TODO: 409 -> { ok: false, reason: 'device' | 'id' }
   // TODO: 503 -> { ok: false, reason: 'closed' }
   // TODO: anything else -> { ok: false, reason: 'error' }
@@ -764,6 +785,7 @@ export async function checkIn(name: string, studentId: string) {
   });
   const data = await res.json();
   if (res.status === 201) return { ok: true as const, entry: data.entry };
+  if (res.status === 200 && data.already) return { ok: true as const, entry: data.entry, already: true as const };
   if (res.status === 409) return { ok: false as const, reason: data.error as 'device' | 'id' };
   if (res.status === 503) return { ok: false as const, reason: 'closed' as const };
   return { ok: false as const, reason: 'error' as const };

@@ -7,6 +7,7 @@ import { WorkspaceFS } from '../core/fs';
 import { TEMPLATES, applyTemplate, importZip, type Template } from '../core/project';
 import { memo, workspaces } from '../core/settings';
 import { applyTheme } from '../core/themes';
+import { COURSE_PROJECTS, courseWorkspace, existingCourseWorkspace } from '../core/course-projects';
 import { confirmBox } from './widgets';
 
 const open = (id: string) => { location.href = `/ide?ws=${encodeURIComponent(id)}`; };
@@ -106,7 +107,19 @@ export function renderStart(mount: HTMLElement, user: { name: string } | null) {
       h('div', { class: 'st-logo', 'aria-hidden': 'true' }, 'B'),
       h('div', null, h('h1', null, 'BUENOVA Code'), h('p', { class: 'st-dim' }, 'Choose what you want to build. Everything runs here in your browser: nothing to install. Press ▶ Run to see it.'))),
     h('div', { class: 'st-cols' },
-      h('section', { 'aria-label': 'New project' }, h('h2', null, 'New project'), h('div', { class: 'st-grid' }, cards)),
+      h('section', { 'aria-label': 'Projects' },
+        h('h2', null, 'Lab projects'),
+        h('div', { class: 'st-grid st-course' }, COURSE_PROJECTS.map((p) => {
+          const tpl = TEMPLATES.find((t) => t.id === p.kind);
+          const btn = h('button', { class: 'st-card-main', type: 'button', onclick: async () => {
+            btn.disabled = true;
+            open(await courseWorkspace(p.id));
+          } },
+            h('span', { class: 'st-card-icon' }, icon('mortar-board')),
+            h('span', { class: 'st-card-text' }, h('b', null, p.title), h('span', { class: 'st-tag mono' }, `${tpl?.name ?? p.kind} · ${existingCourseWorkspace(p.id) ? 'continue' : 'start'}`), h('span', { class: 'st-desc' }, p.description)));
+          return h('div', { class: 'st-card', style: { '--c': tpl?.color ?? '#c8ff4d' } as never }, btn);
+        })),
+        h('h2', { class: 'st-h2-gap' }, 'New project'), h('div', { class: 'st-grid' }, cards)),
       h('section', { 'aria-label': 'Recent projects', class: 'st-side' },
         h('h2', null, 'Recent projects'), recentList,
         h('button', { class: 'ide-btn st-import', type: 'button', onclick: () => zip.click() }, icon('file-zip'), ' Import a project (ZIP)'), zip,

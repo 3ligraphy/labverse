@@ -18,6 +18,7 @@ import { installTerminal } from './services/terminal';
 import { installRun } from './services/run';
 import { installIntellisense } from './services/intellisense';
 import { renderStart } from './ui/start';
+import { installGuide } from './ui/guide';
 
 export const go = (ws: string) => { location.href = `/ide?ws=${encodeURIComponent(ws)}`; };
 
@@ -60,6 +61,7 @@ export async function boot(mount: HTMLElement, user: IdeUser | null) {
     ],
   });
   wb.addSideView({ id: 'search', title: 'Search', iconName: 'search', el: search.el, order: 2, onShow: () => search.focus() });
+  installGuide(ide);
   editors.onReveal = (p) => { wb.showSide('explorer', false); void explorer.reveal(p); };
   editors.emptyContent = (el) => watermark(el);
   editors.refreshEmpty();
@@ -341,8 +343,11 @@ export async function boot(mount: HTMLElement, user: IdeUser | null) {
   if (kind === 'react-native') await runner.openEmulator();
   else if (kind === 'react') await runner.openReact();
   else if (kind === 'web') await runner.openPage();
-  if (!memo.get('welcome.seen', false) && settings.get('workbench.startupEditor') === 'welcome') await run('view.welcome');
-  memo.set('welcome.seen', true);
+  // a project with a GUIDE.md (the lab projects) starts on its Guide, not on the Welcome page
+  if (!(await fs.exists('/GUIDE.md'))) {
+    if (!memo.get('welcome.seen', false) && settings.get('workbench.startupEditor') === 'welcome') await run('view.welcome');
+    memo.set('welcome.seen', true);
+  }
   paintStatus();
   void editors.preload();
   return ide;

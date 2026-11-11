@@ -1,0 +1,64 @@
+---
+/**
+ * Opens a course project (src/ide/core/course-projects.ts) in BUENOVA Code, in a new tab. The first click makes the
+ * student's own copy; later clicks reopen that copy (it lives in this browser).
+ * <OpenInCodeEditor project="lab05-attendance" />  ·  add `compact` for the short version
+ */
+interface Props { project: string; compact?: boolean }
+const { project, compact = false } = Astro.props;
+---
+<div class:list={['oce', { compact }]} data-oce={project} data-reveal>
+  <span class="oce-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M10 6.5 8 9l2 2.5M14 6.5 16 9l-2 2.5" /><path d="M10.5 18.5h3" /></svg>
+  </span>
+  <div class="oce-text">
+    <b data-oce-title>Lab 05 attendance app in the Code Editor</b>
+    {!compact && <span>React Native · phone emulator · nothing to install · a Guide panel with every step</span>}
+    {compact && <span>Working in the Code Editor? Open your project here.</span>}
+  </div>
+  <button type="button" class="btn btn-primary btn-sm oce-btn" data-oce-open>Open in Code Editor ↗</button>
+  <p class="oce-msg" data-oce-msg role="status" hidden></p>
+</div>
+
+<script>
+  const KEY = (id: string) => `ide:course:${id}`;
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-oce]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const id = root.dataset.oce!;
+      const btn = root.querySelector<HTMLButtonElement>('[data-oce-open]')!;
+      const msg = root.querySelector<HTMLElement>('[data-oce-msg]')!;
+      try { if (JSON.parse(localStorage.getItem(KEY(id)) ?? 'null')) btn.textContent = 'Continue in Code Editor ↗'; } catch { /* storage off */ }
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        msg.hidden = true;
+        try {
+          const { openCourseProject } = await import('@/ide/core/course-projects');
+          await openCourseProject(id);
+          btn.textContent = 'Continue in Code Editor ↗';
+        } catch (error) {
+          console.error('[lab] could not open the code editor', error);
+          msg.hidden = false;
+          msg.textContent = 'Could not open the Code Editor. Allow pop-ups for this site, or open “Code editor” in the menu and choose the project under Lab projects.';
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .oce { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 16px; margin: 20px 0 24px; padding: 16px 18px; border-radius: var(--r-lg); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+  .oce.compact { padding: 12px 14px; margin: 14px 0 18px; }
+  .oce-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); }
+  .oce-icon svg { width: 24px; height: 24px; }
+  .oce.compact .oce-icon { width: 36px; height: 36px; border-radius: 10px; }
+  .oce-text { display: grid; gap: 2px; min-width: 0; }
+  .oce-text b { font-size: 15px; }
+  .oce-text span { font-size: 13px; color: var(--text-2); }
+  .oce-btn { white-space: nowrap; }
+  .oce-msg { grid-column: 1 / -1; margin: 0 !important; font-size: 13px; color: var(--danger, #f87171); }
+  @media (max-width: 560px) { .oce { grid-template-columns: auto minmax(0, 1fr); } .oce-btn { grid-column: 1 / -1; justify-self: start; } }
+</style>

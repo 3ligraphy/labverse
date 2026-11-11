@@ -228,6 +228,14 @@ createRoot(document.getElementById('root')).render(<App />);`,
 
 test('unknown package gives a clear message', async () => {
   const { run } = harness();
-  const r = await run({ 'App.tsx': `import axios from 'axios';\nexport default function App() { axios.get('/x'); return null; }` });
-  assert.match(r.error!.message, /The package 'axios' isn't available/);
+  const r = await run({ 'App.tsx': `import _ from 'lodash';\nexport default function App() { _.noop(); return null; }` });
+  assert.match(r.error!.message, /The package 'lodash' isn't available/);
+});
+
+test('axios is built in (Lab 05: fetch or Axios)', async () => {
+  const { run, d } = harness();
+  const r = await run({ 'App.tsx': `import axios, { create } from 'axios';\nimport { Text } from 'react-native';\nexport default function App() { return <Text>{typeof axios.get + typeof create + typeof axios.create({}).post}</Text>; }` });
+  assert.equal(r.error, undefined);
+  assert.equal(r.rendered, true);
+  assert.match(await d.text(), /functionfunctionfunction/);
 });

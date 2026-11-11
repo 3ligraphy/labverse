@@ -198,9 +198,10 @@ function apply(cls: string, s: RNStyle, ratio: Ratio): boolean {
     return true;
   }
   if ((m = /^rotate-(\d+)$/.exec(c))) return (ratio.transform = [...(ratio.transform ?? []), { rotate: `${neg ? '-' : ''}${m[1]}deg` }]), true;
-  if ((m = /^scale-(x-|y-)?(\d+)$/.exec(c))) {
+  // scale-95, and an exact value: scale-[0.98]
+  if ((m = /^scale-(x-|y-)?(?:(\d+)|\[(\d*\.?\d+)\])$/.exec(c))) {
     const key = m[1] === 'x-' ? 'scaleX' : m[1] === 'y-' ? 'scaleY' : 'scale';
-    ratio.transform = [...(ratio.transform ?? []), { [key]: Number(m[2]) / 100 }];
+    ratio.transform = [...(ratio.transform ?? []), { [key]: m[2] !== undefined ? Number(m[2]) / 100 : Number(m[3]) }];
     return true;
   }
 

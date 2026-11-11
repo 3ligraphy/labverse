@@ -52,9 +52,11 @@ export default defineConfig({
         },
       },
     ],
-    optimizeDeps: { exclude: ['@webcontainer/api', 'monaco-editor'] },
-    // dev only: the lab previews (sandboxed iframes, origin "null") can call the local APIs, as they call the real ones
-    server: { cors: { origin: '*' } },
+    optimizeDeps: { exclude: ['monaco-editor'] },
+    // dev only: the dev server adds no CORS headers of its own, so the APIs answer cross-origin requests (and their
+    // OPTIONS preflights) exactly as in production — the lab previews (sandboxed iframes, origin "null") call them.
+    // (With its own CORS on, both added Access-Control-Allow-Origin and the browser refused the answer.)
+    server: { cors: false },
   },
   markdown: {
     shikiConfig: {
