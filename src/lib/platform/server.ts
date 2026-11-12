@@ -12,6 +12,7 @@ import { compileLab, compileModule, emptyFlow, flowLeader, labKey, orderFlow, pa
 import { DEFAULT_FACULTY, DEFAULT_SETTINGS, kindOf, listOf, moduleFaculty, type Audience, type Category } from '@/lib/accounts/core';
 import type { ModuleBannerInput } from './banner';
 import { shippedSeeds } from './seeds/index';
+import { shippedModules, type LabRow, type ModuleRow } from './shipped';
 
 const env = (key: string) => getSecret(key) || undefined;
 const onVercel = () => Boolean(env('VERCEL'));
@@ -31,8 +32,7 @@ export const BUILT_IN_MODULE = {
 };
 
 /** labNodes: the lab components the admin allows in this module's lab canvas (null = every component). */
-export type ModuleRow = { slug: string; title: string; published: boolean; flow: Flow; labNodes: LabNodeType[] | null; created_at: string; updated_at: string };
-export type LabRow = { module: string; slug: string; title: string; published: boolean; flow: Flow; created_at: string; updated_at: string };
+export type { ModuleRow, LabRow };
 export type ModuleBannerRow = ModuleBannerInput & { id: string; module: string; published: boolean; created_by: string; created_at: string; updated_at: string };
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : String(v));
@@ -317,10 +317,23 @@ export async function ensureBuiltInBuilder(): Promise<ModuleRow | null> {
 /** A published module with its published labs, in builder order. */
 export async function loadModule(slug: string, opts: { drafts?: boolean } = {}) {
   const s = getPlatformStore();
-  const mod = s ? await s.getModule(slug) : null;
+  let mod: ModuleRow | null;
+  let rows: LabRow[];
+  try {
+    if (!s) throw new Error('no database');
+    mod = await s.getModule(slug);
+    rows = mod ? await s.listLabs(slug) : [];
+  } catch (error) {
+    // the database cannot be read (e.g. a hosting quota): a module that ships with the code still opens from the code
+    const shipped = shippedModules().get(slug);
+    if (!shipped) { if (!s) return null; throw error; }
+    if (s) console.warn(`[platform] database unavailable, ${slug} is shown from the code`, error);
+    mod = shipped.module;
+    rows = shipped.labs;
+  }
   if (!mod || (!mod.published && !opts.drafts)) return null;
   const compiled = compileModule(mod.flow);
-  const labs = new Map((await s!.listLabs(slug)).filter((l) => l.published || opts.drafts).map((l) => [l.slug, l]));
+  const labs = new Map(rows.filter((l) => l.published || opts.drafts).map((l) => [l.slug, l]));
   let week = '';
   const items: { lab: LabRow; compiled: CompiledLab; week: string; n: number }[] = [];
   for (const it of compiled.items) {
@@ -357,7 +370,17 @@ export type ModuleCard = Audience & { code: string; title: string; term: string;
  */
 export async function moduleCards(builtInAudience: { category: string; years: string; specializations: string; semester?: string; open?: boolean; faculty?: string }, builtInLabs: number, categories: Category[] = DEFAULT_SETTINGS.categories): Promise<ModuleCard[]> {
   const s = getPlatformStore();
-  const [rows, labs] = s ? await Promise.all([s.listModules().catch(() => []), s.listLabs().catch(() => [])]) : [[], []];
+  let rows: ModuleRow[];
+  let labs: LabRow[];
+  try {
+    if (!s) throw new Error('no database');
+    [rows, labs] = await Promise.all([s.listModules(), s.listLabs()]);
+  } catch {
+    // without the database the modules that ship with the code are still listed (see loadModule)
+    const shipped = [...shippedModules().values()];
+    rows = shipped.map((x) => x.module);
+    labs = shipped.flatMap((x) => x.labs);
+  }
   const cat = (v: string | undefined) => (v || 'Core').trim();
   const sem = (v: string | undefined) => (v === 'Semester 2' || v === 'Both' ? v : 'Semester 1') as Audience['semester'];
   return [
