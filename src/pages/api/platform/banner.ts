@@ -17,6 +17,8 @@ export const GET: APIRoute = async ({ url }) => {
     return response;
   } catch (error) {
     console.error('[platform] public banner failed', error);
-    return json({ banner: null }, 500);
+    // temporary diagnostic (2026-11-12): the database error behind the missing modules (no secrets in it: code + message)
+    const e = error as { code?: unknown; message?: unknown };
+    return json({ banner: null, error: { code: e?.code ?? null, message: String(e?.message ?? error).slice(0, 300) } }, 500);
   }
 };
