@@ -6,13 +6,14 @@ import { shippedState } from '../src/lib/platform/shipped.ts';
 import { compileModule, orderFlow, type Flow } from '../src/lib/platform/core.ts';
 import type { Seed } from '../src/lib/platform/seeds/index.ts';
 
-test('Intro to Computing: the practice lab is published, the week 6 revision stays hidden, the settings are applied', () => {
+test('Intro to Computing: all three labs are published (seed @12 showed week 6 again), the settings are applied', () => {
   const s = shippedState().get('intro-to-computing');
   assert.ok(s, 'the module ships');
   assert.equal(s.module.published, true);
   const lab = (slug: string) => s.labs.find((l) => l.slug === slug);
   assert.equal(lab('revision-practice')?.published, true);
-  assert.equal(lab('revision-week-6')?.published, false, 'seed @8 hid it');
+  assert.equal(lab('revision-week-6')?.published, true, 'seed @8 hid it, seed @12 shows it again');
+  assert.equal(lab('type-and-draw')?.published, true, 'seed @11 added Lab 3');
   const meta = compileModule(s.module.flow).meta;
   assert.equal(meta.public, 'Yes', 'seed @6');
   assert.equal(meta.leaderName, 'Prof. Gerard McKee', 'seed @10');

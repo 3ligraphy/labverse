@@ -43,5 +43,5 @@ const { block: b, lab, label } = Astro.props;
 {b.kind === 'browser' && <WebPreview title={b.title} url={b.url} html={b.html} height={b.height} caption={b.caption} />}
 {b.kind === 'websandbox' && <WebSandbox id={b.id} title={b.title} goalHtml={b.htmlGoal} hint={b.hint} starter={b.starter} />}
 {b.kind === 'clickpath' && <ClickPath steps={b.steps} label={b.title || 'Click'} />}
-{(b.kind === 'cpp' || b.kind === 'cpppredict' || b.kind === 'cppanswer' || b.kind === 'parsons' || b.kind === 'cppvisual') && <CppBlock block={b} />}
+{(b.kind === 'cpp' || b.kind === 'cpppredict' || b.kind === 'cppanswer' || b.kind === 'parsons' || b.kind === 'cppvisual' || b.kind === 'flowchart') && <CppBlock block={b} />}
 {(b.kind === 'aiprompt' || b.kind === 'agentsim' || b.kind === 'aidiff' || b.kind === 'aivisual') && <AiBlock block={b} />}

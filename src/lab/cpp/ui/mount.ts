@@ -8,13 +8,15 @@ import type { CppCheck } from '../checks.ts';
 import { CppRunner } from './runner.ts';
 import { mountAnswer, mountParsons, mountPredict } from './puzzles.ts';
 import { mountVisual } from './visuals.ts';
+import { mountFlowchart, type FlowCfg } from '../../flow/ui.ts';
 
 type Cfg =
   | { kind: 'cpp'; id: string; starter: string; input: string; checks: CppCheck[]; hints: string[]; paste: boolean }
   | { kind: 'cpppredict'; id: string; code: string; input: string; options: { text: string; correct: boolean }[]; trace: boolean }
   | { kind: 'cppanswer'; id: string; mode: 'output' | 'value' | 'input'; code: string; input: string; hashes: string[]; expected: string; ignoreCase?: boolean }
   | { kind: 'parsons'; id: string; code: string; input: string }
-  | { kind: 'cppvisual'; id: string; visual: string; text: string };
+  | { kind: 'cppvisual'; id: string; visual: string; text: string }
+  | FlowCfg;
 
 function tracker(el: HTMLElement) {
   return (passed: number, total: number, code: string) => {
@@ -58,6 +60,8 @@ function start(el: HTMLElement) {
       mountParsons(host, { id: cfg.id, code: cfg.code, input: cfg.input }, track);
     } else if (cfg.kind === 'cppvisual') {
       mountVisual(host, cfg.visual, cfg.text);
+    } else if (cfg.kind === 'flowchart') {
+      mountFlowchart(host, cfg, (passed, total, code) => track(passed, total, code));
     }
   } catch (error) {
     console.error('[cpp] could not start this widget', error);

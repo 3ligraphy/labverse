@@ -8,6 +8,7 @@
 import { compileLab, compileModule, nodesOfKits, sanitizeFlow, type Flow, type LabNodeType } from '../core.ts';
 import { introComputingModule, introComputingRevisionLab } from './intro-computing-revision.ts';
 import { introComputingPracticeLab } from './intro-computing-practice.ts';
+import { introComputingTypeDrawLab } from './intro-computing-type-draw.ts';
 import { aiForCodingLab01, aiForCodingModule } from './ai-for-coding.ts';
 
 export type Seed = {
@@ -67,6 +68,11 @@ export function shippedSeeds(): Seed[] {
     // the module page shows its teaching team: the module leader and the other lecturer (from the lecture slides)
     { ...seed('intro-to-computing@10', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']), []),
       patch: { leader: 'gerard.mckee@bue.edu.eg', leaderName: 'Prof. Gerard McKee', lecturers: 'Assoc. Prof. Wessam El-Behaidy' } },
+    // Lab 3: the class test answers, then C++ code and flowcharts from zero to hero (flowcharts that run)
+    { ...seed('intro-to-computing@11', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
+      [{ slug: 'type-and-draw', flow: introComputingTypeDrawLab() }]), extend: true },
+    // the three labs are shown again: the week 6 revision lab is visible next to the practice lab and Lab 3
+    { ...seed('intro-to-computing@12', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']), []), publish: { 'revision-week-6': true } },
     // AI FOR CODING: a new module in the Neon design, with Lab 01 — prompt engineering and coding agents
     seed('ai-for-coding@1', 'ai-for-coding', aiForCodingModule(), nodesOfKits(['ai']),
       [{ slug: 'lab-01', flow: aiForCodingLab01() }]),

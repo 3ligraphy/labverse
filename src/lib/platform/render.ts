@@ -63,7 +63,7 @@ export async function renderBlocks(blocks: Block[]): Promise<RenderedBlock[]> {
       case 'quiz': return { ...b, htmlQuestion: await markdown(b.question), htmlExplain: await markdown(b.explain) };
       case 'prompt': return { ...b, htmlExpect: await markdown(b.expect) };
       case 'websandbox': return { ...b, htmlGoal: await markdown(b.goal) };
-      case 'cpp': case 'parsons': return { ...b, htmlGoal: await markdown(b.goal) };
+      case 'cpp': case 'parsons': case 'flowchart': return { ...b, htmlGoal: await markdown(b.goal) };
       case 'cpppredict': return { ...b, htmlQuestion: await markdown(b.question), htmlExplain: await markdown(b.explain) };
       case 'cppanswer': return { ...b, htmlQuestion: await markdown(b.question), htmlExplain: await markdown(b.explain) };
       case 'cppvisual': return { ...b, html: await markdown(b.caption) };

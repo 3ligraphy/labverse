@@ -524,5 +524,8 @@ export function introComputingModule(): Flow {
     { id: 'week-6', type: 'divider', data: { title: 'Week 6 · Revision' } },
     { id: 'lab-revision', type: 'lab', data: { slug: 'revision-week-6' } },
     { id: 'lab-practice', type: 'lab', data: { slug: 'revision-practice' } },
+    // Lab 3 (seed @11): class test answers, then C++ code and flowcharts from zero to hero
+    { id: 'week-8', type: 'divider', data: { title: 'Week 8 · Code and flowcharts' } },
+    { id: 'lab-type-draw', type: 'lab', data: { slug: 'type-and-draw' } },
   ]);
 }

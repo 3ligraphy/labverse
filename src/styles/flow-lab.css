@@ -1,0 +1,60 @@
+/* Flowchart widgets (src/lab/flow/ui.ts) inside C++ kit blocks (.cx-block). Colours: each shape kind has its own
+   tint so students learn the shapes; running / wrong / selected states use the accent, danger and dashes. */
+.cx-k-flowchart { --kc: #ff8ad8; }
+.fc { display: grid; gap: 12px; min-width: 0; }
+.fc-stage, .fc-canvas { border: 1px solid var(--line); border-radius: 12px; background: var(--code-bg, var(--surface-2)); padding: 10px; overflow-x: auto; min-width: 0; }
+.fc-stage .fc-svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+.fc-canvas { position: relative; max-height: 640px; overflow: auto; outline-offset: 2px; }
+.fc-canvas .fc-svg { display: block; max-width: none; }
+.fc-shape { fill: var(--surface); stroke: var(--text-3); stroke-width: 1.6; transition: stroke 0.15s ease-out, fill 0.15s ease-out; }
+.fc-terminal .fc-shape { fill: color-mix(in oklab, #34d399 16%, var(--surface)); stroke: #34d399; }
+.fc-io .fc-shape { fill: color-mix(in oklab, #60a5fa 16%, var(--surface)); stroke: #60a5fa; }
+.fc-process .fc-shape { fill: color-mix(in oklab, #fbbf24 14%, var(--surface)); stroke: #f59e0b; }
+.fc-decision .fc-shape { fill: color-mix(in oklab, #f472b6 14%, var(--surface)); stroke: #ec4899; }
+.fc-text { fill: var(--text); font: 600 13px/1 var(--font-mono, ui-monospace, monospace); font-variant-ligatures: none; pointer-events: none; }
+.fc-line { fill: none; stroke: var(--text-2); stroke-width: 1.6; }
+.fc-head { fill: var(--text-2); }
+.fc-hit { fill: none; stroke: transparent; stroke-width: 14; }
+.fc-label { font: 700 11px/1 var(--font-sans, system-ui, sans-serif); pointer-events: none; }
+.fc-label.fc-yes { fill: #16a34a; }
+.fc-label.fc-no { fill: #dc2626; }
+:root[data-theme='dark'] .fc-label.fc-yes { fill: #4ade80; }
+:root[data-theme='dark'] .fc-label.fc-no { fill: #f87171; }
+.fc-node.is-active .fc-shape { stroke: var(--accent); stroke-width: 3.2; fill: color-mix(in oklab, var(--accent) 22%, var(--surface)); }
+.fc-node.is-bad .fc-shape { stroke: var(--danger); stroke-width: 3.2; }
+.fc-node.is-blank .fc-shape { stroke-dasharray: 6 4; fill: var(--surface); }
+.fc-node.is-blank .fc-text { fill: var(--text-3); font-size: 16px; }
+.fc-node.is-selected .fc-shape { stroke: var(--accent); stroke-width: 2.6; stroke-dasharray: 5 3; }
+.fc-edge.is-selected .fc-line { stroke: var(--accent); stroke-width: 2.8; }
+.fc-temp { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; pointer-events: none; }
+.fc-mode-draw .fc-node { cursor: grab; touch-action: none; }
+.fc-mode-draw .fc-edge .fc-hit { cursor: pointer; }
+.fc-handle { fill: var(--accent); stroke: var(--surface); stroke-width: 2.5; cursor: crosshair; touch-action: none; }
+.fc-handle:hover { r: 9; }
+
+.fc-tools, .fc-edit, .fc-run-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fc-text-label, .fc-input-label { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; font-size: 13px; color: var(--text-2); }
+.fc-text-input, .fc-input, .fc-answer, .fc-select { flex: 1 1 auto; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-2, var(--line)); background: var(--surface); color: var(--text); font-size: 14px; }
+.fc-answer { width: 100%; resize: vertical; }
+.fc-hint { margin: 0 !important; font-size: 12px; color: var(--text-3); }
+.fc-run { display: grid; gap: 10px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); }
+.fc-run-out { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 560px) { .fc-run-out { grid-template-columns: 1fr; } }
+.fc-k { margin: 0 0 4px !important; font-size: 11px; letter-spacing: 0.04em; color: var(--text-3); }
+.fc-screen { margin: 0; min-height: 48px; max-height: 180px; overflow: auto; padding: 8px 10px; border-radius: 8px; background: var(--code-bg, #0b0f14); color: var(--text); font-size: 13px; white-space: pre-wrap; }
+.fc-vars { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 13px; }
+.fc-vars dt { color: var(--text-2); }
+.fc-vars dd { margin: 0; color: var(--text); }
+.fc-dim { color: var(--text-3); }
+.fc-msg { margin: 0 !important; font-size: 13px; }
+.fc-msg.ok { color: var(--accent-text, var(--accent)); }
+.fc-msg.bad { color: var(--danger); }
+.fc-q { margin: 0 !important; }
+.fc-fill { display: grid; gap: 8px; }
+.fc-fill-row { display: grid; grid-template-columns: 28px 96px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 13px; }
+.fc-letter { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); font-family: var(--font-mono, monospace); }
+.fc-results { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 6px; font-size: 13px; }
+.fc-results li { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); }
+.fc-results li.ok { border-color: color-mix(in oklab, #22c55e 50%, var(--line)); }
+.fc-results li.bad { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
+@media (prefers-reduced-motion: reduce) { .fc-shape { transition: none; } }

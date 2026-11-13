@@ -10,6 +10,9 @@ import { ALWAYS_OPEN } from '../progress/mode.ts';
 import type { Check, Step } from '../../runner/protocol';
 import { DEFAULT_FACULTY } from '../accounts/core.ts';
 import { parseCppChecks, type CppCheck } from '../../lab/cpp/checks.ts';
+import { parseChart, type Chart } from '../../lab/flow/chart.ts';
+import { parseFlowChecks } from '../../lab/flow/check.ts';
+import { runChart } from '../../lab/flow/run.ts';
 import { parseAgentScript, parseDiff, parseRubric, type AgentStep, type DiffLine, type RubricItem } from '../../lab/ai/core.ts';
 
 /* --------------------------------------------------------------- node types */
@@ -45,6 +48,14 @@ export const MODULE_SKINS: Record<string, string> = { Standard: '', 'Neon (futur
 /** how students get into a lab: a session the TA starts, or open any time (a permanent session, still tracked) */
 export const LAB_ACCESS = ['TA starts a session', 'Open any time (no session, still tracked)'] as const;
 /** typed-answer questions: what the student types and how it is checked */
+/** flowchart node: what the student does with the chart (label in the builder → mode) */
+export type FlowMode = 'show' | 'trace' | 'fill' | 'draw';
+export const FLOW_MODES: Record<string, FlowMode> = {
+  'Show it running': 'show',
+  'Read it and type the output': 'trace',
+  'Fill the empty boxes': 'fill',
+  'Draw it yourself': 'draw',
+};
 export const ANSWER_MODES: Record<string, 'output' | 'value' | 'input'> = {
   'What it prints (the output)': 'output',
   'A value': 'value',
@@ -310,6 +321,21 @@ export const LAB_NODES = {
       { key: 'caption', label: 'Caption', kind: 'markdown', max: 1000 },
     ],
     defaults: { visual: Object.keys(CPP_VISUALS)[0], text: '', caption: '' },
+  },
+  flowchart: {
+    label: 'Flowchart', hint: 'A flowchart that runs like a program: watch it run, read it and type the output, fill its boxes, or draw it', color: '#ff8ad8', glyph: '◇', kit: 'cpp',
+    fields: [
+      { key: 'title', label: 'Title', kind: 'text', max: 120 },
+      { key: 'goal', label: 'Goal', kind: 'markdown', max: 3000 },
+      { key: 'mode', label: 'The student', kind: 'select', options: Object.keys(FLOW_MODES), help: 'Show: the chart runs step by step. Read: type what it prints for the input. Fill: choose the text of every box written ? from the bank. Draw: draw it from the chart below (usually only Start and End).' },
+      { key: 'chart', label: 'Flowchart', kind: 'code', max: 8000,
+        help: 'One shape per line: id kind column,row text — kinds start, end, input, output, process, decision (e.g. “d decision 0,2 b = 0?”). Arrows: a -> b -> c, and d -yes-> x, d -no-> y. Write ? as the text of a box to fill.' },
+      { key: 'input', label: 'What the user types', kind: 'textarea', help: 'For Show and Read: the input the chart runs with (numbers or words separated by spaces).', max: 1000 },
+      { key: 'bank', label: 'Texts to choose from (Fill)', kind: 'lines', help: 'One per line: the right texts and a few wrong ones.', max: 3000 },
+      { key: 'checks', label: 'Checks (Fill and Draw)', kind: 'lines', max: 4000,
+        help: 'One per line, like the C++ checks: name :: in 25; expect 77 — also “not text”, “exact text”, “uses decision”, “uses loop”.' },
+    ],
+    defaults: { title: 'Flowchart', goal: '', mode: Object.keys(FLOW_MODES)[0], chart: ['s start 0,0 Start', 'e end 0,1 End', 's -> e'].join('\n'), input: '', bank: '', checks: '' },
   },
   aiprompt: {
     label: 'Prompt workbench', hint: 'Students write a prompt; a live scanner lights up each ingredient it has (graded by the rubric)', color: '#00e5ff', glyph: '⌬', kit: 'ai',
@@ -615,7 +641,7 @@ export function parseChecks(text: string): Result<Check[]> {
 /* ------------------------------------------------------------- compile a lab */
 
 /** A graded item of a lab. RN exercises carry runner checks; C++ items (kind) carry one entry per check, for counting. */
-export type Exercise = { title: string; goal?: string; hint?: string; files: Record<string, string>; solution?: Record<string, string>; checks: Check[]; kind?: 'cpp' | 'cpppredict' | 'cppanswer' | 'parsons' | 'aiprompt' | 'agentsim' | 'aidiff' };
+export type Exercise = { title: string; goal?: string; hint?: string; files: Record<string, string>; solution?: Record<string, string>; checks: Check[]; kind?: 'cpp' | 'cpppredict' | 'cppanswer' | 'parsons' | 'aiprompt' | 'agentsim' | 'aidiff' | 'flowchart' };
 export type Block =
   | { kind: 'part'; n: string; title: string; time: string }
   | { kind: 'task'; n: string; title: string; time: string; body: string; children: Block[] }
@@ -640,6 +666,7 @@ export type Block =
   | { kind: 'cppanswer'; id: string; question: string; code: string; input: string; mode: 'output' | 'value' | 'input'; answers: string[]; ignoreCase: boolean; explain: string }
   | { kind: 'parsons'; id: string; title: string; goal: string; code: string; input: string }
   | { kind: 'cppvisual'; id: string; visual: string; text: string; caption: string }
+  | { kind: 'flowchart'; id: string; title: string; goal: string; mode: FlowMode; chart: Chart; input: string; bank: string[]; checks: string }
   | { kind: 'aiprompt'; id: string; title: string; goal: string; starter: string; rubric: RubricItem[]; minWords: number; example: string }
   | { kind: 'agentsim'; id: string; title: string; goal: string; steps: AgentStep[] }
   | { kind: 'aidiff'; id: string; title: string; goal: string; file: string; lines: DiffLine[] }
@@ -872,6 +899,29 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
         const visual = CPP_VISUALS[d.visual ?? ''];
         if (!visual) { warnings.push(`Visual “${d.visual}” is not available.`); break; }
         push({ kind: 'cppvisual', id: `${key}--${node.id}`, visual, text: d.text ?? '', caption: d.caption ?? '' });
+        break;
+      }
+      case 'flowchart': {
+        const id = `${key}--${node.id}`;
+        const title = d.title || 'Flowchart';
+        const mode = FLOW_MODES[d.mode ?? ''] ?? 'show';
+        const chart = parseChart(d.chart ?? '');
+        if (!chart.ok) { warnings.push(`Flowchart “${title}” (${node.id}): ${chart.error}`); break; }
+        const checks = parseFlowChecks(d.checks ?? '');
+        if (!checks.ok) { warnings.push(`Flowchart “${title}”: ${checks.error}`); break; }
+        if ((mode === 'fill' || mode === 'draw') && !checks.value.length) { warnings.push(`Flowchart “${title}” needs checks to mark the student's chart.`); break; }
+        const bank = (d.bank ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        if (mode === 'fill' && !bank.length) { warnings.push(`Flowchart “${title}” needs texts to choose from.`); break; }
+        if (mode === 'show' || mode === 'trace') {
+          const run = runChart(chart.value, d.input ?? '');
+          if (!run.ok) { warnings.push(`Flowchart “${title}” does not run: ${run.error?.message}`); break; }
+        }
+        push({ kind: 'flowchart', id, title, goal: d.goal ?? '', mode, chart: chart.value, input: d.input ?? '', bank, checks: d.checks ?? '' });
+        if (mode !== 'show') {
+          exercises[id] = { kind: 'flowchart', title, goal: d.goal || undefined, files: { 'flowchart.txt': d.chart ?? '' },
+            checks: mode === 'trace' ? [{ name: 'Right output', steps: [] }] : checks.value.map((c) => ({ name: c.name, steps: [] })) };
+          outline.push(`<Playground ex="${id}" />`);
+        }
         break;
       }
     }

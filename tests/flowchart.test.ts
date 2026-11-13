@@ -162,3 +162,26 @@ test('the picture: one shape per node, arrows with heads, Yes/No labels, safe te
   const blank = chartSvg(chart('s start 0,0 Start\np process 0,1 ?\ne end 0,2 End\ns -> p -> e'), { blanks: { p: 'A' } });
   assert.match(blank, /is-blank/);
 });
+
+test('the builder node: a lab with flowcharts compiles to blocks and graded exercises, broken charts warn', async () => {
+  const { compileLab, sanitizeFlow } = await import('../src/lib/platform/core.ts');
+  const fc = (id: string, data: Record<string, string>) => ({ id, type: 'flowchart', data: { title: id, goal: 'Make it.', input: '', bank: '', checks: '', ...data } });
+  const nodes = [
+    { id: 'root', type: 'start', data: { title: 'Flowcharts' } },
+    { id: 'p1', type: 'part', data: { title: 'Charts', time: '10 min' } },
+    fc('f-show', { mode: 'Show it running', chart: C_TO_F, input: '25' }),
+    fc('f-trace', { mode: 'Read it and type the output', chart: DIVIDE, input: '7 0' }),
+    fc('f-fill', { mode: 'Fill the empty boxes', chart: C_TO_F.replace('F = 1.8 * C + 32', '?'), bank: 'F = 1.8 * C + 32\nF = C + 32', checks: 'Body heat :: in 37; expect 98.6' }),
+    fc('f-draw', { mode: 'Draw it yourself', chart: 's start 0,0 Start\ne end 0,4 End', checks: 'Freezing :: in 0; expect 32' }),
+    fc('f-bad', { mode: 'Show it running', chart: 'x blob 0,0 Hi' }),
+  ];
+  const flow = sanitizeFlow({ nodes: nodes.map((n, i) => ({ ...n, x: 0, y: i * 100 })), edges: nodes.slice(1).map((n, i) => ({ from: nodes[i].id, to: n.id })) }, 'lab');
+  assert.ok(flow.ok, flow.ok ? '' : flow.error);
+  const lab = compileLab(flow.value, 'm--l');
+  const blocks = lab.blocks.filter((b) => b.kind === 'flowchart') as Extract<(typeof lab.blocks)[number], { kind: 'flowchart' }>[];
+  assert.deepEqual(blocks.map((b) => b.mode), ['show', 'trace', 'fill', 'draw']);
+  assert.equal(blocks[0].chart.nodes.length, 5);
+  assert.deepEqual(blocks[2].bank, ['F = 1.8 * C + 32', 'F = C + 32']);
+  assert.deepEqual(Object.keys(lab.exercises).sort(), ['m--l--f-draw', 'm--l--f-fill', 'm--l--f-trace']);
+  assert.ok(lab.warnings.some((w) => /f-bad|blob/.test(w)), lab.warnings.join(' | '));
+});
