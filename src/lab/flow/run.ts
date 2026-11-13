@@ -11,7 +11,8 @@ import { isInputText, isStartText, type Chart, type FNode } from './chart.ts';
 
 type Val = { t: 'int' | 'float'; v: number } | { t: 'str'; v: string } | { t: 'bool'; v: boolean };
 export type RunError = { message: string; node?: string };
-export type RunResult = { ok: boolean; output: string; path: string[]; vars: Record<string, string>; error?: RunError };
+export type TraceStep = { node: string; vars: Record<string, string>; output: string };
+export type RunResult = { ok: boolean; output: string; path: string[]; vars: Record<string, string>; error?: RunError; trace?: TraceStep[] };
 class FlowError extends Error {}
 
 /* ------------------------------------------------------------------ values */
@@ -195,13 +196,15 @@ export function hasLoop(c: Chart): boolean {
   return visit(start.id);
 }
 
-export function runChart(chart: Chart, input: string, opts: { maxSteps?: number } = {}): RunResult {
+export function runChart(chart: Chart, input: string, opts: { maxSteps?: number; trace?: boolean } = {}): RunResult {
   const max = opts.maxSteps ?? 5000;
+  const trace: TraceStep[] | undefined = opts.trace ? [] : undefined;
+  const snap = () => Object.fromEntries([...vars].map(([k, v]) => [k, show(v)]));
   const vars = new Map<string, Val>();
   const path: string[] = [];
   let output = '';
   const words = input.split(/\s+/).filter(Boolean);
-  const done = (error?: RunError): RunResult => ({ ok: !error, output, path, vars: Object.fromEntries([...vars].map(([k, v]) => [k, show(v)])), error });
+  const done = (error?: RunError): RunResult => ({ ok: !error, output, path, vars: snap(), error, ...(trace ? { trace } : {}) });
   const starts = chart.nodes.filter((x) => x.shape === 'terminal' && isStartText(x.text));
   if (!starts.length) return done({ message: 'Your flowchart needs a Start shape: an oval with the word Start.' });
   if (starts.length > 1) return done({ message: `There are ${starts.length} Start shapes: keep only one.` });
@@ -214,11 +217,12 @@ export function runChart(chart: Chart, input: string, opts: { maxSteps?: number 
       if (steps > max) throw Object.assign(new FlowError(`Your flowchart ran ${max} steps and never ends: does every loop have a way out?`), { node: node.id });
       try {
         const outs = chart.edges.filter((e) => e.from === node.id);
-        if (node.shape === 'terminal' && !isStartText(node.text)) return done();
+        if (node.shape === 'terminal' && !isStartText(node.text)) { trace?.push({ node: node.id, vars: snap(), output }); return done(); }
         if (node.shape === 'decision') {
           const yes = outs.find((e) => e.label === 'yes'), no = outs.find((e) => e.label === 'no');
           if (!yes || !no) throw new FlowError(`A decision needs a Yes and a No arrow: ${label(node)}.`);
           const go = truthy(evaluate(node.text, vars)) ? yes : no;
+          trace?.push({ node: node.id, vars: snap(), output });
           node = byId.get(go.to)!;
           continue;
         }
@@ -239,6 +243,7 @@ export function runChart(chart: Chart, input: string, opts: { maxSteps?: number 
         } else if (node.shape === 'process') statement(node.text, vars);
         if (outs.length === 0) throw new FlowError(`${label(node)} has no arrow out: connect it to the next shape.`);
         if (outs.length > 1) throw new FlowError(`${label(node)} has more than one arrow out: only a decision (diamond) can split the path.`);
+        trace?.push({ node: node.id, vars: snap(), output });
         node = byId.get(outs[0].to)!;
       } catch (e) {
         if (e instanceof FlowError) throw Object.assign(e, { node: (e as FlowError & { node?: string }).node ?? node.id });

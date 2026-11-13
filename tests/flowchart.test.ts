@@ -135,3 +135,30 @@ test('checks: the same lines as C++ checks, plus uses decision / uses loop', () 
   assert.equal(checkChart(chart(C_TO_F), 'Has a loop :: uses loop')[0].pass, false);
   assert.match(checkChart(chart(C_TO_F), 'Has a loop :: uses loop')[0].message ?? '', /loop/);
 });
+
+test('a trace records the variables and the screen after every shape (for the step-by-step visual)', () => {
+  const r = runChart(chart(C_TO_F), '25', { trace: true });
+  assert.deepEqual(r.trace?.map((t) => t.node), ['s', 'i', 'p', 'o', 'e']);
+  assert.deepEqual(r.trace?.[1].vars, { C: '25' });
+  assert.equal(r.trace?.[2].vars.F, '77');
+  assert.equal(r.trace?.[2].output, '', 'nothing printed before the Output shape');
+  assert.equal(r.trace?.[3].output, '77\n');
+  assert.equal(runChart(chart(C_TO_F), '25').trace, undefined, 'no trace unless asked');
+});
+
+test('the picture: one shape per node, arrows with heads, Yes/No labels, safe text, the running shape marked', async () => {
+  const { chartSvg } = await import('../src/lab/flow/svg.ts');
+  const svg = chartSvg(chart(DIVIDE), { active: 'd' });
+  assert.equal((svg.match(/data-node="/g) ?? []).length, 6);
+  assert.equal((svg.match(/data-edge="/g) ?? []).length, 6);
+  assert.match(svg, /marker-end="url\(#fc-arrow/);
+  assert.match(svg, />Yes</);
+  assert.match(svg, />No</);
+  assert.match(svg, /class="fc-node fc-decision is-active" data-node="d"/);
+  assert.match(svg, /<polygon/);
+  const evil = chartSvg(chart('s start 0,0 Start\no output 0,1 Output "<b>hi</b>"\ne end 0,2 End\ns -> o -> e'));
+  assert.doesNotMatch(evil, /<b>/);
+  assert.match(evil, /&lt;b&gt;/);
+  const blank = chartSvg(chart('s start 0,0 Start\np process 0,1 ?\ne end 0,2 End\ns -> p -> e'), { blanks: { p: 'A' } });
+  assert.match(blank, /is-blank/);
+});
