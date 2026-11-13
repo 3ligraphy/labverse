@@ -185,3 +185,59 @@ test('the builder node: a lab with flowcharts compiles to blocks and graded exer
   assert.deepEqual(Object.keys(lab.exercises).sort(), ['m--l--f-draw', 'm--l--f-fill', 'm--l--f-trace']);
   assert.ok(lab.warnings.some((w) => /f-bad|blob/.test(w)), lab.warnings.join(' | '));
 });
+
+/* ------------------------------------------------------------------ C++ ideas in flowcharts (perfect solutions) */
+const run1 = (body: string[], input = '') => {
+  const lines = ['s start 0,0 Start', ...body.map((t, i) => `n${i} ${/^\s*(input|getline)/i.test(t) ? 'input' : /^\s*output/i.test(t) ? 'output' : 'process'} 0,${i + 1} ${t}`), `e end 0,${body.length + 1} End`];
+  const ids = ['s', ...body.map((_, i) => `n${i}`), 'e'];
+  return runChart(chart([...lines, ids.join(' -> ')].join('\n')), input);
+};
+
+test('declarations: float makes / a real division, int keeps whole numbers, const cannot change', () => {
+  assert.equal(run1(['float a = 0, b = 0', 'Input a, b', 'Output a / b'], '7 2').output.trim(), '3.5');
+  assert.equal(run1(['int a = 0, b = 0', 'Input a, b', 'Output a / b'], '7 2').output.trim(), '3');
+  assert.equal(run1(['int x = 7 / 2.0', 'Output x']).output.trim(), '3', 'an int keeps the whole part');
+  assert.match(run1(['const float pi = 3.14159', 'pi = 3'], '').error?.message ?? '', /constant/);
+  assert.equal(run1(['const float pi = 3.14159', 'float r = 0', 'Input r', 'Output 2 * pi * r'], '2').output.trim(), '12.5664');
+});
+
+test('characters are numbers: char(c - 32), int(c), comparisons with letters', () => {
+  assert.equal(run1(["char c = ' '", 'Input c', 'Output char(c - 32), " ", int(c), " ", char(c + 1)'], 'a').output.trim(), 'A 97 b');
+  const r = runChart(chart(`s start 0,0 Start\nd0 process 0,1 char c = ' '\ni input 0,2 Input c\nd decision 0,3 c >= 'a' and c <= 'z'?\ny output 1,4 Output "lower"\nn output 0,4 Output "other"\ne end 0,5 End\ns -> d0 -> i -> d\nd -yes-> y\nd -no-> n\ny -> e\nn -> e`), 'Q');
+  assert.equal(r.output.trim(), 'other');
+});
+
+test('strings: Input line (getline), length, find, npos, substr, [i], stoi and escapes', () => {
+  assert.equal(run1(['string name = ""', 'int age = 0', 'Input line name', 'Input age', 'Output "Hello ", name, ", next year you will be ", age + 1'], 'Mohamed Salah\n32').output.trim(), 'Hello Mohamed Salah, next year you will be 33');
+  assert.equal(run1(['string s = ""', 'int p = 0', 'Input s', "p = s.find('-')", 'Output stoi(s.substr(0, p)) + stoi(s.substr(p + 1)), " ", s.length(), " ", s[p]'], '10-2').output.trim(), '12 4 -');
+  assert.equal(run1(['string s = "abc"', "Output s.find('z') == npos"]).output.trim(), 'true');
+  assert.equal(run1(['Output "Name:\tMona"']).output, 'Name:\tMona\n');
+  assert.equal(run1(['string s = "myname@BUE.EDU.EG"', "int dot = s.find('.')", 'Output s.substr(dot + 1, 3), " ", s.substr(dot + 1), " ", s.at(0)']).output.trim(), 'EDU EDU.EG m');
+});
+
+test('buildChart: steps, if/else and loops become a tidy chart that runs (no two shapes in one place)', async () => {
+  const { buildChart } = await import('../src/lab/flow/build.ts');
+  const src = buildChart([
+    'int n = 0, total = 0, k = 1',
+    'Input n',
+    { while: 'k <= n', body: ['total = total + k', 'k = k + 1'] },
+    { if: 'total > 10', yes: ['Output "big ", total'], no: ['Output "small ", total'] },
+  ]);
+  const c = chart(src);
+  assert.equal(runChart(c, '4').output.trim(), 'small 10');
+  assert.equal(runChart(c, '5').output.trim(), 'big 15');
+  assert.equal(c.nodes.filter((x) => x.shape === 'decision').length, 2);
+  assert.ok(c.nodes.some((x) => x.text === 'k <= n?'), 'decisions end with ?');
+  const spots = c.nodes.map((x) => `${x.x},${x.y}`);
+  assert.equal(new Set(spots).size, spots.length, 'no two shapes overlap');
+  assert.equal(checkChart(c, 'Loop :: uses loop; uses decision')[0].pass, true);
+  const nested = chart(buildChart(['int a = 0, b = 0, c = 0', 'Input a, b, c', { if: 'a > b', yes: [{ if: 'a > c', yes: ['Output a'], no: ['Output c'] }], no: [{ if: 'b > c', yes: ['Output b'], no: ['Output c'] }] }]));
+  for (const [inp, want] of [['9 4 2', '9'], ['1 2 3', '3'], ['4 9 2', '9'], ['4 2 9', '9']]) assert.equal(runChart(nested, inp).output.trim(), want, inp);
+  const ns = nested.nodes.map((x) => `${x.x},${x.y}`);
+  assert.equal(new Set(ns).size, ns.length);
+});
+
+test('and / or stop early like C++, so a guard protects s[i]', () => {
+  assert.equal(run1(['string s = "end -"', "int p = s.find('-')", "Output p + 1 < s.length() and s[p + 1] >= '0'"]).output.trim(), 'false');
+  assert.equal(run1(['string s = "x"', "Output s.length() == 1 or s[5] == 'a'"]).output.trim(), 'true');
+});
