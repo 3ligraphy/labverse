@@ -11,7 +11,7 @@ import type { Check, Step } from '../../runner/protocol';
 import { DEFAULT_FACULTY } from '../accounts/core.ts';
 import { parseCppChecks, type CppCheck } from '../../lab/cpp/checks.ts';
 import { parseChart, type Chart } from '../../lab/flow/chart.ts';
-import { parseFlowChecks } from '../../lab/flow/check.ts';
+import { checkChart, parseFlowChecks } from '../../lab/flow/check.ts';
 import { runChart } from '../../lab/flow/run.ts';
 import { parseAgentScript, parseDiff, parseRubric, type AgentStep, type DiffLine, type RubricItem } from '../../lab/ai/core.ts';
 
@@ -332,6 +332,8 @@ export const LAB_NODES = {
         help: 'One shape per line: id kind column,row text — kinds start, end, input, output, process, decision (e.g. “d decision 0,2 b = 0?”). Arrows: a -> b -> c, and d -yes-> x, d -no-> y. Write ? as the text of a box to fill.' },
       { key: 'input', label: 'What the user types', kind: 'textarea', help: 'For Show and Read: the input the chart runs with (numbers or words separated by spaces).', max: 1000 },
       { key: 'bank', label: 'Texts to choose from (Fill)', kind: 'lines', help: 'One per line: the right texts and a few wrong ones.', max: 3000 },
+      { key: 'solution', label: 'The perfect flowchart (Fill and Draw)', kind: 'code', max: 8000,
+        help: 'Shown after the student’s chart passes, or after 3 tries. Same format as the flowchart; it must pass the checks.' },
       { key: 'checks', label: 'Checks (Fill and Draw)', kind: 'lines', max: 4000,
         help: 'One per line, like the C++ checks: name :: in 25; expect 77 — also “not text”, “exact text”, “uses decision”, “uses loop”.' },
     ],
@@ -666,7 +668,7 @@ export type Block =
   | { kind: 'cppanswer'; id: string; question: string; code: string; input: string; mode: 'output' | 'value' | 'input'; answers: string[]; ignoreCase: boolean; explain: string }
   | { kind: 'parsons'; id: string; title: string; goal: string; code: string; input: string }
   | { kind: 'cppvisual'; id: string; visual: string; text: string; caption: string }
-  | { kind: 'flowchart'; id: string; title: string; goal: string; mode: FlowMode; chart: Chart; input: string; bank: string[]; checks: string }
+  | { kind: 'flowchart'; id: string; title: string; goal: string; mode: FlowMode; chart: Chart; input: string; bank: string[]; checks: string; solution?: Chart }
   | { kind: 'aiprompt'; id: string; title: string; goal: string; starter: string; rubric: RubricItem[]; minWords: number; example: string }
   | { kind: 'agentsim'; id: string; title: string; goal: string; steps: AgentStep[] }
   | { kind: 'aidiff'; id: string; title: string; goal: string; file: string; lines: DiffLine[] }
@@ -916,7 +918,16 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
           const run = runChart(chart.value, d.input ?? '');
           if (!run.ok) { warnings.push(`Flowchart “${title}” does not run: ${run.error?.message}`); break; }
         }
-        push({ kind: 'flowchart', id, title, goal: d.goal ?? '', mode, chart: chart.value, input: d.input ?? '', bank, checks: d.checks ?? '' });
+        let solution: Chart | undefined;
+        if ((d.solution ?? '').trim()) {
+          const sol = parseChart(d.solution ?? '');
+          if (!sol.ok) { warnings.push(`Flowchart “${title}”: the perfect flowchart: ${sol.error}`); break; }
+          // the perfect flowchart must pass its own checks
+          const failed = checkChart(sol.value, checks.value).filter((r) => !r.pass);
+          if (failed.length) { warnings.push(`Flowchart “${title}”: the perfect flowchart fails “${failed[0].name}”: ${failed[0].message}`); break; }
+          solution = sol.value;
+        }
+        push({ kind: 'flowchart', id, title, goal: d.goal ?? '', mode, chart: chart.value, input: d.input ?? '', bank, checks: d.checks ?? '', ...(solution ? { solution } : {}) });
         if (mode !== 'show') {
           exercises[id] = { kind: 'flowchart', title, goal: d.goal || undefined, files: { 'flowchart.txt': d.chart ?? '' },
             checks: mode === 'trace' ? [{ name: 'Right output', steps: [] }] : checks.value.map((c) => ({ name: c.name, steps: [] })) };

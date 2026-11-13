@@ -73,6 +73,9 @@ export function shippedSeeds(): Seed[] {
       [{ slug: 'type-and-draw', flow: introComputingTypeDrawLab() }]), extend: true },
     // the three labs are shown again: the week 6 revision lab is visible next to the practice lab and Lab 3
     { ...seed('intro-to-computing@12', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']), []), publish: { 'revision-week-6': true } },
+    // Lab 3: every question is a pair — its perfect flowchart first, then the program (rewrites the lab once)
+    { ...seed('intro-to-computing@13', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
+      [{ slug: 'type-and-draw', flow: introComputingTypeDrawLab() }]), update: true },
     // AI FOR CODING: a new module in the Neon design, with Lab 01 — prompt engineering and coding agents
     seed('ai-for-coding@1', 'ai-for-coding', aiForCodingModule(), nodesOfKits(['ai']),
       [{ slug: 'lab-01', flow: aiForCodingLab01() }]),

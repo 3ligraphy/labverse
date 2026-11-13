@@ -58,3 +58,4 @@
 .fc-results li.ok { border-color: color-mix(in oklab, #22c55e 50%, var(--line)); }
 .fc-results li.bad { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
 @media (prefers-reduced-motion: reduce) { .fc-shape { transition: none; } }
+.fc-perfect { display: grid; gap: 10px; padding: 12px; border-radius: 12px; border: 1px solid color-mix(in oklab, #22c55e 45%, var(--line)); background: color-mix(in oklab, #22c55e 6%, var(--surface)); }

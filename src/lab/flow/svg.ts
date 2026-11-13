@@ -46,7 +46,8 @@ function shape(n: FNode): string {
 }
 
 function label(n: FNode, blank?: string): string {
-  const lines = blank !== undefined ? [blank] : wrap(n.text || ' ', n.shape === 'decision' ? 16 : 22);
+  // the slanted sides of a parallelogram and the points of a diamond leave less room for text
+  const lines = blank !== undefined ? [blank] : wrap(n.text || ' ', n.shape === 'decision' ? 16 : n.shape === 'io' ? 18 : 22);
   const cx = n.x + W / 2, cy = n.y + heightOf(n) / 2, lh = 16;
   const top = cy - ((lines.length - 1) * lh) / 2;
   return `<text class="fc-text" x="${cx}" y="${top}" text-anchor="middle" dominant-baseline="central">${lines.map((l, i) => `<tspan x="${cx}" y="${top + i * lh}">${esc(l)}</tspan>`).join('')}</text>`;

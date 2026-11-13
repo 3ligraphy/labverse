@@ -218,7 +218,9 @@ test('the site ships the module itself: one seed, published content, only the C+
   // other modules ship their own seeds (e.g. ai-for-coding); this test covers this module's
   const seeds = shipped.filter((s) => s.module.slug === 'intro-to-computing');
   // @1 created the module; @2 only rewrites the live lab (it never creates anything)
-  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update), Boolean(s.extend)]), [['intro-to-computing@1', false, false], ['intro-to-computing@2', true, false], ['intro-to-computing@3', true, false], ['intro-to-computing@4', true, false], ['intro-to-computing@5', false, true], ['intro-to-computing@6', false, false], ['intro-to-computing@7', true, false], ['intro-to-computing@8', false, false], ['intro-to-computing@9', true, false], ['intro-to-computing@10', false, false], ['intro-to-computing@11', false, true], ['intro-to-computing@12', false, false]]);
+  assert.deepEqual(seeds.map((s) => [s.id, Boolean(s.update), Boolean(s.extend)]), [['intro-to-computing@1', false, false], ['intro-to-computing@2', true, false], ['intro-to-computing@3', true, false], ['intro-to-computing@4', true, false], ['intro-to-computing@5', false, true], ['intro-to-computing@6', false, false], ['intro-to-computing@7', true, false], ['intro-to-computing@8', false, false], ['intro-to-computing@9', true, false], ['intro-to-computing@10', false, false], ['intro-to-computing@11', false, true], ['intro-to-computing@12', false, false], ['intro-to-computing@13', true, false]]);
+  // @13 rewrites Lab 3: every question as a pair, the perfect flowchart first, then the program
+  assert.deepEqual(seeds[12].labs.map((l) => l.slug), ['type-and-draw']);
   // @11 adds Lab 3 (class test answers, code and flowcharts); @12 shows the week 6 revision lab again
   assert.deepEqual(seeds[10].labs.map((l) => l.slug), ['type-and-draw']);
   assert.deepEqual(seeds[11].publish, { 'revision-week-6': true });

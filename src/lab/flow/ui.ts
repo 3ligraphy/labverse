@@ -13,7 +13,7 @@ import { runChart, type RunResult, type TraceStep } from './run.ts';
 import { checkChart, type FlowResult } from './check.ts';
 
 export type FlowMode = 'show' | 'trace' | 'fill' | 'draw';
-export type FlowCfg = { kind: 'flowchart'; id: string; mode: FlowMode; chart: Chart; input: string; bank: string[]; checks: string };
+export type FlowCfg = { kind: 'flowchart'; id: string; mode: FlowMode; chart: Chart; input: string; bank: string[]; checks: string; solution?: Chart };
 type Track = (passed: number, total: number, code: string) => void;
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, string> = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] {
@@ -81,6 +81,29 @@ function runPanel(parent: HTMLElement, getChart: () => Chart, draw: (c: Chart, o
   return { run };
 }
 
+/**
+ * After the student's chart passes, or after 3 checks, a button shows the perfect flowchart: every variable
+ * declared with its type and given a starting value, one Start, one End, Yes and No on every decision.
+ */
+function perfectReveal(host: HTMLElement, cfg: FlowCfg) {
+  let fails = 0, shown = false;
+  const btn = button('See the perfect flowchart');
+  btn.hidden = true;
+  const box = h('div', { class: 'fc-perfect' });
+  box.hidden = true;
+  host.append(btn, box);
+  btn.addEventListener('click', () => {
+    if (shown || !cfg.solution) return;
+    shown = true; btn.hidden = true; box.hidden = false;
+    box.append(h('p', { class: 'fc-k mono' }, 'The perfect flowchart'),
+      h('p', { class: 'fc-q' }, 'Every variable is declared with its type and given a starting value first; one Start, one End; every decision has a Yes and a No arrow. Run it and compare it with yours.'));
+    const st = stage(box);
+    st.draw(cfg.solution);
+    runPanel(box, () => cfg.solution!, st.draw, cfg.input);
+  });
+  return { offer(passed: boolean) { if (!cfg.solution || shown) return; if (!passed) fails++; if (passed || fails >= 3) btn.hidden = false; } };
+}
+
 /* ------------------------------------------------------------------ the four modes */
 function showMode(host: HTMLElement, cfg: FlowCfg) {
   const st = stage(host);
@@ -141,8 +164,10 @@ function fillMode(host: HTMLElement, cfg: FlowCfg, track: Track) {
     if (missing.length) { out.replaceChildren(h('p', { class: 'fc-msg bad' }, `Choose a text for every box first: ${missing.join(', ')}.`)); return; }
     const res = checkChart(filled(), cfg.checks);
     out.replaceChildren(resultsList(res));
+    reveal.offer(res.every((r) => r.pass));
     track(res.filter((r) => r.pass).length, res.length, chartToText(filled()));
   });
+  const reveal = perfectReveal(host, cfg);
   draw();
   runPanel(host, filled, (c, o) => draw(c, o), cfg.input);
 }
@@ -287,8 +312,10 @@ function drawMode(host: HTMLElement, cfg: FlowCfg, track: Track) {
   check.addEventListener('click', () => {
     const res = checkChart(chart, cfg.checks);
     out.replaceChildren(resultsList(res));
+    reveal.offer(res.every((r) => r.pass));
     track(res.filter((r) => r.pass).length, res.length, chartToText(chart));
   });
+  const reveal = perfectReveal(host, cfg);
   paint({});
   runPanel(host, () => chart, (_c, o) => paint(o ?? {}), cfg.input);
 }

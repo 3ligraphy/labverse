@@ -27,7 +27,7 @@ const cfg = b.kind === 'cpp'
     : b.kind === 'parsons'
       ? { kind: b.kind, id: b.id, code: b.code, input: b.input }
       : b.kind === 'flowchart'
-        ? { kind: b.kind, id: b.id, mode: b.mode, chart: b.chart, input: b.input, bank: b.bank, checks: b.checks }
+        ? { kind: b.kind, id: b.id, mode: b.mode, chart: b.chart, input: b.input, bank: b.bank, checks: b.checks, solution: b.solution }
         : { kind: b.kind, id: b.id, visual: b.visual, text: b.text };
 // </script> inside the JSON would end the tag early
 const json = JSON.stringify(cfg).replace(/</g, '\\u003c');

@@ -241,3 +241,23 @@ test('and / or stop early like C++, so a guard protects s[i]', () => {
   assert.equal(run1(['string s = "end -"', "int p = s.find('-')", "Output p + 1 < s.length() and s[p + 1] >= '0'"]).output.trim(), 'false');
   assert.equal(run1(['string s = "x"', "Output s.length() == 1 or s[5] == 'a'"]).output.trim(), 'true');
 });
+
+test('the perfect solution: a draw node carries it, and a solution that fails its own checks warns', async () => {
+  const { compileLab, sanitizeFlow } = await import('../src/lib/platform/core.ts');
+  const make = (solution: string) => {
+    const nodes = [
+      { id: 'root', type: 'start', data: { title: 'L' } },
+      { id: 'p1', type: 'part', data: { title: 'P', time: '5 min' } },
+      { id: 'f', type: 'flowchart', data: { title: 'C to F', goal: '', mode: 'Draw it yourself', chart: 's start 0,0 Start\ne end 0,4 End', input: '', bank: '', checks: 'Freezing :: in 0; exact 32', solution } },
+    ];
+    const flow = sanitizeFlow({ nodes: nodes.map((n, i) => ({ ...n, x: 0, y: i * 100 })), edges: [{ from: 'root', to: 'p1' }, { from: 'p1', to: 'f' }] }, 'lab');
+    assert.ok(flow.ok);
+    return compileLab(flow.value, 'm--l');
+  };
+  const good = make(C_TO_F);
+  const block = good.blocks.find((b) => b.kind === 'flowchart') as Extract<(typeof good.blocks)[number], { kind: 'flowchart' }>;
+  assert.equal(block.solution?.nodes.length, 5);
+  assert.deepEqual(good.warnings, []);
+  const bad = make(C_TO_F.replace('1.8 * C + 32', '1.8 * C'));
+  assert.ok(bad.warnings.some((w) => /perfect|solution/i.test(w)), bad.warnings.join(' | '));
+});

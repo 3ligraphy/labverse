@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compileLab, compileModule, orderFlow, sanitizeFlow, type Block } from '../src/lib/platform/core.ts';
-import { introComputingTypeDrawLab, CHARTS, FLOW_CHECKS, P } from '../src/lib/platform/seeds/intro-computing-type-draw.ts';
+import { introComputingTypeDrawLab, CHARTS, LOOP_CHECKS, QUESTIONS, flowChecks, P } from '../src/lib/platform/seeds/intro-computing-type-draw.ts';
 import { shippedState } from '../src/lib/platform/shipped.ts';
 import { gradeCpp } from '../src/lab/cpp/grade.ts';
 import { outputOf } from '../src/lab/cpp/answer.ts';
@@ -146,14 +146,15 @@ const passes = (id: string, code: string) => {
   return { ok: !r.compileError && r.results.every((x) => x.pass), why: r.compileError?.message ?? r.results.filter((x) => !x.pass).map((x) => `${x.name}: ${x.message ?? ''}`).join(' | ') };
 };
 
-test('the lab compiles with no warnings: 11 parts, class test first, then code, then flowcharts', () => {
+test('the lab compiles with no warnings: class test, the flowchart basics, code from zero to hero, then loops', () => {
   assert.deepEqual(lab.warnings, []);
   const parts = lab.blocks.filter((b) => b.kind === 'part').map((b) => (b as { title: string }).title);
-  assert.equal(parts.length, 11);
+  assert.equal(parts.length, 10);
   assert.equal(parts[0], 'Class test answers');
-  assert.match(parts[1], /Zero/);
-  assert.match(parts[7], /Hero/);
-  assert.match(parts[10], /Draw it yourself/);
+  assert.match(parts[1], /Flowcharts: the shapes/);
+  assert.match(parts[2], /Zero/);
+  assert.match(parts[8], /Hero/);
+  assert.match(parts[9], /Loops/);
 });
 
 test('every program has a reference solution that passes every check', () => {
@@ -195,61 +196,41 @@ test('class test: the typed answers are the official answers, and what the code 
   for (const a of answers) if (a.mode === 'output') assert.ok(printed(a.code, a.input).length > 0 && !printed(a.code, a.input).startsWith('ERROR'), `${a.id} prints something`);
 });
 
-const DRAWN: Record<string, string> = {
-  ctof: CHARTS.ctof,
-  seconds: CHARTS.seconds,
-  greatest: CHARTS.greatest,
-  divide: CHARTS.divide,
-  fives: CHARTS.fives,
-  prime: CHARTS.prime,
-  zxy: CHARTS.zxy,
-  fifty: `
-s start 0,0 Start
-p process 0,1 total = 0; k = 1
-d decision 0,2 k <= 50?
-i input 0,3 Input x
-a process 0,4 total = total + x; k = k + 1
-o1 output 1,3 Output "sum: ", total
-o2 output 1,4 Output "average: ", total / 50.0
-e end 1,5 End
-s -> p -> d
-d -yes-> i
-d -no-> o1
-i -> a -> d
-o1 -> o2 -> e`,
-  median: `
-s start 0,0 Start
-i input 0,1 Input num1, num2, num3
-d decision 0,2 num1 < num2?
-a1 decision 1,3 num3 > num2?
-a2 decision 1,4 num3 < num1?
-b1 decision -1,3 num3 > num1?
-b2 decision -1,4 num3 < num2?
-m1 output 2,4 Output "median is: ", num2
-m2 output 2,5 Output "median is: ", num1
-m3 output 1,5 Output "median is: ", num3
-n1 output -2,4 Output "median is: ", num1
-n2 output -2,5 Output "median is: ", num2
-n3 output -1,5 Output "median is: ", num3
-e end 0,6 End
-s -> i -> d
-d -yes-> a1
-d -no-> b1
-a1 -yes-> m1
-a1 -no-> a2
-a2 -yes-> m2
-a2 -no-> m3
-b1 -yes-> n1
-b1 -no-> b2
-b2 -yes-> n2
-b2 -no-> n3
-m1 -> e
-m2 -> e
-m3 -> e
-n1 -> e
-n2 -> e
-n3 -> e`,
-};
+const flowOf = (id: string) => byId(charts, `${id}-flow`);
+/** the perfect flowchart of a question: the chart itself (watch) or its solution (fill, draw) */
+const perfectOf = (id: string) => { const b = flowOf(id); return b.mode === 'show' ? b.chart : b.solution!; };
+
+test('every question is a pair: its flowchart first, then its program', () => {
+  const order = all.map((b) => ('id' in b ? b.id : ''));
+  for (const q of QUESTIONS) {
+    const f = order.indexOf(`${KEY}--${q.id}-flow`), c = order.indexOf(`${KEY}--${q.id}`);
+    assert.ok(f >= 0 && c === f + 1, `${q.id}: the flowchart comes just before the code`);
+  }
+  assert.ok(QUESTIONS.length >= 30);
+});
+
+test('every perfect flowchart passes the same tests as its program', () => {
+  for (const q of QUESTIONS) {
+    const res = checkChart(perfectOf(q.id), flowChecks(q.checks).join('\n'));
+    assert.ok(res.length > 0 && res.every((r) => r.pass), `${q.id}: ${res.filter((r) => !r.pass).map((r) => `${r.name}: ${r.message}`).join(' | ')}`);
+  }
+});
+
+test('every perfect flowchart declares its variables with a type and a starting value first', () => {
+  const TYPED = /^(const\s+)?(int|float|double|char|string|bool)\s/;
+  for (const q of QUESTIONS) {
+    const c = perfectOf(q.id);
+    const first = c.nodes.find((n) => c.edges.some((e) => e.from === 's' && e.to === n.id))!;
+    const usesVariables = c.nodes.some((n) => n.shape === 'process' || /^\s*input/i.test(n.text) || n.shape === 'decision');
+    if (!usesVariables) continue;
+    assert.match(first.text, TYPED, `${q.id}: the first shape declares the variables`);
+    // every declared variable is given a starting value
+    for (const decl of first.text.split(';')) {
+      const names = decl.replace(TYPED, '').split(',').map((x) => x.trim()).filter(Boolean);
+      for (const n of names) assert.match(n, /=/, `${q.id}: “${n}” has a starting value`);
+    }
+  }
+});
 
 test('flowcharts: every chart to watch or read runs, and the read answers are what it prints', () => {
   const want: Record<string, string> = { 'f-trace-ctof': '77', 'f-trace-seconds': '1 h 2 min 5 s', 'f-trace-divide': 'unknown', 'f-trace-greatest': 'greatest: 9', 'f-trace-sum': 'sum = 10', 'f-trace-prime': 'not prime' };
@@ -261,19 +242,28 @@ test('flowcharts: every chart to watch or read runs, and the read answers are wh
   }
 });
 
-test('flowcharts: every reference chart passes its checks; empty boxes and empty canvases fail', () => {
-  for (const [name, src] of Object.entries(DRAWN)) {
-    const res = checkChart(chart(src), (FLOW_CHECKS as Record<string, string[]>)[name].join('\n'));
+test('flowcharts: the loop solutions pass; empty boxes and empty canvases fail', () => {
+  for (const [name, src] of [['fives', CHARTS.fives], ['fifty', CHARTS.fifty], ['prime', CHARTS.prime]] as const) {
+    const res = checkChart(chart(src), LOOP_CHECKS[name].join('\n'));
     assert.ok(res.every((r) => r.pass), `${name}: ${res.filter((r) => !r.pass).map((r) => `${r.name}: ${r.message}`).join(' | ')}`);
   }
   for (const c of charts.filter((x) => x.mode === 'fill' || x.mode === 'draw')) {
     const res = checkChart(c.chart, c.checks);
     assert.ok(res.some((r) => !r.pass), `${c.id}: the starter chart must not pass`);
+    assert.ok(c.solution, `${c.id}: has its perfect flowchart`);
   }
-  for (const c of charts.filter((x) => x.mode === 'fill')) {
-    const blanks = c.chart.nodes.filter((n) => n.text === '?');
-    assert.ok(blanks.length >= 2, `${c.id} has boxes to fill`);
-  }
+  for (const c of charts.filter((x) => x.mode === 'fill')) assert.ok(c.chart.nodes.filter((n) => n.text === '?').length >= 2, `${c.id} has boxes to fill`);
+});
+
+test('a counter without a starting value is caught: the fill-in loop offers “int n” and it fails', () => {
+  const f = byId(charts, 'f-fill-fives');
+  assert.ok(f.bank.includes('int n'));
+  const wrong = { ...f.chart, nodes: f.chart.nodes.map((n) => (n.text === '?' ? { ...n, text: n.id === f.chart.nodes.find((x) => x.text === '?')!.id ? 'int n' : n.text } : n)) };
+  const filled = { ...f.solution!, nodes: f.solution!.nodes.map((n) => (n.text === 'int n = 1' ? { ...n, text: 'int n' } : n)) };
+  const r = runChart(filled, '');
+  assert.equal(r.ok, false);
+  assert.match(r.error!.message, /no value yet/);
+  assert.ok(wrong);
 });
 
 test('the module: three labs in order, all shown, and Lab 3 is the new one', () => {
