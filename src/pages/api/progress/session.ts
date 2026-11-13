@@ -3,8 +3,15 @@ import type { APIRoute } from 'astro';
 import { ALWAYS_OPEN, sessionState } from '@/lib/progress/core';
 import { getProgressStore, getStructures, isPermanent, json, permanentSession } from '@/lib/progress/server';
 import { isOpenLab } from '@/lib/platform/server';
+import { shippedModules } from '@/lib/platform/shipped';
+import { labKey } from '@/lib/platform/core';
 
 export const prerender = false;
+
+/** a published lab of a module that ships with the code (it opens even when the database cannot be read) */
+const shippedLab = (key: string) => [...shippedModules().values()].some((m) => m.labs.some((l) => l.published && labKey(m.module.slug, l.slug) === key));
+/** the database cannot be read: the lab still works for practice (answers checked, nothing saved) instead of being locked */
+const offline = () => json({ open: false, closesAt: null, sessions: [], practice: true, offline: true });
 
 export const GET: APIRoute = async ({ url }) => {
   const store = getProgressStore();
@@ -13,7 +20,9 @@ export const GET: APIRoute = async ({ url }) => {
   try {
     if (ALWAYS_OPEN) {
       // sessions are off: every lab is open, day and night, in its permanent session (made here on first use)
-      if (!(await getStructures()).some((l) => l.lab === lab)) return json({ open: false, closesAt: null, sessions: [], practice: false });
+      // builder labs come from the database; a shipped lab is known even when it cannot be read
+      if (!(await getStructures()).some((l) => l.lab === lab) && !shippedLab(lab)) return json({ open: false, closesAt: null, sessions: [], practice: false });
+      // this writes the permanent session: it throws when the database is down (→ practice, below)
       const session = { ...(await permanentSession(store, lab)), open: true, closesAt: null };
       return json({ ...session, sessions: [session], practice: false, selfPaced: true });
     }
@@ -28,6 +37,6 @@ export const GET: APIRoute = async ({ url }) => {
     return json(sessions[0] ? { ...sessions[0], sessions, practice, selfPaced } : { open: false, closesAt: null, sessions: [], practice, selfPaced });
   } catch (err) {
     console.error('[progress] session failed', err);
-    return json({ open: false, closesAt: null, sessions: [], practice: false, error: 'server' }, 500);
+    return offline();
   }
 };

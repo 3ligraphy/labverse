@@ -160,7 +160,9 @@ export function mountStart(lab: string) {
       const response = await fetch(`/api/progress/session?lab=${encodeURIComponent(lab)}`, { cache: 'no-store' });
       // a server error says nothing about the lab: keep what we knew instead of locking it
       if (!response.ok) throw new Error(String(response.status));
-      const data = (await response.json()) as PublicSessionResponse;
+      const data = (await response.json()) as PublicSessionResponse & { offline?: boolean };
+      // the database cannot be read: a session we already knew stays (a hiccup); otherwise the lab opens for practice
+      if (data.offline && sessions.length) throw new Error('offline');
       sessions = Array.isArray(data.sessions) ? data.sessions.filter((item) => item.open) : data.open ? [data] : [];
       practice = data.practice === true;
       selfPaced = data.selfPaced === true;
@@ -173,7 +175,9 @@ export function mountStart(lab: string) {
       sessionIn.value = preferredId;
       session = sessions.find((item) => item.id === preferredId) ?? null;
       sessionField.hidden = sessions.length < 2;
-      status.textContent = staff && !getStudent()
+      status.textContent = data.offline
+        ? 'The course database cannot be reached right now. You can do every exercise and check it now, but nothing is saved until it is back.'
+        : staff && !getStudent()
         ? `Staff preview: you can edit, run and check every exercise and demo now${ALWAYS_OPEN ? '' : ', without starting a session'}. Nothing you do here is recorded.`
         : ALWAYS_OPEN || (selfPaced && session && sessions.length === 1)
         ? 'This lab is open any time. Enter your name and student ID to start. Your work is saved.'
