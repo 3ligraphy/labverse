@@ -15,6 +15,7 @@ const MAX_QUEUE = 200;
 const MAX_CODE = 20_000;
 import { ID_HINT, NAME_RE, STUDENT_ID_RE as ID_RE } from '@/lib/identity';
 import { ALWAYS_OPEN } from '@/lib/progress/mode';
+import { OUTAGE } from '@/lib/outage';
 
 const read = <T>(key: string, fallback: T, store: Storage = localStorage): T => {
   try {
@@ -320,7 +321,7 @@ function wireCheckin() {
     const lab = card.dataset.lab!;
     const msg = card.querySelector<HTMLElement>('[data-ci-msg]')!;
     const btn = card.querySelector<HTMLButtonElement>('[data-ci-btn]')!;
-    const render = (state: 'open' | 'closed' | 'done' | 'conflict' | 'error', text: string) => {
+    const render = (state: 'open' | 'closed' | 'done' | 'conflict' | 'error' | 'offline', text: string) => {
       card.dataset.state = state;
       msg.textContent = text;
       btn.hidden = state !== 'open';
@@ -336,7 +337,9 @@ function wireCheckin() {
       if (at) return render('done', `✓ Checked in at ${clock(at)}. See you next lab!`);
       try {
         const s = await (await fetch(`/api/progress/session?lab=${encodeURIComponent(lab)}`, { cache: 'no-store' })).json();
-        if (s.open) render('open', s.closesAt ? `Check-in is open until ${clock(s.closesAt)}.` : 'Check-in is open now.');
+        // the course database is down: check-in cannot be saved, so say that and what to do instead
+        if (s.offline) render('offline', OUTAGE.checkin);
+        else if (s.open) render('open', s.closesAt ? `Check-in is open until ${clock(s.closesAt)}.` : 'Check-in is open now.');
         else render('closed', ALWAYS_OPEN ? 'Check-in is not available for this lab right now. Try again later.' : 'Check-in opens during the lab session. Your TA will tell you when.');
       } catch {
         render('error', 'Could not reach the server. Try again in a moment.');
@@ -354,7 +357,8 @@ function wireCheckin() {
           write(`progress:checkin:${lab}`, { id: me.studentId, at: data.at });
           render('done', `✓ Checked in at ${clock(data.at)}. See you next lab!`);
           flushViews(true);
-        } else if (res.status === 409) render('conflict', data.message ?? 'This identity is linked to another device. Ask your TA.');
+        } else if (data.offline) render('offline', data.message ?? OUTAGE.checkin);
+        else if (res.status === 409) render('conflict', data.message ?? 'This identity is linked to another device. Ask your TA.');
         else if (res.status === 403 && data.error === 'closed') render('closed', data.message ?? 'Check-in is closed.');
         else render('error', data.message ?? 'Could not check in. Try again in a moment.');
       } catch {

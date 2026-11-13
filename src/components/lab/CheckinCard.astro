@@ -40,6 +40,10 @@ const { lab, label } = Astro.props;
   .ci[data-state='done'] .ci-ic { background: var(--ok); color: #fff; }
   .ci[data-state='done'] .ci-msg { color: var(--ok); font-weight: 600; }
   .ci[data-state='conflict'] .ci-msg, .ci[data-state='error'] .ci-msg { color: var(--danger); }
+  /* the course database is down: no check-in now, the TA records attendance (src/lib/outage.ts) */
+  .ci[data-state='offline'] { border-color: color-mix(in oklab, var(--warn) 55%, var(--line)); background: color-mix(in oklab, var(--warn) 9%, var(--surface)); }
+  .ci[data-state='offline'] .ci-ic { background: color-mix(in oklab, var(--warn) 20%, transparent); color: var(--warn); }
+  .ci[data-state='offline'] .ci-msg { color: var(--text); }
   @keyframes ci-ring { 0% { box-shadow: 0 0 0 0 var(--accent-glow); } 100% { box-shadow: 0 0 0 14px transparent; } }
   @media (prefers-reduced-motion: reduce) { .ci[data-state='open'] .ci-ic { animation: none; } }
 </style>

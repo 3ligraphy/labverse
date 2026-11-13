@@ -12,6 +12,8 @@ import { normalEmail } from '@/lib/accounts/core';
 import { getAccountStore, hashSecret, newSecret } from '@/lib/accounts/server';
 import { cleanStudentId, studentIdError } from '@/lib/identity';
 import { getProgressStore, json } from '@/lib/progress/server';
+import { OUTAGE } from '@/lib/outage';
+import { databaseDown } from '@/lib/outage-server';
 
 export const prerender = false;
 
@@ -45,7 +47,8 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     return json({ id: reset.id, secret, name: user.name });
   } catch (error) {
     console.error('[accounts] forgot-password request failed', error);
-    return json({ error: 'Could not send the request. Try again.' }, 500);
+    const down = await databaseDown();
+    return down ? json({ error: OUTAGE.reset, offline: true }, 503) : json({ error: 'Could not send the request. Try again.' }, 500);
   }
 };
 

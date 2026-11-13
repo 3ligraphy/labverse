@@ -14,6 +14,8 @@ import { validateCheckIn } from '@/lib/attendance/core';
 import { getStore } from '@/lib/attendance/server';
 import { ATTENDANCE_LAB, apiJson as json, preflight } from '@/lib/attendance/api';
 import { LOCKED_MESSAGE, getProgressStore, getStructures, labLocked, liveSession, sessionScope } from '@/lib/progress/server';
+import { OUTAGE } from '@/lib/outage';
+import { databaseDown } from '@/lib/outage-server';
 
 export const prerender = false;
 
@@ -55,7 +57,9 @@ export const POST: APIRoute = async ({ request }) => {
       return before.checkin ? json({ ok: true, already: true, entry: { ...entry, at: before.checkin } }) : json({ ok: true, entry }, 201);
     } catch (err) {
       console.error('[attendance] check-in failed', err);
-      return json({ error: 'server', message: 'Something went wrong on our side. Please try again.' }, 500);
+      // same status and error code as before (Lab 5 apps handle 500), with a message that says what is wrong
+      const down = await databaseDown();
+      return json({ error: 'server', message: down ? OUTAGE.attendance : 'Something went wrong on our side. Please try again.' }, 500);
     }
   }
 

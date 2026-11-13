@@ -2,6 +2,7 @@
 /** /attendance — students check in with their name and student ID, from any device (shared lab PCs too). */
 import Base from '@/layouts/Base.astro';
 import { course } from '@/site.config';
+import { OUTAGE } from '@/lib/outage';
 ---
 <Base title="Attendance" description={`Check in to your ${course.name} lab.`} noindex>
   <section class="att">
@@ -14,6 +15,8 @@ import { course } from '@/site.config';
           <p class="att-sub">Type your name and student ID, then press <b>Submit</b>.</p>
         </div>
 
+        {/* shown only while the course database is down (the "Saving is off" strip); Submit turns off */}
+        <p class="att-off" role="note">{OUTAGE.attendance}</p>
         <form class="att-form" data-att-form novalidate>
           <label class="fld">
             <span class="fld-l">Full name</span>
@@ -65,6 +68,9 @@ import { course } from '@/site.config';
   .is-done .att-sub { display: none; }
   .att-sub b { color: var(--text); }
 
+  .att-off { display: none; }
+  :global(:root.db-down) .att-off { display: block; margin-bottom: 20px; padding: 14px 16px; border-radius: 14px; color: var(--text); line-height: 1.5;
+    border: 1px solid color-mix(in oklab, var(--warn) 50%, transparent); background: color-mix(in oklab, var(--warn) 12%, transparent); }
   .att-form { display: grid; gap: 18px; }
   .fld { display: grid; gap: 8px; }
   .fld-l { font-size: 13px; font-weight: 600; color: var(--text); }
@@ -130,6 +136,13 @@ import { course } from '@/site.config';
     return isNaN(+d) ? '' : d.toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
+  /** While the course database is down (the "Saving is off" strip) a check-in cannot be saved: Submit is off. */
+  function syncDown() {
+    const btn = document.querySelector<HTMLButtonElement>('[data-att-submit]');
+    if (btn && !btn.hasAttribute('aria-busy')) btn.disabled = document.documentElement.classList.contains('db-down');
+  }
+  window.addEventListener('buenova:db', syncDown);
+
   function init() {
     const root = document.querySelector<HTMLElement>('[data-att]');
     if (!root) return;
@@ -138,6 +151,7 @@ import { course } from '@/site.config';
     const btn = root.querySelector<HTMLButtonElement>('[data-att-submit]')!;
     const errEl = (k: string) => root.querySelector<HTMLElement>(`[data-err="${k}"]`)!;
     const device = deviceId();
+    syncDown();
 
     const showDone = (entry: Entry, msg: string) => {
       root.classList.add('is-done');
@@ -197,6 +211,7 @@ import { course } from '@/site.config';
       } finally {
         btn.disabled = false;
         btn.removeAttribute('aria-busy');
+        syncDown();
       }
     });
   }

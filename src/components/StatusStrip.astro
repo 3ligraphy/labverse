@@ -1,0 +1,22 @@
+---
+/**
+ * "Saving is off": a strip under the navbar while the course database cannot be reached (GET /api/status).
+ * It stays hidden until the check in Base.astro's <head> puts `db-down` on <html>; pages leave room for it through
+ * --nav-h (global.css). Same wording as src/lib/outage.ts: plain, short, and what to do now.
+ */
+---
+<div class="dbs" data-db-strip>
+  <div class="container dbs-in">
+    <svg class="dbs-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.6h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9.5v4.2" /><path d="M12 17h.01" /></svg>
+    <p class="dbs-t" role="status"><b>Saving is off.</b> <span class="dbs-long">The course database is down: labs work for practice, but nothing is saved.</span><span class="dbs-short">The course database is down.</span></p>
+    <button type="button" class="dbs-btn" data-dbs-toggle aria-expanded="false" aria-controls="dbs-more">What this means</button>
+  </div>
+  <div class="dbs-more" id="dbs-more" hidden>
+    <ul class="container">
+      <li><b>Off for now:</b> sign-in, saving your work, attendance and hand-ins.</li>
+      <li><b>Still works:</b> every module and lab. You can run your code and check your answers.</li>
+      <li><b>Attendance:</b> tell your TA you are here. They record it.</li>
+      <li>Your account and the work saved before are not lost. This message goes away by itself when the database is back.</li>
+    </ul>
+  </div>
+</div>

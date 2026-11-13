@@ -2,6 +2,8 @@
 import type { APIRoute } from 'astro';
 import { ALWAYS_OPEN, ATTENDANCE_MIN_ACTIVE_SEC, ATTENDANCE_MIN_SEEN, attendanceEligibility, sessionState, validateCheckin } from '@/lib/progress/core';
 import { getProgressStore, getStructures, isPermanent, json, liveSession, sessionScope } from '@/lib/progress/server';
+import { OUTAGE } from '@/lib/outage';
+import { databaseDown } from '@/lib/outage-server';
 
 export const prerender = false;
 
@@ -55,6 +57,9 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ ok: true, at: await store.checkIn(c.studentKey, c.lab, session.id) });
   } catch (error) {
     console.error('[progress] secure check-in failed', error);
-    return json({ error: 'server', message: 'Could not verify attendance. Try again in a moment.' }, 500);
+    const down = await databaseDown();
+    return down
+      ? json({ error: 'offline', offline: true, message: OUTAGE.checkin }, 503)
+      : json({ error: 'server', message: 'Could not verify attendance. Try again in a moment.' }, 500);
   }
 };

@@ -8,6 +8,7 @@ import { cleanName, cleanStudentId, looseGroup, nameError, studentIdError } from
 import { clearProgressIdentity, getIdentity, setProgressIdentity } from '@/scripts/progress';
 import { getMe } from '@/scripts/me';
 import { ALWAYS_OPEN } from '@/lib/progress/mode';
+import { OUTAGE } from '@/lib/outage';
 
 type PublicSession = { id: string; open: boolean; ta_name?: string; time_slot?: string };
 type PublicSessionResponse = PublicSession & { sessions?: PublicSession[]; practice?: boolean; selfPaced?: boolean };
@@ -40,6 +41,10 @@ export function mountStart(lab: string) {
   let practice = false; // the admin's "open practice" toggle: solve without a session, nothing recorded
   let selfPaced = false; // a lab that is open any time: a permanent session, no TA needed, still tracked
   let staff = false; // TAs, doctors and admins: try every exercise any time, nothing recorded
+  let offline = false; // the course database is down: practice only, the form is hidden and the card turns amber
+  const title = root.querySelector<HTMLElement>('h2');
+  const titleText = title?.textContent ?? '';
+  const kicker = root.querySelector<HTMLElement>('.ls-k');
   /** a signed-in student whose account identity is valid: joins the open session by itself */
   let account: { name: string; id: string } | null = null;
   const autoTried = new Set<string>();
@@ -52,7 +57,9 @@ export function mountStart(lab: string) {
     const access = labRoot?.dataset.sessionAccess;
     // a task's "Done" tick is a visually hidden checkbox: explain under the task header instead
     const block = target.closest<HTMLElement>('.task-head') ?? target.closest<HTMLElement>(GATED) ?? target.closest<HTMLElement>('section, article, .card') ?? target;
-    const text = access === 'staff'
+    const text = offline
+      ? (target.closest('[data-checkin]') ? OUTAGE.checkin : target.closest('[data-repo-submit]') ? OUTAGE.handIn : OUTAGE.lab)
+      : access === 'staff'
       ? (ALWAYS_OPEN ? 'Staff preview: hand-ins and check-in are for students. Everything else runs, and nothing is recorded.' : 'Staff preview: hand-ins and check-in are for students in a live session. Everything else runs, and nothing is recorded.')
       : access === 'practice'
       ? 'Hand-ins and check-in need a live lab session. Exercises and demos work now in practice mode.'
@@ -134,8 +141,12 @@ export function mountStart(lab: string) {
   const show = () => {
     const student = getStudent();
     const current = Boolean(student && session?.open && student.sessionId === session.id);
-    // with sessions off the form is always there: the server puts the student in the lab, there is nothing to wait for
-    form.hidden = !ALWAYS_OPEN && sessions.length === 0;
+    // with sessions off the form is always there: the server puts the student in the lab, there is nothing to wait for.
+    // With the database down there is nothing to start: the form goes, and the card says what still works.
+    form.hidden = offline || (!ALWAYS_OPEN && sessions.length === 0);
+    root.classList.toggle('is-offline', offline);
+    if (title) title.textContent = offline ? 'Saving is off right now' : titleText;
+    if (kicker) kicker.hidden = offline;
     if (labRoot) labRoot.dataset.sessionAccess = current ? 'active' : staff ? 'staff' : practice ? 'practice' : 'readonly';
     formBox.hidden = current;
     signed.hidden = !current;
@@ -164,6 +175,7 @@ export function mountStart(lab: string) {
       // the database cannot be read: a session we already knew stays (a hiccup); otherwise the lab opens for practice
       if (data.offline && sessions.length) throw new Error('offline');
       sessions = Array.isArray(data.sessions) ? data.sessions.filter((item) => item.open) : data.open ? [data] : [];
+      offline = data.offline === true;
       practice = data.practice === true;
       selfPaced = data.selfPaced === true;
       const student = getStudent();
@@ -175,8 +187,8 @@ export function mountStart(lab: string) {
       sessionIn.value = preferredId;
       session = sessions.find((item) => item.id === preferredId) ?? null;
       sessionField.hidden = sessions.length < 2;
-      status.textContent = data.offline
-        ? 'The course database cannot be reached right now. You can do every exercise and check it now, but nothing is saved until it is back.'
+      status.textContent = offline
+        ? OUTAGE.lab
         : staff && !getStudent()
         ? `Staff preview: you can edit, run and check every exercise and demo now${ALWAYS_OPEN ? '' : ', without starting a session'}. Nothing you do here is recorded.`
         : ALWAYS_OPEN || (selfPaced && session && sessions.length === 1)

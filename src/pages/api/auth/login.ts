@@ -5,6 +5,8 @@ import { clientIp } from '@/lib/attendance/server';
 import { getProgressStore, json } from '@/lib/progress/server';
 import { AUTH_LIMITS, loginThrottle, normalEmail } from '@/lib/accounts/core';
 import { getAccountStore, publicUser, startUserSession } from '@/lib/accounts/server';
+import { OUTAGE } from '@/lib/outage';
+import { databaseDown } from '@/lib/outage-server';
 
 export const prerender = false;
 
@@ -41,6 +43,8 @@ export const POST: APIRoute = async ({ request, cookies, url, clientAddress, red
     return json({ user: publicUser(user) });
   } catch (error) {
     console.error('[accounts] login failed', error);
-    return json({ error: 'Could not sign in. Try again.' }, 500);
+    // say so when the course database is down: the password was never checked, so "try again" would mislead
+    const down = await databaseDown();
+    return down ? json({ error: OUTAGE.signIn, offline: true }, 503) : json({ error: 'Could not sign in. Try again.' }, 500);
   }
 };

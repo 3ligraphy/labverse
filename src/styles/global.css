@@ -92,6 +92,11 @@
 /* inside a module the navbar has a second row (its sections); admin pages have no site navbar */
 :root.has-modbar { --nav-h: 108px; }
 :root.no-site-nav { --nav-h: 0px; }
+/* "Saving is off" (StatusStrip.astro): while the course database is down a 40px strip sits under the navbar,
+   so --nav-h grows by 40px and every page keeps its content clear of it */
+:root.db-down { --nav-h: 104px; }
+:root.db-down.has-modbar { --nav-h: 148px; }
+:root.db-down.no-site-nav { --nav-h: 40px; }
 /* every light/dark switch (navbar, admin menu, builder): the sun in light mode, the moon in dark */
 [data-theme-toggle] .i-sun { display: none; }
 :root[data-theme='light'] [data-theme-toggle] .i-sun { display: block; }
@@ -247,6 +252,9 @@ main:focus { outline: none; } /* focused by the skip link and back-to-top, not a
 .btn-ghost:hover { background: var(--surface-2); border-color: var(--text-3); }
 .btn-sm { --h: 36px; padding: 0 14px; font-size: var(--fs-xs); }
 .btn-lg { --h: 54px; padding: 0 26px; font-size: var(--fs-base); }
+/* a button that cannot be used right now looks off; the reason is always written next to it */
+.btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; transform: none; }
+.btn:disabled::after { display: none; }
 
 .icon-btn {
   display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--r-md);
@@ -637,6 +645,31 @@ html.reveal-ready [data-reveal]:not(.in) { animation: none; }
 .glass::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; background: linear-gradient(130deg, color-mix(in oklab, var(--g1, #c8ff4d) 70%, transparent), transparent 40%, transparent 60%, color-mix(in oklab, var(--g2, #7cb1ff) 60%, transparent));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
 
+/* ---------------------------------------------------------------- "Saving is off" strip (StatusStrip.astro) */
+/* amber, solid (no glass), full-contrast text; under the navbar while <html> has db-down */
+.dbs { display: none; }
+:root.db-down .dbs {
+  --dbs-bg: color-mix(in oklab, var(--warn) 16%, var(--bg));
+  display: block; position: fixed; z-index: 98; left: 0; right: 0; top: calc(var(--nav-h) - 40px);
+  background: var(--dbs-bg); color: var(--text); border-bottom: 1px solid color-mix(in oklab, var(--warn) 40%, transparent);
+}
+.dbs-in { display: flex; align-items: center; gap: 10px; height: 40px; font-size: 14px; }
+.dbs-ic { flex: none; width: 18px; height: 18px; color: var(--warn); }
+.dbs-t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dbs-t b { font-weight: 650; }
+.dbs-short { display: none; }
+@media (max-width: 760px) { .dbs-long { display: none; } .dbs-short { display: inline; } }
+/* small phones: "Saving is off." and the button are enough; the button explains the rest */
+@media (max-width: 480px) { .dbs-short { display: none; } }
+.dbs-btn { flex: none; height: 30px; padding: 0 12px; border-radius: var(--r-full); border: 1px solid color-mix(in oklab, var(--warn) 50%, transparent);
+  background: transparent; color: var(--text); font: 600 13px var(--font-body); cursor: pointer; transition: background var(--t-fast); }
+.dbs-btn:hover, .dbs-btn[aria-expanded='true'] { background: color-mix(in oklab, var(--warn) 18%, transparent); }
+.dbs-btn:focus-visible { outline: 2px solid var(--warn); outline-offset: 2px; }
+.dbs-more { position: absolute; top: 100%; left: 0; right: 0; background: var(--dbs-bg); border-bottom: 1px solid color-mix(in oklab, var(--warn) 40%, transparent);
+  box-shadow: 0 18px 36px -18px rgb(0 0 0 / 0.55); }
+.dbs-more ul { display: grid; gap: 8px; padding-block: 6px 18px; list-style: none; font-size: 14.5px; line-height: 1.5; color: var(--text); }
+.dbs-more li { max-width: 72ch; padding-left: 28px; }
+.dbs-more b { font-weight: 650; }
 
 /* ---------------------------------------------------------------- phones: tables never widen the page */
 @media (max-width: 719px) {

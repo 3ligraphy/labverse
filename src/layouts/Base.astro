@@ -6,6 +6,7 @@ import SearchPalette from '@/components/SearchPalette.astro';
 import Announce from '@/components/Announce.astro';
 import ModuleAnnounce from '@/components/ModuleAnnounce.astro';
 import StaffBar from '@/components/platform/StaffBar.astro';
+import StatusStrip from '@/components/StatusStrip.astro';
 import { platform } from '@/site.config';
 import '@/styles/global.css';
 
@@ -68,11 +69,58 @@ const staffBar = adminArea ? null
         document.addEventListener('astro:after-swap', apply);
       })();
     </script>
+    <script is:inline>
+      // "Saving is off": while the course database is down (GET /api/status), <html> gets `db-down`. That shows the
+      // strip under the navbar (StatusStrip.astro) and makes room for it (--nav-h). The last answer is kept in this
+      // tab for a short time, so every page shows it before paint; it is asked again when it is old.
+      (function () {
+        if (window.__buenovaDb) return;
+        window.__buenovaDb = true;
+        var KEY = 'buenova:db';
+        var asking = false;
+        function read() { try { return JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+        function apply(s) { document.documentElement.classList.toggle('db-down', Boolean(s && s.down)); }
+        function check() {
+          var s = read();
+          apply(s);
+          if (asking || (s && Date.now() - s.at < (s.down ? 20000 : 120000))) return;
+          asking = true;
+          fetch('/api/status').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+            if (!d) return;
+            var next = { down: d.database === 'down', at: Date.now() };
+            try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch (e) {}
+            apply(next);
+            if (Boolean(s && s.down) !== next.down) window.dispatchEvent(new CustomEvent('buenova:db', { detail: next }));
+          }).catch(function () {}).then(function () { asking = false; });
+        }
+        check();
+        document.addEventListener('astro:after-swap', check);
+        // ask again now and then (every 30 s while it is down, every 2 min otherwise), so the strip comes and goes by itself
+        setInterval(function () { if (document.visibilityState === 'visible') check(); }, 30000);
+        // the strip's "What this means" button: opens the short list, closes on Escape or a click elsewhere
+        function close(focus) {
+          var more = document.getElementById('dbs-more');
+          var btn = document.querySelector('[data-dbs-toggle]');
+          if (!more || more.hidden) return;
+          more.hidden = true;
+          if (btn) { btn.setAttribute('aria-expanded', 'false'); if (focus) btn.focus(); }
+        }
+        document.addEventListener('click', function (e) {
+          var t = e.target instanceof Element ? e.target : null;
+          var btn = t && t.closest('[data-dbs-toggle]');
+          var more = document.getElementById('dbs-more');
+          if (btn && more) { more.hidden = !more.hidden; btn.setAttribute('aria-expanded', String(!more.hidden)); return; }
+          if (!(t && t.closest('#dbs-more'))) close(false);
+        });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(true); });
+      })();
+    </script>
     <ClientRouter fallback="swap" />
   </head>
   <body>
     <a href="#main" class="skip-link">Skip to content</a>
     {!adminArea && <Nav module={module} />}
+    <StatusStrip />
     <main id="main" tabindex="-1" transition:name="main">
       <slot />
     </main>

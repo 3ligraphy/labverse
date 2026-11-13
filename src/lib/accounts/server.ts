@@ -102,7 +102,9 @@ class AccountStore {
 
   constructor(url: string, prefix: string, driver: 'neon' | 'postgres') {
     if (driver === 'postgres') {
-      const pool = new Pool({ connectionString: url, allowExitOnIdle: true });
+      const pool = new Pool({ connectionString: url, allowExitOnIdle: true, connectionTimeoutMillis: 5000 });
+      // a database that stops or restarts drops its idle connections: log it instead of crashing the server
+      pool.on('error', (error) => console.error('[db] lost an idle connection:', error.message));
       this.run = async (text, params = []) => (await pool.query(text, params)).rows;
     } else {
       const sql = neon(url);

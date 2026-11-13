@@ -43,6 +43,9 @@
 .ls-signed .ls-ok { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--ok); color: #fff; font-weight: 800; font-size: 14px; }
 .ls-signed button { font-size: 12px; color: var(--text-3); text-decoration: underline; text-underline-offset: 3px; }
 .ls.is-signed { border-color: color-mix(in oklab, var(--ok) 45%, var(--line)); background: var(--surface); box-shadow: none; }
+/* the course database is down (src/lab/ui/start.ts): practice only, so the card is amber and says what still works */
+.ls.is-offline { border-color: color-mix(in oklab, var(--warn) 55%, var(--line)); background: color-mix(in oklab, var(--warn) 9%, var(--surface)); box-shadow: none; }
+.ls.is-offline [data-ls-status] { max-width: 68ch; color: var(--text); font-size: var(--fs-base); line-height: 1.55; }
 /* ---------- sticky lab progress ---------- */
 .lp { position: fixed; z-index: 40; left: 0; right: 0; top: var(--nav-h); transform: translateY(-110%); opacity: 0; pointer-events: none; transition: transform var(--t-med) var(--ease-out), opacity var(--t-med); background: var(--glass); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border-bottom: 1px solid var(--line); }
 .lp.is-on { transform: none; opacity: 1; pointer-events: auto; }

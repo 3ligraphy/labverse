@@ -65,6 +65,13 @@ const json = JSON.stringify({ next: safeNext }).replace(/</g, '\\u003c');
           <div class="auth-off"><h2>Accounts aren't set up yet</h2><p>This site needs a database and an ADMIN_PASSWORD (or SESSION_SECRET). Staff can still use the <a href="/admin">admin password</a>.</p></div>
         ) : (
           <>
+            {/* shown only while the course database is down (the "Saving is off" strip); the buttons below turn off */}
+            <div class="auth-down" role="note">
+              <h2>Sign-in is off right now</h2>
+              <p>The course database is down, so no one can sign in or make an account. Your account is safe.</p>
+              <p>You do not need to sign in to do a lab. Open your module and start. Nothing is saved until the database is back.</p>
+              <a class="btn btn-primary" href="/modules">Open the modules →</a>
+            </div>
             <div class="auth-tabs" role="tablist">
               <button type="button" role="tab" aria-selected="true" data-tab="in">Sign in</button>
               <button type="button" role="tab" aria-selected="false" data-tab="up">Student sign-up</button>
@@ -163,6 +170,12 @@ const json = JSON.stringify({ next: safeNext }).replace(/</g, '\\u003c');
   .auth-fine { font-size: 12.5px; color: var(--hero-dim); }
   .auth-fine a, .auth-off a { color: var(--hero-accent); }
   .auth-off p { margin-top: 8px; color: var(--hero-lead); }
+  .auth-down { display: none; }
+  :root.db-down .auth-down { display: grid; gap: 8px; justify-items: start; padding: 18px; border-radius: 16px;
+    border: 1px solid color-mix(in oklab, var(--hero-warn) 45%, transparent); background: color-mix(in oklab, var(--hero-warn) 12%, transparent); }
+  .auth-down h2 { font-size: 1.2rem; letter-spacing: -.02em; }
+  .auth-down p { color: var(--hero-lead); font-size: 14px; line-height: 1.5; }
+  .auth-down .btn { margin-top: 6px; }
   .auth-as { display: grid; gap: 14px; }
   .auth-as p { color: var(--hero-lead); line-height: 1.5; }
   .auth-as p b { color: var(--hero-text); }
@@ -195,10 +208,18 @@ const json = JSON.stringify({ next: safeNext }).replace(/</g, '\\u003c');
     return false;
   };
 
+  /** While the course database is down (the "Saving is off" strip) no form here can work: their buttons are off. */
+  const syncDown = () => {
+    const down = document.documentElement.classList.contains('db-down');
+    document.querySelectorAll<HTMLButtonElement>('[data-auth] form [type="submit"]').forEach((b) => { b.disabled = down; });
+  };
+  window.addEventListener('buenova:db', syncDown);
+
   const init = () => {
     const root = document.querySelector<HTMLElement>('[data-auth]');
     if (!root || root.dataset.wired) return;
     root.dataset.wired = '1';
+    syncDown();
     const data = JSON.parse(root.querySelector('[data-auth-data]')!.textContent!) as { next: string };
     const tabs = root.querySelectorAll<HTMLButtonElement>('[data-tab]');
     const show = (t: string) => {

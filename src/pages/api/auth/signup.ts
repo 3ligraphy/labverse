@@ -9,6 +9,8 @@ import { getProgressStore, json } from '@/lib/progress/server';
 import { AUTH_LIMITS, parseAccount, parseProfile, signupBlock } from '@/lib/accounts/core';
 import { getAccountStore, publicUser, startUserSession } from '@/lib/accounts/server';
 import { hubData } from '@/lib/accounts/hub';
+import { OUTAGE } from '@/lib/outage';
+import { databaseDown } from '@/lib/outage-server';
 
 export const prerender = false;
 
@@ -36,6 +38,7 @@ export const POST: APIRoute = async ({ request, cookies, url, clientAddress }) =
     return json({ user: publicUser(user) }, 201);
   } catch (error) {
     console.error('[accounts] signup failed', error);
-    return json({ error: 'Could not create the account. Try again.' }, 500);
+    const down = await databaseDown();
+    return down ? json({ error: OUTAGE.signUp, offline: true }, 503) : json({ error: 'Could not create the account. Try again.' }, 500);
   }
 };
