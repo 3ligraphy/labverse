@@ -55,13 +55,48 @@
         ensureIdentity().then((me) => me && record.task({ lab: root.dataset.lab!, task: b.value, done: b.checked }));
       }),
     );
-    document.querySelector('[data-lab-reset]')?.addEventListener('click', () => {
-      boxes.filter((b) => b.checked).forEach((b) => record.task({ lab: root.dataset.lab!, task: b.value, done: false }));
-      done.clear();
-      boxes.forEach((b) => (b.checked = false));
-      try { localStorage.removeItem(key); } catch {}
-      update();
-    });
+    // "reset" clears every Done tick (here and for the TA), so it asks first: a second click within 5 s clears them,
+    // and for 8 s after that the same button says "undo" and puts them all back.
+    const resetBtn = document.querySelector<HTMLButtonElement>('[data-lab-reset]');
+    if (resetBtn) {
+      const label = resetBtn.textContent || 'reset';
+      let state: 'idle' | 'confirm' | 'undo' = 'idle';
+      let timer = 0;
+      let cleared: string[] = [];
+      const idle = () => { window.clearTimeout(timer); state = 'idle'; cleared = []; resetBtn.textContent = label; };
+      const save = () => { try { localStorage.setItem(key, JSON.stringify([...done])); } catch {} };
+      resetBtn.addEventListener('click', () => {
+        const ticked = boxes.filter((b) => b.checked);
+        if (state === 'undo') {
+          for (const value of cleared) {
+            done.add(value);
+            const box = boxes.find((b) => b.value === value);
+            if (box) box.checked = true;
+            record.task({ lab: root.dataset.lab!, task: value, done: true });
+          }
+          save();
+          update();
+          return idle();
+        }
+        if (!ticked.length) return;
+        if (state === 'idle') {
+          state = 'confirm';
+          resetBtn.textContent = `clear ${ticked.length} tick${ticked.length === 1 ? '' : 's'}? click again`;
+          timer = window.setTimeout(idle, 5000);
+          return;
+        }
+        window.clearTimeout(timer);
+        cleared = ticked.map((b) => b.value);
+        cleared.forEach((task) => record.task({ lab: root.dataset.lab!, task, done: false }));
+        done.clear();
+        boxes.forEach((b) => (b.checked = false));
+        try { localStorage.removeItem(key); } catch {}
+        update();
+        state = 'undo';
+        resetBtn.textContent = 'cleared · undo';
+        timer = window.setTimeout(idle, 8000);
+      });
+    }
     update();
   }
 

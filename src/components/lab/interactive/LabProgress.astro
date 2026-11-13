@@ -10,9 +10,10 @@ const { EXERCISES, BLOCKS } = INTERACTIVE_LABS[Astro.props.lab ?? 'lab-02'];
 ---
 <div class="lp" data-lab-progress role="navigation" aria-label="Lab progress">
   <div class="lp-in container">
-    <span class="lp-where mono" data-lp-where>Part {BLOCKS[0].part} · Block 1/{BLOCKS.length}</span>
+    {/* filled by src/lab/ui/progress.ts: the Part on screen, and the exercise on screen or the next one to solve */}
+    <span class="lp-where mono" data-lp-where>Part {BLOCKS[0].part}</span>
     <span class="lp-title" data-lp-title>{BLOCKS[0].title}</span>
-    <span class="lp-ex" data-lp-ex>Ex 1/{EXERCISES.length}</span>
+    <a class="lp-ex" data-lp-ex href={`#ex-${EXERCISES[0].id}`}>Ex 1/{EXERCISES.length}</a>
     <ol class="lp-squares">
       {EXERCISES.map((e) => <li><a href={`#ex-${e.id}`} data-sq={e.id} title={`Ex ${e.n} · ${e.title}`} aria-label={`Exercise ${e.n}: ${e.title}`}></a></li>)}
     </ol>

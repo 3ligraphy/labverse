@@ -290,7 +290,7 @@ const resGroups = [...groupBy(resources, (r) => r.data.category)];
         <p class="muted mt-6" data-reveal style="max-width:42ch">{setup.length} guided steps for Windows, macOS and Linux — each with verification commands and fixes for common errors.</p>
         <div class="su-progress panel" data-reveal data-setup-mini data-total={checklist.length}>
           <div class="flex between items-center">
-            <span class="mono faint" style="font-size:12px">Your setup progress</span>
+            <span class="mono faint" style="font-size:12px">Your setup checklist ({checklist.length} checks)</span>
             <span class="mono" data-mini-label>0 / {checklist.length}</span>
           </div>
           <div class="su-bar"><i data-mini-bar></i></div>

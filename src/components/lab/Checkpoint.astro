@@ -1,27 +1,30 @@
 ---
-/** "You should now see…" box. <Checkpoint> …markdown… </Checkpoint> */
+/**
+ * "You should now see…" box: a milestone in the lab text, not a status. It cannot know whether the student got there,
+ * so it never looks "done": a neutral flag (no green tick), always labelled Checkpoint, then its title.
+ * <Checkpoint title="…"> …markdown… </Checkpoint>
+ */
 interface Props { title?: string }
-const { title = 'Checkpoint' } = Astro.props;
+const { title } = Astro.props;
+const name = title && title.trim().toLowerCase() !== 'checkpoint' ? title.trim() : '';
 ---
-<div class="cp" role="note" data-reveal>
+<div class="cp" role="note" aria-label={name ? `Checkpoint: ${name}` : 'Checkpoint'} data-reveal>
   <span class="cp-ic" aria-hidden="true">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7" /></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4" /><path d="M5 4h12l-2.5 4.5L17 13H5" /></svg>
   </span>
   <div class="cp-body">
-    <p class="cp-title mono">{title}</p>
+    <p class="cp-title"><span class="cp-k mono">Checkpoint</span>{name && <span class="cp-name">{name}</span>}</p>
     <slot />
   </div>
 </div>
 
 <style>
-  .cp { display: grid; grid-template-columns: 36px 1fr; gap: 14px; padding: 16px 18px; border-radius: var(--r-md); border: 1px solid color-mix(in oklab, var(--ok) 40%, transparent); background: linear-gradient(135deg, var(--ok-soft), transparent 70%); }
-  .cp-ic { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--ok); color: #fff; box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 50%, transparent); }
-  .cp-ic svg { width: 18px; height: 18px; stroke-dasharray: 24; stroke-dashoffset: 24; }
-  .cp.in .cp-ic { animation: cp-ring 1.4s var(--ease-out) 300ms; }
-  .cp.in .cp-ic svg { transition: stroke-dashoffset 500ms var(--ease-out) 250ms; stroke-dashoffset: 0; }
-  @keyframes cp-ring { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 55%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
-  .cp-title { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ok); margin-bottom: 4px; font-weight: 600; }
+  .cp { display: grid; grid-template-columns: 36px 1fr; gap: 14px; padding: 16px 18px; border-radius: var(--r-md); border: 1px solid var(--line-2); background: var(--surface); }
+  .cp-ic { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--text-2); }
+  .cp-ic svg { width: 18px; height: 18px; }
+  .cp-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-bottom: 4px; }
+  .cp-k { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-2); font-weight: 600; }
+  .cp-name { font-weight: 650; color: var(--text); }
   .cp-body { color: var(--text); min-width: 0; }
   .cp-body > :global(* + *) { margin-top: 12px !important; }
-  @media (prefers-reduced-motion: reduce) { .cp-ic svg { stroke-dashoffset: 0; } }
 </style>

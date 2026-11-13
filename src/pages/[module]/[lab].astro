@@ -21,7 +21,7 @@ import '@/styles/skin-neon.css';
 import { claimedByFileLab } from '@/lib/lab/claimed';
 import { renderBlocks } from '@/lib/platform/render';
 import { loadModule } from '@/lib/platform/server';
-import { minutes } from '@/lib/lab';
+import { minutes, formatMinutes } from '@/lib/lab';
 import '@/styles/lab.css';
 
 export const prerender = false;
@@ -53,6 +53,8 @@ const tasksOf = (n: string) => blocks.filter((b) => b.kind === 'task' && b.n.spl
 const taskCount = blocks.filter((b) => b.kind === 'task').length;
 const isMission = taskCount > 0;
 const totalMin = parts.reduce((a, p) => a + minutes(p.time), 0);
+// one time for the whole lab: the parts added up (the lab's own estimate only when its parts have no times)
+const totalTime = formatMinutes(totalMin) || c?.meta.estimatedTime || '';
 const color = data?.meta.color || '#7cb1ff';
 const skin = MODULE_SKINS[data?.meta.skin ?? ''] || '';
 const PART_COLORS = [color, '#7cb1ff', '#ffb547', '#ff8ad8', '#5ee0d2'];
@@ -86,7 +88,7 @@ const q = preview ? '?preview' : '';
               {c.meta.description && <p class="lead mt-6">{c.meta.description}</p>}
               <div class="bl-chips">
                 <span class={`badge badge-${c.meta.difficulty.toLowerCase()}`}><span class="dot"></span>{c.meta.difficulty}</span>
-                {c.meta.estimatedTime && <span class="badge">{c.meta.estimatedTime}</span>}
+                {totalTime && <span class="badge">{totalTime}</span>}
               </div>
             </div>
             {isMission && (
@@ -98,7 +100,7 @@ const q = preview ? '?preview' : '';
                 <div>
                   <p class="mono dash-k">Your progress</p>
                   <p class="dash-v"><b data-done>0</b> / {taskCount} tasks</p>
-                  <p class="dash-s mono">{parts.length} part{parts.length === 1 ? '' : 's'}{totalMin ? ` · ${totalMin} min` : ''}</p>
+                  <p class="dash-s mono">{parts.length} part{parts.length === 1 ? '' : 's'}{totalTime ? ` · ${totalTime}` : ''}</p>
                   <button class="dash-reset mono" data-lab-reset type="button">reset</button>
                 </div>
               </div>

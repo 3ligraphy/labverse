@@ -65,7 +65,7 @@ export function mountStart(lab: string) {
       ? 'Hand-ins and check-in need a live lab session. Exercises and demos work now in practice mode.'
       : ALWAYS_OPEN
         // sessions are off: nothing to wait for, the student only has to press Start
-        ? (account ? 'Press Start in Start lab (your name and ID are filled in). Then you can edit, run and check.' : 'Start the lab first: enter your name and student ID in Start lab. Then you can edit, run and check.')
+        ? (account ? 'Start the lab first (your name and ID come from your account). Then you can edit, run and check.' : 'Start the lab first: type your name and student ID here. Then you can edit, run and check.')
       : sessions.length
         ? (account ? 'Choose your time slot in Start lab and press Start. Then you can edit, run and check.' : 'Join the session first: enter your name and student ID in Start lab. Then you can edit, run and check.')
         : 'This opens when your TA starts the lab session. You can read everything until then.';
@@ -86,6 +86,11 @@ export function mountStart(lab: string) {
       const p = document.createElement('p');
       p.textContent = text;
       note.replaceChildren(p);
+      // the lab is open and only needs a name and ID: ask for them right here, instead of a trip to the top of the page
+      if (!offline && access === 'readonly' && ALWAYS_OPEN) {
+        note.append(inlineStart(target));
+        return;
+      }
       if (access !== 'practice' && access !== 'staff' && (ALWAYS_OPEN || sessions.length)) {
         const go = document.createElement('button');
         go.type = 'button';
@@ -98,6 +103,76 @@ export function mountStart(lab: string) {
         note.append(go);
       }
     }, 60);
+  };
+
+  /**
+   * Name + ID (or one button for a signed-in student) inside the note under the control that was clicked. Starting
+   * here is the same as the Start lab form at the top; afterwards focus goes back to the control, ready to use.
+   */
+  const inlineStart = (target: HTMLElement): HTMLElement => {
+    const back = () => {
+      const control = target.closest<HTMLElement>('button, input, select, textarea, .cm-content') ?? target;
+      control.focus?.({ preventScroll: true });
+    };
+    const box = document.createElement('form');
+    box.className = 'gate-start';
+    box.noValidate = true;
+    const msg = document.createElement('p');
+    msg.className = 'gate-err';
+    msg.setAttribute('role', 'alert');
+    const go = document.createElement('button');
+    go.type = 'submit';
+    go.className = 'btn btn-primary btn-sm';
+    if (account) {
+      go.textContent = `Start as ${account.name} →`;
+      box.append(go, msg);
+      box.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        go.disabled = true;
+        const problem = await join(account!.name, account!.id, looseGroup(groupIn.value), session?.open ? session.id : '');
+        go.disabled = false;
+        if (problem) msg.textContent = problem;
+        else back();
+      });
+      return box;
+    }
+    const field = (label: string, name: string, value: string, attrs: Record<string, string>) => {
+      const wrap = document.createElement('label');
+      wrap.textContent = label;
+      const input = document.createElement('input');
+      input.className = 'input';
+      input.name = name;
+      input.value = value;
+      input.required = true;
+      for (const [k, v] of Object.entries(attrs)) input.setAttribute(k, v);
+      wrap.append(input);
+      return { wrap, input };
+    };
+    const n = field('Full name', 'name', nameIn.value, { autocomplete: 'name', maxlength: '60', placeholder: 'e.g. Mariam Ahmed' });
+    const i = field('Student ID', 'studentId', idIn.value, { autocomplete: 'off', inputmode: 'numeric', maxlength: '11', placeholder: 'e.g. 236541' });
+    i.input.classList.add('mono');
+    go.textContent = 'Start →';
+    box.append(n.wrap, i.wrap, go, msg);
+    box.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = cleanName(n.input.value);
+      const id = cleanStudentId(i.input.value);
+      const badName = nameError(name);
+      if (badName) { msg.textContent = badName; return n.input.focus(); }
+      const badId = studentIdError(id);
+      if (badId) { msg.textContent = badId; return i.input.focus(); }
+      // the Start lab form at the top shows the same student
+      nameIn.value = name;
+      idIn.value = id;
+      msg.textContent = 'Starting…';
+      go.disabled = true;
+      const problem = await join(name, id, looseGroup(groupIn.value), session?.open ? session.id : '');
+      go.disabled = false;
+      msg.textContent = problem ?? '';
+      if (!problem) back();
+    });
+    setTimeout(() => (n.input.value ? i.input : n.input).focus({ preventScroll: true }), 0);
+    return box;
   };
 
   if (labRoot && !labRoot.dataset.sessionGuard) {

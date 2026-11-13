@@ -27,5 +27,18 @@ export function parseLabOutline(body = ''): LabPart[] {
   return parts;
 }
 
-/** "10 min" + "4 min" … → total minutes */
-export const minutes = (t?: string) => Number(t?.match(/\d+/)?.[0] ?? 0);
+/** "45 min", "1 h 40 min", "1 hour 15 min", "2 hours", "1.5 h" → minutes (a bare number is minutes; nothing → 0) */
+export const minutes = (t?: string): number => {
+  if (!t) return 0;
+  const h = t.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/i);
+  const m = t.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/i);
+  if (h || m) return Math.round((h ? parseFloat(h[1]) * 60 : 0) + (m ? Number(m[1]) : 0));
+  return Number(t.match(/\d+/)?.[0] ?? 0);
+};
+
+/** 375 → "6 h 15 min", 60 → "1 h", 45 → "45 min", 0 → "" (the way the parts write their own times) */
+export const formatMinutes = (total: number): string => {
+  if (!total) return '';
+  const h = Math.floor(total / 60), m = total % 60;
+  return [h && `${h} h`, m && `${m} min`].filter(Boolean).join(' ');
+};

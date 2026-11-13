@@ -10,9 +10,10 @@ type Block = { n: number; part: number; title: string };
 export function initProgress(lab: string, meta: ExerciseMeta[], blocks: readonly Block[]) {
   const bar = document.querySelector<HTMLElement>('[data-lab-progress]');
   const ids = meta.map((m) => m.id);
+  let states = loadAll(lab, ids);
 
   const paint = () => {
-    const states = loadAll(lab, ids);
+    states = loadAll(lab, ids);
     const solved = ids.filter((id) => states[id].status === 'solved').length;
     const p = ids.length ? solved / ids.length : 0;
 
@@ -31,24 +32,32 @@ export function initProgress(lab: string, meta: ExerciseMeta[], blocks: readonly
     if (banner) banner.hidden = solved !== ids.length;
   };
 
-  // which block / exercise is on screen
+  // Where the student is: the Part on screen (every Part, also the reading ones without exercises), and the exercise
+  // on screen when that Part has exercises; anywhere else, the next exercise still to solve (a link to it).
   const where = () => {
     if (!bar) return;
     const mid = window.innerHeight * 0.35;
-    let block = blocks[0];
-    for (const b of blocks) {
-      const el = document.getElementById(`part-${b.n}`);
-      if (el && el.getBoundingClientRect().top < mid) block = b;
-    }
-    let ex = meta[0];
-    for (const m of meta) {
+    const parts = [...document.querySelectorAll<HTMLElement>('section.part[id^="part-"]')];
+    let part = parts[0];
+    for (const p of parts) if (p.getBoundingClientRect().top < mid) part = p;
+    const n = part ? part.id.slice('part-'.length) : String(blocks[0]?.part ?? '');
+    const title = (part?.querySelector('.part-title')?.textContent ?? blocks[0]?.title ?? '').replace(/^\s*Part \d+:\s*/, '').trim();
+    bar.querySelector('[data-lp-where]')!.textContent = parts.length ? `Part ${n} of ${parts.length}` : `Part ${n}`;
+    bar.querySelector('[data-lp-title]')!.textContent = title;
+    const inPart = meta.filter((m) => String(m.block) === n);
+    let ex: ExerciseMeta | null = null;
+    for (const m of inPart) {
       const el = document.getElementById(`ex-${m.id}`);
       if (el && el.getBoundingClientRect().top < mid) ex = m;
     }
-    bar.querySelector('[data-lp-where]')!.textContent = `Part ${block.part} · Block ${blocks.indexOf(block) + 1}/${blocks.length}`;
-    bar.querySelector('[data-lp-title]')!.textContent = block.title;
-    bar.querySelector('[data-lp-ex]')!.textContent = `Ex ${ex.n}/${meta.length}`;
-    document.querySelectorAll<HTMLElement>('[data-sq]').forEach((sq) => sq.classList.toggle('is-here', sq.dataset.sq === ex.id));
+    if (inPart.length && !ex) ex = inPart[0];
+    const link = bar.querySelector<HTMLAnchorElement>('[data-lp-ex]')!;
+    const next = ex ? null : meta.find((m) => states[m.id]?.status !== 'solved');
+    const target = ex ?? next;
+    link.textContent = ex ? `Ex ${ex.n}/${meta.length}` : next ? `Next: Ex ${next.n}` : `All ${meta.length} solved`;
+    if (target) link.href = `#ex-${target.id}`;
+    else link.removeAttribute('href');
+    document.querySelectorAll<HTMLElement>('[data-sq]').forEach((sq) => sq.classList.toggle('is-here', Boolean(ex) && sq.dataset.sq === ex!.id));
   };
 
   // show the sticky bar once the lab header has scrolled away
