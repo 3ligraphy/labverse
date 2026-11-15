@@ -18,7 +18,7 @@ export const GET: APIRoute = async ({ cookies, url }) => {
     const data = await buildRegisterFor(module, (lab) => canOnLab(a, 'module.sessions', lab) || canOnLab(a, 'module.progress', lab));
     if (!data) return new Response('No database', { status: 503 });
     const file = await registerWorkbook(data.register, { module: data.moduleTitle });
-    return new Response(file, {
+    return new Response(new Blob([file as Uint8Array<ArrayBuffer>]), {
       headers: {
         'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'content-disposition': `attachment; filename="${module}-attendance-${cairoDate(Date.now())}.xlsx"`,
