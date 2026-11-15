@@ -11,6 +11,7 @@
 import { getSecret } from 'astro:env/server';
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
+import { driverFor, POOL_OPTIONS } from '@/lib/db-driver';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -58,7 +59,7 @@ class FilesStore {
 
   constructor(url: string, prefix: string, driver: 'neon' | 'postgres') {
     if (driver === 'postgres') {
-      const pool = new Pool({ connectionString: url, allowExitOnIdle: true });
+      const pool = new Pool({ connectionString: url, ...POOL_OPTIONS });
       this.run = async (text, params = []) => (await pool.query(text, params)).rows;
     } else {
       const sql = neon(url);
@@ -255,7 +256,7 @@ let store: FilesStore | null | undefined;
 export function getFilesStore(): FilesStore | null {
   if (store !== undefined) return store;
   const url = databaseUrl();
-  store = url ? new FilesStore(url, env('VERCEL_ENV') === 'production' ? 'project' : 'project_dev', onVercel() ? 'neon' : 'postgres') : null;
+  store = url ? new FilesStore(url, env('VERCEL_ENV') === 'production' ? 'project' : 'project_dev', driverFor(url, onVercel())) : null;
   return store;
 }
 

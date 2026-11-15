@@ -13,6 +13,7 @@ import { getSecret } from 'astro:env/server';
 import { createHash, randomUUID } from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
+import { driverFor, POOL_OPTIONS } from '@/lib/db-driver';
 import { BUILT_IN_AUDIENCE, DEFAULT_SETTINGS, SUPER_ADMINS, type NewAccount, type Profile, type PublicUser, type Role, type Settings, upgradeFaculties, upgradeYears } from './core';
 import { DEFAULT_STORED, type ModuleRole, type StoredMatrix } from './permissions';
 import { course, team } from '@/site.config';
@@ -102,7 +103,7 @@ class AccountStore {
 
   constructor(url: string, prefix: string, driver: 'neon' | 'postgres') {
     if (driver === 'postgres') {
-      const pool = new Pool({ connectionString: url, allowExitOnIdle: true });
+      const pool = new Pool({ connectionString: url, ...POOL_OPTIONS });
       this.run = async (text, params = []) => (await pool.query(text, params)).rows;
     } else {
       const sql = neon(url);
@@ -407,6 +408,6 @@ let store: AccountStore | null | undefined;
 export function getAccountStore(): AccountStore | null {
   if (store !== undefined) return store;
   const url = databaseUrl();
-  store = url && tokenSecret() ? new AccountStore(url, env('VERCEL_ENV') === 'production' ? 'accounts' : 'accounts_dev', onVercel() ? 'neon' : 'postgres') : null;
+  store = url && tokenSecret() ? new AccountStore(url, env('VERCEL_ENV') === 'production' ? 'accounts' : 'accounts_dev', driverFor(url, onVercel())) : null;
   return store;
 }

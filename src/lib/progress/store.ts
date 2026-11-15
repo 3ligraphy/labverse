@@ -5,6 +5,7 @@
  */
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
+import { POOL_OPTIONS } from '../db-driver.ts';
 import { type Activity, type Best, type Identity, type StatsRaw } from './core.ts';
 
 export type StudentRow = { student_key: string; student_id: string; name: string; device_key: string | null; created_at: string; last_seen: string; group_name?: string; session_started_at?: string };
@@ -337,7 +338,7 @@ export class NeonStore implements ProgressStore {
 
   constructor(url: string, prefix: Prefix, driver: 'neon' | 'postgres' = 'neon') {
     if (driver === 'postgres') {
-      const pool = new Pool({ connectionString: url, allowExitOnIdle: true });
+      const pool = new Pool({ connectionString: url, ...POOL_OPTIONS });
       this.run = async (text, params = []) => (await pool.query(text, params)).rows;
     } else {
       const sql = neon(url);
