@@ -7,6 +7,7 @@
 import { getSecret } from 'astro:env/server';
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
+import { driverFor, POOL_OPTIONS } from '@/lib/db-driver';
 import { course } from '@/site.config';
 import { compileLab, compileModule, emptyFlow, flowLeader, labKey, orderFlow, parseNodeList, type AssessmentItem, type CompiledLab, type Flow, type LabNodeType } from './core';
 import { DEFAULT_FACULTY, DEFAULT_SETTINGS, kindOf, listOf, moduleFaculty, type Audience, type Category } from '@/lib/accounts/core';
@@ -53,7 +54,7 @@ class PlatformStore {
 
   constructor(url: string, prefix: string, driver: 'neon' | 'postgres') {
     if (driver === 'postgres') {
-      const pool = new Pool({ connectionString: url, allowExitOnIdle: true, connectionTimeoutMillis: 5000 });
+      const pool = new Pool({ connectionString: url, ...POOL_OPTIONS, connectionTimeoutMillis: 5000 });
       // a database that stops or restarts drops its idle connections: log it instead of crashing the server
       pool.on('error', (error) => console.error('[db] lost an idle connection:', error.message));
       this.run = async (text, params = []) => (await pool.query(text, params)).rows;
@@ -286,7 +287,7 @@ let store: PlatformStore | null | undefined;
 export function getPlatformStore(): PlatformStore | null {
   if (store !== undefined) return store;
   const url = databaseUrl();
-  store = url ? new PlatformStore(url, env('VERCEL_ENV') === 'production' ? 'platform' : 'platform_dev', onVercel() ? 'neon' : 'postgres') : null;
+  store = url ? new PlatformStore(url, env('VERCEL_ENV') === 'production' ? 'platform' : 'platform_dev', driverFor(url, onVercel())) : null;
   return store;
 }
 

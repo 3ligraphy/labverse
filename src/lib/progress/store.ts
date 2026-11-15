@@ -6,6 +6,7 @@
 import { neon } from '@neondatabase/serverless';
 import { Pool } from 'pg';
 import { OPEN_LAB, TIME_GAP_CAP, type Activity, type Best, type Identity, type StatsRaw } from './core.ts';
+import { POOL_OPTIONS } from '../db-driver.ts';
 
 export type StudentRow = { student_key: string; student_id: string; name: string; device_key: string | null; created_at: string; last_seen: string; group_name?: string; session_started_at?: string };
 export type AttemptRow = { id: number; exercise: string; passed: number; total: number; code: string; created_at: string };
@@ -461,7 +462,7 @@ export class NeonStore implements ProgressStore {
 
   constructor(url: string, prefix: Prefix, driver: 'neon' | 'postgres' = 'neon') {
     if (driver === 'postgres') {
-      const pool = new Pool({ connectionString: url, allowExitOnIdle: true, connectionTimeoutMillis: 5000 });
+      const pool = new Pool({ connectionString: url, ...POOL_OPTIONS, connectionTimeoutMillis: 5000 });
       // a database that stops or restarts drops its idle connections: log it instead of crashing the server
       pool.on('error', (error) => console.error('[db] lost an idle connection:', error.message));
       this.run = async (text, params = []) => (await pool.query(text, params)).rows;

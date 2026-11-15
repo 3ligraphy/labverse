@@ -15,6 +15,7 @@ import { ALL_SESSIONS, ALWAYS_OPEN, LAB_DONE, OPEN_LAB, exerciseStats, labStruct
 import { NeonStore, type ProgressStore, type Session } from './store';
 import { looseGroup } from '@/lib/identity';
 import { buildRegister } from '@/lib/attendance/weekly';
+import { driverFor } from '@/lib/db-driver';
 import { publishedLabSources } from '@/lib/platform/server';
 import { splitLabKey } from '@/lib/platform/core';
 import { ANY_FACULTY, DEFAULT_FACULTY } from '@/lib/accounts/core';
@@ -32,7 +33,7 @@ let store: ProgressStore | null | undefined;
 export function getProgressStore(): ProgressStore | null {
   if (store !== undefined) return store;
   const url = databaseUrl();
-  if (url) store = new NeonStore(url, env('VERCEL_ENV') === 'production' ? 'progress' : 'progress_dev', onVercel() ? 'neon' : 'postgres');
+  if (url) store = new NeonStore(url, env('VERCEL_ENV') === 'production' ? 'progress' : 'progress_dev', driverFor(url, onVercel()));
   else store = null;
   return store;
 }
