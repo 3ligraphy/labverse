@@ -15,6 +15,7 @@ const MAX_QUEUE = 200;
 const MAX_CODE = 20_000;
 import { ID_HINT, NAME_RE, STUDENT_ID_RE as ID_RE } from '@/lib/identity';
 import { ALWAYS_OPEN } from '@/lib/progress/mode';
+import { weekKey } from '@/lib/attendance/weekly';
 import { OUTAGE } from '@/lib/outage';
 
 const read = <T>(key: string, fallback: T, store: Storage = localStorage): T => {
@@ -330,7 +331,8 @@ function wireCheckin() {
     const doneAt = () => {
       const me = getIdentity();
       const done = read<{ id: string; at: string } | null>(`progress:checkin:${lab}`, null);
-      return me && done && done.id === me.studentId ? done.at : null;
+      // a lab can run over two weeks: last week's check-in does not cover this week
+      return me && done && done.id === me.studentId && weekKey(done.at) === weekKey(Date.now()) ? done.at : null;
     };
     const refresh = async () => {
       const at = doneAt();

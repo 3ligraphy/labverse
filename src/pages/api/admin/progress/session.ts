@@ -3,6 +3,7 @@
  * or { lab, action: 'practice', on: boolean } to let students solve the lab without a session.
  */
 import type { APIRoute } from 'astro';
+import { weekEnd, weekStart } from '@/lib/attendance/weekly';
 import { isAdmin } from '@/lib/attendance/server';
 import { access } from '@/lib/accounts/access';
 import { canOnLab, canSeeLab } from '@/lib/accounts/labscope';
@@ -36,7 +37,16 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       if (!identity.ok) return json({ error: 'invalid', message: Object.values(identity.errors).join(' '), errors: identity.errors }, 400);
       const session = sessionId ? await store.getSessionById(sessionId) : null;
       if (!session || session.lab !== lab) return json({ error: 'not-found', message: 'Select a valid session first.' }, 404);
-      const at = await store.addManualAttendance(lab, sessionId, identity.value);
+      // { week: 'YYYY-MM-DD' } (Saturday) dates the attendance in that week; without it, now
+      const week = typeof body?.week === 'string' && /^d{4}-d{2}-d{2}$/.test(body.week) ? body.week : '';
+      let when: string | undefined;
+      if (week) {
+        const start = weekStart(week), end = weekEnd(week), now = Date.now(), opened = Date.parse(session.opens_at);
+        if (!Number.isFinite(start) || start > now) return json({ error: 'invalid', message: 'Choose a week that has started.' }, 400);
+        // inside the week: now if it is this week, else when the session opened that week, else its Sunday midday
+        if (now >= end) when = new Date(opened >= start && opened < end ? opened : start + 36 * 3_600_000).toISOString();
+      }
+      const at = await store.addManualAttendance(lab, sessionId, identity.value, when);
       if (!at) return json({ error: 'not-found', message: 'Select a valid session first.' }, 404);
       const recorded = (await store.studentData(lab, identity.value.studentKey, sessionId)).student?.name ?? identity.value.name;
       return json({ ok: true, at, name: recorded });

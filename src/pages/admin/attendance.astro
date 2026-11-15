@@ -581,7 +581,7 @@ const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(mod
       try {
         if (action === 'present') {
           const [sessionId, lab] = drawer.querySelector<HTMLSelectElement>(`[data-pick="${week}"]`)!.value.split('|');
-          await post('/api/admin/progress/session', { action: 'add-attendance', lab, sessionId, name: s.name, studentId: s.id });
+          await post('/api/admin/progress/session', { action: 'add-attendance', lab, sessionId, name: s.name, studentId: s.id, week });
         } else {
           await post('/api/admin/attendance', { module, action, week, studentKey: s.key, note: drawer.querySelector<HTMLInputElement>(`[data-note="${week}"]`)?.value ?? '' });
         }

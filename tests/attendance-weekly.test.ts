@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryStore } from '../src/lib/progress/store.ts';
-import { buildRegister, levelFor, weekEnd, weekKey } from '../src/lib/attendance/weekly.ts';
+import { buildRegister, levelFor, weekEnd, weekKey, weekStart } from '../src/lib/attendance/weekly.ts';
 import { registerSheets, registerWorkbook } from '../src/lib/attendance/workbook.ts';
 import { colName, sheetNames } from '../src/lib/xlsx.ts';
 
@@ -103,7 +103,8 @@ test('sessions off: permanent lab sessions count by check-in time, not by when t
   await store.checkIn('231001', 'lab-03', lab3.id);
   const reg = buildRegister(await store.attendanceRaw(['lab-02', 'lab-03']), [], new Map(), Date.parse('2026-11-14T12:00:00Z'));
   assert.deepEqual(reg.weeks.map((w) => w.key), ['2026-10-10', '2026-10-17']);
-  assert.deepEqual(reg.weeks[1].sessions.map((s) => [s.lab, s.checkedIn]), [['lab-03', 1]]);
+  // both permanent sessions are offered in week 2 (staff can mark someone present in either); only lab-03 was attended
+  assert.deepEqual(reg.weeks[1].sessions.map((s) => [s.lab, s.checkedIn]), [['lab-02', 0], ['lab-03', 1]]);
   const s2 = reg.students.find((s) => s.id === '231002')!;
   assert.equal(s2.cells['2026-10-10'].status, 'present');
   assert.equal(s2.cells['2026-10-17'].status, 'absent');
@@ -146,4 +147,38 @@ test('xlsx zip uses the layout Excel accepts: deflate, sizes in headers, no data
   assert.equal(new TextDecoder().decode(inflateRawSync(out.subarray(30 + nameLen, 30 + nameLen + size))), text);
   assert.equal(Buffer.from(out).indexOf(Buffer.from([0x50, 0x4b, 0x07, 0x08])), -1);
   assert.equal(v.getUint32(out.length - 22, true), 0x06054b50); // end of central directory
+});
+
+test('a lab that runs over two weeks in one permanent session counts each week it was attended', async () => {
+  let t = Date.parse('2026-11-10T08:00:00Z'); // Tue 10 Nov, week of Sat 7 Nov
+  const store = new MemoryStore(() => t);
+  for (const id of ['231001', '231002']) await store.touchStudent({ studentKey: id, studentId: id, name: `Student ${id}`, deviceKey: null } as never);
+  const open = await store.permanentSession('lab-05');
+  for (const id of ['231001', '231002']) { await store.joinSession(open.id, id, 'G1'); await store.checkIn(id, 'lab-05', open.id); }
+  t = Date.parse('2026-11-17T08:00:00Z'); // Tue 17 Nov, the next week: same lab, same session
+  assert.equal(await store.checkinSince(open.id, '231001', new Date(weekStart('2026-11-14')).toISOString()), null); // not yet this week
+  const again = await store.checkIn('231001', 'lab-05', open.id);
+  assert.equal(again, new Date(t).toISOString()); // a new check-in, not last week's
+  assert.equal(await store.checkinSince(open.id, '231001', new Date(weekStart('2026-11-14')).toISOString()), again);
+  const reg = buildRegister(await store.attendanceRaw(['lab-05']), [], new Map(), Date.parse('2026-11-25T12:00:00Z'));
+  assert.deepEqual(reg.weeks.map((w) => w.key), ['2026-11-07', '2026-11-14']);
+  const by = new Map(reg.students.map((s) => [s.id, s]));
+  assert.equal(by.get('231001')!.attended, 2);
+  assert.equal(by.get('231002')!.cells['2026-11-14'].status, 'absent');
+  assert.equal(by.get('231002')!.absences, 1);
+});
+
+test('staff can mark a student present in a past week of a permanent session', async () => {
+  let t = Date.parse('2026-11-10T08:00:00Z');
+  const store = new MemoryStore(() => t);
+  await store.touchStudent({ studentKey: '231003', studentId: '231003', name: 'Student 231003', deviceKey: null } as never);
+  const open = await store.permanentSession('lab-05');
+  await store.joinSession(open.id, '231003', 'G1');
+  await store.checkIn('231003', 'lab-05', open.id); // week of 7 Nov
+  t = Date.parse('2026-11-25T08:00:00Z'); // two weeks later, staff fix the week of 14 Nov
+  const at = await store.addManualAttendance('lab-05', open.id, { studentKey: '231003', studentId: '231003', name: 'Student 231003' }, new Date(weekStart('2026-11-14') + 36 * 3_600_000).toISOString());
+  assert.equal(weekKey(at!), '2026-11-14');
+  const reg = buildRegister(await store.attendanceRaw(['lab-05']), [], new Map(), t);
+  assert.equal(reg.students[0].cells['2026-11-14'].status, 'present');
+  assert.equal(reg.students[0].attended, 2);
 });

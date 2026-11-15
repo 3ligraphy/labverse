@@ -4,6 +4,7 @@ import { ALWAYS_OPEN, ATTENDANCE_MIN_ACTIVE_SEC, ATTENDANCE_MIN_SEEN, attendance
 import { getProgressStore, getStructures, isPermanent, json, liveSession, sessionScope } from '@/lib/progress/server';
 import { OUTAGE } from '@/lib/outage';
 import { databaseDown } from '@/lib/outage-server';
+import { weekKey, weekStart } from '@/lib/attendance/weekly';
 
 export const prerender = false;
 
@@ -23,8 +24,10 @@ export const POST: APIRoute = async ({ request }) => {
     if (!session) return json({ error: 'closed', message: 'This lab session is not active.' }, 403);
     // with sessions off, minutes and sections read in any session of the lab count
     const existing = await store.studentData(c.lab, c.studentKey, ALWAYS_OPEN ? await sessionScope(store, c.lab, null) : session.id);
-    // An accepted check-in is immutable and idempotent, from whichever device asks.
-    if (existing.checkin) return json({ ok: true, at: existing.checkin });
+    // An accepted check-in is immutable and idempotent within its week, from whichever device asks. A lab can
+    // run over two weeks in one session, so a new week takes a new check-in (one per Cairo day is stored).
+    const thisWeek = await store.checkinSince(session.id, c.studentKey, new Date(weekStart(weekKey(Date.now()))).toISOString());
+    if (thisWeek) return json({ ok: true, at: thisWeek });
     const activeSec = existing.views?.active_sec ?? 0;
     const seen = existing.views?.seen.length ?? 0;
     const eligible = attendanceEligibility({ student: existing.student, name: c.name, activeSec, seen });

@@ -59,7 +59,10 @@ export interface ProgressStore {
   listExcuses(module: string): Promise<Excuse[]>;
   setExcuse(e: { module: string; week: string; studentKey: string; note: string; by: string }): Promise<void>;
   clearExcuse(module: string, week: string, studentKey: string): Promise<void>;
-  addManualAttendance(lab: string, sessionId: string, student: { studentKey: string; studentId: string; name: string }): Promise<string | null>;
+  /** Staff mark a student present; `at` (optional) dates the attendance inside a past week. */
+  addManualAttendance(lab: string, sessionId: string, student: { studentKey: string; studentId: string; name: string }, at?: string): Promise<string | null>;
+  /** The first check-in to this session at or after `since` (one per day is kept), or null. */
+  checkinSince(sessionId: string, studentKey: string, since: string): Promise<string | null>;
   /** Creates the student or updates them: the name and ID last typed win, from any device. */
   touchStudent(i: Identity & { studentKey: string }): Promise<'ok'>;
   joinSession(sessionId: string, studentKey: string, group: string): Promise<void>;
@@ -98,19 +101,21 @@ export interface ProgressStore {
    */
   permanentSession(lab: string): Promise<Session>;
   /** Returns the check-in time; the first check-in is kept. */
-  checkIn(studentKey: string, lab: string, sessionId?: string): Promise<string>;
+  checkIn(studentKey: string, lab: string, sessionId?: string, at?: string): Promise<string>;
   addViews(studentKey: string, lab: string, seen: string[], activeSec: number, sessionId?: string): Promise<void>;
   /** Open practice: students may solve the lab with no session running (nothing is recorded). */
   getPractice(lab: string): Promise<boolean>;
   setPractice(lab: string, on: boolean): Promise<void>;
 }
 
+/** The Cairo calendar date (YYYY-MM-DD) of an instant. */
+const cairoDay = (at: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(at));
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v));
 
 /* ------------------------------------------------------------------ memory */
 
 export class MemoryStore implements ProgressStore {
-  async addManualAttendance(lab: string, sessionId: string, student: { studentKey: string; studentId: string; name: string }) {
+  async addManualAttendance(lab: string, sessionId: string, student: { studentKey: string; studentId: string; name: string }, at?: string) {
     if (this.sessions.get(sessionId)?.lab !== lab) return null;
     // Staff are trusted: the ID decides, and a student already on record keeps their name.
     const existing = this.students.get(student.studentKey);
@@ -119,7 +124,7 @@ export class MemoryStore implements ProgressStore {
       device_key: null, created_at: this.stamp(), last_seen: this.stamp(),
     });
     if (!(await this.isSessionStudent(sessionId, student.studentKey))) await this.joinSession(sessionId, student.studentKey, '');
-    return this.checkIn(student.studentKey, lab, sessionId);
+    return this.checkIn(student.studentKey, lab, sessionId, at);
   }
   private students = new Map<string, StudentRow>();
   private attempts: (AttemptRow & { student_key: string; lab: string; session_id?: string })[] = [];
@@ -129,6 +134,8 @@ export class MemoryStore implements ProgressStore {
   private sessions = new Map<string, Session>();
   private memberships = new Map<string, { session_id: string; student_key: string; group_name: string; joined_at: string }>();
   private checkins = new Map<string, { student_key: string; lab: string; at: string; session_id?: string }>();
+  /** one check-in per student per session per Cairo day: a lab that runs over two weeks gets one in each */
+  private checkinDays = new Map<string, { session_id: string; student_key: string; at: string }>();
   private views = new Map<string, { student_key: string; lab: string; seen: Set<string>; active_sec: number; session_id?: string }>();
   private practice = new Set<string>();
   private excuses = new Map<string, Excuse>();
@@ -284,7 +291,10 @@ export class MemoryStore implements ProgressStore {
     const sessions = [...this.sessions.values()].filter((x) => labs.includes(x.lab)).sort((a, b) => a.opens_at.localeCompare(b.opens_at));
     const ids = new Set(sessions.map((x) => x.id));
     const members = [...this.memberships.values()].filter((m) => ids.has(m.session_id));
-    const checkins = [...this.checkins.values()].filter((c) => c.session_id && ids.has(c.session_id)).map((c) => ({ session_id: c.session_id!, student_key: c.student_key, at: c.at }));
+    const checkins = [
+      ...[...this.checkins.values()].filter((c) => c.session_id && ids.has(c.session_id)).map((c) => ({ session_id: c.session_id!, student_key: c.student_key, at: c.at })),
+      ...[...this.checkinDays.values()].filter((d) => ids.has(d.session_id)).map((d) => ({ ...d })),
+    ];
     const keys = new Set([...members, ...checkins].map((r) => r.student_key));
     const students = [...keys].map((k) => this.students.get(k)).filter((x): x is StudentRow => Boolean(x))
       .map(({ student_key, student_id, name }) => ({ student_key, student_id, name }));
@@ -371,10 +381,18 @@ export class MemoryStore implements ProgressStore {
     this.sessions.set(id, session);
     return session;
   }
-  async checkIn(studentKey: string, lab: string, sessionId?: string) {
+  async checkIn(studentKey: string, lab: string, sessionId?: string, at?: string) {
+    const when = at ?? this.stamp();
     const k = `${sessionId ?? ''}|${studentKey}|${lab}`;
-    if (!this.checkins.has(k)) this.checkins.set(k, { student_key: studentKey, lab, session_id: sessionId, at: this.stamp() });
-    return this.checkins.get(k)!.at;
+    if (!this.checkins.has(k)) this.checkins.set(k, { student_key: studentKey, lab, session_id: sessionId, at: when });
+    if (!sessionId) return this.checkins.get(k)!.at;
+    const dk = `${sessionId}|${studentKey}|${cairoDay(when)}`;
+    if (!this.checkinDays.has(dk)) this.checkinDays.set(dk, { session_id: sessionId, student_key: studentKey, at: when });
+    return this.checkinDays.get(dk)!.at;
+  }
+  async checkinSince(sessionId: string, studentKey: string, since: string) {
+    return [...this.checkinDays.values()].filter((d) => d.session_id === sessionId && d.student_key === studentKey && d.at >= since)
+      .map((d) => d.at).sort()[0] ?? null;
   }
   async addViews(studentKey: string, lab: string, seen: string[], activeSec: number, sessionId?: string) {
     const k = `${sessionId ?? ''}|${studentKey}|${lab}`;
@@ -458,7 +476,7 @@ export class NeonStore implements ProgressStore {
   private run: (text: string, params?: unknown[]) => Promise<any[]>;
   private ready: Promise<void> | null = null;
   private t: { students: string; attempts: string; tasks: string; subs: string; hits: string; checkins: string; sessions: string; views: string; settings: string; excuses: string };
-  private v2: { sessions: string; members: string; attempts: string; tasks: string; subs: string; checkins: string; views: string };
+  private v2: { sessions: string; members: string; attempts: string; tasks: string; subs: string; checkins: string; views: string; days: string };
 
   constructor(url: string, prefix: Prefix, driver: 'neon' | 'postgres' = 'neon') {
     if (driver === 'postgres') {
@@ -476,7 +494,7 @@ export class NeonStore implements ProgressStore {
     };
     this.v2 = {
       sessions: `${prefix}_class_sessions`, members: `${prefix}_session_students`, attempts: `${prefix}_session_attempts`,
-      tasks: `${prefix}_session_tasks`, subs: `${prefix}_session_submissions`, checkins: `${prefix}_session_checkins`, views: `${prefix}_session_views`,
+      tasks: `${prefix}_session_tasks`, subs: `${prefix}_session_submissions`, checkins: `${prefix}_session_checkins`, views: `${prefix}_session_views`, days: `${prefix}_session_checkin_days`,
     };
   }
 
@@ -542,6 +560,13 @@ export class NeonStore implements ProgressStore {
       `create table if not exists ${this.v2.checkins} (
         session_id text not null references ${this.v2.sessions}(id) on delete cascade, student_key text not null references ${students}(student_key) on delete cascade,
         lab text not null, at timestamptz not null default now(), primary key (session_id, student_key))`,
+      // one check-in per student per session per Cairo day, so a lab that runs over two weeks records both;
+      // the first check-ins above are copied in (idempotent) so older attendance keeps counting
+      `create table if not exists ${this.v2.days} (
+        session_id text not null references ${this.v2.sessions}(id) on delete cascade, student_key text not null references ${students}(student_key) on delete cascade,
+        day date not null, at timestamptz not null default now(), primary key (session_id, student_key, day))`,
+      `insert into ${this.v2.days} (session_id, student_key, day, at)
+        select session_id, student_key, (at at time zone 'Africa/Cairo')::date, at from ${this.v2.checkins} on conflict do nothing`,
       `create table if not exists ${this.v2.views} (
         session_id text not null references ${this.v2.sessions}(id) on delete cascade, student_key text not null references ${students}(student_key) on delete cascade,
         lab text not null, seen text[] not null default '{}', active_sec int not null default 0, updated_at timestamptz not null default now(), primary key (session_id, student_key))`,
@@ -809,7 +834,7 @@ export class NeonStore implements ProgressStore {
   private sessionRow(row: any): Session {
     return { id: row.id, lab: row.lab, ta_name: row.ta_name, time_slot: row.time_slot, opens_at: iso(row.opens_at)!, closes_at: iso(row.closes_at), duration_minutes: row.duration_minutes == null ? null : Number(row.duration_minutes) };
   }
-  async addManualAttendance(lab: string, sessionId: string, student: { studentKey: string; studentId: string; name: string }) {
+  async addManualAttendance(lab: string, sessionId: string, student: { studentKey: string; studentId: string; name: string }, at?: string) {
     // One statement makes identity, membership and attendance atomic. Staff are
     // trusted, so the ID decides even when the typed name differs. Existing names,
     // device bindings, groups and attendance timestamps are preserved.
@@ -822,11 +847,15 @@ export class NeonStore implements ProgressStore {
       insert into ${this.v2.members} (session_id, student_key, group_name)
       select $2, student_key, '' from identity
       on conflict (session_id, student_key) do nothing
+    ), first as (
+      insert into ${this.v2.checkins} as c (session_id, student_key, lab, at)
+      select $2, student_key, $1, coalesce($6::timestamptz, now()) from identity
+      on conflict (session_id, student_key) do nothing
     )
-    insert into ${this.v2.checkins} as c (session_id, student_key, lab)
-    select $2, student_key, $1 from identity
-    on conflict (session_id, student_key) do update set at = c.at returning at`,
-    [lab, sessionId, student.studentKey, student.studentId, student.name]);
+    insert into ${this.v2.days} as d (session_id, student_key, day, at)
+    select $2, student_key, (coalesce($6::timestamptz, now()) at time zone 'Africa/Cairo')::date, coalesce($6::timestamptz, now()) from identity
+    on conflict (session_id, student_key, day) do update set at = d.at returning at`,
+    [lab, sessionId, student.studentKey, student.studentId, student.name, at ?? null]);
     return row ? iso(row.at)! : null;
   }
   async getSession(lab: string) {
@@ -850,7 +879,8 @@ export class NeonStore implements ProgressStore {
     const [sessions, members, checkins, students] = await Promise.all([
       this.q(`select * from ${v.sessions} where lab = any($1) order by opens_at`, [labs]),
       this.q(`select m.session_id, m.student_key, m.group_name, m.joined_at from ${v.members} m join ${v.sessions} s on s.id = m.session_id where s.lab = any($1)`, [labs]),
-      this.q(`select c.session_id, c.student_key, c.at from ${v.checkins} c join ${v.sessions} s on s.id = c.session_id where s.lab = any($1)`, [labs]),
+      this.q(`select c.session_id, c.student_key, c.at from ${v.checkins} c join ${v.sessions} s on s.id = c.session_id where s.lab = any($1)
+              union all select d.session_id, d.student_key, d.at from ${v.days} d join ${v.sessions} s on s.id = d.session_id where s.lab = any($1)`, [labs]),
       this.q(`select st.student_key, st.student_id, st.name from ${this.t.students} st where st.student_key in (
                 select m.student_key from ${v.members} m join ${v.sessions} s on s.id = m.session_id where s.lab = any($1)
                 union select c.student_key from ${v.checkins} c join ${v.sessions} s on s.id = c.session_id where s.lab = any($1))`, [labs]),
@@ -861,6 +891,10 @@ export class NeonStore implements ProgressStore {
       checkins: checkins.map((r) => ({ session_id: r.session_id, student_key: r.student_key, at: iso(r.at)! })),
       students: students.map((r) => ({ student_key: r.student_key, student_id: r.student_id, name: r.name })),
     };
+  }
+  async checkinSince(sessionId: string, studentKey: string, since: string) {
+    const [row] = await this.q(`select min(at) as at from ${this.v2.days} where session_id = $1 and student_key = $2 and at >= $3`, [sessionId, studentKey, since]);
+    return row?.at ? iso(row.at) : null;
   }
   async listExcuses(module: string): Promise<Excuse[]> {
     const rows = await this.q(`select * from ${this.t.excuses} where module = $1`, [module]);
@@ -936,10 +970,15 @@ export class NeonStore implements ProgressStore {
     return this.sessionRow(row);
   }
 
-  async checkIn(studentKey: string, lab: string, sessionId?: string) {
+  async checkIn(studentKey: string, lab: string, sessionId?: string, at?: string) {
     if (sessionId) {
-      const [row] = await this.q(`insert into ${this.v2.checkins} as c (session_id, student_key, lab) values ($1, $2, $3)
-        on conflict (session_id, student_key) do update set at = c.at returning at`, [sessionId, studentKey, lab]);
+      const [row] = await this.q(`with first as (
+          insert into ${this.v2.checkins} (session_id, student_key, lab, at) values ($1, $2, $3, coalesce($4::timestamptz, now()))
+          on conflict (session_id, student_key) do nothing
+        )
+        insert into ${this.v2.days} as d (session_id, student_key, day, at)
+        values ($1, $2, (coalesce($4::timestamptz, now()) at time zone 'Africa/Cairo')::date, coalesce($4::timestamptz, now()))
+        on conflict (session_id, student_key, day) do update set at = d.at returning at`, [sessionId, studentKey, lab, at ?? null]);
       return iso(row.at)!;
     }
     const [row] = await this.q(

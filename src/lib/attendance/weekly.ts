@@ -52,6 +52,9 @@ export function weekKey(iso: string | number | Date): string {
 }
 
 /** The instant a week (by key) ends: the next Saturday at 00:00 Cairo time. */
+/** The instant a week (by key) starts: its Saturday at 00:00 Cairo time. */
+export const weekStart = (key: string): number => weekEnd(addDays(key, -7));
+
 export function weekEnd(key: string): number {
   const next = addDays(key, 7);
   // Cairo is UTC+2 or UTC+3; find the offset that day by formatting noon UTC.
@@ -125,9 +128,11 @@ export function buildRegister(raw: AttendanceRaw, excuses: Excuse[], labTitles: 
     const k = `${c.student_key}|${week}`;
     if (!firstIn.has(k)) firstIn.set(k, { sessionId: c.session_id, at: c.at });
   }
-  // the sessions shown for a week: TA sessions opened in it, and any session someone checked in to during it
+  // the sessions shown for a week: TA sessions opened in it, any session someone attended in it, and the
+  // permanent "Open lab" sessions already open by then (a lab can run over two weeks in one of them)
   const weekSessions = (key: string) => sessions.filter((s) =>
-    (!isPermanentSession(s) && weekKey(s.opens_at) === key) || attendees.has(`${s.id}|${key}`));
+    (!isPermanentSession(s) && weekKey(s.opens_at) === key) || attendees.has(`${s.id}|${key}`)
+    || (isPermanentSession(s) && Date.parse(s.opens_at) < weekEnd(key)));
   const excused = new Map(excuses.map((e) => [`${e.student_key}|${e.week}`, e]));
 
   // the latest non-empty group each student joined with
