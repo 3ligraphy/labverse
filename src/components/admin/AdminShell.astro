@@ -33,6 +33,7 @@ type Item = { key: string; label: string; href: string; icon: string; show: bool
 const firstModule = manageable[0]?.slug ?? 'mobile-development';
 const teaching: Item[] = [
   { key: 'sessions', label: 'Attendance', href: '/admin/sessions', icon: '◷', show: any('module.sessions') || any('module.progress') },
+  { key: 'attendance', label: 'Absence warnings', href: '/admin/attendance', icon: '⚠', show: any('module.sessions') || any('module.progress') },
   { key: 'progress', label: 'Lab progress', href: '/admin/progress', icon: '▤', show: any('module.progress') },
   { key: 'stats', label: 'Statistics', href: '/admin/stats', icon: '◫', show: any('module.progress') },
   { key: 'banner', label: 'Banners', href: `/admin/banner/${encodeURIComponent(firstModule)}`, icon: '⚑', show: any('module.build') || any('module.submissions') },
@@ -64,7 +65,7 @@ const allItems = groups.flatMap((g) => g.items);
 const current = allItems.find((i) => i.key === active);
 const tabItems = allItems.slice(0, 4);
 if (current && !tabItems.includes(current)) tabItems[3] = current;
-const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessions: 'Attendance', progress: 'Progress', stats: 'Stats', submissions: 'Projects', canvas: 'Canvas', assessment: 'Assessment', team: 'Team', banner: 'Banners', builder: 'Builder', teams: 'Teams', catalogue: 'Catalogue', components: 'Components', accounts: 'Accounts', cms: 'CMS' };
+const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessions: 'Attendance', attendance: 'Warnings', progress: 'Progress', stats: 'Stats', submissions: 'Projects', canvas: 'Canvas', assessment: 'Assessment', team: 'Team', banner: 'Banners', builder: 'Builder', teams: 'Teams', catalogue: 'Catalogue', components: 'Components', accounts: 'Accounts', cms: 'CMS' };
 ---
 <div class="ash" data-ash-active={active}>
   <!-- phones: no site navbar on admin pages, so Back and light/dark sit in a slim bar on top -->

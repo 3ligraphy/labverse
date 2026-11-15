@@ -1,0 +1,318 @@
+---
+/**
+ * /admin/attendance — one module's weekly attendance register: every student × every teaching week (weeks come
+ * from the dates sessions were opened), absences, warnings (2 = Warning 1, 3 = Warning 2, 4+ = Barred) and an
+ * Excel download. Staff who run sessions may excuse an absence or mark a student present in a week's session.
+ * Rules: src/lib/attendance/weekly.ts. Data: buildRegisterFor (src/lib/progress/server.ts). No polling: the
+ * table reloads only after a change or when "Refresh" is pressed.
+ */
+import Base from '@/layouts/Base.astro';
+import AdminShell from '@/components/admin/AdminShell.astro';
+import { isAdmin } from '@/lib/attendance/server';
+import { access } from '@/lib/accounts/access';
+import { canOnLab } from '@/lib/accounts/labscope';
+import { buildRegisterFor, progressSetup } from '@/lib/progress/server';
+import { WARNING_AT } from '@/lib/attendance/weekly';
+import { ADMIN_MODULE_COOKIE } from '@/scripts/admin-module';
+import { hubData } from '@/lib/accounts/hub';
+import ModulePicker from '@/components/admin/ModulePicker.astro';
+
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store, max-age=0');
+if (!isAdmin(Astro.cookies)) return Astro.redirect('/admin', 303);
+const a = await access(Astro.cookies);
+const module = Astro.url.searchParams.get('module') ?? Astro.cookies.get(ADMIN_MODULE_COOKIE)?.value ?? 'mobile-development';
+const allowed = a.can('module.sessions', module) || a.can('module.progress', module);
+const canManage = a.can('module.sessions', module);
+// the module is chosen on the page (the admin menu has no module switcher)
+const pickable = (await hubData()).cards.filter((c) => a.can('module.sessions', c.slug) || a.can('module.progress', c.slug)).map((c) => ({ slug: c.slug, title: c.title }));
+let failed = false;
+const data = allowed && progressSetup().database
+  ? await buildRegisterFor(module, (lab) => canOnLab(a, 'module.sessions', lab) || canOnLab(a, 'module.progress', lab))
+      .catch((e) => { console.error('[attendance] page failed', e); failed = true; return null; })
+  : null;
+const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(module)}`;
+---
+<Base title="Absence warnings" noindex>
+  <AdminShell active="attendance">
+    <section class="aw container" data-aw data-module={module} data-manage={canManage ? '1' : ''}>
+      <header class="aw-head">
+        <div>
+          <h1>Absence warnings</h1>
+          <ModulePicker modules={pickable} current={module} href="/admin/attendance?module=__M__" />
+          <p class="muted">Each week that had at least one lab session opened is a column. A student is present when they checked in to any session that week. Absences count once the week is over (Saturday–Friday, Cairo time).</p>
+          <p class="aw-rules">
+            <span class="lv lv1">{WARNING_AT[0]} absences · Warning 1</span>
+            <span class="lv lv2">{WARNING_AT[1]} absences · Warning 2</span>
+            <span class="lv lv3">{WARNING_AT[2]}+ absences · Barred</span>
+          </p>
+        </div>
+        {data && (
+          <div class="aw-actions">
+            <button class="btn btn-ghost btn-sm" type="button" data-refresh>Refresh</button>
+            <a class="btn btn-primary btn-sm" href={exportHref} download data-export>Download Excel</a>
+          </div>
+        )}
+      </header>
+
+      {!allowed ? (
+        <p class="aw-note">You don’t run sessions or follow progress in this module. Pick another module in the menu.</p>
+      ) : failed ? (
+        <p class="aw-note">The attendance register could not be loaded (the database did not answer). Try again in a minute.</p>
+      ) : !data ? (
+        <p class="aw-note">Attendance needs the progress database. Open <a href="/admin/sessions">Sessions &amp; attendance</a> for setup.</p>
+      ) : (
+        <>
+          <dl class="aw-tiles" data-tiles></dl>
+          <div class="aw-filter">
+            <label><span>Search</span><input class="input" type="search" placeholder="Name, ID or group" data-search autocomplete="off" /></label>
+            <label><span>Show</span>
+              <select class="input" data-show>
+                <option value="all">Everyone</option>
+                <option value="flagged">Any warning</option>
+                <option value="1">Warning 1</option>
+                <option value="2">Warning 2</option>
+                <option value="3">Barred</option>
+                <option value="0">Good standing</option>
+              </select>
+            </label>
+            <p class="muted small" data-count></p>
+          </div>
+          <div class="table-wrap aw-wrap">
+            <table class="table aw-table">
+              <thead data-head></thead>
+              <tbody data-rows></tbody>
+            </table>
+            <p class="aw-empty" data-empty hidden></p>
+          </div>
+          <p class="muted small aw-legend">
+            <span class="c present">P</span> present · <span class="c absent">A</span> absent · <span class="c excused">E</span> excused (does not count) · <span class="c pending">–</span> week not over yet.
+            {canManage ? ' Select a week cell to excuse an absence or mark the student present.' : ''}
+          </p>
+          <script type="application/json" data-aw-data set:html={JSON.stringify(data)} />
+        </>
+      )}
+
+      <dialog class="aw-dlg" data-dlg aria-labelledby="aw-dlg-title">
+        <form method="dialog" class="aw-dlg-body" data-dlg-form>
+          <h2 id="aw-dlg-title" data-dlg-title></h2>
+          <p class="muted small" data-dlg-sub></p>
+          <div data-dlg-content></div>
+          <p class="aw-msg small" data-dlg-msg role="status" aria-live="polite"></p>
+          <div class="aw-dlg-actions"><button class="btn btn-ghost btn-sm" value="cancel">Close</button></div>
+        </form>
+      </dialog>
+    </section>
+  </AdminShell>
+</Base>
+
+<style is:global>
+  .aw { min-height: 80dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 18px; align-content: start; }
+  .aw-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; }
+  .aw-head h1 { font-size: var(--fs-xl); letter-spacing: -.04em; }
+  .aw-head p.muted { max-width: 75ch; margin-top: 6px; }
+  .aw-rules { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .aw-actions { display: flex; gap: 8px; }
+  .aw-note { padding: 18px; border-radius: var(--r-lg); border: 1px solid var(--line-2); background: var(--surface); }
+  .lv { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+  .lv0 { background: var(--ok-soft); color: var(--ok); }
+  .lv1 { background: var(--warn-soft); color: var(--warn); }
+  .lv2 { background: color-mix(in oklab, var(--warn) 22%, var(--danger-soft)); color: color-mix(in oklab, var(--warn) 45%, var(--danger)); }
+  .lv3 { background: var(--danger); color: #fff; }
+  .aw-tiles { display: flex; flex-wrap: wrap; gap: 1px; margin: 0; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--line); }
+  .aw-tiles > div { flex: 1 1 150px; display: grid; gap: 2px; padding: 14px 18px; background: var(--surface); }
+  .aw-tiles dt { font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .aw-tiles dd { margin: 0; font-family: var(--font-display); font-size: 1.9rem; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .aw-tiles dd.t1 { color: var(--warn); } .aw-tiles dd.t3 { color: var(--danger); }
+  .aw-filter { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 16px; }
+  .aw-filter label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .aw-filter .input { height: 40px; padding: 0 12px; border-radius: 10px; min-width: 220px; }
+  .aw-filter p { padding-bottom: 10px; }
+  .aw-wrap { max-height: 70dvh; overflow: auto; }
+  .aw-table { min-width: 0; font-size: 13.5px; }
+  .aw-table th, .aw-table td { padding: 8px 10px; white-space: nowrap; vertical-align: middle; }
+  .aw-table thead th { position: sticky; top: 0; z-index: 2; }
+  .aw-table th.wk { text-align: center; text-transform: none; letter-spacing: 0; line-height: 1.3; }
+  .aw-table th.wk small { display: block; font-size: 11px; color: var(--text-3); }
+  .aw-table td.n, .aw-table th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .aw-table td.wk { text-align: center; padding: 4px; }
+  .aw-table .who b { display: block; font-weight: 600; }
+  .aw-table .who span { font-size: 12px; color: var(--text-3); }
+  .aw-table tr.lvl3 td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+  .aw-table tr.lvl2 td:first-child, .aw-table tr.lvl1 td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+  .c { display: inline-grid; place-items: center; min-width: 30px; height: 26px; padding: 0 6px; border-radius: 7px; font-weight: 700; font-size: 12.5px; border: 1px solid transparent; }
+  .c.present { background: var(--ok-soft); color: var(--ok); }
+  .c.absent { background: var(--danger-soft); color: var(--danger); }
+  .c.excused { background: var(--surface-2); color: var(--text-2); border-color: var(--line-2); }
+  .c.pending { color: var(--text-3); }
+  button.c { cursor: pointer; font: inherit; font-weight: 700; font-size: 12.5px; }
+  button.c:hover, button.c:focus-visible { border-color: var(--text-3); }
+  .aw-empty { padding: 26px; text-align: center; color: var(--text-3); }
+  .aw-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .aw-legend .c { min-width: 24px; height: 22px; }
+  .aw-dlg { width: min(520px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); color: var(--text); box-shadow: 0 24px 80px rgb(0 0 0 / .35); }
+  .aw-dlg::backdrop { background: rgb(8 12 20 / .55); backdrop-filter: blur(3px); }
+  .aw-dlg-body { display: grid; gap: 12px; padding: 20px; }
+  .aw-dlg h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
+  .aw-dlg label { display: grid; gap: 6px; font-size: 12.5px; font-weight: 650; color: var(--text-2); }
+  .aw-dlg .input { height: 40px; padding: 0 12px; border-radius: 10px; width: 100%; }
+  .aw-dlg fieldset { display: grid; gap: 10px; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-md); }
+  .aw-dlg legend { padding: 0 6px; font-size: 13px; font-weight: 650; }
+  .aw-dlg-actions { display: flex; justify-content: flex-end; }
+  .aw-msg { min-height: 1.2em; color: var(--text-3); }
+  .aw-msg.err { color: var(--danger); }
+</style>
+
+<script>
+  import { onPageLoad } from '@/scripts/page-load';
+
+  type CellStatus = 'present' | 'absent' | 'excused' | 'pending';
+  type Cell = { status: CellStatus; sessionId?: string; at?: string; note?: string; by?: string };
+  type Week = { key: string; number: number; label: string; range: string; over: boolean; present: number;
+    sessions: { id: string; lab: string; labTitle: string; ta: string; slot: string; opensAt: string; closesAt: string | null; checkedIn: number }[] };
+  type Student = { key: string; id: string; name: string; group: string; cells: Record<string, Cell>; attended: number; absences: number; excused: number; level: 0 | 1 | 2 | 3; status: string };
+  type Data = { module: string; moduleTitle: string; register: { weeks: Week[]; students: Student[];
+    totals: { students: number; weeks: number; warning1: number; warning2: number; barred: number; attendancePct: number } } };
+
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const LETTER: Record<CellStatus, string> = { present: 'P', absent: 'A', excused: 'E', pending: '–' };
+  const when = (iso?: string | null) => iso ? new Date(iso).toLocaleString('en-GB', { timeZone: 'Africa/Cairo', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+
+  function init() {
+    const root = document.querySelector<HTMLElement>('[data-aw]');
+    const raw = root?.querySelector('[data-aw-data]');
+    if (!root || !raw || root.dataset.wired) return;
+    root.dataset.wired = '1';
+    const module = root.dataset.module!;
+    const manage = Boolean(root.dataset.manage);
+    let data = JSON.parse(raw.textContent || '{}') as Data;
+    const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const search = $<HTMLInputElement>('[data-search]');
+    const show = $<HTMLSelectElement>('[data-show]');
+    const dlg = $<HTMLDialogElement>('[data-dlg]');
+    const msg = $<HTMLElement>('[data-dlg-msg]');
+
+    const tiles = () => {
+      const t = data.register.totals;
+      $('[data-tiles]').innerHTML = [
+        ['Students', t.students, '', 'joined at least one session'],
+        ['Teaching weeks', t.weeks, '', 'weeks with an opened session'],
+        ['Attendance', `${t.attendancePct}%`, '', 'of students, weeks that are over'],
+        ['Warning 1', t.warning1, 't1', '2 absences'],
+        ['Warning 2', t.warning2, 't1', '3 absences'],
+        ['Barred', t.barred, 't3', '4 or more absences'],
+      ].map(([dt, dd, cls, span]) => `<div><dt>${dt}</dt><dd class="${cls}">${dd}</dd><span class="muted small">${span}</span></div>`).join('');
+    };
+
+    const render = () => {
+      const { weeks, students } = data.register;
+      $('[data-head]').innerHTML = `<tr><th scope="col">Student</th><th scope="col">Group</th>${weeks.map((w) =>
+        `<th scope="col" class="wk" title="${esc(w.sessions.map((s) => `${s.labTitle} · ${s.ta} · ${s.slot}`).join('\n'))}">${esc(w.label)}<small>${esc(w.range)}</small></th>`).join('')}<th scope="col" class="n">Present</th><th scope="col" class="n">Absent</th><th scope="col">Status</th></tr>`;
+      const q = search.value.trim().toLowerCase();
+      const f = show.value;
+      const rows = students.filter((s) =>
+        (!q || `${s.name} ${s.id} ${s.group}`.toLowerCase().includes(q)) &&
+        (f === 'all' || (f === 'flagged' ? s.level > 0 : String(s.level) === f)));
+      $('[data-rows]').innerHTML = rows.map((s) => `<tr class="lvl${s.level}">
+        <td class="who"><b>${esc(s.name)}</b><span>${esc(s.id)}</span></td>
+        <td>${esc(s.group || '—')}</td>
+        ${weeks.map((w) => {
+          const c = s.cells[w.key];
+          const tip = c.status === 'present' ? `Checked in ${when(c.at)}` : c.status === 'excused' ? `Excused${c.note ? `: ${c.note}` : ''}${c.by ? ` (by ${c.by})` : ''}` : c.status === 'absent' ? 'Absent' : 'Week not over yet';
+          const tag = manage ? 'button' : 'span';
+          return `<td class="wk"><${tag} ${manage ? 'type="button" ' : ''}class="c ${c.status}" title="${esc(tip)}" data-cell="${esc(s.key)}|${esc(w.key)}">${LETTER[c.status]}</${tag}></td>`;
+        }).join('')}
+        <td class="n">${s.attended}</td><td class="n">${s.absences}${s.excused ? ` <span class="muted small">(+${s.excused} exc.)</span>` : ''}</td>
+        <td><span class="lv lv${s.level}">${esc(s.status)}</span></td></tr>`).join('');
+      const empty = $('[data-empty]');
+      empty.hidden = rows.length > 0;
+      empty.textContent = !students.length ? 'No student has joined a session of this module yet.' : 'No student matches the filter.';
+      $('[data-count]').textContent = `${rows.length} of ${students.length} students`;
+    };
+
+    const reload = async () => {
+      const res = await fetch(`/api/admin/attendance?module=${encodeURIComponent(module)}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? 'The register could not be loaded.');
+      data = await res.json();
+      tiles();
+      render();
+    };
+
+    const post = async (url: string, body: unknown) => {
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      const out = await res.json().catch(() => null);
+      if (!res.ok || !out?.ok) throw new Error(out?.message ?? 'That did not work. Try again.');
+      return out;
+    };
+
+    const open = (studentKey: string, weekKey: string) => {
+      const s = data.register.students.find((x) => x.key === studentKey);
+      const w = data.register.weeks.find((x) => x.key === weekKey);
+      if (!s || !w) return;
+      const c = s.cells[weekKey];
+      $('[data-dlg-title]').textContent = `${s.name} · ${w.label}`;
+      $('[data-dlg-sub]').textContent = `${s.id}${s.group ? ` · ${s.group}` : ''} · ${w.range}`;
+      msg.textContent = '';
+      msg.classList.remove('err');
+      const sessionOptions = w.sessions.map((x) => `<option value="${esc(x.id)}|${esc(x.lab)}">${esc(`${x.labTitle} — ${x.ta}, ${x.slot} (${when(x.opensAt)})`)}</option>`).join('');
+      const markPresent = `<fieldset><legend>Mark present</legend>
+          <label><span>Session</span><select class="input" data-pick-session>${sessionOptions}</select></label>
+          <button class="btn btn-primary btn-sm" type="button" data-do="present">Mark present in this session</button></fieldset>`;
+      let html = '';
+      if (c.status === 'present') {
+        const x = w.sessions.find((y) => y.id === c.sessionId);
+        html = `<p>Checked in ${esc(when(c.at))}${x ? ` to <b>${esc(x.labTitle)}</b> (${esc(x.ta)}, ${esc(x.slot)})` : ''}.</p>
+          <p class="muted small">Check-ins are kept as they were recorded. To remove one, use the session’s attendance list.</p>`;
+      } else if (c.status === 'excused') {
+        html = `<p>Excused${c.note ? `: “${esc(c.note)}”` : ''}${c.by ? ` — by ${esc(c.by)}` : ''}.</p>
+          <button class="btn btn-ghost btn-sm" type="button" data-do="unexcuse">Remove excuse (counts as absent again)</button>${markPresent}`;
+      } else {
+        html = `${c.status === 'pending' ? '<p class="muted small">This week is not over yet; the student may still attend another session.</p>' : ''}
+          <fieldset><legend>Excuse this absence</legend>
+            <label><span>Reason (optional)</span><input class="input" maxlength="200" placeholder="e.g. medical certificate" data-note /></label>
+            <button class="btn btn-ghost btn-sm" type="button" data-do="excuse">Excuse — it will not count</button></fieldset>${markPresent}`;
+      }
+      const box = $('[data-dlg-content]');
+      box.innerHTML = html;
+      box.querySelectorAll<HTMLButtonElement>('[data-do]').forEach((b) => b.addEventListener('click', async () => {
+        const action = b.dataset.do!;
+        box.querySelectorAll<HTMLButtonElement>('button').forEach((x) => (x.disabled = true));
+        msg.classList.remove('err');
+        msg.textContent = 'Saving…';
+        try {
+          if (action === 'present') {
+            const [sessionId, lab] = box.querySelector<HTMLSelectElement>('[data-pick-session]')!.value.split('|');
+            await post('/api/admin/progress/session', { action: 'add-attendance', lab, sessionId, name: s.name, studentId: s.id });
+          } else {
+            await post('/api/admin/attendance', { module, action, week: weekKey, studentKey, note: box.querySelector<HTMLInputElement>('[data-note]')?.value ?? '' });
+          }
+          await reload();
+          dlg.close();
+        } catch (e) {
+          msg.classList.add('err');
+          msg.textContent = (e as Error).message;
+          box.querySelectorAll<HTMLButtonElement>('button').forEach((x) => (x.disabled = false));
+        }
+      }));
+      dlg.showModal();
+    };
+
+    search.addEventListener('input', render);
+    show.addEventListener('change', render);
+    $('[data-rows]').addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('button[data-cell]');
+      if (!btn || !manage) return;
+      const [studentKey, weekKey] = btn.dataset.cell!.split('|');
+      open(studentKey, weekKey);
+    });
+    $<HTMLButtonElement>('[data-refresh]').addEventListener('click', async (e) => {
+      const b = e.currentTarget as HTMLButtonElement;
+      b.disabled = true;
+      try { await reload(); } catch (err) { console.error(err); } finally { b.disabled = false; }
+    });
+    tiles();
+    render();
+  }
+
+  onPageLoad(init);
+</script>

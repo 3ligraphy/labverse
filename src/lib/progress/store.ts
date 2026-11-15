@@ -42,8 +42,22 @@ export type StudentProgress = {
   /** labs with a hand-in */
   subs: string[];
 };
+/** Every session of some labs, who joined and who checked in: the weekly attendance register. */
+export type AttendanceRaw = {
+  sessions: Session[];
+  members: { session_id: string; student_key: string; group_name: string; joined_at: string }[];
+  checkins: { session_id: string; student_key: string; at: string }[];
+  students: { student_key: string; student_id: string; name: string }[];
+};
+/** Staff excused a student's absence in one week of one module (it no longer counts towards warnings). */
+export type Excuse = { module: string; week: string; student_key: string; note: string; by_name: string; at: string };
 
 export interface ProgressStore {
+  /** Sessions, joins and check-ins of these labs (for the weekly register and its warnings). */
+  attendanceRaw(labs: string[]): Promise<AttendanceRaw>;
+  listExcuses(module: string): Promise<Excuse[]>;
+  setExcuse(e: { module: string; week: string; studentKey: string; note: string; by: string }): Promise<void>;
+  clearExcuse(module: string, week: string, studentKey: string): Promise<void>;
   addManualAttendance(lab: string, sessionId: string, student: { studentKey: string; studentId: string; name: string }): Promise<string | null>;
   /** Creates the student or updates them: the name and ID last typed win, from any device. */
   touchStudent(i: Identity & { studentKey: string }): Promise<'ok'>;
@@ -116,6 +130,7 @@ export class MemoryStore implements ProgressStore {
   private checkins = new Map<string, { student_key: string; lab: string; at: string; session_id?: string }>();
   private views = new Map<string, { student_key: string; lab: string; seen: Set<string>; active_sec: number; session_id?: string }>();
   private practice = new Set<string>();
+  private excuses = new Map<string, Excuse>();
   private acted = new Map<string, string>(); // `${sessionId}|${studentKey}` → last activity
   private taskLog: { session_id?: string; student_key: string; task: string; at: string; n: number }[] = [];
   private seq = 0;
@@ -264,6 +279,21 @@ export class MemoryStore implements ProgressStore {
   }
   async getSessionById(id: string) { return this.sessions.get(id) ?? null; }
   async getPractice(lab: string) { return this.practice.has(lab); }
+  async attendanceRaw(labs: string[]): Promise<AttendanceRaw> {
+    const sessions = [...this.sessions.values()].filter((x) => labs.includes(x.lab)).sort((a, b) => a.opens_at.localeCompare(b.opens_at));
+    const ids = new Set(sessions.map((x) => x.id));
+    const members = [...this.memberships.values()].filter((m) => ids.has(m.session_id));
+    const checkins = [...this.checkins.values()].filter((c) => c.session_id && ids.has(c.session_id)).map((c) => ({ session_id: c.session_id!, student_key: c.student_key, at: c.at }));
+    const keys = new Set([...members, ...checkins].map((r) => r.student_key));
+    const students = [...keys].map((k) => this.students.get(k)).filter((x): x is StudentRow => Boolean(x))
+      .map(({ student_key, student_id, name }) => ({ student_key, student_id, name }));
+    return { sessions: sessions.map((x) => ({ ...x })), members: members.map((m) => ({ ...m })), checkins, students };
+  }
+  async listExcuses(module: string) { return [...this.excuses.values()].filter((e) => e.module === module); }
+  async setExcuse(e: { module: string; week: string; studentKey: string; note: string; by: string }) {
+    this.excuses.set(`${e.module}|${e.week}|${e.studentKey}`, { module: e.module, week: e.week, student_key: e.studentKey, note: e.note, by_name: e.by, at: this.stamp() });
+  }
+  async clearExcuse(module: string, week: string, studentKey: string) { this.excuses.delete(`${module}|${week}|${studentKey}`); }
   async setPractice(lab: string, on: boolean) { if (on) this.practice.add(lab); else this.practice.delete(lab); }
   async listSessions(lab: string) { return [...this.sessions.values()].filter((s) => s.lab === lab).sort((a, b) => b.opens_at.localeCompare(a.opens_at)); }
   async createSession(lab: string, taName: string, timeSlot: string, minutes: number | null = 90) {
@@ -426,7 +456,7 @@ type Prefix = 'progress' | 'progress_dev';
 export class NeonStore implements ProgressStore {
   private run: (text: string, params?: unknown[]) => Promise<any[]>;
   private ready: Promise<void> | null = null;
-  private t: { students: string; attempts: string; tasks: string; subs: string; hits: string; checkins: string; sessions: string; views: string; settings: string };
+  private t: { students: string; attempts: string; tasks: string; subs: string; hits: string; checkins: string; sessions: string; views: string; settings: string; excuses: string };
   private v2: { sessions: string; members: string; attempts: string; tasks: string; subs: string; checkins: string; views: string };
 
   constructor(url: string, prefix: Prefix, driver: 'neon' | 'postgres' = 'neon') {
@@ -441,7 +471,7 @@ export class NeonStore implements ProgressStore {
     }
     this.t = {
       students: `${prefix}_students`, attempts: `${prefix}_attempts`, tasks: `${prefix}_tasks`, subs: `${prefix}_submissions`, hits: `${prefix}_hits`,
-      checkins: `${prefix}_checkins`, sessions: `${prefix}_sessions`, views: `${prefix}_views`, settings: `${prefix}_lab_settings`,
+      checkins: `${prefix}_checkins`, sessions: `${prefix}_sessions`, views: `${prefix}_views`, settings: `${prefix}_lab_settings`, excuses: `${prefix}_attendance_excuses`,
     };
     this.v2 = {
       sessions: `${prefix}_class_sessions`, members: `${prefix}_session_students`, attempts: `${prefix}_session_attempts`,
@@ -515,6 +545,8 @@ export class NeonStore implements ProgressStore {
         session_id text not null references ${this.v2.sessions}(id) on delete cascade, student_key text not null references ${students}(student_key) on delete cascade,
         lab text not null, seen text[] not null default '{}', active_sec int not null default 0, updated_at timestamptz not null default now(), primary key (session_id, student_key))`,
       `create table if not exists ${this.t.settings} (lab text primary key, practice boolean not null default false, updated_at timestamptz not null default now())`,
+      `create table if not exists ${this.t.excuses} (module text not null, week text not null, student_key text not null references ${students}(student_key) on delete cascade,
+        note text not null default '', by_name text not null default '', at timestamptz not null default now(), primary key (module, week, student_key))`,
     ];
     try {
       for (const s of statements) await this.run(s);
@@ -811,6 +843,34 @@ export class NeonStore implements ProgressStore {
   async setPractice(lab: string, on: boolean) {
     await this.q(`insert into ${this.t.settings} (lab, practice) values ($1, $2)
       on conflict (lab) do update set practice = excluded.practice, updated_at = now()`, [lab, on]);
+  }
+  async attendanceRaw(labs: string[]): Promise<AttendanceRaw> {
+    const v = this.v2;
+    const [sessions, members, checkins, students] = await Promise.all([
+      this.q(`select * from ${v.sessions} where lab = any($1) order by opens_at`, [labs]),
+      this.q(`select m.session_id, m.student_key, m.group_name, m.joined_at from ${v.members} m join ${v.sessions} s on s.id = m.session_id where s.lab = any($1)`, [labs]),
+      this.q(`select c.session_id, c.student_key, c.at from ${v.checkins} c join ${v.sessions} s on s.id = c.session_id where s.lab = any($1)`, [labs]),
+      this.q(`select st.student_key, st.student_id, st.name from ${this.t.students} st where st.student_key in (
+                select m.student_key from ${v.members} m join ${v.sessions} s on s.id = m.session_id where s.lab = any($1)
+                union select c.student_key from ${v.checkins} c join ${v.sessions} s on s.id = c.session_id where s.lab = any($1))`, [labs]),
+    ]);
+    return {
+      sessions: sessions.map((row) => this.sessionRow(row)),
+      members: members.map((r) => ({ session_id: r.session_id, student_key: r.student_key, group_name: r.group_name ?? '', joined_at: iso(r.joined_at)! })),
+      checkins: checkins.map((r) => ({ session_id: r.session_id, student_key: r.student_key, at: iso(r.at)! })),
+      students: students.map((r) => ({ student_key: r.student_key, student_id: r.student_id, name: r.name })),
+    };
+  }
+  async listExcuses(module: string): Promise<Excuse[]> {
+    const rows = await this.q(`select * from ${this.t.excuses} where module = $1`, [module]);
+    return rows.map((r) => ({ module: r.module, week: r.week, student_key: r.student_key, note: r.note, by_name: r.by_name, at: iso(r.at)! }));
+  }
+  async setExcuse(e: { module: string; week: string; studentKey: string; note: string; by: string }) {
+    await this.q(`insert into ${this.t.excuses} (module, week, student_key, note, by_name) values ($1, $2, $3, $4, $5)
+      on conflict (module, week, student_key) do update set note = excluded.note, by_name = excluded.by_name, at = now()`, [e.module, e.week, e.studentKey, e.note, e.by]);
+  }
+  async clearExcuse(module: string, week: string, studentKey: string) {
+    await this.q(`delete from ${this.t.excuses} where module = $1 and week = $2 and student_key = $3`, [module, week, studentKey]);
   }
   async listSessions(lab: string) {
     const rows = await this.q(`select * from ${this.v2.sessions} where lab = $1 order by opens_at desc limit 200`, [lab]);

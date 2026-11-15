@@ -14,6 +14,7 @@ import { noStore } from '@/lib/attendance/server';
 import { ALL_SESSIONS, ALWAYS_OPEN, LAB_DONE, OPEN_LAB, exerciseStats, labStructure, liveClass, moduleStats, scoreStudent, sessionState, type Identity, type LabStructure, type Valid } from './core';
 import { NeonStore, type ProgressStore, type Session } from './store';
 import { looseGroup } from '@/lib/identity';
+import { buildRegister } from '@/lib/attendance/weekly';
 import { publishedLabSources } from '@/lib/platform/server';
 import { splitLabKey } from '@/lib/platform/core';
 import { ANY_FACULTY, DEFAULT_FACULTY } from '@/lib/accounts/core';
@@ -369,4 +370,20 @@ export async function buildDashboard(labParam: string | null, sessionParam?: str
     alwaysOpen: ALWAYS_OPEN,
     updatedAt: new Date().toISOString(),
   };
+}
+
+/** The weekly attendance register of one module: every lab the person may see, all of its sessions. */
+export async function buildRegisterFor(moduleSlug: string, allow: (lab: string) => boolean) {
+  const s = getProgressStore();
+  if (!s) return null;
+  const labs = (await getStructures()).filter((l) => allow(l.lab) && (splitLabKey(l.lab)?.module ?? 'mobile-development') === moduleSlug);
+  const choices = await labChoices(labs);
+  const titles = new Map(choices.map((c) => [c.id, c.title]));
+  const [raw, excuses] = await Promise.all([
+    labs.length ? s.attendanceRaw(labs.map((l) => l.lab)) : Promise.resolve({ sessions: [], members: [], checkins: [], students: [] }),
+    s.listExcuses(moduleSlug),
+  ]);
+  const { cards } = await hubData().catch(() => ({ cards: [] as Awaited<ReturnType<typeof hubData>>['cards'] }));
+  const moduleTitle = cards.find((c) => c.slug === moduleSlug)?.title ?? choices[0]?.moduleTitle ?? moduleSlug;
+  return { module: moduleSlug, moduleTitle, labs: choices.map((c) => ({ id: c.id, title: c.title })), register: buildRegister(raw, excuses, titles), updatedAt: new Date().toISOString() };
 }
