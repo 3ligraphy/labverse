@@ -122,7 +122,7 @@ test('workbook: summary, warnings, a sheet per week and sessions; valid zip', as
   const store = await setup(2, [['231001'], []]);
   const reg = buildRegister(await store.attendanceRaw(['lab-02']), [], new Map(), Date.parse('2026-11-14T12:00:00Z'));
   const sheets = registerSheets(reg, { module: 'Mobile Development' });
-  assert.deepEqual(sheets.map((s) => s.name), ['Summary', 'Warnings', 'Week 1 10 Oct', 'Week 2 17 Oct', 'Sessions']);
+  assert.deepEqual(sheets.map((s) => s.name), ['Summary', 'Warnings', 'Week 1 L02 p1of2 10 Oct', 'Week 2 L02 p2of2 17 Oct', 'Sessions']);
   assert.equal(sheets[1].rows.length, 1 + 2); // header + two students on Warning 1
   const file = await registerWorkbook(reg, { module: 'Mobile Development' });
   assert.deepEqual([...file.slice(0, 2)], [0x50, 0x4b]); // "PK"
@@ -181,4 +181,28 @@ test('staff can mark a student present in a past week of a permanent session', a
   const reg = buildRegister(await store.attendanceRaw(['lab-05']), [], new Map(), t);
   assert.equal(reg.students[0].cells['2026-11-14'].status, 'present');
   assert.equal(reg.students[0].attended, 2);
+});
+
+test('each week names its lab: a lab split over two weeks gets parts, a make-up lab is a side badge', async () => {
+  let t = Date.parse('2026-10-06T07:00:00Z');
+  const store = new MemoryStore(() => t);
+  for (const id of ['231001', '231002', '231003']) await store.touchStudent({ studentKey: id, studentId: id, name: `Student ${id}`, deviceKey: null } as never);
+  const at = async (iso: string, lab: string, ids: string[]) => {
+    t = Date.parse(iso);
+    const s = await store.openSession(lab, 120, 'TA', 'slot');
+    for (const id of ids) await store.joinSession(s.id, id, 'G1');
+  };
+  await at('2026-10-06T07:00:00Z', 'lab-02', ['231001', '231002', '231003']); // Lab 02 part 1
+  await at('2026-10-13T07:00:00Z', 'lab-02', ['231001', '231002']); // Lab 02 part 2
+  await at('2026-10-20T07:00:00Z', 'mobile-development--lab-03', ['231001', '231002', '231003']);
+  await at('2026-10-27T07:00:00Z', 'mobile-development--lab-03', ['231003']); // make-up
+  await at('2026-10-28T07:00:00Z', 'lab-04', ['231001', '231002']);
+  const titles = new Map([['lab-02', 'Lab 02: React'], ['mobile-development--lab-03', 'Lab 03: UI'], ['lab-04', 'Lab 04: Store']]);
+  const reg = buildRegister(await store.attendanceRaw(['lab-02', 'mobile-development--lab-03', 'lab-04']), [], titles, Date.parse('2026-11-14T12:00:00Z'));
+  const main = reg.weeks.map((w) => { const m = w.labs.find((l) => l.main)!; return `${m.short} ${m.part}/${m.parts}`; });
+  assert.deepEqual(main, ['Lab 02 1/2', 'Lab 02 2/2', 'Lab 03 1/1', 'Lab 04 1/1']);
+  assert.deepEqual(reg.weeks[3].labs.map((l) => [l.short, l.students, l.main]), [['Lab 04', 2, true], ['Lab 03', 1, false]]);
+  const sheets = registerSheets(reg, { module: 'Mobile Development' });
+  assert.equal(sheets[2].name, 'Week 1 L02 p1of2 3 Oct');
+  assert.ok(String((sheets[0].rows[3][4] as { v: string }).v).includes('Lab 02 · Part 1/2'));
 });

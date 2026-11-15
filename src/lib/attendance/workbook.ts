@@ -3,7 +3,10 @@
  * week (who came to which session) and Sessions. Pure apart from the zip; tested in tests/attendance-weekly.test.ts.
  */
 import { buildXlsx, type StyleName, type XCell, type XSheet } from '../xlsx.ts';
-import { TIME_ZONE, WARNING_AT, type CellStatus, type Register } from './weekly.ts';
+import { TIME_ZONE, WARNING_AT, labBadge, type CellStatus, type Register, type WeekInfo } from './weekly.ts';
+
+/** "Lab 02 · Part 1/2" for the week's main lab, or '' */
+const weekLab = (w: WeekInfo) => { const m = w.labs?.find((l) => l.main); return m ? labBadge(m) : ''; };
 
 const LETTER: Record<CellStatus, string> = { present: 'P', absent: 'A', excused: 'E', pending: '–' };
 const levelStyle: StyleName[] = ['ok', 'warning1', 'warning2', 'barred'];
@@ -15,7 +18,7 @@ export function registerSheets(reg: Register, meta: { module: string; generatedA
   const rules = `Rules: ${WARNING_AT[0]} absences = Warning 1 · ${WARNING_AT[1]} = Warning 2 · ${WARNING_AT[2]}+ = Barred. P present · A absent · E excused · – week not over yet.`;
   const sessionById = new Map(reg.weeks.flatMap((w) => w.sessions.map((s) => [s.id, s] as const)));
 
-  const summaryHead = ['#', 'Name', 'Student ID', 'Group', ...reg.weeks.map((w) => `${w.label} (${w.range})`), 'Attended', 'Absences', 'Excused', 'Status'];
+  const summaryHead = ['#', 'Name', 'Student ID', 'Group', ...reg.weeks.map((w) => `${w.label}${weekLab(w) ? ` · ${weekLab(w)}` : ''} (${w.range})`), 'Attended', 'Absences', 'Excused', 'Status'];
   const summary: XSheet = {
     name: 'Summary',
     freezeRows: 4,
@@ -51,11 +54,11 @@ export function registerSheets(reg: Register, meta: { module: string; generatedA
   };
 
   const weekSheets: XSheet[] = reg.weeks.map((w) => ({
-    name: `${w.label} ${w.range.split(' – ')[0]}`,
+    name: `${w.label}${weekLab(w) ? ` ${weekLab(w).replace('Lab ', 'L').replace(' · Part ', ' p').replace('/', 'of')}` : ''} ${w.range.split(' – ')[0]}`,
     freezeRows: 3,
     widths: [30, 14, 14, 12, 34, 18, 22, 20, 30],
     rows: [
-      [{ v: `${w.label} · ${w.range}${w.over ? '' : ' (in progress)'}`, s: 'title' }],
+      [{ v: `${w.label}${weekLab(w) ? ` · ${weekLab(w)}` : ''} · ${w.range}${w.over ? '' : ' (in progress)'}`, s: 'title' }],
       [{ v: `${w.present} of ${reg.students.length} present · ${w.sessions.length} session${w.sessions.length === 1 ? '' : 's'}`, s: 'muted' }],
       ['Name', 'Student ID', 'Group', 'Status', 'Lab', 'TA', 'Time slot', 'Checked in', 'Note'].map((h) => ({ v: h, s: 'header' as StyleName })),
       ...[...reg.students].sort((a, b) => a.name.localeCompare(b.name)).map((st): XCell[] => {

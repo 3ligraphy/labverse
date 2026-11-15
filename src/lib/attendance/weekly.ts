@@ -83,7 +83,21 @@ export type WeekInfo = {
   over: boolean;
   sessions: { id: string; lab: string; labTitle: string; ta: string; slot: string; opensAt: string; closesAt: string | null; checkedIn: number }[];
   present: number;
+  /**
+   * The labs taught that week, most attended first. `main` is the week's lab; a lab that is the main lab of
+   * several weeks (one lab split over two weeks) gets `part` of `parts`. Others are make-ups or catch-ups.
+   */
+  labs: WeekLab[];
 };
+export type WeekLab = { lab: string; short: string; title: string; students: number; main: boolean; part: number; parts: number };
+
+/** "Lab 02" from a title like "Lab 02: React…" or a key like "lab-02" / "mobile-development--lab-03". */
+export function shortLab(lab: string, title = ''): string {
+  const n = title.match(/^lab\s*0*(\d+)/i)?.[1] ?? lab.match(/lab-0*(\d+)$/i)?.[1];
+  return n ? `Lab ${n.padStart(2, '0')}` : title || lab;
+}
+/** "Lab 02 · Part 1/2", or just "Lab 02" when the lab had one week. */
+export const labBadge = (l: Pick<WeekLab, 'short' | 'part' | 'parts'>) => (l.parts > 1 ? `${l.short} · Part ${l.part}/${l.parts}` : l.short);
 export type RegisterStudent = {
   key: string;
   id: string;
@@ -154,7 +168,35 @@ export function buildRegister(raw: AttendanceRaw, excuses: Excuse[], labTitles: 
       opensAt: s.opens_at, closesAt: s.closes_at, checkedIn: attendees.get(`${s.id}|${key}`)?.size ?? 0,
     })),
     present: 0,
+    labs: [],
   }));
+
+  // which labs each week taught: distinct students who attended each lab that week
+  const labOf = new Map(sessions.map((s) => [s.id, s.lab]));
+  const perLab = new Map<string, Map<string, Set<string>>>(); // week → lab → students
+  for (const c of checkins) {
+    const lab = labOf.get(c.session_id);
+    if (!lab) continue;
+    const wk = weekKey(c.at);
+    if (!perLab.has(wk)) perLab.set(wk, new Map());
+    const m = perLab.get(wk)!;
+    if (!m.has(lab)) m.set(lab, new Set());
+    m.get(lab)!.add(c.student_key);
+  }
+  for (const w of weeks) {
+    const found = [...(perLab.get(w.key) ?? new Map<string, Set<string>>())].map(([lab, set]) => ({ lab, students: set.size }));
+    // a week with a TA session but nobody attending yet still names the lab it opened
+    for (const s of w.sessions) if (!found.some((x) => x.lab === s.lab) && !isPermanentSession({ ta_name: s.ta, closes_at: s.closesAt })) found.push({ lab: s.lab, students: 0 });
+    found.sort((a, b) => b.students - a.students || a.lab.localeCompare(b.lab));
+    w.labs = found.map((x, i) => {
+      const title = labTitles.get(x.lab) ?? x.lab;
+      return { lab: x.lab, short: shortLab(x.lab, title), title, students: x.students, main: i === 0, part: 1, parts: 1 };
+    });
+  }
+  // parts: a lab that is the main lab of several weeks was split over them
+  const mainWeeks = new Map<string, WeekInfo[]>();
+  for (const w of weeks) { const m = w.labs.find((l) => l.main); if (m) mainWeeks.set(m.lab, [...(mainWeeks.get(m.lab) ?? []), w]); }
+  for (const [lab, ws] of mainWeeks) ws.forEach((w, i) => { const l = w.labs.find((x) => x.lab === lab)!; l.part = i + 1; l.parts = ws.length; });
 
   const students: RegisterStudent[] = raw.students.map((st) => {
     const cells: Record<string, Cell> = {};

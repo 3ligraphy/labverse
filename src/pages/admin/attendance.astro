@@ -220,6 +220,12 @@ const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(mod
   .aw-wk .bar .q { background: repeating-linear-gradient(45deg, var(--surface-2) 0 5px, color-mix(in oklab, var(--text-3) 22%, var(--surface-2)) 5px 10px); }
   .aw-wk .lbl { display: grid; gap: 1px; font-size: 12.5px; font-weight: 650; }
   .aw-wk .lbl small { font-weight: 500; font-size: 11px; color: var(--text-3); }
+  .aw-labs { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin-top: 5px; }
+  .aw-lab { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .01em; white-space: nowrap;
+    background: color-mix(in oklab, var(--accent) 16%, var(--surface)); color: var(--accent-text); border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent); }
+  .aw-lab.more { background: var(--surface-2); color: var(--text-2); border-color: var(--line-2); font-weight: 600; }
+  .aw-th-lab { display: block; font-style: normal; font-size: 10px; font-weight: 700; color: var(--accent-text); margin-top: 1px; }
+  .aw-wkrow-top .aw-lab { margin-left: 6px; vertical-align: 1px; }
   .aw-wk .live { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-text); }
 
   /* register toolbar */
@@ -339,7 +345,20 @@ const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(mod
   type CellStatus = 'present' | 'absent' | 'excused' | 'pending';
   type Cell = { status: CellStatus; sessionId?: string; at?: string; note?: string; by?: string };
   type Session = { id: string; lab: string; labTitle: string; ta: string; slot: string; opensAt: string; closesAt: string | null; checkedIn: number };
-  type Week = { key: string; number: number; label: string; range: string; over: boolean; present: number; sessions: Session[] };
+  type WeekLab = { lab: string; short: string; title: string; students: number; main: boolean; part: number; parts: number };
+  type Week = { key: string; number: number; label: string; range: string; over: boolean; present: number; sessions: Session[]; labs: WeekLab[] };
+  /** "Lab 02 · Part 1/2", or just "Lab 02" when the lab had one week */
+  const badge = (l: WeekLab) => (l.parts > 1 ? `${l.short} · Part ${l.part}/${l.parts}` : l.short);
+  const mainLab = (w: Week) => w.labs?.find((l) => l.main);
+  const labTip = (w: Week) => (w.labs ?? []).map((l) => `${badge(l)}${l.main ? '' : ' (make-up / catch-up)'}: ${l.students} student${l.students === 1 ? '' : 's'}`).join('\n');
+  /** the week's lab badge, plus the other labs attended that week as a small "+L03" */
+  const labBadges = (w: Week) => {
+    const m = mainLab(w);
+    if (!m) return '';
+    const others = w.labs.filter((l) => !l.main && l.students > 0);
+    const more = others.length ? `<span class="aw-lab more">+${others.map((o) => esc(o.short.replace('Lab ', 'L'))).join(' ')}</span>` : '';
+    return `<span class="aw-lab">${esc(badge(m))}</span>${more}`;
+  };
   type Student = { key: string; id: string; name: string; group: string; cells: Record<string, Cell>; attended: number; absences: number; excused: number; level: 0 | 1 | 2 | 3; status: string };
   type Data = { module: string; moduleTitle: string; updatedAt: string; register: { weeks: Week[]; students: Student[];
     totals: { students: number; weeks: number; warning1: number; warning2: number; barred: number; attendancePct: number } } };
@@ -460,14 +479,15 @@ const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(mod
         const c = { p: 0, e: 0, x: 0, q: 0 };
         for (const s of students) { const st = s.cells[w.key]?.status; if (st === 'present') c.p++; else if (st === 'excused') c.e++; else if (st === 'absent') c.x++; else c.q++; }
         const pct = Math.round((c.p / n) * 100);
-        const tip = `${w.label} (${w.range}): ${c.p} present, ${c.e} excused, ${w.over ? `${c.x} absent` : `${c.q} not yet`} · ${w.sessions.length} session${w.sessions.length === 1 ? '' : 's'}`;
+        const m = mainLab(w);
+        const tip = `${w.label}${m ? ` · ${badge(m)}` : ''} (${w.range}): ${c.p} present, ${c.e} excused, ${w.over ? `${c.x} absent` : `${c.q} not yet`} · ${w.sessions.length} session${w.sessions.length === 1 ? '' : 's'}`;
         return `<button type="button" class="aw-wk${state.week === w.key ? ' on' : ''}" data-week="${w.key}" title="${esc(tip)}" aria-pressed="${state.week === w.key}" aria-label="${esc(tip)}">
           <span class="pct">${pct}<small>%</small></span>
           <span class="bar" style="height:100%">
             <i class="p" style="height:${(c.p / n) * 100}%"></i><i class="e" style="height:${(c.e / n) * 100}%"></i>
             <i class="${w.over ? 'x' : 'q'}" style="height:${((w.over ? c.x : c.q) / n) * 100}%"></i>
           </span>
-          <span class="lbl">${esc(w.label)}<small>${esc(w.range)}</small>${w.over ? '' : '<span class="live">in progress</span>'}</span>
+          <span class="lbl">${esc(w.label)}<small>${esc(w.range)}</small><span class="aw-labs" title="${esc(labTip(w))}">${labBadges(w)}</span>${w.over ? '' : '<span class="live">in progress</span>'}</span>
         </button>`;
       }).join('') : '<p class="muted small">No teaching weeks yet: they appear once a session is opened or a student checks in.</p>';
     };
@@ -479,7 +499,7 @@ const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(mod
       const th = (key: SortKey, label: string, cls = '') =>
         `<th scope="col" class="${cls}" aria-sort="${state.sort === key ? (state.dir === 1 ? 'ascending' : 'descending') : 'none'}"><button type="button" class="sort" data-sort="${key}">${label}</button></th>`;
       $('[data-head]').innerHTML = `<tr>${th('name', 'Student', 'stick')}${th('group', 'Group')}${weeks.map((w) =>
-        `<th scope="col" class="wk${state.week === w.key ? ' focus' : ''}" data-col="${w.key}" title="${esc(w.sessions.map((s) => `${s.labTitle} · ${s.ta} · ${s.slot}`).join('\n'))}">${esc(w.label.replace('Week ', 'W'))}<small>${esc(w.range.split(' – ')[0])}</small></th>`).join('')}${th('attended', 'Present', 'n')}${th('absences', 'Absent', 'n')}${th('standing', 'Standing')}</tr>`;
+        `<th scope="col" class="wk${state.week === w.key ? ' focus' : ''}" data-col="${w.key}" title="${esc(labTip(w) || w.sessions.map((s) => `${s.labTitle} · ${s.ta} · ${s.slot}`).join('\n'))}">${esc(w.label.replace('Week ', 'W'))}<small>${esc(w.range.split(' – ')[0])}</small>${mainLab(w) ? `<em class="aw-th-lab">${esc(badge(mainLab(w)!).replace('Lab ', 'L').replace(' · Part ', ' · '))}</em>` : ''}</th>`).join('')}${th('attended', 'Present', 'n')}${th('absences', 'Absent', 'n')}${th('standing', 'Standing')}</tr>`;
       $('[data-rows]').innerHTML = rows.map((s) => `<tr>
         <td class="stick"><button type="button" class="aw-who" data-open="${esc(s.key)}"><b>${esc(s.name)}</b><span>${esc(s.id)}</span></button></td>
         <td class="aw-grp" title="${esc(s.group)}">${esc(s.group || '—')}</td>
@@ -551,7 +571,7 @@ const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(mod
         }
         return `<div class="aw-wkrow${focusWeek === w.key ? ' focus' : ''}" data-wkrow="${w.key}">
           <div class="aw-wkrow-top"><span class="cell ${c.status}" aria-hidden="true">${ICON[c.status]}</span>
-            <div><b>${esc(w.label)}</b><small>${esc(w.range)}</small></div><span class="st">${STATUS_LABEL[c.status]}</span></div>
+            <div><b>${esc(w.label)}${mainLab(w) ? ` <span class="aw-lab">${esc(badge(mainLab(w)!))}</span>` : ''}</b><small>${esc(w.range)}</small></div><span class="st">${STATUS_LABEL[c.status]}</span></div>
           <p class="det">${det}</p>${acts}</div>`;
       };
       $('[data-dr]').innerHTML = `
