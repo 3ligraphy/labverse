@@ -1,8 +1,12 @@
 /**
  * A small, dependency-light Excel (.xlsx) writer: several sheets of text/number cells with a few fixed styles,
- * column widths and frozen header rows. The package is zipped with client-zip (already used for downloads).
+ * column widths and frozen header rows.
+ *
+ * The package is zipped here, not with a streaming zipper: Excel refuses ("cannot be repaired") entries that
+ * are stored with their sizes in trailing data descriptors. Every entry is deflated, with CRC and sizes in
+ * its local header, and the central directory follows: the classic layout every Office version reads.
  */
-import { downloadZip } from 'client-zip';
+import { crc32, deflateRawSync } from 'node:zlib';
 
 export const STYLES = ['default', 'header', 'title', 'muted', 'present', 'absent', 'excused', 'pending', 'warning1', 'warning2', 'barred', 'ok'] as const;
 export type StyleName = (typeof STYLES)[number];
@@ -123,6 +127,61 @@ ${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.open
     { name: 'xl/styles.xml', input: stylesXml() },
     ...sheets.map((s, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, input: sheetXml(s) })),
   ];
-  const lastModified = new Date();
-  return new Uint8Array(await downloadZip(files.map((f) => ({ ...f, lastModified }))).arrayBuffer());
+  return zip(files.map((f) => ({ name: f.name, data: new TextEncoder().encode(f.input) })));
+}
+
+/** A plain zip archive (deflate, no data descriptors, no Zip64): what Excel expects inside an .xlsx. */
+export function zip(entries: { name: string; data: Uint8Array }[], when = new Date()): Uint8Array {
+  // MS-DOS date and time, as zip headers store them
+  const dosTime = (when.getHours() << 11) | (when.getMinutes() << 5) | (when.getSeconds() >> 1);
+  const dosDate = ((Math.max(1980, when.getFullYear()) - 1980) << 9) | ((when.getMonth() + 1) << 5) | when.getDate();
+  const parts: Uint8Array[] = [];
+  const central: Uint8Array[] = [];
+  let offset = 0;
+  for (const e of entries) {
+    const name = new TextEncoder().encode(e.name);
+    const packed = deflateRawSync(e.data, { level: 6 });
+    const crc = crc32(e.data) >>> 0;
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true); // local file header
+    local.setUint16(4, 20, true); // version needed: 2.0 (deflate)
+    local.setUint16(6, 0x0800, true); // flags: UTF-8 names
+    local.setUint16(8, 8, true); // method: deflate
+    local.setUint16(10, dosTime, true);
+    local.setUint16(12, dosDate, true);
+    local.setUint32(14, crc, true);
+    local.setUint32(18, packed.length, true);
+    local.setUint32(22, e.data.length, true);
+    local.setUint16(26, name.length, true);
+    local.setUint16(28, 0, true);
+    const dir = new DataView(new ArrayBuffer(46));
+    dir.setUint32(0, 0x02014b50, true); // central directory header
+    dir.setUint16(4, 20, true); // made by
+    dir.setUint16(6, 20, true); // version needed
+    dir.setUint16(8, 0x0800, true);
+    dir.setUint16(10, 8, true);
+    dir.setUint16(12, dosTime, true);
+    dir.setUint16(14, dosDate, true);
+    dir.setUint32(16, crc, true);
+    dir.setUint32(20, packed.length, true);
+    dir.setUint32(24, e.data.length, true);
+    dir.setUint16(28, name.length, true);
+    // extra length, comment length, disk number, internal attrs, external attrs: all 0
+    dir.setUint32(42, offset, true); // where the local header starts
+    parts.push(new Uint8Array(local.buffer), name, packed);
+    central.push(new Uint8Array(dir.buffer), name);
+    offset += 30 + name.length + packed.length;
+  }
+  const dirSize = central.reduce((n, p) => n + p.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); // end of central directory
+  end.setUint16(8, entries.length, true);
+  end.setUint16(10, entries.length, true);
+  end.setUint32(12, dirSize, true);
+  end.setUint32(16, offset, true);
+  const all = [...parts, ...central, new Uint8Array(end.buffer)];
+  const out = new Uint8Array(all.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of all) { out.set(p, at); at += p.length; }
+  return out;
 }

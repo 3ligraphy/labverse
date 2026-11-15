@@ -19,20 +19,41 @@ test('weeks run Saturday to Friday in Cairo time', () => {
   assert.equal(new Date(weekEnd('2026-10-10')).toISOString(), '2026-10-16T21:00:00.000Z');
 });
 
-/** A store with one session a week for `weeks` weeks; `present[w]` lists who checked in that week. */
+/**
+ * A store with one TA session a week for `weeks` weeks; `present[w]` lists who joined and checked in that week.
+ * Everyone joins the permanent "Open lab" session first: that puts them on the roster but is not attendance.
+ */
 async function setup(weeks: number, present: string[][]) {
   let t = Date.parse('2026-10-11T08:00:00Z'); // Sunday
   const store = new MemoryStore(() => t);
   const people = ['231001', '231002', '231003'];
   for (const id of people) await store.touchStudent({ studentKey: id, studentId: id, name: `Student ${id}`, deviceKey: null } as never);
+  const open = await store.permanentSession('lab-02');
+  for (const id of people) await store.joinSession(open.id, id, 'G1');
   for (let w = 0; w < weeks; w++) {
     t = Date.parse('2026-10-11T08:00:00Z') + w * 7 * 86_400_000;
     const s = await store.openSession('lab-02', 90, 'TA Mona', 'Sun 10:00');
-    for (const id of people) await store.joinSession(s.id, id, 'G1');
-    for (const id of present[w] ?? []) await store.checkIn(id, 'lab-02', s.id);
+    for (const id of present[w] ?? []) { await store.joinSession(s.id, id, 'G1'); await store.checkIn(id, 'lab-02', s.id); }
   }
   return store;
 }
+
+test('joining a TA session counts as present even without a check-in (weeks before check-in was used)', async () => {
+  let t = Date.parse('2026-10-06T07:00:00Z'); // Tue 6 Oct, week of Sat 3 Oct
+  const store = new MemoryStore(() => t);
+  for (const id of ['231001', '231002']) await store.touchStudent({ studentKey: id, studentId: id, name: `Student ${id}`, deviceKey: null } as never);
+  const s = await store.openSession('lab-02', 120, 'Ramy', 'Tue 09:00');
+  await store.joinSession(s.id, '231001', 'G1'); // joined, never checked in
+  const open = await store.permanentSession('lab-02');
+  t += 3_600_000;
+  await store.joinSession(open.id, '231002', 'G1'); // opened the lab on their own: not attendance
+  const reg = buildRegister(await store.attendanceRaw(['lab-02']), [], new Map(), Date.parse('2026-11-14T12:00:00Z'));
+  assert.equal(reg.weeks.length, 1);
+  const by = new Map(reg.students.map((x) => [x.id, x.cells[reg.weeks[0].key].status]));
+  assert.equal(by.get('231001'), 'present');
+  assert.equal(by.get('231002'), 'absent');
+  assert.equal(reg.weeks[0].sessions.find((x) => x.id === s.id)?.checkedIn, 1);
+});
 
 test('register counts weekly absences once the week is over and assigns warnings', async () => {
   const store = await setup(5, [['231001', '231002'], ['231001'], ['231001'], ['231001'], []]);
@@ -110,4 +131,19 @@ test('workbook: summary, warnings, a sheet per week and sessions; valid zip', as
 test('xlsx helpers', () => {
   assert.deepEqual([0, 25, 26, 701].map(colName), ['A', 'Z', 'AA', 'ZZ']);
   assert.deepEqual(sheetNames(['A/B', 'a/b', 'x'.repeat(40)]), ['A B', 'a b 2', 'x'.repeat(31)]);
+});
+
+test('xlsx zip uses the layout Excel accepts: deflate, sizes in headers, no data descriptors', async () => {
+  const { zip } = await import('../src/lib/xlsx.ts');
+  const { inflateRawSync } = await import('node:zlib');
+  const text = 'hello <x/> ' + 'é'.repeat(50);
+  const out = zip([{ name: 'a/b.xml', data: new TextEncoder().encode(text) }]);
+  const v = new DataView(out.buffer);
+  assert.equal(v.getUint32(0, true), 0x04034b50);
+  assert.equal(v.getUint16(6, true), 0x0800); // UTF-8 names, no data-descriptor bit (0x0008)
+  assert.equal(v.getUint16(8, true), 8); // deflate
+  const size = v.getUint32(18, true), nameLen = v.getUint16(26, true);
+  assert.equal(new TextDecoder().decode(inflateRawSync(out.subarray(30 + nameLen, 30 + nameLen + size))), text);
+  assert.equal(Buffer.from(out).indexOf(Buffer.from([0x50, 0x4b, 0x07, 0x08])), -1);
+  assert.equal(v.getUint32(out.length - 22, true), 0x06054b50); // end of central directory
 });

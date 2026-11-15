@@ -6,7 +6,8 @@
  *    or when anyone checked in during it (with sessions off — ALWAYS_OPEN — each lab has one permanent
  *    "Open lab" session whose open date says nothing about when classes ran, so check-in times decide).
  *    Weeks are numbered from the module's first teaching week.
- *  - A student is present in a week when they checked in (to any session of the module) during that week.
+ *  - A student is present in a week when they checked in (to any session of the module), or joined a TA
+ *    session, during that week. Joining the permanent "Open lab" session does not count.
  *  - The roster is everyone who joined or checked in to at least one session of the module.
  *  - An absence only counts once the week is over (until then the student may still attend another slot);
  *    staff may excuse an absence, and excused absences never count.
@@ -103,21 +104,30 @@ export function buildRegister(raw: AttendanceRaw, excuses: Excuse[], labTitles: 
   const known = new Set(sessions.map((s) => s.id));
   // a TA session marks its week as taught; a permanent "Open lab" session's open date does not
   const taught = sessions.filter((s) => !isPermanentSession(s));
-  const checkins = raw.checkins.filter((c) => known.has(c.session_id)).sort((a, b) => a.at.localeCompare(b.at));
+  // Attendance evidence: a check-in, or joining a TA session (class slots ran before the check-in step was
+  // used, and many students only joined). Joining the permanent "Open lab" session is not evidence: students
+  // can open the lab from anywhere.
+  const taSession = new Set(taught.map((s) => s.id));
+  const checkins = [
+    ...raw.checkins.filter((c) => known.has(c.session_id)),
+    ...raw.members.filter((m) => taSession.has(m.session_id)).map((m) => ({ session_id: m.session_id, student_key: m.student_key, at: m.joined_at })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
   const keys = [...new Set([...taught.map((s) => weekKey(s.opens_at)), ...checkins.map((c) => weekKey(c.at))])].sort();
 
-  // the first check-in of each student in each week (the week of the check-in time), and check-ins per session per week
+  // the first evidence of each student in each week (the week of its time), and distinct students per session per week
   const firstIn = new Map<string, { sessionId: string; at: string }>();
-  const perSessionWeek = new Map<string, number>();
+  const attendees = new Map<string, Set<string>>();
   for (const c of checkins) {
     const week = weekKey(c.at);
-    perSessionWeek.set(`${c.session_id}|${week}`, (perSessionWeek.get(`${c.session_id}|${week}`) ?? 0) + 1);
+    const sk = `${c.session_id}|${week}`;
+    if (!attendees.has(sk)) attendees.set(sk, new Set());
+    attendees.get(sk)!.add(c.student_key);
     const k = `${c.student_key}|${week}`;
     if (!firstIn.has(k)) firstIn.set(k, { sessionId: c.session_id, at: c.at });
   }
   // the sessions shown for a week: TA sessions opened in it, and any session someone checked in to during it
   const weekSessions = (key: string) => sessions.filter((s) =>
-    (!isPermanentSession(s) && weekKey(s.opens_at) === key) || perSessionWeek.has(`${s.id}|${key}`));
+    (!isPermanentSession(s) && weekKey(s.opens_at) === key) || attendees.has(`${s.id}|${key}`));
   const excused = new Map(excuses.map((e) => [`${e.student_key}|${e.week}`, e]));
 
   // the latest non-empty group each student joined with
@@ -136,7 +146,7 @@ export function buildRegister(raw: AttendanceRaw, excuses: Excuse[], labTitles: 
     over: now >= weekEnd(key),
     sessions: weekSessions(key).map((s) => ({
       id: s.id, lab: s.lab, labTitle: labTitles.get(s.lab) ?? s.lab, ta: s.ta_name, slot: s.time_slot,
-      opensAt: s.opens_at, closesAt: s.closes_at, checkedIn: perSessionWeek.get(`${s.id}|${key}`) ?? 0,
+      opensAt: s.opens_at, closesAt: s.closes_at, checkedIn: attendees.get(`${s.id}|${key}`)?.size ?? 0,
     })),
     present: 0,
   }));
