@@ -1,10 +1,13 @@
 ---
 /**
- * /admin/attendance — one module's weekly attendance register: every student × every teaching week (weeks come
- * from the dates sessions were opened), absences, warnings (2 = Warning 1, 3 = Warning 2, 4+ = Barred) and an
- * Excel download. Staff who run sessions may excuse an absence or mark a student present in a week's session.
+ * /admin/attendance — one module's weekly attendance register: every student × every teaching week, absences,
+ * warnings (2 = Warning 1, 3 = Warning 2, 4+ = Barred) and an Excel download.
+ *
+ * Interactive: the standing bar and the tiles filter the table; each week's bar filters to that week's
+ * absentees; columns sort; a student opens a side panel with their week-by-week record, where staff who run
+ * sessions can excuse an absence or mark the student present. Filters live in the URL so a view can be shared.
  * Rules: src/lib/attendance/weekly.ts. Data: buildRegisterFor (src/lib/progress/server.ts). No polling: the
- * table reloads only after a change or when "Refresh" is pressed.
+ * register reloads only after a change or when "Refresh" is pressed.
  */
 import Base from '@/layouts/Base.astro';
 import AdminShell from '@/components/admin/AdminShell.astro';
@@ -35,132 +38,299 @@ const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(mod
 ---
 <Base title="Absence warnings" noindex>
   <AdminShell active="attendance">
-    <section class="aw container" data-aw data-module={module} data-manage={canManage ? '1' : ''}>
+    <section class="aw container" data-aw data-module={module} data-manage={canManage ? '1' : ''} data-thresholds={WARNING_AT.join(',')}>
       <header class="aw-head">
-        <div>
+        <div class="aw-title">
+          <p class="aw-eyebrow">Attendance</p>
           <h1>Absence warnings</h1>
           <ModulePicker modules={pickable} current={module} href="/admin/attendance?module=__M__" />
-          <p class="muted">Each week that had at least one lab session opened is a column. A student is present when they checked in to any session that week. Absences count once the week is over (Saturday–Friday, Cairo time).</p>
-          <p class="aw-rules">
-            <span class="lv lv1">{WARNING_AT[0]} absences · Warning 1</span>
-            <span class="lv lv2">{WARNING_AT[1]} absences · Warning 2</span>
-            <span class="lv lv3">{WARNING_AT[2]}+ absences · Barred</span>
-          </p>
         </div>
         {data && (
           <div class="aw-actions">
-            <button class="btn btn-ghost btn-sm" type="button" data-refresh>Refresh</button>
-            <a class="btn btn-primary btn-sm" href={exportHref} download data-export>Download Excel</a>
+            <span class="aw-updated muted small" data-updated></span>
+            <button class="btn btn-ghost btn-sm" type="button" data-refresh aria-label="Reload the register">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Refresh</span>
+            </button>
+            <a class="btn btn-primary btn-sm" href={exportHref} download data-export>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Download Excel</span>
+            </a>
           </div>
         )}
       </header>
 
       {!allowed ? (
-        <p class="aw-note">You don’t run sessions or follow progress in this module. Pick another module in the menu.</p>
+        <p class="aw-note">You don’t run sessions or follow progress in this module. Pick another module above.</p>
       ) : failed ? (
         <p class="aw-note">The attendance register could not be loaded (the database did not answer). Try again in a minute.</p>
       ) : !data ? (
-        <p class="aw-note">Attendance needs the progress database. Open <a href="/admin/sessions">Sessions &amp; attendance</a> for setup.</p>
+        <p class="aw-note">Attendance needs the progress database. Open <a href="/admin/sessions">Attendance</a> for setup.</p>
       ) : (
         <>
-          <dl class="aw-tiles" data-tiles></dl>
-          <div class="aw-filter">
-            <label><span>Search</span><input class="input" type="search" placeholder="Name, ID or group" data-search autocomplete="off" /></label>
-            <label><span>Show</span>
-              <select class="input" data-show>
-                <option value="all">Everyone</option>
-                <option value="flagged">Any warning</option>
-                <option value="1">Warning 1</option>
-                <option value="2">Warning 2</option>
-                <option value="3">Barred</option>
-                <option value="0">Good standing</option>
-              </select>
-            </label>
-            <p class="muted small" data-count></p>
+          <div class="aw-overview">
+            <section class="aw-card aw-standing" aria-labelledby="aw-standing-h">
+              <div class="aw-card-head">
+                <h2 id="aw-standing-h">Standing</h2>
+                <p class="muted small" data-standing-sub></p>
+              </div>
+              <div class="aw-stack" data-stack role="group" aria-label="Students by standing — select a part to filter"></div>
+              <div class="aw-ladder" aria-label="Warning rules">
+                <span class="step s0"><b>0–{WARNING_AT[0] - 1}</b> absence{WARNING_AT[0] - 1 === 1 ? '' : 's'}<em>Good standing</em></span>
+                <span class="step s1"><b>{WARNING_AT[0]}</b> absences<em>Warning 1</em></span>
+                <span class="step s2"><b>{WARNING_AT[1]}</b> absences<em>Warning 2</em></span>
+                <span class="step s3"><b>{WARNING_AT[2]}+</b> absences<em>Barred</em></span>
+              </div>
+            </section>
+
+            <div class="aw-tiles" data-tiles></div>
           </div>
-          <div class="table-wrap aw-wrap">
-            <table class="table aw-table">
-              <thead data-head></thead>
-              <tbody data-rows></tbody>
-            </table>
-            <p class="aw-empty" data-empty hidden></p>
-          </div>
-          <p class="muted small aw-legend">
-            <span class="c present">P</span> present · <span class="c absent">A</span> absent · <span class="c excused">E</span> excused (does not count) · <span class="c pending">–</span> week not over yet.
-            {canManage ? ' Select a week cell to excuse an absence or mark the student present.' : ''}
-          </p>
+
+          <section class="aw-card aw-weeks" aria-labelledby="aw-weeks-h">
+            <div class="aw-card-head">
+              <h2 id="aw-weeks-h">Week by week</h2>
+              <p class="muted small">Present, excused and absent students each teaching week (Saturday–Friday, Cairo time). Select a week to list who missed it.</p>
+            </div>
+            <div class="aw-chart" data-chart></div>
+          </section>
+
+          <section class="aw-card aw-register" aria-labelledby="aw-reg-h">
+            <div class="aw-toolbar">
+              <h2 id="aw-reg-h">Register</h2>
+              <label class="aw-search">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <input class="input" type="search" placeholder="Search name, ID or group" data-search autocomplete="off" aria-label="Search students" />
+                <kbd aria-hidden="true">/</kbd>
+              </label>
+              <div class="aw-seg" role="radiogroup" aria-label="Show" data-seg>
+                <button type="button" role="radio" data-show="all">Everyone</button>
+                <button type="button" role="radio" data-show="flagged">Warnings</button>
+                <button type="button" role="radio" data-show="1">W1</button>
+                <button type="button" role="radio" data-show="2">W2</button>
+                <button type="button" role="radio" data-show="3">Barred</button>
+                <button type="button" role="radio" data-show="0">Good</button>
+              </div>
+              <div class="aw-tools-end">
+                <button class="btn btn-ghost btn-sm" type="button" data-copy title="Copy the student IDs shown in the table">Copy IDs</button>
+              </div>
+            </div>
+            <div class="aw-chips" data-chips></div>
+            <div class="aw-wrap" data-wrap>
+              <table class="aw-table" data-table>
+                <thead data-head></thead>
+                <tbody data-rows></tbody>
+              </table>
+              <div class="aw-empty" data-empty hidden>
+                <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="22" cy="22" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="m32 32 9 9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                <p data-empty-text></p>
+                <button class="btn btn-ghost btn-sm" type="button" data-clear>Clear filters</button>
+              </div>
+            </div>
+            <div class="aw-foot">
+              <p class="aw-legend small">
+                <span><i class="dot present"></i>Present</span>
+                <span><i class="dot absent"></i>Absent</span>
+                <span><i class="dot excused"></i>Excused (does not count)</span>
+                <span><i class="dot pending"></i>Week not over</span>
+              </p>
+              <p class="muted small" data-count></p>
+            </div>
+          </section>
           <script type="application/json" data-aw-data set:html={JSON.stringify(data)} />
         </>
       )}
 
-      <dialog class="aw-dlg" data-dlg aria-labelledby="aw-dlg-title">
-        <form method="dialog" class="aw-dlg-body" data-dlg-form>
-          <h2 id="aw-dlg-title" data-dlg-title></h2>
-          <p class="muted small" data-dlg-sub></p>
-          <div data-dlg-content></div>
-          <p class="aw-msg small" data-dlg-msg role="status" aria-live="polite"></p>
-          <div class="aw-dlg-actions"><button class="btn btn-ghost btn-sm" value="cancel">Close</button></div>
-        </form>
+      <dialog class="aw-drawer" data-drawer aria-labelledby="aw-dr-name">
+        <div class="aw-dr-inner" data-dr></div>
       </dialog>
+      <div class="aw-toast" data-toast role="status" aria-live="polite" hidden></div>
     </section>
   </AdminShell>
 </Base>
 
 <style is:global>
-  .aw { min-height: 80dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 18px; align-content: start; }
+  .aw {
+    --p: var(--ok); --p-soft: var(--ok-soft);
+    --x: var(--danger); --x-soft: var(--danger-soft);
+    --e: color-mix(in oklab, var(--text-3) 70%, var(--surface)); --e-soft: var(--surface-2);
+    --w1: var(--warn); --w1-soft: var(--warn-soft);
+    --w2: color-mix(in oklab, var(--warn) 45%, var(--danger)); --w2-soft: color-mix(in oklab, var(--warn) 22%, var(--danger-soft));
+    min-height: 80dvh; padding-top: calc(var(--nav-h) + 40px); padding-bottom: 110px; display: grid; gap: 16px; align-content: start;
+  }
+  .aw svg { width: 16px; height: 16px; flex: none; }
   .aw-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; }
-  .aw-head h1 { font-size: var(--fs-xl); letter-spacing: -.04em; }
-  .aw-head p.muted { max-width: 75ch; margin-top: 6px; }
-  .aw-rules { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  .aw-actions { display: flex; gap: 8px; }
+  .aw-title { display: grid; gap: 6px; }
+  .aw-eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+  .aw-head h1 { font-size: var(--fs-xl); letter-spacing: -.04em; line-height: 1.05; }
+  .aw-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .aw-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+  .aw-actions [data-refresh].spin svg { animation: aw-spin .8s linear infinite; }
+  @keyframes aw-spin { to { transform: rotate(360deg); } }
   .aw-note { padding: 18px; border-radius: var(--r-lg); border: 1px solid var(--line-2); background: var(--surface); }
-  .lv { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 650; white-space: nowrap; }
-  .lv0 { background: var(--ok-soft); color: var(--ok); }
-  .lv1 { background: var(--warn-soft); color: var(--warn); }
-  .lv2 { background: color-mix(in oklab, var(--warn) 22%, var(--danger-soft)); color: color-mix(in oklab, var(--warn) 45%, var(--danger)); }
-  .lv3 { background: var(--danger); color: #fff; }
-  .aw-tiles { display: flex; flex-wrap: wrap; gap: 1px; margin: 0; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--line); }
-  .aw-tiles > div { flex: 1 1 150px; display: grid; gap: 2px; padding: 14px 18px; background: var(--surface); }
-  .aw-tiles dt { font-size: 13px; font-weight: 600; color: var(--text-2); }
-  .aw-tiles dd { margin: 0; font-family: var(--font-display); font-size: 1.9rem; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .aw-tiles dd.t1 { color: var(--warn); } .aw-tiles dd.t3 { color: var(--danger); }
-  .aw-filter { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 16px; }
-  .aw-filter label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--text-2); }
-  .aw-filter .input { height: 40px; padding: 0 12px; border-radius: 10px; min-width: 220px; }
-  .aw-filter p { padding-bottom: 10px; }
-  .aw-wrap { max-height: 70dvh; overflow: auto; }
-  .aw-table { min-width: 0; font-size: 13.5px; }
-  .aw-table th, .aw-table td { padding: 8px 10px; white-space: nowrap; vertical-align: middle; }
-  .aw-table thead th { position: sticky; top: 0; z-index: 2; }
-  .aw-table th.wk { text-align: center; text-transform: none; letter-spacing: 0; line-height: 1.3; }
-  .aw-table th.wk small { display: block; font-size: 11px; color: var(--text-3); }
-  .aw-table td.n, .aw-table th.n { text-align: right; font-variant-numeric: tabular-nums; }
-  .aw-table td.wk { text-align: center; padding: 4px; }
-  .aw-table .who b { display: block; font-weight: 600; }
-  .aw-table .who span { font-size: 12px; color: var(--text-3); }
-  .aw-table tr.lvl3 td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
-  .aw-table tr.lvl2 td:first-child, .aw-table tr.lvl1 td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
-  .c { display: inline-grid; place-items: center; min-width: 30px; height: 26px; padding: 0 6px; border-radius: 7px; font-weight: 700; font-size: 12.5px; border: 1px solid transparent; }
-  .c.present { background: var(--ok-soft); color: var(--ok); }
-  .c.absent { background: var(--danger-soft); color: var(--danger); }
-  .c.excused { background: var(--surface-2); color: var(--text-2); border-color: var(--line-2); }
-  .c.pending { color: var(--text-3); }
-  button.c { cursor: pointer; font: inherit; font-weight: 700; font-size: 12.5px; }
-  button.c:hover, button.c:focus-visible { border-color: var(--text-3); }
-  .aw-empty { padding: 26px; text-align: center; color: var(--text-3); }
-  .aw-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-  .aw-legend .c { min-width: 24px; height: 22px; }
-  .aw-dlg { width: min(520px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); color: var(--text); box-shadow: 0 24px 80px rgb(0 0 0 / .35); }
-  .aw-dlg::backdrop { background: rgb(8 12 20 / .55); backdrop-filter: blur(3px); }
-  .aw-dlg-body { display: grid; gap: 12px; padding: 20px; }
-  .aw-dlg h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
-  .aw-dlg label { display: grid; gap: 6px; font-size: 12.5px; font-weight: 650; color: var(--text-2); }
-  .aw-dlg .input { height: 40px; padding: 0 12px; border-radius: 10px; width: 100%; }
-  .aw-dlg fieldset { display: grid; gap: 10px; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-md); }
-  .aw-dlg legend { padding: 0 6px; font-size: 13px; font-weight: 650; }
-  .aw-dlg-actions { display: flex; justify-content: flex-end; }
-  .aw-msg { min-height: 1.2em; color: var(--text-3); }
-  .aw-msg.err { color: var(--danger); }
+
+  .aw-card { display: grid; gap: 14px; align-content: start; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); min-width: 0; }
+  .aw-card-head h2, .aw-toolbar h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
+  .aw-card-head p { margin-top: 2px; max-width: 70ch; }
+  .aw-overview { display: grid; gap: 16px; }
+  @media (min-width: 1100px) { .aw-overview { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
+
+  /* standing: one stacked bar, each part a filter */
+  .aw-stack { display: flex; height: 46px; border-radius: 12px; overflow: hidden; background: var(--surface-2); gap: 2px; }
+  .aw-stack button { position: relative; min-width: 0; border: 0; padding: 0 12px; display: flex; align-items: center; justify-content: flex-start; gap: 8px; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; transition: filter var(--t-fast), flex-grow 400ms var(--ease-out), opacity var(--t-fast); overflow: hidden; white-space: nowrap; }
+  .aw-stack button b { font-family: var(--font-display); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .aw-stack button span { overflow: hidden; text-overflow: ellipsis; }
+  .aw-stack button:hover, .aw-stack button:focus-visible { filter: brightness(1.06) saturate(1.1); outline: none; }
+  .aw-stack button:focus-visible { box-shadow: inset 0 0 0 2px var(--text); }
+  .aw-stack.filtering button:not(.on) { opacity: .4; }
+  .aw-stack .l0 { background: var(--p-soft); color: var(--p); }
+  .aw-stack .l1 { background: var(--w1-soft); color: var(--w1); }
+  .aw-stack .l2 { background: var(--w2-soft); color: var(--w2); }
+  .aw-stack .l3 { background: var(--x); color: #fff; }
+  .aw-ladder { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .aw-ladder .step { display: grid; gap: 1px; padding: 8px 10px 8px 12px; border-radius: 10px; font-size: 12px; color: var(--text-2); background: var(--surface-2); position: relative; }
+  .aw-ladder .step::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; }
+  .aw-ladder .s0::before { background: var(--p); } .aw-ladder .s1::before { background: var(--w1); } .aw-ladder .s2::before { background: var(--w2); } .aw-ladder .s3::before { background: var(--x); }
+  .aw-ladder b { font-size: 14px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .aw-ladder em { font-style: normal; font-weight: 650; color: var(--text); }
+  @media (max-width: 560px) { .aw-ladder { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  /* tiles */
+  .aw-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--line); align-self: stretch; }
+  @media (max-width: 640px) { .aw-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .aw-tiles > * { display: grid; gap: 2px; align-content: start; padding: 14px 16px; background: var(--surface); text-align: left; font: inherit; color: inherit; border: 0; }
+  .aw-tiles button { cursor: pointer; transition: background var(--t-fast); }
+  .aw-tiles button:hover, .aw-tiles button:focus-visible { background: var(--surface-2); outline: none; }
+  .aw-tiles button.on { background: color-mix(in oklab, var(--accent) 10%, var(--surface)); box-shadow: inset 0 -3px 0 var(--accent); }
+  .aw-tiles .k { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+  .aw-tiles .v { margin: 0; font-family: var(--font-display); font-size: 1.85rem; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .aw-tiles .v small { font-size: .95rem; color: var(--text-3); margin-left: 1px; }
+  .aw-tiles .hint { font-size: 12px; color: var(--text-3); }
+  .aw-tiles .t1 .v { color: var(--w1); } .aw-tiles .t2 .v { color: var(--w2); } .aw-tiles .t3 .v { color: var(--x); }
+
+  /* week chart */
+  .aw-chart { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(64px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .aw-wk { display: grid; grid-template-rows: auto 150px auto; gap: 8px; padding: 10px 8px; border: 1px solid transparent; border-radius: 12px; background: none; font: inherit; color: inherit; cursor: pointer; text-align: center; transition: background var(--t-fast), border-color var(--t-fast); }
+  .aw-wk:hover, .aw-wk:focus-visible { background: var(--surface-2); outline: none; }
+  .aw-wk.on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 8%, var(--surface)); }
+  .aw-wk .pct { font-family: var(--font-display); font-size: 1.15rem; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .aw-wk .pct small { font-size: .75rem; color: var(--text-3); }
+  .aw-wk .bar { display: flex; flex-direction: column-reverse; width: min(44px, 70%); margin: 0 auto; border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+  .aw-wk .bar i { display: block; transition: height 500ms var(--ease-out); }
+  .aw-wk .bar .p { background: var(--p); } .aw-wk .bar .e { background: var(--e); } .aw-wk .bar .x { background: color-mix(in oklab, var(--x) 75%, var(--surface)); }
+  .aw-wk .bar .q { background: repeating-linear-gradient(45deg, var(--surface-2) 0 5px, color-mix(in oklab, var(--text-3) 22%, var(--surface-2)) 5px 10px); }
+  .aw-wk .lbl { display: grid; gap: 1px; font-size: 12.5px; font-weight: 650; }
+  .aw-wk .lbl small { font-weight: 500; font-size: 11px; color: var(--text-3); }
+  .aw-wk .live { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-text); }
+
+  /* register toolbar */
+  .aw-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+  .aw-toolbar h2 { margin-right: auto; }
+  .aw-search { position: relative; display: flex; align-items: center; }
+  .aw-search svg { position: absolute; left: 11px; color: var(--text-3); pointer-events: none; }
+  .aw-search .input { height: 38px; padding: 0 34px 0 34px; border-radius: 10px; width: min(300px, 70vw); }
+  .aw-search kbd { position: absolute; right: 9px; font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--line-2); color: var(--text-3); }
+  .aw-search .input:focus + kbd, .aw-search .input:not(:placeholder-shown) + kbd { display: none; }
+  .aw-seg { display: inline-flex; flex-wrap: wrap; padding: 3px; gap: 2px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--line); }
+  .aw-seg button { border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--text-2); padding: 6px 11px; border-radius: 8px; cursor: pointer; }
+  .aw-seg button:hover { color: var(--text); }
+  .aw-seg button[aria-checked='true'] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+  .aw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .aw-chips:empty { display: none; }
+  .aw-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: color-mix(in oklab, var(--accent) 12%, var(--surface)); color: var(--text); border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent); }
+  .aw-chip button { border: 0; background: none; cursor: pointer; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: var(--text-2); font-size: 15px; line-height: 1; }
+  .aw-chip button:hover { background: var(--surface-2); color: var(--text); }
+
+  /* register table */
+  .aw-wrap { position: relative; max-height: 68dvh; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-md); }
+  .aw-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
+  .aw-table th, .aw-table td { padding: 7px 10px; white-space: nowrap; vertical-align: middle; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .aw-table thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-2); font-size: 12px; font-weight: 600; color: var(--text-2); text-align: left; }
+  .aw-table th button.sort { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .aw-table th button.sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .aw-table th button.sort::after { content: '↕'; opacity: .35; font-size: 11px; }
+  .aw-table th[aria-sort='ascending'] button.sort::after { content: '↑'; opacity: 1; }
+  .aw-table th[aria-sort='descending'] button.sort::after { content: '↓'; opacity: 1; }
+  .aw-table .stick { position: sticky; left: 0; z-index: 2; box-shadow: 1px 0 0 var(--line); }
+  .aw-table thead .stick { z-index: 4; }
+  .aw-table th.wk, .aw-table td.wk { text-align: center; padding: 5px 4px; min-width: 62px; }
+  .aw-table th.wk small { display: block; font-weight: 500; font-size: 10.5px; color: var(--text-3); }
+  .aw-table th.wk.focus, .aw-table td.wk.focus { background: color-mix(in oklab, var(--accent) 9%, var(--surface)); }
+  .aw-table td.wk.hot, .aw-table th.wk.hot { background: color-mix(in oklab, var(--text) 5%, var(--surface)); }
+  .aw-table tbody tr:hover td { background: color-mix(in oklab, var(--text) 4%, var(--surface)); }
+  .aw-table tbody tr:hover td.wk.focus { background: color-mix(in oklab, var(--accent) 13%, var(--surface)); }
+  .aw-table .n { text-align: right; font-variant-numeric: tabular-nums; }
+  .aw-who { all: unset; cursor: pointer; display: grid; gap: 1px; max-width: 240px; }
+  .aw-who b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+  .aw-who span { font-size: 12px; color: var(--text-3); font-family: var(--font-mono); }
+  .aw-who:hover b, .aw-who:focus-visible b { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
+  .aw-who:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .aw-grp { color: var(--text-2); max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+  .cell { display: inline-grid; place-items: center; width: 30px; height: 28px; border-radius: 8px; border: 1px solid transparent; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: transform var(--t-fast), box-shadow var(--t-fast); }
+  .cell svg { width: 14px; height: 14px; }
+  .cell:hover, .cell:focus-visible { transform: scale(1.12); box-shadow: var(--shadow-sm); outline: none; }
+  .cell:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+  .cell.present { background: var(--p-soft); color: var(--p); }
+  .cell.absent { background: var(--x-soft); color: var(--x); }
+  .cell.excused { background: var(--e-soft); color: var(--text-2); border-color: var(--line-2); }
+  .cell.pending { background: none; color: var(--text-3); border: 1px dashed var(--line-2); }
+  .aw-meter { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: 8px; }
+  .aw-meter i { width: 7px; height: 14px; border-radius: 2px; background: var(--surface-2); border: 1px solid var(--line-2); }
+  .aw-meter i.f1 { background: var(--w1); border-color: transparent; } .aw-meter i.f2 { background: var(--w2); border-color: transparent; } .aw-meter i.f3, .aw-meter i.f4 { background: var(--x); border-color: transparent; }
+  .aw-meter i.f0 { background: color-mix(in oklab, var(--text-3) 55%, transparent); border-color: transparent; }
+  .lv { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 650; white-space: nowrap; }
+  .lv0 { background: var(--p-soft); color: var(--p); }
+  .lv1 { background: var(--w1-soft); color: var(--w1); }
+  .lv2 { background: var(--w2-soft); color: var(--w2); }
+  .lv3 { background: var(--x); color: #fff; }
+  .aw-next { display: block; font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .aw-empty { display: grid; justify-items: center; gap: 10px; padding: 40px 16px; color: var(--text-3); text-align: center; }
+  .aw-empty svg { width: 40px; height: 40px; }
+  .aw-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
+  .aw-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--text-2); }
+  .aw-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+  .dot.present { background: var(--p); } .dot.absent { background: var(--x); } .dot.excused { background: var(--e); } .dot.pending { border: 1px dashed var(--text-3); }
+
+  /* student side panel */
+  .aw-drawer { margin: 0 0 0 auto; height: 100dvh; max-height: 100dvh; width: min(460px, 100vw); padding: 0; border: 0; border-left: 1px solid var(--line-2); background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg); }
+  .aw-drawer[open] { animation: aw-in 260ms var(--ease-out); }
+  @keyframes aw-in { from { transform: translateX(40px); opacity: 0; } }
+  .aw-drawer::backdrop { background: rgb(8 12 20 / .45); backdrop-filter: blur(2px); }
+  .aw-dr-inner { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+  .aw-dr-head { display: grid; gap: 10px; padding: 20px 22px 16px; border-bottom: 1px solid var(--line); }
+  .aw-dr-top { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+  .aw-dr-head h2 { font-size: var(--fs-lg); letter-spacing: -.02em; }
+  .aw-dr-head .id { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-3); }
+  .aw-x { border: 0; background: var(--surface-2); width: 32px; height: 32px; border-radius: 9px; cursor: pointer; font-size: 18px; color: var(--text-2); flex: none; }
+  .aw-x:hover { color: var(--text); }
+  .aw-dr-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
+  .aw-dr-stats div { padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+  .aw-dr-stats dt { font-size: 11.5px; color: var(--text-3); font-weight: 600; }
+  .aw-dr-stats dd { margin: 0; font-family: var(--font-display); font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+  .aw-track { display: grid; gap: 6px; }
+  .aw-track-bar { display: grid; grid-template-columns: repeat(var(--steps), 1fr); gap: 3px; }
+  .aw-track-bar i { height: 8px; border-radius: 3px; background: var(--surface-2); }
+  .aw-track-bar i.f1 { background: var(--w1); } .aw-track-bar i.f2 { background: var(--w2); } .aw-track-bar i.f3 { background: var(--x); }
+  .aw-track p { font-size: 12.5px; color: var(--text-2); }
+  .aw-dr-body { overflow-y: auto; padding: 14px 22px 30px; display: grid; gap: 10px; align-content: start; }
+  .aw-dr-body h3 { font-size: 13px; font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin-top: 4px; }
+  .aw-wkrow { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; transition: border-color var(--t-fast), box-shadow var(--t-fast); }
+  .aw-wkrow.focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 20%, transparent); }
+  .aw-wkrow-top { display: flex; align-items: center; gap: 10px; }
+  .aw-wkrow-top .cell { cursor: default; transform: none; box-shadow: none; }
+  .aw-wkrow-top div { display: grid; min-width: 0; }
+  .aw-wkrow-top b { font-size: 14px; }
+  .aw-wkrow-top small { font-size: 12px; color: var(--text-3); }
+  .aw-wkrow-top .st { margin-left: auto; font-size: 12px; font-weight: 650; color: var(--text-2); }
+  .aw-wkrow .det { font-size: 12.5px; color: var(--text-2); }
+  .aw-acts { display: grid; gap: 8px; padding-top: 4px; }
+  .aw-acts .aw-act-row { display: flex; gap: 6px; }
+  .aw-acts .input { height: 36px; padding: 0 10px; border-radius: 9px; flex: 1; min-width: 0; font-size: 13px; }
+  .aw-acts .btn { flex: none; }
+  .aw-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 400; padding: 10px 16px; border-radius: 12px; background: var(--text); color: var(--bg); font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow-lg); animation: aw-up 220ms var(--ease-out); }
+  .aw-toast.err { background: var(--danger); color: #fff; }
+  @keyframes aw-up { from { transform: translate(-50%, 12px); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .aw *, .aw-drawer[open], .aw-toast { animation: none !important; transition: none !important; } }
 </style>
 
 <script>
@@ -168,15 +338,27 @@ const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(mod
 
   type CellStatus = 'present' | 'absent' | 'excused' | 'pending';
   type Cell = { status: CellStatus; sessionId?: string; at?: string; note?: string; by?: string };
-  type Week = { key: string; number: number; label: string; range: string; over: boolean; present: number;
-    sessions: { id: string; lab: string; labTitle: string; ta: string; slot: string; opensAt: string; closesAt: string | null; checkedIn: number }[] };
+  type Session = { id: string; lab: string; labTitle: string; ta: string; slot: string; opensAt: string; closesAt: string | null; checkedIn: number };
+  type Week = { key: string; number: number; label: string; range: string; over: boolean; present: number; sessions: Session[] };
   type Student = { key: string; id: string; name: string; group: string; cells: Record<string, Cell>; attended: number; absences: number; excused: number; level: 0 | 1 | 2 | 3; status: string };
-  type Data = { module: string; moduleTitle: string; register: { weeks: Week[]; students: Student[];
+  type Data = { module: string; moduleTitle: string; updatedAt: string; register: { weeks: Week[]; students: Student[];
     totals: { students: number; weeks: number; warning1: number; warning2: number; barred: number; attendancePct: number } } };
+  type SortKey = 'standing' | 'name' | 'group' | 'attended' | 'absences';
 
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-  const LETTER: Record<CellStatus, string> = { present: 'P', absent: 'A', excused: 'E', pending: '–' };
+  const LEVELS = ['Good standing', 'Warning 1', 'Warning 2', 'Barred'];
+  const STATUS_LABEL: Record<CellStatus, string> = { present: 'Present', absent: 'Absent', excused: 'Excused', pending: 'Not over yet' };
+  const ICON: Record<CellStatus, string> = {
+    present: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    absent: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+    excused: 'E',
+    pending: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg>',
+  };
   const when = (iso?: string | null) => iso ? new Date(iso).toLocaleString('en-GB', { timeZone: 'Africa/Cairo', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  const ago = (iso: string) => {
+    const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+    return s < 60 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : when(iso);
+  };
 
   function init() {
     const root = document.querySelector<HTMLElement>('[data-aw]');
@@ -185,59 +367,155 @@ const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(mod
     root.dataset.wired = '1';
     const module = root.dataset.module!;
     const manage = Boolean(root.dataset.manage);
+    const T = root.dataset.thresholds!.split(',').map(Number); // e.g. [2, 3, 4]
+    const maxSteps = T[T.length - 1];
     let data = JSON.parse(raw.textContent || '{}') as Data;
-    const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const $ = <E extends HTMLElement>(sel: string) => root.querySelector<E>(sel)!;
     const search = $<HTMLInputElement>('[data-search]');
-    const show = $<HTMLSelectElement>('[data-show]');
-    const dlg = $<HTMLDialogElement>('[data-dlg]');
-    const msg = $<HTMLElement>('[data-dlg-msg]');
+    const drawer = $<HTMLDialogElement>('[data-drawer]');
 
-    const tiles = () => {
-      const t = data.register.totals;
-      $('[data-tiles]').innerHTML = [
-        ['Students', t.students, '', 'joined at least one session'],
-        ['Teaching weeks', t.weeks, '', 'weeks with an opened session'],
-        ['Attendance', `${t.attendancePct}%`, '', 'of students, weeks that are over'],
-        ['Warning 1', t.warning1, 't1', '2 absences'],
-        ['Warning 2', t.warning2, 't1', '3 absences'],
-        ['Barred', t.barred, 't3', '4 or more absences'],
-      ].map(([dt, dd, cls, span]) => `<div><dt>${dt}</dt><dd class="${cls}">${dd}</dd><span class="muted small">${span}</span></div>`).join('');
+    /* ---------- state (kept in the URL so a view can be shared or reloaded) */
+    const params = new URLSearchParams(location.search);
+    const SORTS: SortKey[] = ['standing', 'name', 'group', 'attended', 'absences'];
+    const state = {
+      q: params.get('q') ?? '',
+      show: params.get('show') ?? 'all',
+      week: params.get('week') ?? '',
+      sort: (SORTS.includes(params.get('sort') as SortKey) ? params.get('sort') : 'standing') as SortKey,
+      dir: params.get('dir') === 'asc' ? 1 : -1,
+    };
+    search.value = state.q;
+    const saveUrl = () => {
+      const p = new URLSearchParams(location.search);
+      const set = (k: string, v: string, def: string) => (v && v !== def ? p.set(k, v) : p.delete(k));
+      set('q', state.q, ''); set('show', state.show, 'all'); set('week', state.week, '');
+      set('sort', state.sort, 'standing'); set('dir', state.dir === 1 ? 'asc' : '', '');
+      history.replaceState(history.state, '', `${location.pathname}?${p}`);
     };
 
-    const render = () => {
-      const { weeks, students } = data.register;
-      $('[data-head]').innerHTML = `<tr><th scope="col">Student</th><th scope="col">Group</th>${weeks.map((w) =>
-        `<th scope="col" class="wk" title="${esc(w.sessions.map((s) => `${s.labTitle} · ${s.ta} · ${s.slot}`).join('\n'))}">${esc(w.label)}<small>${esc(w.range)}</small></th>`).join('')}<th scope="col" class="n">Present</th><th scope="col" class="n">Absent</th><th scope="col">Status</th></tr>`;
-      const q = search.value.trim().toLowerCase();
-      const f = show.value;
-      const rows = students.filter((s) =>
+    /* ---------- toast */
+    let toastTimer = 0;
+    const toast = (text: string, err = false) => {
+      const t = $('[data-toast]');
+      t.textContent = text;
+      t.classList.toggle('err', err);
+      t.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => (t.hidden = true), 2800);
+    };
+
+    /* ---------- helpers */
+    const weekOf = (key: string) => data.register.weeks.find((w) => w.key === key);
+    const nextStep = (s: Student) => {
+      const next = T.find((t) => t > s.absences);
+      if (next === undefined) return 'Barred';
+      const left = next - s.absences;
+      return `${left} more absence${left === 1 ? '' : 's'} → ${LEVELS[T.indexOf(next) + 1]}`;
+    };
+    const fill = (s: Student) => (s.level ? `f${s.level}` : 'f0');
+    const meter = (s: Student) => Array.from({ length: maxSteps }, (_, i) => `<i class="${i < s.absences ? fill(s) : ''}"></i>`).join('');
+
+    const visible = () => {
+      const q = state.q.trim().toLowerCase();
+      const list = data.register.students.filter((s) =>
         (!q || `${s.name} ${s.id} ${s.group}`.toLowerCase().includes(q)) &&
-        (f === 'all' || (f === 'flagged' ? s.level > 0 : String(s.level) === f)));
-      $('[data-rows]').innerHTML = rows.map((s) => `<tr class="lvl${s.level}">
-        <td class="who"><b>${esc(s.name)}</b><span>${esc(s.id)}</span></td>
-        <td>${esc(s.group || '—')}</td>
+        (state.show === 'all' || (state.show === 'flagged' ? s.level > 0 : String(s.level) === state.show)) &&
+        (!state.week || s.cells[state.week]?.status === 'absent'));
+      const by: Record<SortKey, (a: Student, b: Student) => number> = {
+        standing: (a, b) => a.level - b.level || a.absences - b.absences || b.name.localeCompare(a.name),
+        name: (a, b) => a.name.localeCompare(b.name),
+        group: (a, b) => (a.group || '~').localeCompare(b.group || '~') || a.name.localeCompare(b.name),
+        attended: (a, b) => a.attended - b.attended || a.name.localeCompare(b.name),
+        absences: (a, b) => a.absences - b.absences || a.name.localeCompare(b.name),
+      };
+      return list.sort((a, b) => by[state.sort](a, b) * state.dir);
+    };
+
+    /* ---------- overview */
+    const renderOverview = () => {
+      const { totals, students, weeks } = data.register;
+      const counts = [0, 1, 2, 3].map((l) => students.filter((s) => s.level === l).length);
+      const stack = $('[data-stack]');
+      const levelFilter = ['0', '1', '2', '3'].includes(state.show) ? Number(state.show) : state.show === 'flagged' ? -1 : null;
+      stack.classList.toggle('filtering', levelFilter !== null);
+      stack.innerHTML = counts.map((n, l) => n ? `<button type="button" class="l${l}${levelFilter === l || (levelFilter === -1 && l > 0) ? ' on' : ''}" style="flex-grow:${n}" data-level="${l}"
+          title="${esc(`${LEVELS[l]}: ${n} student${n === 1 ? '' : 's'} — select to filter`)}" aria-pressed="${levelFilter === l}"><b>${n}</b><span>${LEVELS[l]}</span></button>` : '').join('')
+        || '<p class="muted small" style="padding:12px">No students yet.</p>';
+      const over = weeks.filter((w) => w.over).length;
+      $('[data-standing-sub]').textContent = `${totals.students} students · ${over} of ${weeks.length} week${weeks.length === 1 ? '' : 's'} counted so far`;
+
+      const tile = (key: string, cls: string, dt: string, dd: string, hint: string) =>
+        `<button type="button" class="${cls}${state.show === key && key !== 'all' ? ' on' : ''}" data-tile="${key}" aria-pressed="${state.show === key && key !== 'all'}"><span class="k">${dt}</span><span class="v">${dd}</span><span class="hint">${hint}</span></button>`;
+      $('[data-tiles]').innerHTML = [
+        `<div><span class="k">Average attendance</span><span class="v">${totals.attendancePct}<small>%</small></span><span class="hint">weeks that are over</span></div>`,
+        tile('all', '', 'Students', String(totals.students), 'joined a session'),
+        `<div><span class="k">Teaching weeks</span><span class="v">${totals.weeks}</span><span class="hint">with a session or check-in</span></div>`,
+        tile('1', 't1', 'Warning 1', String(totals.warning1), `${T[0]} absences`),
+        tile('2', 't2', 'Warning 2', String(totals.warning2), `${T[1]} absences`),
+        tile('3', 't3', 'Barred', String(totals.barred), `${T[2]}+ absences`),
+      ].join('');
+
+      const n = students.length || 1;
+      $('[data-chart]').innerHTML = weeks.length ? weeks.map((w) => {
+        const c = { p: 0, e: 0, x: 0, q: 0 };
+        for (const s of students) { const st = s.cells[w.key]?.status; if (st === 'present') c.p++; else if (st === 'excused') c.e++; else if (st === 'absent') c.x++; else c.q++; }
+        const pct = Math.round((c.p / n) * 100);
+        const tip = `${w.label} (${w.range}): ${c.p} present, ${c.e} excused, ${w.over ? `${c.x} absent` : `${c.q} not yet`} · ${w.sessions.length} session${w.sessions.length === 1 ? '' : 's'}`;
+        return `<button type="button" class="aw-wk${state.week === w.key ? ' on' : ''}" data-week="${w.key}" title="${esc(tip)}" aria-pressed="${state.week === w.key}" aria-label="${esc(tip)}">
+          <span class="pct">${pct}<small>%</small></span>
+          <span class="bar" style="height:100%">
+            <i class="p" style="height:${(c.p / n) * 100}%"></i><i class="e" style="height:${(c.e / n) * 100}%"></i>
+            <i class="${w.over ? 'x' : 'q'}" style="height:${((w.over ? c.x : c.q) / n) * 100}%"></i>
+          </span>
+          <span class="lbl">${esc(w.label)}<small>${esc(w.range)}</small>${w.over ? '' : '<span class="live">in progress</span>'}</span>
+        </button>`;
+      }).join('') : '<p class="muted small">No teaching weeks yet: they appear once a session is opened or a student checks in.</p>';
+    };
+
+    /* ---------- table */
+    const renderTable = () => {
+      const { weeks } = data.register;
+      const rows = visible();
+      const th = (key: SortKey, label: string, cls = '') =>
+        `<th scope="col" class="${cls}" aria-sort="${state.sort === key ? (state.dir === 1 ? 'ascending' : 'descending') : 'none'}"><button type="button" class="sort" data-sort="${key}">${label}</button></th>`;
+      $('[data-head]').innerHTML = `<tr>${th('name', 'Student', 'stick')}${th('group', 'Group')}${weeks.map((w) =>
+        `<th scope="col" class="wk${state.week === w.key ? ' focus' : ''}" data-col="${w.key}" title="${esc(w.sessions.map((s) => `${s.labTitle} · ${s.ta} · ${s.slot}`).join('\n'))}">${esc(w.label.replace('Week ', 'W'))}<small>${esc(w.range.split(' – ')[0])}</small></th>`).join('')}${th('attended', 'Present', 'n')}${th('absences', 'Absent', 'n')}${th('standing', 'Standing')}</tr>`;
+      $('[data-rows]').innerHTML = rows.map((s) => `<tr>
+        <td class="stick"><button type="button" class="aw-who" data-open="${esc(s.key)}"><b>${esc(s.name)}</b><span>${esc(s.id)}</span></button></td>
+        <td class="aw-grp" title="${esc(s.group)}">${esc(s.group || '—')}</td>
         ${weeks.map((w) => {
           const c = s.cells[w.key];
-          const tip = c.status === 'present' ? `Checked in ${when(c.at)}` : c.status === 'excused' ? `Excused${c.note ? `: ${c.note}` : ''}${c.by ? ` (by ${c.by})` : ''}` : c.status === 'absent' ? 'Absent' : 'Week not over yet';
-          const tag = manage ? 'button' : 'span';
-          return `<td class="wk"><${tag} ${manage ? 'type="button" ' : ''}class="c ${c.status}" title="${esc(tip)}" data-cell="${esc(s.key)}|${esc(w.key)}">${LETTER[c.status]}</${tag}></td>`;
+          const tip = c.status === 'present' ? `Present · ${when(c.at)}` : c.status === 'excused' ? `Excused${c.note ? `: ${c.note}` : ''}` : c.status === 'absent' ? 'Absent' : 'Week not over yet';
+          return `<td class="wk${state.week === w.key ? ' focus' : ''}" data-col="${w.key}"><button type="button" class="cell ${c.status}" data-open="${esc(s.key)}" data-wk="${w.key}" title="${esc(`${w.label}: ${tip}`)}" aria-label="${esc(`${s.name}, ${w.label}: ${tip}`)}">${ICON[c.status]}</button></td>`;
         }).join('')}
-        <td class="n">${s.attended}</td><td class="n">${s.absences}${s.excused ? ` <span class="muted small">(+${s.excused} exc.)</span>` : ''}</td>
-        <td><span class="lv lv${s.level}">${esc(s.status)}</span></td></tr>`).join('');
-      const empty = $('[data-empty]');
-      empty.hidden = rows.length > 0;
-      empty.textContent = !students.length ? 'No student has joined a session of this module yet.' : 'No student matches the filter.';
-      $('[data-count]').textContent = `${rows.length} of ${students.length} students`;
+        <td class="n">${s.attended}</td>
+        <td class="n">${s.absences}${s.excused ? ` <small class="muted">+${s.excused}E</small>` : ''}</td>
+        <td><span class="aw-meter" aria-hidden="true">${meter(s)}</span><span class="lv lv${s.level}">${esc(s.status)}</span>${s.level < 3 && s.absences > 0 ? `<span class="aw-next">${esc(nextStep(s))}</span>` : ''}</td>
+      </tr>`).join('');
+      $('[data-empty]').hidden = rows.length > 0;
+      $('[data-table]').hidden = rows.length === 0;
+      $('[data-empty-text]').textContent = data.register.students.length ? 'No student matches these filters.' : 'No student has joined a session of this module yet.';
+      $('[data-count]').textContent = `Showing ${rows.length} of ${data.register.students.length} students`;
+
+      // filter chips + segmented control
+      const chips: string[] = [];
+      if (state.week) { const w = weekOf(state.week); if (w) chips.push(`<span class="aw-chip">Absent in ${esc(w.label)} · ${esc(w.range)}<button type="button" data-unset="week" aria-label="Remove filter">×</button></span>`); }
+      if (state.q) chips.push(`<span class="aw-chip">“${esc(state.q)}”<button type="button" data-unset="q" aria-label="Clear search">×</button></span>`);
+      $('[data-chips]').innerHTML = chips.join('');
+      root.querySelectorAll<HTMLButtonElement>('[data-seg] button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.show === state.show)));
     };
 
+    const render = () => { renderOverview(); renderTable(); saveUrl(); };
+    const updated = () => ($('[data-updated]').textContent = `Updated ${ago(data.updatedAt)}`);
+
+    /* ---------- data */
     const reload = async () => {
       const res = await fetch(`/api/admin/attendance?module=${encodeURIComponent(module)}`, { cache: 'no-store' });
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? 'The register could not be loaded.');
       data = await res.json();
-      tiles();
       render();
+      updated();
     };
-
     const post = async (url: string, body: unknown) => {
       const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const out = await res.json().catch(() => null);
@@ -245,73 +523,149 @@ const exportHref = `/api/admin/attendance/export?module=${encodeURIComponent(mod
       return out;
     };
 
-    const open = (studentKey: string, weekKey: string) => {
-      const s = data.register.students.find((x) => x.key === studentKey);
-      const w = data.register.weeks.find((x) => x.key === weekKey);
-      if (!s || !w) return;
-      const c = s.cells[weekKey];
-      $('[data-dlg-title]').textContent = `${s.name} · ${w.label}`;
-      $('[data-dlg-sub]').textContent = `${s.id}${s.group ? ` · ${s.group}` : ''} · ${w.range}`;
-      msg.textContent = '';
-      msg.classList.remove('err');
-      const sessionOptions = w.sessions.map((x) => `<option value="${esc(x.id)}|${esc(x.lab)}">${esc(`${x.labTitle} — ${x.ta}, ${x.slot} (${when(x.opensAt)})`)}</option>`).join('');
-      const markPresent = `<fieldset><legend>Mark present</legend>
-          <label><span>Session</span><select class="input" data-pick-session>${sessionOptions}</select></label>
-          <button class="btn btn-primary btn-sm" type="button" data-do="present">Mark present in this session</button></fieldset>`;
-      let html = '';
-      if (c.status === 'present') {
-        const x = w.sessions.find((y) => y.id === c.sessionId);
-        html = `<p>Checked in ${esc(when(c.at))}${x ? ` to <b>${esc(x.labTitle)}</b> (${esc(x.ta)}, ${esc(x.slot)})` : ''}.</p>
-          <p class="muted small">Check-ins are kept as they were recorded. To remove one, use the session’s attendance list.</p>`;
-      } else if (c.status === 'excused') {
-        html = `<p>Excused${c.note ? `: “${esc(c.note)}”` : ''}${c.by ? ` — by ${esc(c.by)}` : ''}.</p>
-          <button class="btn btn-ghost btn-sm" type="button" data-do="unexcuse">Remove excuse (counts as absent again)</button>${markPresent}`;
-      } else {
-        html = `${c.status === 'pending' ? '<p class="muted small">This week is not over yet; the student may still attend another session.</p>' : ''}
-          <fieldset><legend>Excuse this absence</legend>
-            <label><span>Reason (optional)</span><input class="input" maxlength="200" placeholder="e.g. medical certificate" data-note /></label>
-            <button class="btn btn-ghost btn-sm" type="button" data-do="excuse">Excuse — it will not count</button></fieldset>${markPresent}`;
-      }
-      const box = $('[data-dlg-content]');
-      box.innerHTML = html;
-      box.querySelectorAll<HTMLButtonElement>('[data-do]').forEach((b) => b.addEventListener('click', async () => {
-        const action = b.dataset.do!;
-        box.querySelectorAll<HTMLButtonElement>('button').forEach((x) => (x.disabled = true));
-        msg.classList.remove('err');
-        msg.textContent = 'Saving…';
-        try {
-          if (action === 'present') {
-            const [sessionId, lab] = box.querySelector<HTMLSelectElement>('[data-pick-session]')!.value.split('|');
-            await post('/api/admin/progress/session', { action: 'add-attendance', lab, sessionId, name: s.name, studentId: s.id });
-          } else {
-            await post('/api/admin/attendance', { module, action, week: weekKey, studentKey, note: box.querySelector<HTMLInputElement>('[data-note]')?.value ?? '' });
-          }
-          await reload();
-          dlg.close();
-        } catch (e) {
-          msg.classList.add('err');
-          msg.textContent = (e as Error).message;
-          box.querySelectorAll<HTMLButtonElement>('button').forEach((x) => (x.disabled = false));
+    /* ---------- student panel */
+    let openKey = '';
+    const openStudent = (key: string, focusWeek = '') => {
+      const s = data.register.students.find((x) => x.key === key);
+      if (!s) return;
+      openKey = key;
+      const { weeks } = data.register;
+      const counted = weeks.filter((w) => w.over).length;
+      const steps = Array.from({ length: maxSteps }, (_, i) => `<i class="${i < s.absences ? `f${Math.max(1, s.level)}` : ''}"></i>`).join('');
+      const rowFor = (w: Week) => {
+        const c = s.cells[w.key];
+        const sess = c.sessionId ? w.sessions.find((x) => x.id === c.sessionId) : undefined;
+        const det = c.status === 'present' ? `${esc(when(c.at))}${sess ? ` · ${esc(sess.labTitle)} · ${esc(sess.ta)}, ${esc(sess.slot)}` : ''}`
+          : c.status === 'excused' ? `Excused${c.note ? `: “${esc(c.note)}”` : ''}${c.by ? ` — ${esc(c.by)}` : ''}`
+          : c.status === 'absent' ? `No check-in or session join this week${w.sessions.length ? '' : ' (no session was opened)'}.`
+          : 'The week is not over: the student may still attend another slot.';
+        let acts = '';
+        if (manage && c.status !== 'present') {
+          const options = w.sessions.map((x) => `<option value="${esc(x.id)}|${esc(x.lab)}">${esc(`${x.ta} · ${x.slot} (${when(x.opensAt)})`)}</option>`).join('');
+          acts = `<div class="aw-acts">
+            ${c.status === 'excused'
+              ? `<div class="aw-act-row"><button class="btn btn-ghost btn-sm" type="button" data-act="unexcuse" data-wk="${w.key}">Remove excuse</button></div>`
+              : `<div class="aw-act-row"><input class="input" maxlength="200" placeholder="Reason (optional), e.g. medical note" data-note="${w.key}" aria-label="Reason for excusing ${esc(w.label)}" /><button class="btn btn-ghost btn-sm" type="button" data-act="excuse" data-wk="${w.key}">Excuse</button></div>`}
+            ${options ? `<div class="aw-act-row"><select class="input" data-pick="${w.key}" aria-label="Session in ${esc(w.label)}">${options}</select><button class="btn btn-primary btn-sm" type="button" data-act="present" data-wk="${w.key}">Mark present</button></div>` : ''}
+          </div>`;
         }
-      }));
-      dlg.showModal();
+        return `<div class="aw-wkrow${focusWeek === w.key ? ' focus' : ''}" data-wkrow="${w.key}">
+          <div class="aw-wkrow-top"><span class="cell ${c.status}" aria-hidden="true">${ICON[c.status]}</span>
+            <div><b>${esc(w.label)}</b><small>${esc(w.range)}</small></div><span class="st">${STATUS_LABEL[c.status]}</span></div>
+          <p class="det">${det}</p>${acts}</div>`;
+      };
+      $('[data-dr]').innerHTML = `
+        <header class="aw-dr-head">
+          <div class="aw-dr-top"><div><h2 id="aw-dr-name">${esc(s.name)}</h2><p class="id">${esc(s.id)}${s.group ? ` · ${esc(s.group)}` : ''}</p></div>
+            <button type="button" class="aw-x" data-close aria-label="Close">×</button></div>
+          <span class="lv lv${s.level}" style="justify-self:start">${esc(s.status)}</span>
+          <dl class="aw-dr-stats"><div><dt>Present</dt><dd>${s.attended}</dd></div><div><dt>Absent</dt><dd>${s.absences}</dd></div><div><dt>Excused</dt><dd>${s.excused}</dd></div></dl>
+          <div class="aw-track"><div class="aw-track-bar" style="--steps:${maxSteps}">${steps}</div>
+            <p>${s.level === 3 ? `Barred: ${s.absences} absences in ${counted} counted week${counted === 1 ? '' : 's'}.` : s.absences ? `${esc(nextStep(s))}.` : 'No absences so far.'}</p></div>
+        </header>
+        <div class="aw-dr-body"><h3>Weeks</h3>${weeks.length ? [...weeks].reverse().map(rowFor).join('') : '<p class="muted small">No teaching weeks yet.</p>'}</div>`;
+      if (!drawer.open) drawer.showModal();
+      if (focusWeek) requestAnimationFrame(() => drawer.querySelector(`[data-wkrow="${focusWeek}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     };
 
-    search.addEventListener('input', render);
-    show.addEventListener('change', render);
-    $('[data-rows]').addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLElement>('button[data-cell]');
-      if (!btn || !manage) return;
-      const [studentKey, weekKey] = btn.dataset.cell!.split('|');
-      open(studentKey, weekKey);
+    drawer.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      if (t === drawer || t.closest('[data-close]')) return drawer.close();
+      const btn = t.closest<HTMLButtonElement>('[data-act]');
+      if (!btn) return;
+      const s = data.register.students.find((x) => x.key === openKey);
+      if (!s) return;
+      const week = btn.dataset.wk!;
+      const action = btn.dataset.act!;
+      drawer.querySelectorAll<HTMLButtonElement>('[data-act]').forEach((b) => (b.disabled = true));
+      try {
+        if (action === 'present') {
+          const [sessionId, lab] = drawer.querySelector<HTMLSelectElement>(`[data-pick="${week}"]`)!.value.split('|');
+          await post('/api/admin/progress/session', { action: 'add-attendance', lab, sessionId, name: s.name, studentId: s.id });
+        } else {
+          await post('/api/admin/attendance', { module, action, week, studentKey: s.key, note: drawer.querySelector<HTMLInputElement>(`[data-note="${week}"]`)?.value ?? '' });
+        }
+        await reload();
+        openStudent(s.key, week);
+        const w = weekOf(week)?.label ?? 'that week';
+        toast(action === 'present' ? `${s.name} marked present in ${w}` : action === 'excuse' ? `Absence in ${w} excused` : `Excuse removed for ${w}`);
+      } catch (err) {
+        toast((err as Error).message, true);
+        drawer.querySelectorAll<HTMLButtonElement>('[data-act]').forEach((b) => (b.disabled = false));
+      }
     });
-    $<HTMLButtonElement>('[data-refresh]').addEventListener('click', async (e) => {
-      const b = e.currentTarget as HTMLButtonElement;
-      b.disabled = true;
-      try { await reload(); } catch (err) { console.error(err); } finally { b.disabled = false; }
+    drawer.addEventListener('close', () => { openKey = ''; });
+
+    /* ---------- events */
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      if (drawer.contains(t)) return;
+      const open = t.closest<HTMLElement>('[data-open]');
+      if (open) return openStudent(open.dataset.open!, open.dataset.wk ?? '');
+      const level = t.closest<HTMLElement>('[data-level]');
+      if (level) { state.show = state.show === level.dataset.level ? 'all' : level.dataset.level!; return render(); }
+      const tileEl = t.closest<HTMLElement>('[data-tile]');
+      if (tileEl) { state.show = state.show === tileEl.dataset.tile ? 'all' : tileEl.dataset.tile!; return render(); }
+      const seg = t.closest<HTMLElement>('[data-seg] button');
+      if (seg) { state.show = seg.dataset.show!; return render(); }
+      const wk = t.closest<HTMLElement>('[data-week]');
+      if (wk) {
+        state.week = state.week === wk.dataset.week ? '' : wk.dataset.week!;
+        render();
+        if (state.week) root.querySelector(`th[data-col="${state.week}"]`)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+        return;
+      }
+      const sort = t.closest<HTMLElement>('[data-sort]');
+      if (sort) {
+        const key = sort.dataset.sort as SortKey;
+        state.dir = state.sort === key ? -state.dir : key === 'name' || key === 'group' ? 1 : -1;
+        state.sort = key;
+        renderTable(); saveUrl();
+        return;
+      }
+      const unset = t.closest<HTMLElement>('[data-unset]');
+      if (unset) { if (unset.dataset.unset === 'q') search.value = state.q = ''; else state.week = ''; return render(); }
+      if (t.closest('[data-clear]')) { search.value = state.q = ''; state.week = ''; state.show = 'all'; return render(); }
+      if (t.closest('[data-copy]')) {
+        const ids = visible().map((s) => s.id);
+        try { await navigator.clipboard.writeText(ids.join('\n')); toast(`Copied ${ids.length} student ID${ids.length === 1 ? '' : 's'}`); }
+        catch { toast('Copying is blocked in this browser.', true); }
+        return;
+      }
+      const refresh = t.closest<HTMLButtonElement>('[data-refresh]');
+      if (refresh) {
+        refresh.disabled = true; refresh.classList.add('spin');
+        try { await reload(); toast('Register refreshed'); } catch (err) { toast((err as Error).message, true); }
+        finally { refresh.disabled = false; refresh.classList.remove('spin'); }
+      }
     });
-    tiles();
+
+    let typing = 0;
+    search.addEventListener('input', () => { clearTimeout(typing); typing = window.setTimeout(() => { state.q = search.value; renderTable(); saveUrl(); }, 120); });
+    search.addEventListener('keydown', (e) => { if (e.key === 'Escape' && search.value) { e.preventDefault(); search.value = state.q = ''; renderTable(); saveUrl(); } });
+    const onKey = (e: KeyboardEvent) => {
+      if (!root.isConnected) return document.removeEventListener('keydown', onKey);
+      const el = document.activeElement as HTMLElement | null;
+      if (e.key === '/' && !drawer.open && !(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))) { e.preventDefault(); search.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+
+    // crosshair: highlight the week column under the pointer
+    const table = $('[data-table]');
+    let hot = '';
+    const cool = () => { table.querySelectorAll('.hot').forEach((x) => x.classList.remove('hot')); hot = ''; };
+    table.addEventListener('pointerover', (e) => {
+      const col = (e.target as HTMLElement).closest<HTMLElement>('[data-col]')?.dataset.col ?? '';
+      if (col === hot) return;
+      cool();
+      hot = col;
+      if (col) table.querySelectorAll(`[data-col="${col}"]`).forEach((x) => x.classList.add('hot'));
+    });
+    table.addEventListener('pointerleave', cool);
+
     render();
+    updated();
+    const tick = window.setInterval(() => (root.isConnected ? updated() : clearInterval(tick)), 60_000); // relabels only; no requests
   }
 
   onPageLoad(init);
