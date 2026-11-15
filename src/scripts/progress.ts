@@ -369,7 +369,7 @@ function wireCheckin() {
     const timer = window.setInterval(() => {
       if (!card.isConnected) return clearInterval(timer);
       if (document.visibilityState === 'visible' && card.dataset.state !== 'done') refresh();
-    }, 30_000);
+    }, 60_000); // was 30 s
   });
 }
 
@@ -440,7 +440,7 @@ function initReadingTracker() {
     send('/api/progress/views', { lab, seen: p.seen, activeSec });
     write(viewsKey(lab), { seen: [], sec: p.sec - activeSec, sent: [...p.sent, ...p.seen] });
   };
-  const every = window.setInterval(() => flush(), 30_000);
+  const every = window.setInterval(() => flush(), 120_000); // was 30 s; leaving or hiding the tab still sends at once
   const onHide = () => document.visibilityState === 'hidden' && flush(true);
   document.addEventListener('visibilitychange', onHide);
   reading = {

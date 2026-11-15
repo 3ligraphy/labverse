@@ -347,6 +347,6 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     });
 
     load();
-    const timer = setInterval(() => (root.isConnected ? document.visibilityState === 'visible' && load() : clearInterval(timer)), 30_000);
+    const timer = setInterval(() => (root.isConnected ? document.visibilityState === 'visible' && load() : clearInterval(timer)), 60_000);
   });
 </script>

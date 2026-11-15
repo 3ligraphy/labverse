@@ -200,7 +200,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
       out.textContent = d ? `${d}d ${h}h left` : h ? `${h}h ${m}m left` : `${m}m left`;
     };
     tick();
-    const t = setInterval(() => (out.isConnected ? tick() : clearInterval(t)), 30_000);
+    const t = setInterval(() => (out.isConnected ? tick() : clearInterval(t)), 60_000);
   }
 
   function wire() {

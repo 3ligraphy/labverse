@@ -83,7 +83,7 @@ const staffBar = adminArea ? null
         function check() {
           var s = read();
           apply(s);
-          if (asking || (s && Date.now() - s.at < (s.down ? 20000 : 120000))) return;
+          if (asking || (s && Date.now() - s.at < (s.down ? 30000 : 600000))) return;
           asking = true;
           fetch('/api/status').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
             if (!d) return;
@@ -95,7 +95,7 @@ const staffBar = adminArea ? null
         }
         check();
         document.addEventListener('astro:after-swap', check);
-        // ask again now and then (every 30 s while it is down, every 2 min otherwise), so the strip comes and goes by itself
+        // ask again now and then (every 30 s while it is down, every 10 min otherwise), so the strip comes and goes by itself
         setInterval(function () { if (document.visibilityState === 'visible') check(); }, 30000);
         // the strip's "What this means" button: opens the short list, closes on Escape or a click elsewhere
         function close(focus) {

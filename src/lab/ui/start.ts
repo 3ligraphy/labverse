@@ -424,5 +424,5 @@ export function mountStart(lab: string) {
   const timer = window.setInterval(() => {
     if (!root.isConnected) return clearInterval(timer);
     if (document.visibilityState === 'visible') void refreshSession();
-  }, 15_000);
+  }, 60_000); // was 15 s
 }

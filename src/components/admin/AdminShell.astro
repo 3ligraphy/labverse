@@ -277,7 +277,7 @@ const short: Record<string, string> = { resets: 'Passwords', home: 'Home', sessi
     void refreshBadge();
     void refreshSubmissions();
     clearInterval(badgeTimer);
-    badgeTimer = window.setInterval(() => { if (document.visibilityState === 'visible') { void refreshBadge(); void refreshSubmissions(); } }, 60_000);
+    badgeTimer = window.setInterval(() => { if (document.visibilityState === 'visible') { void refreshBadge(); void refreshSubmissions(); } }, 120_000);
     // Phones: scroll the menu row so the current page's pill is visible (without moving the page).
     const nav = document.querySelector<HTMLElement>('.ash-nav');
     const on = nav?.querySelector<HTMLElement>('.ash-link.on');

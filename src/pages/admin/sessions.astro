@@ -635,7 +635,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
     if (root) {
       void load(root);
       clearInterval(timer);
-      timer = window.setInterval(() => !document.hidden && load(root), 4000);
+      timer = window.setInterval(() => !document.hidden && load(root), 30_000); // was 4 s: kept the database awake all day
     }
   }
 

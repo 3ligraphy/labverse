@@ -79,7 +79,7 @@ export function startTracker(lab: string) {
   const seen = () => {
     if (document.visibilityState === 'visible' && activeLab && getStudent()) track({ lab: activeLab, event: 'start' });
   };
-  heartbeat = window.setInterval(seen, 45_000);
+  heartbeat = window.setInterval(seen, 300_000); // "still here" every 5 min (was 45 s); visibility changes still report at once
   document.addEventListener('visibilitychange', seen);
   window.addEventListener('lab:student', seen);
   seen();
