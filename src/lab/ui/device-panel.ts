@@ -13,6 +13,7 @@ const ICON = {
   restart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></svg>',
   wifi: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 9a14 14 0 0 1 19 0"/><path d="M5.8 12.5a9.2 9.2 0 0 1 12.4 0"/><path d="M9.2 16a4.4 4.4 0 0 1 5.6 0"/><path d="M12 19.5h.01"/></svg>',
   erase: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/></svg>',
+  tablet: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="3" width="15" height="18" rx="2.5"/><path d="M10.5 18h3"/><path d="M12 7.5v6M9 10.5h6"/></svg>',
 };
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -23,6 +24,8 @@ export type DevicePanelOptions = {
   restart: () => Promise<void> | void;
   network?: (online: boolean) => Promise<void> | void;
   erase: () => Promise<void> | void;
+  /** Realtime apps: a change from the student's other device (same user), with this task title */
+  remote?: (title: string) => Promise<void> | void;
 };
 
 export class DevicePanel {
@@ -31,6 +34,7 @@ export class DevicePanel {
   private wifi: HTMLButtonElement | null = null;
   private seen = new Map<string, string>();
   private first = true;
+  private tablet = 0;
   private opts: DevicePanelOptions;
 
   constructor(opts: DevicePanelOptions) {
@@ -58,6 +62,7 @@ export class DevicePanel {
         h('span', { class: 'dp-spacer' }),
         btn(ICON.restart, 'Restart app', 'Close the app and open it again: React state is lost, saved data stays', () => void opts.restart()),
         this.wifi,
+        opts.remote ? btn(ICON.tablet, 'Add a task from your tablet', 'Your other device (same user) adds a task: Realtime sends it to this phone', () => void opts.remote!(`From your tablet ${++this.tablet}`)) : null,
         btn(ICON.erase, 'Erase phone', 'Delete everything this phone saved (the practice cloud goes back to its first rows)', () => void opts.erase()),
       ),
       this.body,
@@ -117,3 +122,5 @@ export class DevicePanel {
 /** Code that uses phone storage gets the panel (other labs' workbenches stay as they were). */
 export const STORAGE_IMPORT = /['"](@react-native-async-storage\/async-storage|react-native-mmkv|expo-secure-store|expo-sqlite(\/[\w/]+)?|@supabase\/supabase-js|@react-native-community\/netinfo)['"]/;
 export const NETWORK_IMPORT = /['"](@supabase\/supabase-js|@react-native-community\/netinfo)['"]/;
+/** Code that opens a Realtime channel gets the "Add a task from your tablet" button. */
+export const REALTIME_USE = /\.channel\(/;

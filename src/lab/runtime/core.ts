@@ -11,7 +11,9 @@ import { createDomDriver } from './driver-dom.ts';
 import { createRouterApp } from '../../runner/router-shim.tsx';
 import { setPlatform } from './tw.ts';
 import { setSafeArea } from './safe-area.ts';
-import { onDeviceChange, resetDevice, setOnline, snapshot } from './device.ts';
+import { appStarted, onDeviceChange, resetDevice, setOnline, snapshot } from './device.ts';
+import { practiceRemote } from './supabase-practice.ts';
+import type { RemoteOp } from './protocol.ts';
 import { loadSqlite, setAssetLoader } from './sqlite.ts';
 import { needsRealSupabase } from './supabase.ts';
 import type { FromRuntime, LabErrorInfo, LogLevel, RunRequest } from './protocol.ts';
@@ -134,6 +136,7 @@ export function createRuntime(opts: { container: HTMLElement; post: Post; onFram
     errored = false;
     logs.length = 0;
     unmount();
+    appStarted(); // a new start of the app: what lived only in its memory is gone
     try {
       await prepare(request.files, opts.loadAsset);
     } catch (error) {
@@ -228,6 +231,10 @@ export function createRuntime(opts: { container: HTMLElement; post: Post; onFram
         return snapshot().online;
       case 'reset-device':
         resetDevice();
+        return null;
+      // Lab 06 Realtime: a write from the student's other device (the same user, signed in on a tablet)
+      case 'remote':
+        practiceRemote(args[0] as RemoteOp);
         return null;
       default:
         throw new Error(`Unknown preview method: ${method}`);

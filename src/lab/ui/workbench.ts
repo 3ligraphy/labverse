@@ -9,7 +9,7 @@ import { LabPreview } from '../engine/preview.ts';
 import type { CodeExercise, Demo } from '../exercises/types.ts';
 import type { LabErrorInfo, LogLevel } from '../runtime/protocol.ts';
 import { createEditor, type LabEditor } from './editor.ts';
-import { DevicePanel, NETWORK_IMPORT, STORAGE_IMPORT } from './device-panel.ts';
+import { DevicePanel, NETWORK_IMPORT, REALTIME_USE, STORAGE_IMPORT } from './device-panel.ts';
 import { debounce, h, md } from './dom.ts';
 import { ExerciseShell } from './shell.ts';
 import { loadExercise, saveExercise } from './store.ts';
@@ -86,6 +86,7 @@ export class Workbench {
       this.device = new DevicePanel({
         restart: () => this.preview.rerun(),
         network: NETWORK_IMPORT.test(starterCode) ? (online) => this.preview.network(online) : undefined,
+        remote: REALTIME_USE.test(starterCode) ? (title) => this.preview.remote({ kind: 'insert', table: 'tasks', title }) : undefined,
         erase: async () => {
           await this.preview.resetDevice();
           await this.refresh();

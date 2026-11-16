@@ -2,7 +2,8 @@
  * A practice Supabase project inside the lab preview, at https://practice.supabase.co. Same supabase-js API as a real
  * project (v2): from(table).select/insert/update/upsert/delete with filters and modifiers, auth (signUp,
  * signInWithPassword, getSession, getUser, signOut, onAuthStateChange), and storage (upload, getPublicUrl,
- * createSignedUrl, download, list, remove). Same rules too: Row Level Security on every table and bucket, Postgres
+ * createSignedUrl, download, list, remove), and Realtime (channel().on('postgres_changes', …).subscribe(), removeChannel).
+ * Same rules too: Row Level Security on every table and bucket, Postgres
  * error codes, and requests fail when the preview's Wi-Fi is off. Students practise here without an account; their
  * own project (any other URL) uses the real supabase-js.
  *
@@ -12,7 +13,8 @@
  *   notes (RLS on, no policy yet: shows what RLS does before you write one)
  * with "owner only" policies, and the buckets avatars (public) and documents (private), one folder per user.
  */
-import { changed, isOnline, registerStore, type DeviceFile, type DeviceTable } from './device.ts';
+import { changed, isOnline, onAppStart, onNetworkChange, registerStore, type DeviceFile, type DeviceTable } from './device.ts';
+import type { RemoteOp } from './protocol.ts';
 import { randomUUID } from './storage.ts';
 
 export const PRACTICE_URL = 'https://practice.supabase.co';
@@ -88,9 +90,12 @@ const requests: string[] = [];
 
 /** The panel shows the practice cloud only once this phone's app has made a Supabase client (not in the AsyncStorage or SQLite parts). */
 let used = false;
+/** Open Realtime channels of this phone's app (they live in the app's memory). */
+const channels = new Set<PracticeChannel>();
 
 function seed() {
   used = false;
+  closeAllChannels();
   db.clear();
   users.clear();
   buckets.clear();
@@ -133,7 +138,7 @@ registerStore({
     for (const [bucket, map] of buckets) for (const [path, f] of map) files.push({ path: `${bucket}/${path}`, size: f.bytes.byteLength, type: f.contentType, public: BUCKETS[bucket].public });
     const who = currentUser ? users.get(currentUser)?.email : null;
     return [
-      { id: 'supabase-db', title: 'Supabase · Database (practice project)', where: 'Postgres in the cloud, shared by every user. Row Level Security decides which rows each user may see.', place: 'cloud' as const, tables, lines: [`Signed in on this phone: ${who ?? 'nobody (anon)'}`, ...requests.map((r) => `↕ ${r}`)] },
+      { id: 'supabase-db', title: 'Supabase · Database (practice project)', where: 'Postgres in the cloud, shared by every user. Row Level Security decides which rows each user may see.', place: 'cloud' as const, tables, lines: [`Signed in on this phone: ${who ?? 'nobody (anon)'}`, ...realtimeLines(), ...requests.map((r) => `↕ ${r}`)] },
       ...(files.length ? [{ id: 'supabase-storage', title: 'Supabase · Storage (practice project)', where: 'Files in buckets in the cloud. avatars is public (anyone with the URL), documents is private (signed URLs).', place: 'cloud' as const, files }] : []),
     ];
   },
@@ -410,6 +415,7 @@ class QueryBuilder implements PromiseLike<Result> {
       if (!(key in def.columns)) return failed(400, pgError('42P10', 'there is no unique or exclusion constraint matching the ON CONFLICT specification'));
       const staged = rows.map((r) => ({ ...r }));
       const touched: Row[] = [];
+      const events: [ChangeEvent, Row, Row][] = [];
       for (const input of list as Row[]) {
         const existing = this.action === 'upsert' && input[key] !== undefined ? staged.find((r) => String(r[key]) === String(input[key])) : undefined;
         if (existing) {
@@ -423,8 +429,10 @@ class QueryBuilder implements PromiseLike<Result> {
             next[k] = c.value;
           }
           if (!rls('update', next)) return denied();
+          const before = { ...existing };
           Object.assign(existing, next);
           touched.push(existing);
+          events.push(['UPDATE', existing, before]);
           continue;
         }
         const built = buildRow(this.table, input, uid);
@@ -437,8 +445,10 @@ class QueryBuilder implements PromiseLike<Result> {
         }
         staged.push(row);
         touched.push(row);
+        events.push(['INSERT', row, row]);
       }
       db.set(this.table, staged);
+      for (const [event, row, before] of events) emitChange(this.table, event, row, before);
       return this.returning ? this.shape(touched, 201) : result(201, null, this.countMode ? touched.length : null);
     }
 
@@ -463,13 +473,19 @@ class QueryBuilder implements PromiseLike<Result> {
         if (!rls('update', next)) return denied();
         updated.push(next);
       }
-      for (const n of updated) Object.assign(rows.find((r) => r[def.pk] === n[def.pk])!, n);
+      for (const n of updated) {
+        const row = rows.find((r) => r[def.pk] === n[def.pk])!;
+        const before = { ...row };
+        Object.assign(row, n);
+        emitChange(this.table, 'UPDATE', row, before);
+      }
       return this.returning ? this.shape(updated, 200) : result(204, null, this.countMode ? updated.length : null);
     }
 
     // delete
     const gone = rows.filter((r) => rls('select', r) && rls('delete', r) && this.matches(r));
     db.set(this.table, rows.filter((r) => !gone.includes(r)));
+    for (const g of gone) emitChange(this.table, 'DELETE', g, g);
     return this.returning ? this.shape(gone, 200) : result(204, null, this.countMode ? gone.length : null);
   }
 }
@@ -769,6 +785,157 @@ export function resolvePracticeUri(uri: string): string {
   return url;
 }
 
+
+/* --------------------------------------------------------------- realtime */
+
+/** Tables in the `supabase_realtime` publication (Database → Publications, or "Enable Realtime" on the table). */
+const REALTIME_TABLES = new Set(['tasks']);
+type ChangeEvent = 'INSERT' | 'UPDATE' | 'DELETE';
+type ChangeFilter = { event: ChangeEvent | '*'; schema?: string; table?: string; filter?: string };
+export type ChangePayload = { schema: string; table: string; commit_timestamp: string; eventType: ChangeEvent; new: Row; old: Row; errors: null };
+type Status = 'SUBSCRIBED' | 'CHANNEL_ERROR' | 'CLOSED';
+
+/** `column=eq.value` (also neq, lt, lte, gt, gte, in.(a,b)): the filters postgres_changes accepts. */
+function passesFilter(filter: string, row: Row): boolean {
+  const m = /^(\w+)=(eq|neq|lt|lte|gt|gte|in)\.(.*)$/.exec(filter.trim());
+  if (!m) return false;
+  const [, col, op, raw] = m;
+  const v = row[col];
+  if (op === 'in') return raw.replace(/^\(|\)$/g, '').split(',').map((x) => x.trim()).includes(String(v));
+  const c = cmp(String(v ?? ''), raw);
+  return op === 'eq' ? String(v) === raw : op === 'neq' ? String(v) !== raw : op === 'lt' ? c < 0 : op === 'lte' ? c <= 0 : op === 'gt' ? c > 0 : c >= 0;
+}
+
+class PracticeChannel {
+  topic: string;
+  owner: object;
+  state: 'joining' | 'joined' | 'errored' | 'closed' = 'closed';
+  private listeners: { filter: ChangeFilter; cb: (p: ChangePayload) => void }[] = [];
+  private onStatus: ((status: Status, error?: Error) => void) | null = null;
+  private uid: () => string | null;
+  constructor(name: string, uid: () => string | null, owner: object) {
+    this.topic = `realtime:${name}`;
+    this.uid = uid;
+    this.owner = owner;
+  }
+  on(type: string, filter: ChangeFilter, cb: (p: ChangePayload) => void) {
+    if (type !== 'postgres_changes') throw new Error(`The practice project supports channel.on('postgres_changes', …) only (not '${type}').`);
+    if (!filter || typeof cb !== 'function') throw new Error("channel.on('postgres_changes', { event, schema, table }, callback) needs a filter object and a callback.");
+    this.listeners.push({ filter, cb });
+    return this;
+  }
+  subscribe(onStatus?: (status: Status, error?: Error) => void) {
+    this.onStatus = typeof onStatus === 'function' ? onStatus : null;
+    channels.add(this);
+    this.join();
+    return this;
+  }
+  join() {
+    this.state = 'joining';
+    changed();
+    setTimeout(() => {
+      if (!channels.has(this)) return;
+      if (!isOnline()) {
+        this.state = 'errored';
+        this.onStatus?.('CHANNEL_ERROR', new TypeError('Network request failed'));
+        return;
+      }
+      this.state = 'joined';
+      logRequest(`WS  ${this.topic}  SUBSCRIBED`);
+      this.onStatus?.('SUBSCRIBED');
+    }, 60);
+  }
+  async unsubscribe(): Promise<'ok'> {
+    this.close();
+    return 'ok';
+  }
+  close() {
+    if (!channels.delete(this)) return;
+    this.state = 'closed';
+    this.onStatus?.('CLOSED');
+    changed();
+  }
+  deliver(table: string, event: ChangeEvent, row: Row, before: Row) {
+    if (this.state !== 'joined') return;
+    const def = SCHEMA[table];
+    const subject = event === 'DELETE' ? before : row;
+    // Row Level Security applies to Realtime too: only rows this user may select are sent
+    if (!(def.policies.select?.(subject, this.uid()) ?? false)) return;
+    for (const { filter, cb } of this.listeners) {
+      if (filter.event !== '*' && filter.event !== event) continue;
+      if (filter.schema && filter.schema !== '*' && filter.schema !== 'public') continue;
+      if (filter.table && filter.table !== '*' && filter.table !== table) continue;
+      if (filter.filter && !passesFilter(filter.filter, subject)) continue;
+      // like a real project with RLS: `old` holds only the primary key
+      const payload: ChangePayload = { schema: 'public', table, commit_timestamp: now(), eventType: event, new: event === 'DELETE' ? {} : { ...row }, old: event === 'INSERT' ? {} : { [def.pk]: before[def.pk] }, errors: null };
+      try {
+        cb(payload);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }
+}
+
+/** A row changed in the database: Realtime sends it to every open channel that listens, a moment later. */
+function emitChange(table: string, event: ChangeEvent, row: Row, before: Row) {
+  if (!REALTIME_TABLES.has(table) || !channels.size) return;
+  const after = { ...row }, old = { ...before };
+  setTimeout(() => {
+    if (!isOnline()) return; // this phone is offline: the event is lost, and Realtime never sends it again
+    for (const c of [...channels]) c.deliver(table, event, after, old);
+  }, 70 + Math.round(Math.random() * 60));
+}
+
+function closeAllChannels() {
+  if (!channels.size) return;
+  for (const c of channels) c.state = 'closed';
+  channels.clear();
+  changed();
+}
+
+function realtimeLines(): string[] {
+  const n = channels.size;
+  if (!n) return [];
+  const live = [...channels].filter((c) => c.state === 'joined').length;
+  return [`Realtime: ${n} channel${n === 1 ? '' : 's'} open${live < n ? ` (${n - live} waiting for the network)` : ''}${n > 1 ? ' — more than one? Remove the old one in the useEffect cleanup.' : ''}`];
+}
+
+// the app started again: its channels are gone (they lived in its memory)
+onAppStart(closeAllChannels);
+// Wi-Fi off: the socket drops (CHANNEL_ERROR); Wi-Fi on: channels join again. Nothing missed is sent again.
+onNetworkChange((online) => {
+  for (const c of channels) {
+    if (!online && c.state !== 'closed') {
+      c.state = 'errored';
+      changed();
+    } else if (online && c.state === 'errored') c.join();
+  }
+});
+
+/** For the panel's "Add a task from your tablet" and the checks: the same user writes from another device. */
+export function practiceRemote(op: RemoteOp, as: string = currentUser ?? MONA.id) {
+  const rows = db.get(op.table) ?? [];
+  if (op.kind === 'insert') {
+    const built = buildRow(op.table, { title: op.title }, as);
+    if (!built.row) return;
+    rows.push(built.row);
+    db.set(op.table, rows);
+    logRequest(`(your tablet)  POST /rest/v1/${op.table}  201`);
+    emitChange(op.table, 'INSERT', built.row, built.row);
+  } else {
+    const row = rows.find((r) => r.id === op.id && r.user_id === as);
+    if (!row) return;
+    db.set(op.table, rows.filter((r) => r !== row));
+    logRequest(`(your tablet)  DELETE /rest/v1/${op.table}  204`);
+    emitChange(op.table, 'DELETE', row, row);
+  }
+  changed();
+}
+
+/** Channels open on this phone (for the checks). */
+export const activeChannels = () => channels.size;
+
 /* ----------------------------------------------------------------- client */
 
 export function createPracticeClient(url: string, key: string, options: { auth?: AuthOptions } = {}) {
@@ -777,6 +944,7 @@ export function createPracticeClient(url: string, key: string, options: { auth?:
     throw new Error('Never put a secret (service_role) key in an app: anyone can read the app’s code. Use the publishable key (sb_publishable_…) and protect your data with Row Level Security.');
   }
   used = true;
+  const owner = {}; // this client: getChannels / removeAllChannels only see its own channels
   const { auth, uid } = createAuth(options.auth, (id) => {
     currentUser = id;
     changed();
@@ -793,10 +961,17 @@ export function createPracticeClient(url: string, key: string, options: { auth?:
       },
     },
     rpc: async (fn: string) => failed(404, pgError('PGRST202', `Could not find the function public.${fn} without parameters in the schema cache`)),
-    channel: () => {
-      throw new Error('Realtime is not part of this lab.');
+    channel: (name: string) => new PracticeChannel(String(name ?? 'realtime'), uid, owner),
+    getChannels: () => [...channels].filter((c) => c.owner === owner),
+    async removeChannel(channel: PracticeChannel): Promise<'ok'> {
+      channel?.close?.();
+      return 'ok';
     },
-    removeAllChannels: async () => [],
+    async removeAllChannels(): Promise<'ok'[]> {
+      const mine = [...channels].filter((c) => c.owner === owner);
+      for (const c of mine) c.close();
+      return mine.map(() => 'ok' as const);
+    },
   };
 }
 

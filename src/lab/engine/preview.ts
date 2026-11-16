@@ -2,7 +2,7 @@
  * The live preview on the lab page: a sandboxed iframe (no access to the site, its cookies or storage)
  * that runs the student's compiled files. Implements PreviewDriver so checks can press/type/read it.
  */
-import type { DeviceSnapshot, Found, Frame, FromRuntime, LabErrorInfo, LogLevel, PreviewDriver, Query, ToRuntime } from '../runtime/protocol.ts';
+import type { DeviceSnapshot, Found, Frame, FromRuntime, LabErrorInfo, LogLevel, PreviewDriver, Query, RemoteOp, ToRuntime } from '../runtime/protocol.ts';
 
 /** A runtime message without its `__lab` marker (Omit on each member of the union, not on the union). */
 type WithoutLab<T> = T extends unknown ? Omit<T, '__lab'> : never;
@@ -217,6 +217,10 @@ export class LabPreview implements PreviewDriver {
   /** Lab 06: erase everything the phone stored */
   async resetDevice() {
     await this.rpc('reset-device');
+  }
+  /** Lab 06 Realtime: a change from the student's other device */
+  async remote(op: RemoteOp) {
+    await this.rpc('remote', op);
   }
 
   destroy() {

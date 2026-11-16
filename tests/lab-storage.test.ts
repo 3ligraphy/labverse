@@ -277,3 +277,116 @@ test('the practice cloud shows in the panel only after the app makes a Supabase 
   device.resetDevice();
   assert.ok(!ids().includes('supabase-db'), 'Erase phone hides it again until the app makes a client');
 });
+
+/* ------------------------------------------------------------ Realtime (Lab 06 Part 5 H) */
+
+type Payload = { schema: string; table: string; eventType: string; new: Record<string, unknown>; old: Record<string, unknown>; errors: null };
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function waitFor(test: () => boolean, ms = 1500) {
+  const end = Date.now() + ms;
+  while (!test() && Date.now() < end) await pause(20);
+  return test();
+}
+async function signedInClient(who = practice.MONA) {
+  const sb = practice.createPracticeClient(practice.PRACTICE_URL, practice.PRACTICE_KEY);
+  const { error } = await sb.auth.signInWithPassword({ email: who.email, password: who.password });
+  assert.equal(error, null);
+  return sb;
+}
+function listen(sb: ReturnType<typeof practice.createPracticeClient>, event: 'INSERT' | '*' = 'INSERT') {
+  const got: Payload[] = [];
+  const statuses: string[] = [];
+  const ch = sb
+    .channel('tasks-feed')
+    .on('postgres_changes', { event, schema: 'public', table: 'tasks' }, (p: Payload) => got.push(p))
+    .subscribe((s: string) => statuses.push(s));
+  return { ch, got, statuses };
+}
+
+test('realtime: an insert from another phone reaches a subscribed app once', async () => {
+  device.resetDevice();
+  const sb = await signedInClient();
+  const { got, statuses } = listen(sb);
+  assert.ok(await waitFor(() => statuses.includes('SUBSCRIBED')), 'the channel says SUBSCRIBED');
+  practice.practiceRemote({ kind: 'insert', table: 'tasks', title: 'From the tablet' });
+  assert.ok(await waitFor(() => got.length > 0), 'the event arrives');
+  await pause(300);
+  assert.equal(got.length, 1, 'once');
+  assert.equal(got[0].eventType, 'INSERT');
+  assert.equal(got[0].schema, 'public');
+  assert.equal(got[0].table, 'tasks');
+  assert.equal(got[0].new.title, 'From the tablet');
+  assert.equal(got[0].errors, null);
+});
+
+test('realtime: other users’ rows are not delivered (RLS)', async () => {
+  device.resetDevice();
+  const sb = await signedInClient();
+  const { got, statuses } = listen(sb, '*');
+  await waitFor(() => statuses.includes('SUBSCRIBED'));
+  practice.practiceRemote({ kind: 'insert', table: 'tasks', title: 'Omar’s new task' }, practice.CLASSMATE.id);
+  await pause(500);
+  assert.equal(got.length, 0, 'Omar’s row is not sent to Mona');
+  practice.practiceRemote({ kind: 'insert', table: 'tasks', title: 'Mona on the tablet' });
+  assert.ok(await waitFor(() => got.length === 1));
+});
+
+test('realtime: removeChannel and offline stop delivery, and nothing is replayed', async () => {
+  device.resetDevice();
+  const sb = await signedInClient();
+  const first = listen(sb);
+  await waitFor(() => first.statuses.includes('SUBSCRIBED'));
+  assert.equal(await sb.removeChannel(first.ch), 'ok');
+  practice.practiceRemote({ kind: 'insert', table: 'tasks', title: 'After remove' });
+  await pause(400);
+  assert.equal(first.got.length, 0, 'a removed channel hears nothing');
+  assert.equal(practice.activeChannels(), 0);
+
+  const second = listen(sb);
+  await waitFor(() => second.statuses.includes('SUBSCRIBED'));
+  device.setOnline(false);
+  practice.practiceRemote({ kind: 'insert', table: 'tasks', title: 'While offline' });
+  await pause(400);
+  device.setOnline(true);
+  await pause(400);
+  assert.equal(second.got.length, 0, 'offline: no event, and none replayed when back online');
+  practice.practiceRemote({ kind: 'insert', table: 'tasks', title: 'Back online' });
+  assert.ok(await waitFor(() => second.got.length === 1), 'events flow again once online');
+  assert.equal(second.got[0].new.title, 'Back online');
+});
+
+test('realtime: a restart (rerun) leaves one subscription, and the panel shows it', async () => {
+  device.resetDevice();
+  const h = harness();
+  const err = await h.run({
+    'App.tsx': `import { useEffect, useState } from 'react';
+import { Text } from 'react-native';
+import { createClient } from '@supabase/supabase-js';
+const supabase = createClient('https://practice.supabase.co', 'sb_publishable_practice');
+export default function App() {
+  const [items, setItems] = useState<string[]>([]);
+  useEffect(() => {
+    supabase.auth.signInWithPassword({ email: 'student@practice.dev', password: 'practice-123' }).then(() => {
+      supabase.channel('feed').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks' }, (p) => setItems((x) => [...x, p.new.title])).subscribe();
+    });
+  }, []);
+  return <Text>{items.length ? items.join(',') : 'none'}</Text>;
+}`,
+  });
+  assert.equal(err, null);
+  assert.ok(await waitFor(() => practice.activeChannels() === 1, 3000), 'one channel after the first start');
+  await h.runtime.rpc('rerun', []);
+  await pause(50);
+  assert.ok(await waitFor(() => practice.activeChannels() === 1, 3000), 'still one channel after Restart app');
+  const line = device.snapshot().sections.find((s) => s.id === 'supabase-db')?.lines?.join('\n') ?? '';
+  assert.match(line, /Realtime: 1 channel open/);
+  practice.practiceRemote({ kind: 'insert', table: 'tasks', title: 'From the tablet' });
+  assert.equal(await h.until((t) => t.includes('From the tablet')), 'From the tablet', 'shown once, not twice');
+  h.runtime.unmount();
+});
+
+test('auth: startAutoRefresh / stopAutoRefresh (the AppState pattern) exist', async () => {
+  const sb = await signedInClient();
+  await sb.auth.startAutoRefresh();
+  await sb.auth.stopAutoRefresh();
+});

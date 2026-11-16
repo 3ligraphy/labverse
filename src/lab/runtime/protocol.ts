@@ -81,4 +81,9 @@ export interface PreviewDriver {
   network?(online: boolean): Promise<void>;
   /** Lab 06: erase what the phone stored (the practice Supabase project goes back to its first rows) */
   resetDevice?(): Promise<void>;
+  /** Lab 06: a write to the practice project from the student's other device (Realtime sends it to this phone) */
+  remote?(op: RemoteOp): Promise<void>;
 }
+
+/** A change made in the practice project by "your tablet": the same user, another device. */
+export type RemoteOp = { kind: 'insert'; table: 'tasks'; title: string } | { kind: 'delete'; table: 'tasks'; id: string };

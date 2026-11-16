@@ -67,6 +67,18 @@ export function onNetworkChange(fn: (online: boolean) => void): () => void {
   return () => netListeners.delete(fn);
 }
 
+/* ------------------------------------------------------------- app starts */
+
+/** What lived only in the app's memory (open Realtime channels…) ends when the app starts again. Saved data stays. */
+const startListeners = new Set<() => void>();
+export function appStarted() {
+  for (const fn of startListeners) fn();
+}
+export function onAppStart(fn: () => void): () => void {
+  startListeners.add(fn);
+  return () => startListeners.delete(fn);
+}
+
 /** The error a phone gets when a request cannot leave it (React Native's own message). */
 export const networkError = () => new TypeError('Network request failed');
 
