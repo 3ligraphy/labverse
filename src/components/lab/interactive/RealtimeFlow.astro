@@ -163,8 +163,8 @@ const CODE = `useEffect(() => {
   .rt-name { margin: 0 !important; font-size: 13.5px; font-weight: 700; color: var(--text); }
   .rt-what { margin: 0 !important; font-size: 13px; color: var(--text-2); }
   .rt-list { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 4px; }
-  .rt-list li { margin: 0 !important; padding: 5px 8px; border-radius: 7px; background: var(--surface); font-size: 13px; color: var(--text); }
-  .rt-list li.fresh { animation: rt-in 0.9s var(--ease-out); }
+  .rt-list :global(li) { margin: 0 !important; padding: 5px 8px; border-radius: 7px; background: var(--surface); font-size: 13px; color: var(--text); }
+  .rt-list :global(li.fresh) { animation: rt-in 0.9s var(--ease-out); }
   @keyframes rt-in { from { background: color-mix(in oklab, var(--accent) 35%, var(--surface)); transform: translateY(-3px); } }
   .rt-link { justify-self: center; width: 2px; height: 18px; background: var(--line-2); border-radius: 2px; transition: background-color 0.25s var(--ease-out); }
   @media (min-width: 900px) { .rt-link { width: 100%; height: 2px; } }
@@ -182,5 +182,5 @@ const CODE = `useEffect(() => {
   .rt-note[data-tone='warn'] { background: color-mix(in oklab, var(--warn) 14%, transparent); }
   .rt-note[data-tone='bad'] { background: color-mix(in oklab, var(--danger) 14%, transparent); }
   .rt :global(code) { font-size: .9em; }
-  @media (prefers-reduced-motion: reduce) { .rt-node, .rt-link, .rt-code { transition: none; } .rt-list li.fresh { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .rt-node, .rt-link, .rt-code { transition: none; } .rt-list :global(li.fresh) { animation: none; } }
 </style>

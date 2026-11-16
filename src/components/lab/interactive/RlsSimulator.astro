@@ -154,11 +154,11 @@ const OWNER = [
   .rls-tablewrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--line-2); }
   .rls .rls-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13.5px; }
   .rls .rls-table th { text-align: left; padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--text-2); background: var(--bg-2); border-bottom: 1px solid var(--line-2); text-transform: none; letter-spacing: 0; font-family: var(--font-body); }
-  .rls .rls-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); color: var(--text); vertical-align: top; }
-  .rls .rls-table tr:last-child td { border-bottom: 0; }
-  .rls-table tr.is-pass td:last-child { color: var(--ok); font-weight: 600; }
-  .rls-table tr.is-block td { color: var(--text-2); }
-  .rls-why { font-size: 12.5px; }
+  .rls .rls-table :global(td) { padding: 8px 10px; border-bottom: 1px solid var(--line); color: var(--text); vertical-align: top; }
+  .rls .rls-table :global(tr:last-child td) { border-bottom: 0; }
+  .rls-table :global(tr.is-pass td:last-child) { color: var(--ok); font-weight: 600; }
+  .rls-table :global(tr.is-block td) { color: var(--text-2); }
+  .rls-table :global(.rls-why) { font-size: 12.5px; }
   .rls-result { margin: 0 !important; padding: 10px 12px; border-radius: 10px; font-size: 14.5px; line-height: 1.6; color: var(--text); }
   .rls-result[data-tone='good'] { background: color-mix(in oklab, var(--ok) 12%, transparent); }
   .rls-result[data-tone='warn'] { background: color-mix(in oklab, var(--warn) 14%, transparent); }

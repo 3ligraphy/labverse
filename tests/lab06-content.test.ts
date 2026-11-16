@@ -2,7 +2,7 @@
 // every component it uses is available to lab pages, and the final project opens in the Code Editor.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 
 const mdx = readFileSync(new URL('../src/content/labs/lab-06.mdx', import.meta.url), 'utf8');
 const page = readFileSync(new URL('../src/pages/mobile-development/labs/[id].astro', import.meta.url), 'utf8');
@@ -10,14 +10,33 @@ const { parseLabOutline, minutes, formatMinutes } = await import('../src/lib/lab
 const { EXERCISE_IDS } = await import('../src/lab/exercises/lab-06/meta.ts');
 const { demos } = await import('../src/lab/exercises/lab-06/demos.ts');
 
-test('the seven parts take 13 + 30 + 27 + 20 + 40 + 20 + 0 = 150 minutes', () => {
+test('the seven parts take 14 + 30 + 27 + 20 + 68 + 21 + 0 = 180 minutes (3 hours at most)', () => {
   const parts = parseLabOutline(mdx);
   assert.deepEqual(parts.map((p) => p.n), ['1', '2', '3', '4', '5', '6', '7']);
-  assert.deepEqual(parts.map((p) => minutes(p.time)), [13, 30, 27, 20, 40, 20, 0]);
+  assert.deepEqual(parts.map((p) => minutes(p.time)), [14, 30, 27, 20, 68, 21, 0]);
   const total = parts.reduce((a, p) => a + minutes(p.time), 0);
-  assert.equal(total, 150);
-  assert.equal(formatMinutes(total), '2 h 30 min');
-  assert.match(mdx, /estimatedTime: '2 h 30 min'/);
+  assert.equal(total, 180);
+  assert.equal(formatMinutes(total), '3 h');
+  assert.match(mdx, /estimatedTime: '3 h'/);
+});
+
+test('every part has a real screenshot; each one exists, is small and has alt text', () => {
+  const parts = mdx.split(/<Part n="/).slice(1, 7); // Parts 1–6
+  parts.forEach((p, i) => assert.match(p, /<Shot[\s\S]*?\/>/, `Part ${i + 1} has a real screenshot`));
+  const shots = [...mdx.matchAll(/<Shot([\s\S]*?)\/>/g)].map((m) => m[1]);
+  assert.ok(shots.length >= 12, `${shots.length} screenshots`);
+  const srcs = shots.flatMap((s) => [...s.matchAll(/src[:=]\s*["']([^"']+)["']/g)].map((m) => m[1]));
+  let total = 0;
+  for (const src of srcs) {
+    assert.match(src, /^\/labs\/lab-06\/[\w-]+\.webp$/, `${src} is a webp in /labs/lab-06/`);
+    const file = new URL(`../public${src}`, import.meta.url);
+    assert.ok(existsSync(file), `${src} exists`);
+    const size = statSync(file).size;
+    assert.ok(size <= 160 * 1024, `${src} is ${Math.round(size / 1024)} KB (at most 160 KB)`);
+    total += size;
+  }
+  assert.ok(total <= 2.5 * 1024 * 1024, `all screenshots together: ${Math.round(total / 1024)} KB (at most 2.5 MB)`);
+  for (const s of shots) assert.match(s, /alt[:=]\s*["'][^"']{12,}/, 'every screenshot has a real alt text');
 });
 
 test('every exercise of the registry is on the page once, in order; every demo exists', () => {

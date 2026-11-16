@@ -1,10 +1,10 @@
 ---
 number: 6
 title: 'Storage in React Native — AsyncStorage, SQLite, SecureStore and Supabase'
-description: 'Where an app keeps its data, and why: key-value storage (AsyncStorage, MMKV), a SQLite database on the phone, secure storage for tokens, and a Supabase cloud database with sign-in, file storage and Row Level Security. Then the phone and the cloud work together, even offline. 14 checked exercises build the parts of one offline-ready tasks app.'
+description: 'Where an app keeps its data, and why: key-value storage (AsyncStorage, MMKV), a SQLite database on the phone, secure storage for tokens, and a Supabase cloud database with sign-in, file storage, Row Level Security and Realtime. Then the phone and the cloud work together, even offline. Real screenshots of the phone and the Supabase dashboard in every part, and 18 checked exercises build the parts of one offline-ready tasks app.'
 difficulty: Intermediate
-estimatedTime: '2 h 30 min'
-skills: [AsyncStorage, MMKV, SQLite, SecureStore, Supabase, Row Level Security, Offline sync]
+estimatedTime: '3 h'
+skills: [AsyncStorage, MMKV, SQLite, SecureStore, Supabase, Supabase Auth, Row Level Security, Realtime, Offline sync]
 roadmapStage: data
 interactive: true
 objectives:
@@ -15,6 +15,9 @@ objectives:
   - Connect an app to Supabase with the project URL and the publishable key, and read, add, change and delete rows
   - Upload a file to Supabase Storage and show it with a public or a signed URL
   - Explain Supabase Auth sessions and Row Level Security, and write a policy
+  - 'Create a Supabase project and find your way in its dashboard: API keys, Table Editor, SQL Editor, Authentication, Storage, Realtime and Logs'
+  - Show new rows on the phone the moment they are added, with Supabase Realtime
+  - Read a Supabase error code and find the fix
   - Keep data available offline and send it to the cloud later, without duplicates
 prerequisites:
   - 'Lab 05 completed: fetch, async / await and JSON'
@@ -57,6 +60,15 @@ troubleshooting:
   - problem: '"Network request failed"'
     cause: 'The phone has no connection (or the emulator’s Wi-Fi is off).'
     solution: 'Expected when offline: the tasks stay `synced = 0` and are sent when NetInfo reports the connection is back.'
+  - problem: 'Realtime: the channel says SUBSCRIBED, but no change ever arrives'
+    cause: 'The table is not in the `supabase_realtime` publication, or Row Level Security does not let this user read the row.'
+    solution: 'Run `alter publication supabase_realtime add table public.tasks;` (or Database → Publications), and check the select policy: Realtime only sends rows the user may read.'
+  - problem: 'Realtime: every new task appears two or three times'
+    cause: 'A new channel opens each time the screen opens, and the old ones are never removed.'
+    solution: 'Return a cleanup from the `useEffect`: `return () => { supabase.removeChannel(channel); };`'
+  - problem: 'The user is signed out after every restart'
+    cause: 'The client has no `auth.storage`, or the screen never reads the saved session.'
+    solution: 'Give `createClient` a storage (`localStorage` from expo-sqlite, or `LargeSecureStore`) and set the user from `onAuthStateChange`: it reports the saved session at the start.'
 draft: false
 ---
 
@@ -149,9 +161,81 @@ export const SYNC_CODE = `export async function syncPending() {
   return waiting.length;
 }`;
 
-<Part n="1" title="Where your app keeps data" time="13 min" />
+export const TABLE_SQL = `create table public.tasks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  title text not null check (char_length(title) > 0),
+  done boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);`;
+
+export const APPSTATE_CODE = `import { AppState } from 'react-native';
+import { supabase } from './lib/supabase';
+
+// refresh the session only while the app is on the screen
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') supabase.auth.startAutoRefresh();
+  else supabase.auth.stopAutoRefresh();
+});`;
+
+export const POLICIES_SQL = `alter table public.tasks enable row level security;
+
+create policy "Read own tasks" on public.tasks
+  for select to authenticated
+  using ( (select auth.uid()) = user_id );
+
+create policy "Add own tasks" on public.tasks
+  for insert to authenticated
+  with check ( (select auth.uid()) = user_id );
+
+create policy "Edit own tasks" on public.tasks
+  for update to authenticated
+  using ( (select auth.uid()) = user_id )
+  with check ( (select auth.uid()) = user_id );
+
+create policy "Delete own tasks" on public.tasks
+  for delete to authenticated
+  using ( (select auth.uid()) = user_id );`;
+
+export const STORAGE_SQL = `insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true);
+
+create policy "Add to your own folder" on storage.objects
+  for insert to authenticated
+  with check ( bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text );
+
+create policy "See your own folder" on storage.objects
+  for select to authenticated
+  using ( bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text );
+
+create policy "Replace in your own folder" on storage.objects
+  for update to authenticated
+  using ( bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text );`;
+
+export const REALTIME_CODE = `useEffect(() => {
+  const channel = supabase
+    .channel('my-tasks')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'tasks' },
+      (payload) => setTasks((list) => [...list, payload.new as Task]),
+    )
+    .subscribe((status) => console.log('realtime:', status));
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);`;
+
+<Part n="1" title="Where your app keeps data" time="14 min" />
 
 In Lab 05 your app got data from a server. When the app closed, everything it had in its variables was gone. **Storage** means writing data somewhere it stays, so the app can read it again later.
+
+What “closed” means: when the user swipes the app away, or the phone restarts, the phone ends the app. Everything the app kept in **memory** — its variables and every `useState` — is deleted. What the app wrote to the phone’s **disk** stays. Only deleting the app deletes its files too.
 
 <Cards cols={2} items={[
   { tag: 'memory', icon: 'clock', title: 'Memory', text: 'useState and variables. Fast, but it is emptied when the app closes. Use it for what the screen needs right now.' },
@@ -195,6 +279,13 @@ Two more words you will meet in every part:
 
 <Demo id="memory-vs-storage" />
 
+The same app on a real Android phone. Left: after pressing the button three times. Right: after closing the app and opening it again.
+
+<Shot frame="phone" w={540} h={1202} shots={[
+  { src: '/labs/lab-06/phone-memory-before.webp', alt: 'The counter app on an Android phone: in memory 3, saved 3, after pressing the button three times', label: 'Before closing' },
+  { src: '/labs/lab-06/phone-memory-after.webp', alt: 'The same app after it was closed and opened again: in memory 0, saved still 3', label: 'After opening it again' },
+]} caption="`useState` started again from 0. The number in AsyncStorage was read back from the disk: still 3." />
+
 <Exercise id="lab-06--where-data-lives" />
 
 <Checkpoint>
@@ -221,6 +312,8 @@ const keys = await AsyncStorage.getAllKeys();                   // which keys ex
 
 <KvFlow />
 
+Where is it on the phone? On Android, AsyncStorage keeps every key in one small SQLite database file named **RKStorage**, in the app’s private folder. On iOS it is a file in the app’s folder. Other apps cannot open these folders. But anyone who copies the app’s files (from a backup, or a rooted phone) can read them, because the values are **not encrypted**. In Expo Go, each project gets its own storage, so two projects never see each other’s keys.
+
 Reading and saving can fail (a full disk, a broken value), so put them in `try / catch`:
 
 ```ts
@@ -243,6 +336,13 @@ try {
 
 <Exercise id="lab-06--settings-async" />
 
+The settings screen of Exercise 3 on a real phone, after it was closed and opened again. The dark theme and the text size were read back from AsyncStorage when the app started:
+
+<Shot frame="phone" w={540} h={1202} src="/labs/lab-06/phone-settings.webp" alt="A settings screen on an Android phone in dark theme with text size 20, after the app was closed and opened again" notes={[
+  { x: 37, y: 13, label: 'The theme, read back with `getItem` and `JSON.parse` when the app starts' },
+  { x: 37, y: 17.4, label: 'The text size: a number inside the same JSON text' },
+]} />
+
 **MMKV** is another key-value store. It is written in C++, it reads and writes **synchronously** (no `await`), and it keeps types: a number comes back as a number. It is much faster than AsyncStorage when an app reads values very often. It is native code, so it needs a **development build** — it does not run in Expo Go.
 
 <Terminal title="Terminal — install MMKV (development build)" lines={[
@@ -251,6 +351,10 @@ try {
   '$ npx expo run:android',
   '# Expo Go cannot load it: from now on you open the development build instead',
 ]} />
+
+This is what Expo Go shows when an app uses MMKV. Expo Go is a ready-made app with a fixed set of native code, and MMKV’s native part (NitroModules) is not in it. A **development build** is your own version of that app, built on your PC, with every native package your project needs:
+
+<Shot frame="phone" w={540} h={1202} src="/labs/lab-06/phone-mmkv-expo-go.webp" alt="Expo Go on Android showing Something went wrong: Failed to get NitroModules, the native module could not be found" caption="Read the first line of the error: **Failed to get NitroModules … could not be found**. The native part is missing, so the fix is a development build, not a change in your code." />
 
 <Compare
   title="AsyncStorage or MMKV?"
@@ -303,6 +407,8 @@ Key-value storage is not enough when the data is a list you search. To show “t
   ]}
 />
 
+Every column has a **type**. SQLite has four: `INTEGER` (whole numbers), `REAL` (decimals), `TEXT` and `BLOB` (bytes). There is no true/false type: store `1` for true and `0` for false in an `INTEGER` column, like `done` below. Dates are stored as `TEXT`, for example `2026-11-16T09:00:00Z`.
+
 In Expo, use **expo-sqlite**. It is included in Expo Go.
 
 <Terminal title="Terminal — install" lines={['$ npx expo install expo-sqlite']} />
@@ -322,6 +428,13 @@ The database code belongs in its own file, `db.ts`. Screens only call its functi
 <Exercise id="lab-06--sql-match" />
 
 <Exercise id="lab-06--tasks-sqlite" />
+
+The tasks app of Exercise 6 on a real phone. Each line on the screen is one row of the `tasks` table in the file **tasks.db**:
+
+<Shot frame="phone" w={540} h={1202} src="/labs/lab-06/phone-sqlite.webp" alt="A tasks app on an Android phone with three tasks read from SQLite, one of them ticked as done" notes={[
+  { x: 89, y: 12.3, label: '**Add** runs `runAsync(\'INSERT INTO tasks (title) VALUES (?)\', title)`: one new row' },
+  { x: 8.6, y: 28.9, label: 'Ticking sets `done = 1` with one `UPDATE … WHERE id = ?`' },
+]} caption="Close the app and open it again: the list is read back from tasks.db with `getAllAsync`." />
 
 <Checkpoint>
 Your tasks live in a real SQLite table on the phone. You can explain tables, rows, columns, the primary key, `?` parameters, WHERE, and why a transaction saves all or nothing.
@@ -385,6 +498,10 @@ await Keychain.resetGenericPassword(options);
 
 <Demo id="secure-vs-plain" />
 
+On a real phone the app reads back the same token from both places: the difference is only on the disk. AsyncStorage wrote it as plain text; SecureStore wrote unreadable bytes and keeps the key in the Android Keystore:
+
+<Shot frame="phone" w={540} h={1202} src="/labs/lab-06/phone-secure.webp" alt="An Android app that saved the same token in AsyncStorage and in SecureStore and reads both back" caption="Your app always gets the real value back. Someone who copies the files does not: that is what “encrypted at rest” protects against." />
+
 <Exercise id="lab-06--secrets-predict" />
 
 <Exercise id="lab-06--token-store" />
@@ -393,25 +510,43 @@ await Keychain.resetGenericPassword(options);
 Tokens go to SecureStore with three calls, and stay out of AsyncStorage, logs and `EXPO_PUBLIC_` variables. The server still checks every request.
 </Checkpoint>
 
-<Part n="5" title="The cloud: Supabase" time="40 min" />
+<Part n="5" title="The cloud: Supabase" time="68 min" />
 
-**Supabase** is a backend you do not have to write. One project gives you a **Postgres database**, **Auth** (sign-in), **Storage** (files in buckets) and **Row Level Security** (rules inside the database that decide which rows each user may touch). Your app talks to it with the **supabase-js** library.
+**Supabase** is a backend you do not have to write. One project gives you a **Postgres database**, **Auth** (sign-in), **Storage** (files in buckets), **Row Level Security** (rules inside the database that decide which rows each user may touch) and **Realtime** (changes sent to the phones that listen). Your app talks to it with the **supabase-js** library.
+
+Every section below shows the real Supabase dashboard first, then the code, then an exercise.
 
 <SupabaseMap />
 
-### A. Your project
+### A. Create your project
 
 Start this first: a new project takes about two minutes to be ready, and you can read on meanwhile.
 
 <ClickPath steps={['supabase.com', 'Sign in', 'New project', 'Name + database password + region', 'Create new project']} />
 
-Then copy two values from **Project Settings → API Keys** (the **Connect** button shows them too):
+The words on this form:
+
+- An **organization** groups your projects. A free account starts with one.
+- A **project** is one backend: one database, one Auth, one Storage, one set of keys. One app usually needs one project.
+- The **database password** is for connecting to Postgres directly (from a server or a database tool). The app never uses it. Press **Generate a password** and keep it in a password manager.
+- The **region** is where the computer that runs your project is. Choose the one closest to your users: for Egypt, **Central EU (Frankfurt)**.
+- A free project **pauses** after about a week with no use. Open it in the dashboard to start it again.
+
+<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/new" src="/labs/lab-06/dash-new-project.webp" alt="The Supabase dashboard form for a new project with the organization, project name, database password and region fields" />
+
+### B. Keys: publishable and secret
+
+When the project is ready, copy two values from **Project Settings → API Keys** (the **Connect** button at the top shows them too):
 
 <Cards cols={3} items={[
   { tone: 'good', icon: 'link', title: 'Project URL', text: '`https://<project-ref>.supabase.co`. Safe in the app.' },
   { tone: 'good', icon: 'key', title: 'Publishable key', text: '`sb_publishable_…`. Made for apps: it reaches only what Row Level Security allows.' },
   { tone: 'bad', icon: 'alert', title: 'Secret key', text: '`sb_secret_…` (the old name: service_role). It skips Row Level Security. **Never** put it in an app, a .env with EXPO_PUBLIC_, or Git.' },
 ]} />
+
+<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/settings/api-keys" src="/labs/lab-06/dash-api-keys.webp" alt="The API Keys page of the Supabase dashboard with the publishable key shown and the secret key hidden" caption="The publishable key is shown in full. The secret key stays hidden until you press its eye button: it is meant for servers only. (The project’s own values are blurred in this picture.)" />
+
+Why is the publishable key safe in an app? It only says **which project** the request is for. It does not say **who** sends it. A request with only the publishable key is treated as **anon** (nobody signed in). What anon and signed-in users may do is decided by Row Level Security, in section F.
 
 <Terminal title="Terminal — install" lines={['$ npx expo install @supabase/supabase-js react-native-url-polyfill expo-sqlite']} />
 
@@ -429,21 +564,30 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
   { lines: [8, 15], text: '`createClient` makes **one** client for the whole app. `persistSession` saves the session, `autoRefreshToken` gets a new access token before the old one stops working, and `detectSessionInUrl: false` because a phone app has no web address bar.' },
 ]} />
 
-Then create the table. In the dashboard: **SQL Editor → New query**, paste, **Run**:
+<Exercise id="lab-06--supabase-parts" />
 
-```sql
-create table public.tasks (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
-  title text not null check (char_length(title) > 0),
-  done boolean not null default false,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
--- Row Level Security and its policies: see D below
-```
+### C. Tables: Table Editor or SQL Editor
 
-### B. Rows: select, insert, update, delete
+There are two ways to make a table. Both make the same table:
+
+<Cards cols={2} items={[
+  { tag: 'click', icon: 'grid', title: 'Table Editor', text: 'Add columns with a form: name, type, default. Good for looking at your rows and changing one by hand.' },
+  { tag: 'type', icon: 'code', title: 'SQL Editor', text: 'Paste SQL and press **Run**. Good for many steps at once, and you can keep the SQL in your project (`supabase/schema.sql`) to run again in a new project.' },
+]} />
+
+In the dashboard: **SQL Editor → New query**, paste, **Run**:
+
+<CodeWalk file="SQL Editor" code={TABLE_SQL} steps={[
+  { lines: [2, 2], text: '`uuid`: a long random id, made by the database with `gen_random_uuid()`. In Part 6 the phone makes the id itself.' },
+  { lines: [3, 3], text: 'Whose task it is. `default auth.uid()` fills it with the signed-in user, so the app never sends it. `references auth.users` links it to a user; `on delete cascade` deletes the user’s tasks with the user.' },
+  { lines: [4, 4], text: '`not null`: a title is required. `check (char_length(title) > 0)`: and it may not be empty (error code 23514).' },
+  { lines: [5, 5], text: 'Postgres has a real `boolean` type (SQLite used 0 and 1).' },
+  { lines: [6, 7], text: '`timestamptz`: a date and time with its time zone. `default now()` fills it in.' },
+]} />
+
+<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/sql" src="/labs/lab-06/dash-sql-editor.webp" alt="The Supabase SQL Editor with the create table statement for tasks and the result Success. No rows returned" caption="“Success. No rows returned” is the right answer: `create table` makes a table, it does not read rows." />
+
+### D. Rows: select, insert, update, delete
 
 Every call returns `{ data, error }`. Check `error` first.
 
@@ -464,11 +608,13 @@ if (error) console.warn(error.code, error.message); // e.g. 42501 = blocked by R
 
 <Demo id="supabase-first" />
 
-<Exercise id="lab-06--supabase-parts" />
-
 <Exercise id="lab-06--cloud-tasks" />
 
-### C. Auth: users and sessions
+After the app added tasks, they are in **Table Editor → tasks**. Every row has the `user_id` of the user who added it:
+
+<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/editor" src="/labs/lab-06/dash-table-editor.webp" alt="The Supabase Table Editor showing the tasks table with rows added from the phone app, with id, user_id, title, done and created_at columns" caption="The Table Editor shows every row, because the dashboard is the project’s owner. Your app only sees what Row Level Security allows." />
+
+### E. Auth: users and sessions
 
 **Supabase Auth** checks the email and password and answers with a **session**: the access token and the refresh token. supabase-js keeps the session in `auth.storage` (so the user stays signed in after a restart) and sends the access token with every request.
 
@@ -477,13 +623,32 @@ await supabase.auth.signUp({ email, password });                 // new account
 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 const { data: { session } } = await supabase.auth.getSession();  // the saved session, or null
 const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-  // SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED…: update the screen
+  // INITIAL_SESSION, SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED…: update the screen
 });
 listener.subscription.unsubscribe(); // in the useEffect cleanup
 await supabase.auth.signOut();
 ```
 
-The quickstart above keeps the session in `localStorage`, which is not encrypted. The session holds the refresh token — a secret (Part 4). Supabase’s Expo tutorial shows how to keep it encrypted, and the final project does exactly that:
+Try every step, in any order:
+
+<AuthFlow />
+
+**Confirm email.** A new project asks every new user to confirm their email address: `signUp` creates the user and sends an email, but returns **no session** until the user opens the link. For a class project you can turn it off in **Authentication → Sign In / Providers → Email**. Then `signUp` signs the user in at once.
+
+<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/auth/providers" src="/labs/lab-06/dash-auth-email.webp" alt="The Email provider settings in Supabase Authentication with the Confirm email switch" />
+
+**Users.** **Authentication → Users** lists every account: its email, when it was created and when it last signed in. You can add a user here (tick **Auto Confirm User**) or delete one. Passwords are never shown: Supabase keeps only a scrambled form of them (a hash).
+
+<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/auth/users" src="/labs/lab-06/dash-auth-users.webp" alt="The Users page of Supabase Authentication listing test accounts with their sign-in times" />
+
+**Keeping the session fresh.** The access token works for about one hour. supabase-js gets a new one with a timer before it runs out. On a phone, that timer should only run while the app is on the screen — this is in Supabase’s Expo guide:
+
+<CodeWalk file="App.tsx" title="Refresh only while the app is open" code={APPSTATE_CODE} steps={[
+  { lines: [1, 2], text: '`AppState` tells you whether the app is on the screen (`active`) or in the background.' },
+  { lines: [5, 8], text: 'On screen: start the refresh timer. In the background: stop it. When the app comes back, an expired token is refreshed at once.' },
+]} />
+
+The quickstart keeps the session in `localStorage`, which is not encrypted. The session holds the refresh token — a secret (Part 4). Supabase’s Expo tutorial shows how to keep it encrypted, and the final project does exactly that:
 
 <CodeWalk file="lib/largeSecureStore.ts" title="An encrypted session store" code={LARGE_SECURE_CODE} steps={[
   { lines: [2, 8], text: 'A new random **AES-256 key** for each value. The value is encrypted with it, and the small key goes to **SecureStore** (encrypted by the phone).' },
@@ -491,30 +656,48 @@ The quickstart above keeps the session in `localStorage`, which is not encrypted
   { lines: [15, 19], text: 'Reading: take the ciphertext from AsyncStorage, the key from SecureStore, and decrypt. supabase-js uses it as `auth: { storage: new LargeSecureStore() }`.' },
 ]} />
 
-### D. Row Level Security
+<Exercise id="lab-06--auth-screen" />
+
+### F. Row Level Security
 
 The publishable key is inside every copy of your app, so anyone can call your project’s API. **Row Level Security (RLS)** makes the **database** decide, for every row and every request, what this user may do. Checks in your app’s code are not enough: anyone can send requests without your app.
 
-```sql
-alter table public.tasks enable row level security; -- now nothing is allowed…
+Pick a user, an action and the rules, and watch which rows pass:
 
-create policy "Users read their own tasks" on public.tasks   -- …until a policy allows it
-  for select to authenticated
-  using ( (select auth.uid()) = user_id );
+<RlsSimulator />
 
-create policy "Users add their own tasks" on public.tasks
-  for insert to authenticated
-  with check ( (select auth.uid()) = user_id );
--- the same for update (using + with check) and delete (using)
-```
+One policy per action. Run this in the SQL Editor after the table:
+
+<CodeWalk file="SQL Editor" title="The four policies of the tasks table" code={POLICIES_SQL} steps={[
+  { lines: [1, 1], text: 'RLS on: from now on **nothing** is allowed through the API until a policy allows it.' },
+  { lines: [3, 5], text: '**Read**: `using` is checked on every row that exists. A row is returned only when its `user_id` is the signed-in user.' },
+  { lines: [7, 9], text: '**Add**: `with check` is checked on the new row. Nobody can add a row for someone else.' },
+  { lines: [11, 14], text: '**Edit**: `using` picks the rows you may change, `with check` checks the row after the change (you cannot give your task to someone else).' },
+  { lines: [16, 18], text: '**Delete**: only `using` — there is no new row to check.' },
+]} />
 
 <Explain parts={[['for select', 'the operation it allows'], ['to authenticated', 'only signed-in users'], ['using ( … )', 'checked for every existing row: which rows they may see or change'], ['with check ( … )', 'checked for every new or changed row: may it be saved?'], ['(select auth.uid())', 'the id of the user who sent the request']]} />
 
+<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/auth/policies" src="/labs/lab-06/dash-policies.webp" alt="The Policies page of the Supabase dashboard showing the tasks table with RLS enabled and its four policies" caption="The Policies page lists every table: whether RLS is on, and each policy with its action. A table with RLS off is shown with a warning." />
+
+Two things that surprise everyone:
+
+- A read that RLS blocks is **not an error**: you get `data: []` and `error: null`. An empty list often means “not signed in” or “no select policy”.
+- The **SQL Editor** and the **Table Editor** run as the project’s owner, so they skip RLS and show every row. Test your policies from the app.
+
 <Exercise id="lab-06--rls-predict" />
 
-### E. Storage: files in buckets
+<Exercise id="lab-06--rls-policies" />
+
+### G. Storage: files in buckets
 
 A **bucket** is a folder for files. A **public** bucket gives each file a fixed URL anyone can open: right for profile photos. A **private** bucket gives **signed URLs** that stop working after the number of seconds you choose: right for personal documents. Storage has its own policies; a common rule is “each user writes only in the folder named after their id”.
+
+<CodeWalk file="SQL Editor" title="A public bucket, one folder per user" code={STORAGE_SQL} steps={[
+  { lines: [1, 2], text: 'Creates the bucket **avatars**. `public = true`: anyone with a file’s URL can open it (no policy needed to view it).' },
+  { lines: [4, 7], text: 'Uploading needs an insert policy on `storage.objects`. `storage.foldername(name)[1]` is the first folder of the path: it must be the user’s id.' },
+  { lines: [9, 17], text: '`upsert: true` (replace a photo) also needs the select and update policies.' },
+]} />
 
 ```ts
 import { decode } from 'base64-arraybuffer';
@@ -549,13 +732,59 @@ await supabase.storage.from('avatars').remove([path]);
   ]}
 />
 
+<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/storage/buckets/avatars" src="/labs/lab-06/dash-storage.webp" alt="Supabase Storage showing the public avatars bucket with a folder named after a user id that holds avatar.png" caption="The path is the folder (the user’s id) and the file name. The bucket is marked Public, so the file has a fixed URL." />
+
 <Exercise id="lab-06--avatar-upload" />
 
+### H. Realtime: changes sent to the phone
+
+Until now the phone **asked** for the rows (`select`). With **Realtime**, Supabase **tells** the phone when a row changes. The phone opens a **channel** — a connection that stays open — and says what it wants to hear, for example “new rows in tasks”. When a row is added (by this phone, by the same user’s tablet, or in the dashboard), Realtime sends it to every phone that listens.
+
+Four rules:
+
+1. A table sends changes only if it is in the **supabase_realtime publication**. Turn it on once, in the SQL Editor: `alter publication supabase_realtime add table public.tasks;` — or in **Database → Publications → supabase_realtime**.
+2. **RLS still applies**: a phone only receives rows its user may read.
+3. Realtime does **not** keep changes for later. A phone that was offline must load the list again with `select` when it is back (Part 6 does this).
+4. Close what you open: remove the channel in the `useEffect` cleanup, or every visit to the screen adds one more listener.
+
+<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/database/publications" src="/labs/lab-06/dash-realtime.webp" alt="The supabase_realtime publication in the Supabase dashboard with the tasks table switched on" />
+
+<RealtimeFlow />
+
+<CodeWalk file="TaskList.tsx" title="Listen for new tasks" code={REALTIME_CODE} steps={[
+  { lines: [2, 3], text: '`channel(\'my-tasks\')` makes a channel. The name is yours: it only has to be different from your other channels.' },
+  { lines: [4, 8], text: '`postgres_changes`: listen to the database. `event: \'INSERT\'` (or `UPDATE`, `DELETE`, `*`) and the table. `payload.new` is the new row.' },
+  { lines: [9, 9], text: '`subscribe` opens the channel. The status becomes `SUBSCRIBED` when it is listening (or `CHANNEL_ERROR`, for example offline).' },
+  { lines: [11, 13], text: 'The cleanup: when the screen closes, `removeChannel` stops listening and closes the connection.' },
+]} />
+
+<Exercise id="lab-06--realtime-tasks" />
+
+### I. Logs and errors
+
+When something fails, read `error` first. The code says where to look:
+
+| You get | It means | Look at |
+|---|---|---|
+| `error.code` `42501` | RLS refused an insert or update | your insert/update policy, and whether the user is signed in |
+| `data: []`, `error: null` | RLS hid every row | the select policy, and whether the user is signed in |
+| `PGRST116` | `.single()` got no row (or more than one) | the filter; use `.maybeSingle()` when “none” is fine |
+| `23505` | a row with this id already exists | send it with `upsert` |
+| `PGRST204` | the table has no column with this name | the spelling of the column |
+| `Invalid login credentials` | wrong email or password | what the user typed; whether the user exists |
+| `TypeError: Network request failed` | the phone is offline | NetInfo (Part 6) |
+
+The dashboard keeps a record of every request in **Logs**. Each line shows the time, the method and path (for example `POST /rest/v1/tasks`) and the **status code**: `200`/`201` worked, `401` and `403` were refused by Auth or RLS, `400` means the request itself was wrong, `5xx` is a problem on the server.
+
+<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/logs/explorer" src="/labs/lab-06/dash-logs.webp" alt="The API logs of a Supabase project listing requests from the phone app with their method, path and status code" caption="Open the logs when the app gets an error you do not understand: the request that failed is there, with its status." />
+
+<Exercise id="lab-06--supabase-errors" />
+
 <Checkpoint>
-Your app reads and writes rows in Supabase, uploads a file, and signs in. Row Level Security — not your app — decides what each user may touch.
+Your app signs users in and keeps them signed in, reads and writes their rows, uploads a file, and hears new rows live. Row Level Security — not your app — decides what each user may touch. In the dashboard you can find every table, user, file, policy and request.
 </Checkpoint>
 
-<Part n="6" title="Local and cloud together: offline basics" time="20 min" />
+<Part n="6" title="Local and cloud together: offline basics" time="21 min" />
 
 Real apps use both: the **phone** for speed and for working offline, the **cloud** for sharing and for keeping data safe when a phone is lost.
 
@@ -601,6 +830,13 @@ const unsubscribe = NetInfo.addEventListener((state) => {
 <Exercise id="lab-06--sync-order" />
 
 <Exercise id="lab-06--offline-sync" />
+
+The final project on a real phone. Left: the Wi-Fi is off and a new task waits on the phone. Right: the Wi-Fi is back, the task was sent once, and Supabase has it:
+
+<Shot frame="phone" w={540} h={1202} shots={[
+  { src: '/labs/lab-06/phone-offline.webp', alt: 'The tasks app on an Android phone in airplane mode: Offline, 1 waiting to sync, the new task marked waiting', label: 'Offline: saved on the phone' },
+  { src: '/labs/lab-06/phone-online.webp', alt: 'The same app back online: everything is in the cloud and the task is marked in the cloud', label: 'Online again: sent once' },
+]} caption="Realtime (Part 5 H) does not replace this: it only works while the phone is online. The sync plan is what keeps the app working without a connection." />
 
 <Checkpoint title="Parts 1–6 done">
 The app works offline: it saves on the phone at once, waits with `synced = 0`, and sends each task once when the phone is back online.

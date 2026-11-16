@@ -164,14 +164,14 @@
   .af-code { margin: 0; min-height: 3.2em; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); color: var(--text); font: 12px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
   .af-log { display: grid; gap: 6px; }
   .af-events { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 4px; font-size: 12.5px; max-height: 9.5em; overflow: auto; }
-  .af-events li { margin: 0 !important; padding: 5px 9px; border-radius: 8px; background: var(--bg-2); color: var(--text-2); }
-  .af-events li b { color: var(--text); }
+  .af-events :global(li) { margin: 0 !important; padding: 5px 9px; border-radius: 8px; background: var(--bg-2); color: var(--text-2); }
+  .af-events :global(li b) { color: var(--text); }
   .af-note { margin: 0 !important; padding: 10px 12px; border-radius: 10px; font-size: 14.5px; line-height: 1.6; color: var(--text); background: var(--bg-2); }
   .af-note[data-tone='good'] { background: color-mix(in oklab, var(--ok) 12%, transparent); }
   .af-note[data-tone='warn'] { background: color-mix(in oklab, var(--warn) 14%, transparent); }
   .af-note[data-tone='bad'] { background: color-mix(in oklab, var(--danger) 14%, transparent); }
-  .af .flash { animation: af-flash 1.2s var(--ease-out); }
+  .af :global(.flash) { animation: af-flash 1.2s var(--ease-out); }
   @keyframes af-flash { from { background: color-mix(in oklab, var(--accent) 30%, transparent); } }
   .af :global(code) { font-size: .9em; }
-  @media (prefers-reduced-motion: reduce) { .af .flash { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .af :global(.flash) { animation: none; } }
 </style>

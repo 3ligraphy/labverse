@@ -9,12 +9,12 @@ export const LAB_ID = 'lab-06';
 const id = (name: string) => `${LAB_ID}--${name}`;
 
 export const BLOCKS = [
-  { n: 1, part: 1, time: '0–13', title: 'Where your app keeps data' },
-  { n: 2, part: 2, time: '13–43', title: 'Key-value storage: AsyncStorage and MMKV' },
-  { n: 3, part: 3, time: '43–70', title: 'A database on the phone: SQLite' },
-  { n: 4, part: 4, time: '70–90', title: 'Secrets: secure storage' },
-  { n: 5, part: 5, time: '90–130', title: 'The cloud: Supabase' },
-  { n: 6, part: 6, time: '130–150', title: 'Local and cloud together: offline basics' },
+  { n: 1, part: 1, time: '0–14', title: 'Where your app keeps data' },
+  { n: 2, part: 2, time: '14–44', title: 'Key-value storage: AsyncStorage and MMKV' },
+  { n: 3, part: 3, time: '44–71', title: 'A database on the phone: SQLite' },
+  { n: 4, part: 4, time: '71–91', title: 'Secrets: secure storage' },
+  { n: 5, part: 5, time: '91–159', title: 'The cloud: Supabase' },
+  { n: 6, part: 6, time: '159–180', title: 'Local and cloud together: offline basics' },
 ] as const;
 
 export const EXERCISES: ExerciseMeta[] = [

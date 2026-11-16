@@ -417,6 +417,9 @@ create policy "Users replace their own avatar" on storage.objects
   for update to authenticated using ( bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text );
 create policy "Users see their own avatar files" on storage.objects
   for select to authenticated using ( bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text );
+
+-- 4. Optional (Exercise 15): Realtime sends new and changed tasks to the phones that listen
+alter publication supabase_realtime add table public.tasks;
 `;
 
 const GUIDE = `# Lab 06 · Offline-Ready Tasks App
