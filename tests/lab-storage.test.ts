@@ -267,3 +267,13 @@ export default function App() { return <Text>{process.env.EXPO_PUBLIC_SUPABASE_U
   assert.equal(err, null);
   assert.equal(await h.text(), 'https://practice.supabase.co undefined');
 });
+
+test('the practice cloud shows in the panel only after the app makes a Supabase client', () => {
+  device.resetDevice();
+  const ids = () => device.snapshot().sections.map((s) => s.id);
+  assert.ok(!ids().includes('supabase-db'), 'an AsyncStorage or SQLite app shows no cloud');
+  practice.createPracticeClient(practice.PRACTICE_URL, practice.PRACTICE_KEY);
+  assert.ok(ids().includes('supabase-db'), 'shown once a client exists');
+  device.resetDevice();
+  assert.ok(!ids().includes('supabase-db'), 'Erase phone hides it again until the app makes a client');
+});

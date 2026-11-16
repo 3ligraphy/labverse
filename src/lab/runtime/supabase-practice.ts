@@ -86,7 +86,11 @@ const buckets = new Map<string, Map<string, StoredFile>>();
 const signed = new Map<string, { bucket: string; path: string; expires: number }>();
 const requests: string[] = [];
 
+/** The panel shows the practice cloud only once this phone's app has made a Supabase client (not in the AsyncStorage or SQLite parts). */
+let used = false;
+
 function seed() {
+  used = false;
   db.clear();
   users.clear();
   buckets.clear();
@@ -120,6 +124,7 @@ let currentUser: string | null = null; // the user signed in on this phone (show
 registerStore({
   id: 'supabase',
   snapshot: () => {
+    if (!used) return [];
     const tables: DeviceTable[] = [...db].map(([name, rows]) => {
       const columns = Object.keys(SCHEMA[name].columns);
       return { name: `public.${name}`, columns, rows: rows.slice(0, 40).map((r) => columns.map((c) => (/(^id$|_id$)/.test(c) ? short(r[c]) : r[c] ?? null))), total: rows.length };
@@ -771,6 +776,7 @@ export function createPracticeClient(url: string, key: string, options: { auth?:
   if (/^sb_secret_/.test(key) || /service_role/.test(key)) {
     throw new Error('Never put a secret (service_role) key in an app: anyone can read the app’s code. Use the publishable key (sb_publishable_…) and protect your data with Row Level Security.');
   }
+  used = true;
   const { auth, uid } = createAuth(options.auth, (id) => {
     currentUser = id;
     changed();
