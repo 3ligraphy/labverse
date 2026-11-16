@@ -1,0 +1,171 @@
+---
+/**
+ * Lab 06 · Part 5 — what happens inside Supabase for each request of the app: sign in (Auth), read and add tasks
+ * (Database + Row Level Security), the same read with RLS off, a photo upload (Storage + its policy), and public vs
+ * signed URLs. The parts on the request's path light up in order, with the HTTP request, the answer, and which rows RLS
+ * let through. <SupabaseMap />
+ */
+const NODES = [
+  { id: 'app', name: 'Your app', sub: 'supabase-js on the phone' },
+  { id: 'gate', name: 'API gateway', sub: 'checks the apikey' },
+  { id: 'auth', name: 'Auth', sub: 'users and sessions' },
+  { id: 'rest', name: 'Database API', sub: 'turns the request into SQL' },
+  { id: 'rls', name: 'Row Level Security', sub: 'a policy for every row' },
+  { id: 'pg', name: 'Postgres', sub: 'the tables' },
+  { id: 'storage', name: 'Storage', sub: 'buckets of files' },
+];
+const ROWS = [
+  { title: 'Read Part 5 of the lab', owner: 'Mona' },
+  { title: 'Buy milk', owner: 'Mona' },
+  { title: 'Omar’s private task', owner: 'Omar' },
+];
+const KEY = 'sb_publishable_…';
+const CASES = [
+  { id: 'signin', label: 'Sign in', path: ['app', 'gate', 'auth'], rows: null,
+    req: `POST /auth/v1/token?grant_type=password\napikey: ${KEY}\n\n{ "email": "mona@bue.edu.eg", "password": "••••••••" }`,
+    res: '200 OK\n{ "access_token": "eyJhbGciOi…",   ← lasts about 1 hour\n  "refresh_token": "v1.Mz9k…",    ← gets new access tokens\n  "expires_in": 3600,\n  "user": { "id": "c0ffee00-…", "email": "mona@bue.edu.eg" } }',
+    note: 'Auth checks the password and answers with a **session**: a short-lived access token and a long-lived refresh token. supabase-js saves the session (the `auth.storage` option) and sends the access token with every request.' },
+  { id: 'read', label: 'Read my tasks', path: ['app', 'gate', 'rest', 'rls', 'pg'], rows: 'mine',
+    req: `GET /rest/v1/tasks?select=*\napikey: ${KEY}\nAuthorization: Bearer eyJhbGciOi…   ← who is asking`,
+    res: '200 OK\n[ { "title": "Read Part 5 of the lab", … },\n  { "title": "Buy milk", … } ]',
+    note: 'The request does not say “only Mona’s rows”. The **policy** `using ((select auth.uid()) = user_id)` runs inside the database for every row: Omar’s row is never sent.' },
+  { id: 'insert', label: 'Add a task', path: ['app', 'gate', 'rest', 'rls', 'pg'], rows: 'insert',
+    req: `POST /rest/v1/tasks\napikey: ${KEY}\nAuthorization: Bearer eyJhbGciOi…\n\n{ "title": "Read the RLS guide" }`,
+    res: '201 Created\n(no rows in the answer: add .select() to get the new row back)',
+    note: 'The app sends only the title. The table fills `user_id` with `auth.uid()`, and the insert policy’s `with check` accepts the row because it belongs to the user who sent it.' },
+  { id: 'off', label: 'Read with RLS off', path: ['app', 'gate', 'rest', 'pg'], rows: 'all',
+    req: `GET /rest/v1/tasks?select=*\napikey: ${KEY}`,
+    res: '200 OK\n[ …every task of every user… ]',
+    note: '**Danger.** With RLS off, anyone who has the publishable key (it is inside every copy of the app) can read every row, without signing in. Supabase warns about every table without RLS.' },
+  { id: 'upload', label: 'Upload a photo', path: ['app', 'gate', 'storage'], rows: null,
+    req: `POST /storage/v1/object/avatars/c0ffee00-…/avatar.png\napikey: ${KEY}\nAuthorization: Bearer eyJhbGciOi…\nContent-Type: image/png\n\n<the photo’s bytes>`,
+    res: '200 OK\n{ "Key": "avatars/c0ffee00-…/avatar.png" }',
+    note: 'Storage has its own policies (on `storage.objects`). This bucket allows each user to write only in the folder named after their own id, so the path starts with the user’s id.' },
+  { id: 'urls', label: 'Public vs signed URL', path: ['app', 'gate', 'storage'], rows: null,
+    req: "getPublicUrl('c0ffee00-…/avatar.png')            ← public bucket: no request\ncreateSignedUrl('c0ffee00-…/cv.pdf', 60)           ← private bucket: asks Storage",
+    res: 'https://<project>.supabase.co/storage/v1/object/public/avatars/c0ffee00-…/avatar.png\nhttps://<project>.supabase.co/storage/v1/object/sign/documents/c0ffee00-…/cv.pdf?token=eyJ…  (works for 60 s)',
+    note: 'A **public** bucket’s files have a fixed URL that anyone can open. A **private** bucket gives signed URLs that stop working after the seconds you choose: use it for anything personal.' },
+];
+---
+<figure class="sbm" data-sbm data-reveal data-free>
+  <div class="sbm-acts" role="toolbar" aria-label="Choose a request">
+    {CASES.map((c) => <button type="button" class="sbm-act" data-sbm-case={c.id}>{c.label}</button>)}
+  </div>
+  <div class="sbm-map">
+    <div class="sbm-phone">{NODES.filter((n) => n.id === 'app').map((n) => <div class="sbm-node" data-sbm-node={n.id}><b>{n.name}</b><span>{n.sub}</span></div>)}</div>
+    <span class="sbm-wire" aria-hidden="true"><i data-sbm-wire></i><small class="mono">HTTPS</small></span>
+    <div class="sbm-project">
+      <p class="sbm-k mono">Your Supabase project</p>
+      <div class="sbm-node" data-sbm-node="gate"><b>API gateway</b><span>checks the apikey</span></div>
+      <div class="sbm-lanes">
+        <div class="sbm-lane"><div class="sbm-node" data-sbm-node="auth"><b>Auth</b><span>users and sessions</span></div></div>
+        <div class="sbm-lane">
+          <div class="sbm-node" data-sbm-node="rest"><b>Database API</b><span>request → SQL</span></div>
+          <div class="sbm-node" data-sbm-node="rls"><b>Row Level Security</b><span>a policy for every row</span></div>
+          <div class="sbm-node" data-sbm-node="pg"><b>Postgres</b><span>the tables</span></div>
+        </div>
+        <div class="sbm-lane"><div class="sbm-node" data-sbm-node="storage"><b>Storage</b><span>buckets of files</span></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="sbm-io">
+    <div><p class="sbm-k mono">The request</p><pre data-sbm-req>Choose a request above.</pre></div>
+    <div><p class="sbm-k mono">The answer</p><pre data-sbm-res>—</pre></div>
+  </div>
+  <div class="sbm-rows" data-sbm-rows hidden>
+    <p class="sbm-k mono">The tasks table (Mona is signed in)</p>
+    <ul>{ROWS.map((r) => <li data-owner={r.owner}><span>{r.title}</span><span class="mono">user: {r.owner}</span><b data-sbm-verdict></b></li>)}</ul>
+  </div>
+  <p class="sbm-note" data-sbm-note aria-live="polite">Each button sends one request. Watch which parts of Supabase it passes through.</p>
+  <script type="application/json" data-sbm-json set:html={JSON.stringify(CASES)} />
+</figure>
+
+<script>
+  type Case = { id: string; path: string[]; rows: string | null; req: string; res: string; note: string };
+  const md = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-sbm]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const cases = JSON.parse(root.querySelector('[data-sbm-json]')!.textContent!) as Case[];
+      const req = root.querySelector<HTMLElement>('[data-sbm-req]')!;
+      const res = root.querySelector<HTMLElement>('[data-sbm-res]')!;
+      const note = root.querySelector<HTMLElement>('[data-sbm-note]')!;
+      const rows = root.querySelector<HTMLElement>('[data-sbm-rows]')!;
+      const nodes = (id: string) => root.querySelector<HTMLElement>(`[data-sbm-node="${id}"]`);
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const STEP = reduce ? 0 : 420;
+      let timers: ReturnType<typeof setTimeout>[] = [];
+      root.querySelectorAll<HTMLButtonElement>('[data-sbm-case]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const c = cases.find((x) => x.id === b.dataset.sbmCase)!;
+          timers.forEach(clearTimeout);
+          timers = [];
+          root.querySelectorAll('[data-sbm-case]').forEach((x) => x.classList.toggle('on', x === b));
+          root.querySelectorAll<HTMLElement>('[data-sbm-node]').forEach((n) => n.classList.remove('lit', 'back', 'off'));
+          root.querySelectorAll<HTMLElement>('[data-sbm-node]').forEach((n) => { if (!c.path.includes(n.dataset.sbmNode!)) n.classList.add('off'); });
+          req.textContent = c.req;
+          res.textContent = '…';
+          rows.hidden = true;
+          note.innerHTML = 'Sending…';
+          c.path.forEach((id, i) => timers.push(setTimeout(() => nodes(id)?.classList.add('lit'), i * STEP)));
+          const back = c.path.length * STEP;
+          timers.push(setTimeout(() => {
+            [...c.path].reverse().forEach((id) => nodes(id)?.classList.add('back'));
+            res.textContent = c.res;
+            note.innerHTML = md(c.note);
+            if (c.rows) {
+              rows.hidden = false;
+              rows.dataset.mode = c.rows;
+              rows.querySelectorAll<HTMLElement>('li').forEach((li) => {
+                const mine = li.dataset.owner === 'Mona';
+                const pass = c.rows === 'all' || mine;
+                li.dataset.pass = String(pass);
+                li.querySelector('[data-sbm-verdict]')!.textContent = c.rows === 'insert' ? (mine ? 'policy: yours, allowed' : 'not touched') : pass ? 'sent to the app' : 'hidden by RLS';
+              });
+            }
+          }, back));
+        }),
+      );
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .sbm { margin: 22px 0 30px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .sbm-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sbm-act { padding: 7px 13px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 13px var(--font-body); cursor: pointer; }
+  .sbm-act.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .sbm-act:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .sbm-map { display: grid; gap: 10px; align-items: center; }
+  @media (min-width: 900px) { .sbm-map { grid-template-columns: 170px 70px minmax(0, 1fr); } }
+  .sbm-k { margin: 0 0 6px !important; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+  .sbm-node { display: grid; gap: 2px; padding: 9px 11px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); transition: border-color .25s, background .25s, opacity .25s; }
+  .sbm-node b { font-size: 13.5px; }
+  .sbm-node span { font-size: 12px; color: var(--text-2); }
+  .sbm-node.off { border-style: dashed; background: transparent; }
+  .sbm-node.lit { border-color: var(--accent-text); background: color-mix(in oklab, var(--accent) 15%, var(--surface)); }
+  .sbm-node.back { border-color: var(--info); background: color-mix(in oklab, var(--info) 14%, var(--surface)); }
+  .sbm-wire { display: grid; justify-items: center; gap: 4px; }
+  .sbm-wire i { display: block; width: 100%; height: 2px; background: repeating-linear-gradient(90deg, var(--line-2) 0 6px, transparent 6px 10px); }
+  .sbm-wire small { font-size: 12px; color: var(--text-2); }
+  .sbm-project { display: grid; gap: 8px; padding: 12px; border-radius: 16px; border: 1px solid color-mix(in oklab, var(--ok) 40%, var(--line)); background: color-mix(in oklab, var(--ok) 5%, var(--surface)); }
+  .sbm-lanes { display: grid; gap: 8px; }
+  @media (min-width: 700px) { .sbm-lanes { grid-template-columns: 1fr 1.6fr 1fr; align-items: start; } }
+  .sbm-lane { display: grid; gap: 6px; }
+  .sbm-io { display: grid; gap: 10px; }
+  @media (min-width: 860px) { .sbm-io { grid-template-columns: 1fr 1fr; } }
+  .sbm-io > div { min-width: 0; }
+  .sbm-io pre { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); color: var(--text); font: 12.5px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; min-height: 5em; }
+  .sbm-rows ul { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 6px; }
+  .sbm-rows li { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font-size: 14px; }
+  .sbm-rows li .mono { font-size: 12px; color: var(--text-2); }
+  .sbm-rows li b { margin-left: auto; font-size: 12.5px; }
+  .sbm-rows li[data-pass='true'] b { color: var(--ok); }
+  .sbm-rows li[data-pass='false'] { border-style: dashed; background: transparent; }
+  .sbm-rows li[data-pass='false'] > span:first-child { text-decoration: line-through; color: var(--text-2); }
+  .sbm-rows li[data-pass='false'] b { color: var(--danger); }
+  .sbm-rows[data-mode='all'] li[data-owner='Omar'] { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
+  .sbm-note { margin: 0 !important; font-size: 15px; color: var(--text); }
+  .sbm :global(code) { font-size: .88em; }
+</style>

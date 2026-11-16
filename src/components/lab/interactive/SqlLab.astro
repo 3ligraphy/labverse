@@ -1,0 +1,224 @@
+---
+/**
+ * Lab 06 · Part 3 — a real SQLite database in the page (sql.js, the same engine as expo-sqlite). Run the statements
+ * one by one and watch the tables change: CREATE, INSERT, SELECT … WHERE, UPDATE, DELETE, a DELETE without WHERE, a
+ * relationship (JOIN), an index, and a transaction that rolls back. Or type your own SQL. <SqlLab />
+ */
+const STEPS = [
+  { id: 'create', label: 'CREATE TABLE', sql: "CREATE TABLE lists (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\nCREATE TABLE tasks (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  title TEXT NOT NULL,\n  done INTEGER NOT NULL DEFAULT 0,\n  list_id INTEGER REFERENCES lists(id)\n);\nINSERT INTO lists (id, name) VALUES (1, 'Study'), (2, 'Home');", explain: 'Two empty tables. Each **column** has a name and a type. `id` is the **primary key**: a number that is different for every row. `list_id` points at a row of `lists`: one list has many tasks (a **relationship**).' },
+  { id: 'insert', label: 'INSERT 3 tasks', sql: "INSERT INTO tasks (title, list_id) VALUES ('Read Part 3', 1);\nINSERT INTO tasks (title, list_id) VALUES ('Buy milk', 2);\nINSERT INTO tasks (title, done, list_id) VALUES ('Install expo-sqlite', 1, 1);", explain: 'Each INSERT adds one **row**. You did not give an `id`: SQLite numbered them 1, 2, 3. `done` took its default value 0 where you left it out.' },
+  { id: 'select', label: 'SELECT … WHERE', sql: 'SELECT id, title FROM tasks WHERE done = 0 ORDER BY id;', explain: '`SELECT` only reads. `WHERE done = 0` keeps the rows that are not done; `ORDER BY` sorts them. The table did not change.' },
+  { id: 'update', label: 'UPDATE one row', sql: 'UPDATE tasks SET done = 1 WHERE id = 2;', explain: '`WHERE id = 2` picks exactly one row by its primary key; only that row changed.' },
+  { id: 'delete', label: 'DELETE one row', sql: 'DELETE FROM tasks WHERE id = 3;', explain: 'One row removed. The other ids stay as they were: a deleted id is not used again.' },
+  { id: 'join', label: 'JOIN two tables', sql: 'SELECT tasks.title, lists.name AS list\nFROM tasks JOIN lists ON lists.id = tasks.list_id;', explain: 'The relationship at work: each task is shown with the name of its list, found through `list_id`.' },
+  { id: 'index', label: 'CREATE INDEX', sql: 'CREATE INDEX idx_tasks_done ON tasks (done);', explain: 'An **index** is a sorted list of one column that SQLite keeps for you. With many rows, `WHERE done = 0` jumps straight to the right rows instead of reading every row. Nothing changes on screen.' },
+  { id: 'tx', label: 'Transaction (rolls back)', sql: "BEGIN;\nUPDATE tasks SET list_id = 2 WHERE id = 1;\nINSERT INTO tasks (title) VALUES (NULL); -- fails: title is NOT NULL\nCOMMIT;", explain: 'A **transaction** keeps changes together: all of them, or none. The INSERT failed, so `ROLLBACK` undid the UPDATE too: task 1 is still in list 1.' },
+  { id: 'nuke', label: 'DELETE with no WHERE', sql: 'DELETE FROM tasks;', explain: '**Every row is gone.** Without `WHERE`, DELETE and UPDATE change the whole table. Press Start again to rebuild it.' },
+];
+---
+<figure class="sql" data-sql data-reveal data-free>
+  <div class="sql-grid">
+    <div class="sql-left">
+      <p class="sql-k mono">Run one statement at a time</p>
+      <ol class="sql-steps">
+        {STEPS.map((s, i) => <li><button type="button" class="sql-step" data-sql-step={s.id} disabled={i > 0}><span class="mono">{String(i + 1).padStart(2, '0')}</span>{s.label}</button></li>)}
+      </ol>
+      <button type="button" class="sql-reset" data-sql-reset>Start again</button>
+    </div>
+    <div class="sql-right">
+      <label class="sql-k mono" for="sql-box">The SQL (you can edit it, then press Run)</label>
+      <textarea id="sql-box" class="sql-box" data-sql-box spellcheck="false" rows="6">-- Press 01 · CREATE TABLE to begin</textarea>
+      <div class="sql-run"><button type="button" class="btn btn-primary btn-sm" data-sql-run>Run</button><span class="sql-status mono" data-sql-status aria-live="polite">loading SQLite…</span></div>
+      <p class="sql-explain" data-sql-explain aria-live="polite"></p>
+      <div class="sql-result" data-sql-result hidden></div>
+      <div class="sql-tables" data-sql-tables></div>
+    </div>
+  </div>
+  <script type="application/json" data-sql-json set:html={JSON.stringify(STEPS)} />
+</figure>
+
+<script>
+  type Step = { id: string; label: string; sql: string; explain: string };
+  type Db = { exec(sql: string): { columns: string[]; values: unknown[][] }[]; run(sql: string): void; close(): void };
+  type SqlJs = { Database: new () => Db };
+
+  let engine: Promise<SqlJs> | null = null;
+  const loadEngine = () =>
+    (engine ??= Promise.all([import('sql.js'), import('sql.js/dist/sql-wasm.wasm?url')]).then(async ([mod, wasm]) =>
+      (mod.default as unknown as (c: object) => Promise<SqlJs>)({ locateFile: () => (wasm as { default: string }).default }),
+    ));
+
+  const esc = (s: unknown) => String(s ?? 'NULL').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
+  const md = (s: string) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-sql]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const steps = JSON.parse(root.querySelector('[data-sql-json]')!.textContent!) as Step[];
+      const box = root.querySelector<HTMLTextAreaElement>('[data-sql-box]')!;
+      const status = root.querySelector<HTMLElement>('[data-sql-status]')!;
+      const explain = root.querySelector<HTMLElement>('[data-sql-explain]')!;
+      const result = root.querySelector<HTMLElement>('[data-sql-result]')!;
+      const tables = root.querySelector<HTMLElement>('[data-sql-tables]')!;
+      const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-sql-step]'));
+      let db: Db | null = null;
+      let before = new Map<string, string>();
+
+      const snapshot = () => {
+        const out = new Map<string, string>();
+        if (!db) return out;
+        for (const name of ['lists', 'tasks']) {
+          try {
+            const r = db.exec(`SELECT * FROM ${name}`)[0];
+            for (const row of r?.values ?? []) out.set(`${name}:${row[0]}`, JSON.stringify(row));
+          } catch {
+            /* the table does not exist yet */
+          }
+        }
+        return out;
+      };
+      const drawTables = () => {
+        if (!db) return;
+        const now = snapshot();
+        const html: string[] = [];
+        for (const name of ['lists', 'tasks']) {
+          let r: { columns: string[]; values: unknown[][] } | undefined;
+          let cols: string[] = [];
+          try {
+            r = db.exec(`SELECT * FROM ${name}`)[0];
+            cols = r?.columns ?? (db.exec(`PRAGMA table_info(${name})`)[0]?.values.map((v) => String(v[1])) ?? []);
+          } catch {
+            continue;
+          }
+          if (!cols.length) continue;
+          const rows = (r?.values ?? []).map((row) => {
+            const key = `${name}:${row[0]}`;
+            const fresh = before.get(key) !== now.get(key);
+            return `<tr class="${fresh ? 'is-new' : ''}">${row.map((v) => `<td class="mono">${esc(v)}</td>`).join('')}</tr>`;
+          });
+          html.push(`<div class="sql-t"><p class="mono"><b>${name}</b> · ${r?.values.length ?? 0} row${(r?.values.length ?? 0) === 1 ? '' : 's'}</p><table><thead><tr>${cols.map((c) => `<th class="mono">${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.join('') || `<tr><td class="sql-none" colspan="${cols.length}">no rows</td></tr>`}</tbody></table></div>`);
+        }
+        tables.innerHTML = html.join('') || '<p class="sql-none">No tables yet.</p>';
+        before = now;
+      };
+      const showResult = (res: { columns: string[]; values: unknown[][] }[]) => {
+        const last = res[res.length - 1];
+        if (!last) {
+          result.hidden = true;
+          return;
+        }
+        result.hidden = false;
+        result.innerHTML = `<p class="mono">Result · ${last.values.length} row${last.values.length === 1 ? '' : 's'}</p><table><thead><tr>${last.columns.map((c) => `<th class="mono">${esc(c)}</th>`).join('')}</tr></thead><tbody>${last.values.map((row) => `<tr>${row.map((v) => `<td class="mono">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+      };
+      const run = (sql: string, note?: string) => {
+        if (!db) return;
+        result.hidden = true;
+        try {
+          if (/^\s*BEGIN/i.test(sql)) {
+            // a transaction: run each statement; on the first error, ROLLBACK everything since BEGIN
+            const parts = sql.split(/;\s*(?:--[^\n]*)?\n?/).map((s) => s.trim()).filter(Boolean);
+            for (const p of parts) {
+              try {
+                db.run(p);
+              } catch (error) {
+                db.run('ROLLBACK');
+                status.textContent = `error: ${(error as Error).message} → ROLLBACK`;
+                status.dataset.tone = 'bad';
+                if (note) explain.innerHTML = md(note);
+                drawTables();
+                return;
+              }
+            }
+            status.textContent = 'committed';
+          } else {
+            const res = db.exec(sql);
+            showResult(res);
+            status.textContent = res.length ? 'read' : 'done';
+          }
+          status.dataset.tone = 'good';
+          if (note) explain.innerHTML = md(note);
+        } catch (error) {
+          status.textContent = `error: ${(error as Error).message}`;
+          status.dataset.tone = 'bad';
+        }
+        drawTables();
+      };
+      const start = async () => {
+        status.textContent = 'loading SQLite…';
+        try {
+          const SQL = await loadEngine();
+          db?.close();
+          db = new SQL.Database();
+          before = new Map();
+          buttons.forEach((b, i) => (b.disabled = i > 0));
+          box.value = '-- Press 01 · CREATE TABLE to begin';
+          explain.textContent = '';
+          result.hidden = true;
+          status.textContent = 'ready: an empty database';
+          status.dataset.tone = '';
+          drawTables();
+        } catch (error) {
+          status.textContent = `could not load SQLite (${(error as Error).message})`;
+        }
+      };
+      buttons.forEach((b, i) =>
+        b.addEventListener('click', () => {
+          if (!db) {
+            status.textContent = 'SQLite is still loading… press it again in a moment.';
+            void start();
+            return;
+          }
+          const s = steps[i];
+          box.value = s.sql;
+          buttons.forEach((x, n) => x.classList.toggle('on', n === i));
+          if (buttons[i + 1]) buttons[i + 1].disabled = false;
+          run(s.sql, s.explain);
+        }),
+      );
+      root.querySelector('[data-sql-run]')!.addEventListener('click', () => run(box.value, 'Your own SQL ran against the same database.'));
+      root.querySelector('[data-sql-reset]')!.addEventListener('click', () => void start());
+      // load SQLite (≈700 KB) only when the lab reaches this part
+      const io = new IntersectionObserver((entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          void start();
+        }
+      }, { rootMargin: '600px 0px' });
+      io.observe(root);
+      root.addEventListener('pointerenter', () => { if (!db) { io.disconnect(); void start(); } }, { once: true });
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .sql { margin: 22px 0 30px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .sql-grid { display: grid; gap: 16px; }
+  @media (min-width: 880px) { .sql-grid { grid-template-columns: 220px minmax(0, 1fr); } }
+  .sql-k { display: block; margin: 0 0 6px !important; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+  .sql-steps { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 6px; }
+  .sql-step { width: 100%; display: flex; gap: 10px; align-items: center; text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 13.5px var(--font-body); cursor: pointer; }
+  .sql-step .mono { font-size: 12px; color: var(--text-2); }
+  .sql-step.on { border-color: var(--accent-text); background: color-mix(in oklab, var(--accent) 12%, var(--surface)); }
+  .sql-step:disabled { opacity: .55; cursor: not-allowed; }
+  .sql-step:focus-visible, .sql-reset:focus-visible, .sql-box:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .sql-reset { margin-top: 10px; border: 0; background: none; padding: 4px 2px; color: var(--accent-text); font: 600 13px var(--font-body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .sql-right { display: grid; gap: 10px; min-width: 0; align-content: start; }
+  .sql-box { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--code-bg); color: var(--text); font: 13px/1.6 var(--font-mono); resize: vertical; }
+  .sql-run { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .sql-status { font-size: 12.5px; color: var(--text-2); }
+  .sql-status[data-tone='good'] { color: var(--ok); }
+  .sql-status[data-tone='bad'] { color: var(--danger); }
+  .sql-explain { margin: 0 !important; font-size: 15px; color: var(--text); min-height: 1.4em; }
+  .sql-result, .sql-t { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); overflow-x: auto; }
+  .sql-result { border-color: color-mix(in oklab, var(--info) 45%, var(--line)); }
+  .sql-result p, .sql-t p { margin: 0 0 6px !important; font-size: 12.5px; color: var(--text-2); }
+  .sql-tables { display: grid; gap: 10px; }
+  .sql :global(table) { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .sql :global(th) { text-align: left; padding: 4px 8px; color: var(--text-2); font-weight: 600; border-bottom: 1px solid var(--line-2); }
+  .sql :global(td) { padding: 5px 8px; color: var(--text); border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .sql :global(.sql-none) { color: var(--text-2); font-style: italic; }
+  .sql :global(tr.is-new) { animation: sql-flash 1.3s var(--ease-out); }
+  @keyframes sql-flash { 0% { background: color-mix(in oklab, var(--accent) 36%, transparent); } 100% { background: transparent; } }
+  @media (prefers-reduced-motion: reduce) { .sql :global(tr.is-new) { animation: none; } }
+</style>

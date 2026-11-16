@@ -1,0 +1,137 @@
+---
+/**
+ * Lab 06 · Part 1 — every place an app can keep data, on the phone and in the cloud. Save some data, then restart
+ * the app, reinstall it, or sign in on a new phone: each place keeps or loses its data. Click a place to read what
+ * it is for. <StorageMap />
+ */
+const PLACES = [
+  { id: 'memory', side: 'phone', name: 'Memory', tech: 'useState, variables', sample: "search = 'milk'", what: 'The values your code is using right now.', read: 'At once (synchronous).', lasts: 'Until the app closes.', secret: 'Not saved anywhere.', shared: 'No.', use: 'What a screen needs while it is open: the text being typed, which tab is selected.' },
+  { id: 'kv', side: 'phone', name: 'Key-value storage', tech: 'AsyncStorage · MMKV', sample: 'settings → {"dark":true}', what: 'A list of keys, each with one value (text, or for MMKV a number or boolean).', read: 'AsyncStorage: later (await). MMKV: at once.', lasts: 'Until the app is deleted.', secret: 'Plain file: not encrypted.', shared: 'No, this phone only.', use: 'Small settings: theme, language, “seen the welcome screen”.' },
+  { id: 'db', side: 'phone', name: 'Database', tech: 'SQLite (expo-sqlite)', sample: 'tasks: 3 rows', what: 'Tables of rows and columns, read and changed with SQL.', read: 'Later (await), with queries: WHERE, ORDER BY.', lasts: 'Until the app is deleted.', secret: 'Plain file: not encrypted.', shared: 'No, this phone only.', use: 'Many rows of the same shape that you search, sort and filter: tasks, messages, notes.' },
+  { id: 'secure', side: 'phone', name: 'Secure storage', tech: 'SecureStore (Keychain / Keystore)', sample: 'auth.token → ●●●● (encrypted)', what: 'A few small secrets, encrypted with a key the phone protects.', read: 'Later (await).', lasts: 'Until the app is deleted (iOS may keep it after a reinstall: do not rely on it).', secret: 'Encrypted.', shared: 'No, this phone only.', use: 'Tokens and keys: anything that lets someone act as the user.' },
+  { id: 'files', side: 'phone', name: 'Files on the phone', tech: 'expo-file-system', sample: 'photo-1.jpg (2 MB)', what: 'Whole files: photos, PDFs, downloads.', read: 'Later (await), as bytes or text.', lasts: 'Until the app is deleted (cache files may be removed earlier).', secret: 'Plain files.', shared: 'No, this phone only.', use: 'A photo before it is uploaded, a downloaded document.' },
+  { id: 'cloud-db', side: 'cloud', name: 'Cloud database', tech: 'Supabase (Postgres)', sample: 'tasks, profiles', what: 'Tables on a server, shared by every user, protected by Row Level Security.', read: 'Over the internet: later (await), and only when online.', lasts: 'Until it is deleted on the server.', secret: 'Rows are protected by policies, not by the phone.', shared: 'Yes: every phone of the user sees it.', use: 'Anything the user must find again on another phone, or that other users share.' },
+  { id: 'cloud-files', side: 'cloud', name: 'Cloud file storage', tech: 'Supabase Storage (buckets)', sample: 'avatars/…/avatar.png', what: 'Files in buckets, each with a URL (public, or signed and short-lived).', read: 'Over the internet, as a URL or a download.', lasts: 'Until it is deleted on the server.', secret: 'Public bucket: anyone with the URL. Private: signed URLs only.', shared: 'Yes.', use: 'Profile photos, attachments, anything big that many phones show.' },
+  { id: 'cloud-auth', side: 'cloud', name: 'Accounts', tech: 'Supabase Auth', sample: 'users · sessions', what: 'Who the users are, and the sessions (tokens) that prove it.', read: 'Over the internet, when signing in.', lasts: 'Until the account is deleted.', secret: 'Passwords are stored hashed; the app keeps only the token.', shared: 'Yes: the same account on every phone.', use: 'Signing in. Row Level Security uses it to know who is asking.' },
+];
+const ACTIONS = [
+  { id: 'save', label: 'Save some data', keep: ['memory', 'kv', 'db', 'secure', 'files', 'cloud-db', 'cloud-files', 'cloud-auth'], note: 'Every place holds something now. Next: restart the app, or delete it.' },
+  { id: 'restart', label: 'Restart the app', keep: ['kv', 'db', 'secure', 'files', 'cloud-db', 'cloud-files', 'cloud-auth'], note: 'A restart clears **memory** only. Everything saved on the phone’s disk is read back.' },
+  { id: 'reinstall', label: 'Delete and reinstall the app', keep: ['cloud-db', 'cloud-files', 'cloud-auth'], note: 'Deleting the app deletes its files: key-value, SQLite, secure storage and files are gone. Only the **cloud** keeps the user’s data.' },
+  { id: 'phone', label: 'Sign in on a new phone', keep: ['cloud-db', 'cloud-files', 'cloud-auth'], note: 'A new phone starts empty. After signing in, the app downloads what is in the **cloud**. Settings that lived only on the old phone are lost.' },
+];
+---
+<figure class="sm" data-sm data-reveal data-free>
+  <div class="sm-acts" role="toolbar" aria-label="What happens to the phone">
+    {ACTIONS.map((a) => <button type="button" class="sm-act" data-sm-act={a.id}>{a.label}</button>)}
+  </div>
+  <p class="sm-note" data-sm-note aria-live="polite">Press <b>Save some data</b>, then try the other buttons. Click any place to read what it is for.</p>
+  <div class="sm-grid">
+    {(['phone', 'cloud'] as const).map((side) => (
+      <section class={`sm-side sm-${side}`} aria-label={side === 'phone' ? 'On the phone' : 'In the cloud'}>
+        <p class="sm-k mono">{side === 'phone' ? 'On the phone' : 'In the cloud (Supabase)'}</p>
+        {PLACES.filter((p) => p.side === side).map((p) => (
+          <button type="button" class="sm-place" data-sm-place={p.id} aria-pressed="false">
+            <span class="sm-name">{p.name}</span>
+            <span class="sm-tech mono">{p.tech}</span>
+            <span class="sm-data mono" data-sm-data>empty</span>
+          </button>
+        ))}
+      </section>
+    ))}
+  </div>
+  <dl class="sm-detail" data-sm-detail hidden>
+    <div><dt>What it holds</dt><dd data-f="what"></dd></div>
+    <div><dt>Reading it</dt><dd data-f="read"></dd></div>
+    <div><dt>Lasts</dt><dd data-f="lasts"></dd></div>
+    <div><dt>Secret?</dt><dd data-f="secret"></dd></div>
+    <div><dt>Other phones see it?</dt><dd data-f="shared"></dd></div>
+    <div><dt>Use it for</dt><dd data-f="use"></dd></div>
+  </dl>
+  <script type="application/json" data-sm-json set:html={JSON.stringify({ places: PLACES, actions: ACTIONS })} />
+</figure>
+
+<script>
+  type Place = { id: string; name: string; sample: string; [k: string]: string };
+  type Action = { id: string; keep: string[]; note: string };
+  const md = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-sm]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const { places, actions } = JSON.parse(root.querySelector('[data-sm-json]')!.textContent!) as { places: Place[]; actions: Action[] };
+      const note = root.querySelector<HTMLElement>('[data-sm-note]')!;
+      const detail = root.querySelector<HTMLElement>('[data-sm-detail]')!;
+      const full = new Set<string>();
+      const paint = (changed: Set<string>) => {
+        for (const p of places) {
+          const el = root.querySelector<HTMLElement>(`[data-sm-place="${p.id}"]`)!;
+          const has = full.has(p.id);
+          el.dataset.state = has ? 'full' : 'empty';
+          el.querySelector('[data-sm-data]')!.textContent = has ? p.sample : 'empty';
+          if (changed.has(p.id)) {
+            el.classList.remove('pulse');
+            void el.offsetWidth;
+            el.classList.add('pulse');
+          }
+        }
+      };
+      root.querySelectorAll<HTMLButtonElement>('[data-sm-act]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const a = actions.find((x) => x.id === b.dataset.smAct)!;
+          const before = new Set(full);
+          if (a.id !== 'save' && full.size === 0) {
+            note.innerHTML = 'Nothing is saved yet: press <b>Save some data</b> first.';
+            return;
+          }
+          if (a.id === 'save') places.forEach((p) => full.add(p.id));
+          else for (const id of [...full]) if (!a.keep.includes(id)) full.delete(id);
+          const changed = new Set(places.map((p) => p.id).filter((id) => before.has(id) !== full.has(id)));
+          paint(changed);
+          root.querySelectorAll('[data-sm-act]').forEach((x) => x.classList.toggle('on', x === b));
+          note.innerHTML = md(a.note);
+        }),
+      );
+      root.querySelectorAll<HTMLButtonElement>('[data-sm-place]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const p = places.find((x) => x.id === b.dataset.smPlace)!;
+          root.querySelectorAll('[data-sm-place]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+          detail.hidden = false;
+          detail.querySelectorAll<HTMLElement>('[data-f]').forEach((dd) => (dd.textContent = p[dd.dataset.f!]));
+          detail.setAttribute('aria-label', p.name);
+        }),
+      );
+      paint(new Set());
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .sm { margin: 22px 0 30px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .sm-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sm-act { padding: 7px 13px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 13px var(--font-body); cursor: pointer; }
+  .sm-act.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .sm-act:focus-visible, .sm-place:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .sm-note { margin: 0 !important; font-size: 15px; color: var(--text); min-height: 1.5em; }
+  .sm-grid { display: grid; gap: 12px; }
+  @media (min-width: 760px) { .sm-grid { grid-template-columns: 1.25fr 1fr; } }
+  .sm-side { display: grid; gap: 8px; align-content: start; padding: 14px; border-radius: 22px; border: 1px solid var(--line-2); }
+  .sm-phone { background: var(--bg-2); }
+  .sm-cloud { background: color-mix(in oklab, var(--info) 7%, var(--surface)); border-color: color-mix(in oklab, var(--info) 35%, var(--line)); }
+  .sm-k { margin: 0 0 2px !important; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+  .sm-place { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); cursor: pointer; transition: border-color .2s, background .2s, opacity .3s; }
+  .sm-place[aria-pressed='true'] { border-color: var(--accent-text); }
+  .sm-name { font-weight: 650; font-size: 14.5px; }
+  .sm-tech { font-size: 12px; color: var(--text-2); }
+  .sm-data { font-size: 12.5px; color: var(--text-2); }
+  .sm-place[data-state='full'] .sm-data { color: var(--text); }
+  .sm-place[data-state='empty'] { border-style: dashed; background: transparent; }
+  .sm-place.pulse { animation: sm-pulse 1s var(--ease-out); }
+  @keyframes sm-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 12px transparent; } }
+  .sm-detail { margin: 0 !important; display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); }
+  @media (min-width: 760px) { .sm-detail { grid-template-columns: 1fr 1fr 1fr; } }
+  .sm-detail div { display: grid; gap: 2px; }
+  .sm-detail dt { font-size: 12px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+  .sm-detail dd { margin: 0; font-size: 14px; color: var(--text); }
+  @media (prefers-reduced-motion: reduce) { .sm-place.pulse { animation: none; } }
+</style>

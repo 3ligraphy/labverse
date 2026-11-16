@@ -1,0 +1,668 @@
+---
+number: 6
+title: 'Storage in React Native — AsyncStorage, SQLite, SecureStore and Supabase'
+description: 'Where an app keeps its data, and why: key-value storage (AsyncStorage, MMKV), a SQLite database on the phone, secure storage for tokens, and a Supabase cloud database with sign-in, file storage and Row Level Security. Then the phone and the cloud work together, even offline. 14 checked exercises build the parts of one offline-ready tasks app.'
+difficulty: Intermediate
+estimatedTime: '2 h 30 min'
+skills: [AsyncStorage, MMKV, SQLite, SecureStore, Supabase, Row Level Security, Offline sync]
+roadmapStage: data
+interactive: true
+objectives:
+  - Explain how an app keeps data — memory or storage, phone or cloud, key-value or database, files — and choose the right place for each piece of data
+  - Save and read data with AsyncStorage (as JSON text) and with MMKV, and say when to choose each one
+  - Create a SQLite table on the phone and run INSERT, SELECT, UPDATE and DELETE with ? parameters
+  - Keep tokens in SecureStore, and explain why AsyncStorage is not safe for secrets
+  - Connect an app to Supabase with the project URL and the publishable key, and read, add, change and delete rows
+  - Upload a file to Supabase Storage and show it with a public or a signed URL
+  - Explain Supabase Auth sessions and Row Level Security, and write a policy
+  - Keep data available offline and send it to the cloud later, without duplicates
+prerequisites:
+  - 'Lab 05 completed: fetch, async / await and JSON'
+  - 'React Native basics: components, useState, useEffect'
+  - 'For Part 5: a free Supabase account (sign up at supabase.com with GitHub or an email)'
+expectedResult:
+  description: 'An Offline-Ready Tasks App: a new task is saved on the phone at once (SQLite), the theme is remembered (AsyncStorage), the session is encrypted (SecureStore), and the tasks reach your Supabase project when the phone is online, one row each.'
+  screen: ['My tasks', 'Online · 1 waiting to sync', '☐ Buy milk — waiting', '☑ Read Part 6 — in the cloud', 'Sync now · Dark theme · Sign out']
+troubleshooting:
+  - problem: 'AsyncStorage holds "[object Object]"'
+    cause: 'An object was saved without JSON.stringify. AsyncStorage keeps text only.'
+    solution: 'Save `JSON.stringify(value)` and read it back with `JSON.parse(text)`.'
+  - problem: '"SQLite error: no such table: tasks"'
+    cause: 'A query ran before the CREATE TABLE, or the table name is misspelled.'
+    solution: 'Run `CREATE TABLE IF NOT EXISTS …` once when the database opens, and await it before the first query.'
+  - problem: '"NOT NULL constraint failed" from SQLite'
+    cause: 'An INSERT left out a column marked NOT NULL.'
+    solution: 'Give that column a value, or a DEFAULT in the CREATE TABLE.'
+  - problem: '"Invalid key provided to SecureStore"'
+    cause: 'The key has a space or another character SecureStore does not allow.'
+    solution: 'Keys may contain letters, numbers, ".", "-" and "_" only, for example `auth.token`.'
+  - problem: 'MMKV: "not supported in Expo Go", or a missing native module'
+    cause: 'MMKV is native code that Expo Go does not include.'
+    solution: 'Use a development build: `npx expo prebuild`, then `npx expo run:android` (or `run:ios`). Or use AsyncStorage, which works in Expo Go.'
+  - problem: 'Supabase returns an empty list, but the table has rows'
+    cause: 'Row Level Security is on and no policy allows this user to read them — or nobody is signed in.'
+    solution: 'Sign in first, and add a `for select` policy (Part 5). With RLS on, no policy means no rows.'
+  - problem: '"new row violates row-level security policy for table" (code 42501)'
+    cause: 'No policy allows this insert or update, or the row would belong to someone else.'
+    solution: 'Add a `for insert … with check ((select auth.uid()) = user_id)` policy, and let the table fill `user_id` with `auth.uid()`.'
+  - problem: '"The resource already exists" when uploading'
+    cause: 'A file with this path is already in the bucket.'
+    solution: 'Add `upsert: true` to the upload options (and the update and select storage policies), or use a new path.'
+  - problem: '"Invalid supabaseUrl" or an undefined key'
+    cause: 'The .env names do not start with EXPO_PUBLIC_, or Expo was not restarted after editing .env.'
+    solution: 'Use `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, then stop and run `npx expo start` again.'
+  - problem: '"Email not confirmed" when signing in'
+    cause: 'New Supabase projects ask users to confirm their email first.'
+    solution: 'Click the link in the email, or create the user in Authentication → Users → Add user with “Auto Confirm User” ticked.'
+  - problem: '"Network request failed"'
+    cause: 'The phone has no connection (or the emulator’s Wi-Fi is off).'
+    solution: 'Expected when offline: the tasks stay `synced = 0` and are sent when NetInfo reports the connection is back.'
+draft: false
+---
+
+export const SQLITE_CODE = `import * as SQLite from 'expo-sqlite';
+
+export const dbPromise = SQLite.openDatabaseAsync('tasks.db');
+
+export async function setup() {
+  const db = await dbPromise;
+  await db.execAsync(\`
+    PRAGMA journal_mode = WAL;
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      done INTEGER NOT NULL DEFAULT 0
+    );
+  \`);
+}
+
+export async function addTask(title: string) {
+  const db = await dbPromise;
+  const result = await db.runAsync('INSERT INTO tasks (title) VALUES (?)', title);
+  return result.lastInsertRowId;
+}
+
+export async function getOpenTasks() {
+  const db = await dbPromise;
+  return db.getAllAsync('SELECT * FROM tasks WHERE done = ? ORDER BY id DESC', 0);
+}
+
+export async function addMany(titles: string[]) {
+  const db = await dbPromise;
+  await db.withTransactionAsync(async () => {
+    for (const title of titles) {
+      await db.runAsync('INSERT INTO tasks (title) VALUES (?)', title);
+    }
+  });
+}`;
+
+export const SUPABASE_CODE = `import 'react-native-url-polyfill/auto';
+import { createClient } from '@supabase/supabase-js';
+import 'expo-sqlite/localStorage/install';
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+
+export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+  auth: {
+    storage: localStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});`;
+
+export const LARGE_SECURE_CODE = `class LargeSecureStore {
+  private async _encrypt(key: string, value: string) {
+    const encryptionKey = crypto.getRandomValues(new Uint8Array(256 / 8));
+    const cipher = new aesjs.ModeOfOperation.ctr(encryptionKey, new aesjs.Counter(1));
+    const encryptedBytes = cipher.encrypt(aesjs.utils.utf8.toBytes(value));
+    await SecureStore.setItemAsync(key, aesjs.utils.hex.fromBytes(encryptionKey));
+    return aesjs.utils.hex.fromBytes(encryptedBytes);
+  }
+
+  async setItem(key: string, value: string) {
+    const encrypted = await this._encrypt(key, value);
+    await AsyncStorage.setItem(key, encrypted);
+  }
+
+  async getItem(key: string) {
+    const encrypted = await AsyncStorage.getItem(key);
+    if (!encrypted) return encrypted;
+    return this._decrypt(key, encrypted); // reads the key from SecureStore
+  }
+}`;
+
+export const SYNC_CODE = `export async function syncPending() {
+  const db = await dbPromise;
+  const waiting = await db.getAllAsync('SELECT * FROM tasks WHERE synced = 0');
+  if (waiting.length === 0) return 0;
+
+  const { error } = await supabase
+    .from('tasks')
+    .upsert(waiting.map((t) => ({ id: t.id, title: t.title, done: t.done === 1 })), { onConflict: 'id' });
+  if (error) throw error;
+
+  for (const t of waiting) {
+    await db.runAsync('UPDATE tasks SET synced = 1 WHERE id = ?', t.id);
+  }
+  return waiting.length;
+}`;
+
+<Part n="1" title="Where your app keeps data" time="13 min" />
+
+In Lab 05 your app got data from a server. When the app closed, everything it had in its variables was gone. **Storage** means writing data somewhere it stays, so the app can read it again later.
+
+<Cards cols={2} items={[
+  { tag: 'memory', icon: 'clock', title: 'Memory', text: 'useState and variables. Fast, but it is emptied when the app closes. Use it for what the screen needs right now.' },
+  { tag: 'persistent', icon: 'download', title: 'Persistent storage', text: 'Written to the phone’s disk (or a server). It is still there after the app closes and opens again.' },
+  { tag: 'local', icon: 'phone', title: 'Local storage', text: 'On this phone only. Works with no internet. Gone if the app is deleted.' },
+  { tag: 'cloud', icon: 'cloud', title: 'Cloud storage', text: 'On a server. Every phone of the user (and other users) can reach it — but only when online.' },
+]} />
+
+Data also has a **shape**:
+
+<Cards cols={3} items={[
+  { tag: 'key-value', icon: 'key', title: 'Key-value', text: 'One value under one name (the key): `theme → dark`. Simple and small. AsyncStorage and MMKV (Part 2).' },
+  { tag: 'relational', icon: 'grid', title: 'A relational database', text: 'Tables of rows and columns that you search with SQL: “tasks not done, newest first”. SQLite (Part 3) and Postgres in Supabase (Part 5).' },
+  { tag: 'files', icon: 'file', title: 'File storage', text: 'Whole files: a photo, a PDF. They are bytes, not rows. Supabase Storage (Part 5).' },
+]} />
+
+Two more words you will meet in every part:
+
+- **Synchronous** means the answer comes back at once (MMKV). **Asynchronous** means the answer comes later, so you write `await` (AsyncStorage, SQLite, SecureStore, Supabase).
+- Storage keeps **text**, not JavaScript objects. **Serialize** = turn an object into text with `JSON.stringify`. **Deserialize** = turn the text back into an object with `JSON.parse`.
+
+<StorageMap />
+
+<Compare
+  title="Phone or cloud?"
+  a={{ name: 'On the phone', tag: 'local' }}
+  b={{ name: 'In the cloud', tag: 'Supabase' }}
+  rows={[
+    { label: 'Works with no internet', a: 'Yes', b: 'No', better: 'a' },
+    { label: 'Speed', a: 'Very fast: no network', b: 'A request over the internet', better: 'a' },
+    { label: 'Other phones see it', a: 'No', b: 'Yes', better: 'b' },
+    { label: 'Deleting the app', a: 'Deletes the data', b: 'The data stays', better: 'b' },
+    { label: 'Who protects it', a: 'The phone (and you, for secrets)', b: 'The server: sign-in and Row Level Security' },
+  ]}
+  picks={[
+    { situation: 'The user’s profile must be the same on their phone and their tablet.', answer: 'b', why: 'Only the cloud is shared between devices.' },
+    { situation: 'The app must show today’s tasks on the bus, with no signal.', answer: 'a', why: 'Only data on the phone is there without a connection. Part 6 keeps a copy on the phone and syncs it.' },
+    { situation: 'Remember that the welcome screen was already seen.', answer: 'a', why: 'A small setting of this phone: no server needed.' },
+  ]}
+/>
+
+<Demo id="memory-vs-storage" />
+
+<Exercise id="lab-06--where-data-lives" />
+
+<Checkpoint>
+You can say, for any piece of data, whether it belongs in memory, key-value storage, a database, secure storage, files, or the cloud — and why.
+</Checkpoint>
+
+<Part n="2" title="Key-value storage: AsyncStorage and MMKV" time="30 min" />
+
+**AsyncStorage** saves text under a key, on the phone. It exists because React Native has no built-in way to keep small data between launches. It is asynchronous (every call needs `await`), it is not encrypted, and it is included in **Expo Go**.
+
+<Terminal title="Terminal — install" lines={['$ npx expo install @react-native-async-storage/async-storage']} />
+
+```ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+await AsyncStorage.setItem('settings', JSON.stringify({ dark: true, size: 18 })); // save (object → text)
+const text = await AsyncStorage.getItem('settings');           // read: the text, or null
+const settings = text ? JSON.parse(text) : null;                // text → object
+await AsyncStorage.mergeItem('settings', JSON.stringify({ size: 20 })); // update one field
+await AsyncStorage.removeItem('settings');                      // remove one key
+await AsyncStorage.clear();                                     // remove every key of this app
+const keys = await AsyncStorage.getAllKeys();                   // which keys exist
+```
+
+<KvFlow />
+
+Reading and saving can fail (a full disk, a broken value), so put them in `try / catch`:
+
+```ts
+try {
+  const text = await AsyncStorage.getItem('settings');
+  if (text) setSettings(JSON.parse(text)); // JSON.parse throws if the text is broken
+} catch (error) {
+  console.warn('Could not load the settings', error); // the app keeps its defaults
+}
+```
+
+<Cards cols={2} items={[
+  { tone: 'good', title: 'Use AsyncStorage for', points: ['+ settings: theme, language, text size', '+ small flags: “seen the welcome screen”', '+ a small cache of the last screen'] },
+  { tone: 'bad', title: 'Do not use it for', points: ['- tokens and passwords: it is a plain file (Part 4)', '- hundreds of rows you search or sort (Part 3)', '- anything other phones must see (Part 5)'] },
+]} />
+
+<Demo id="async-storage-api" />
+
+<Exercise id="lab-06--async-predict" />
+
+<Exercise id="lab-06--settings-async" />
+
+**MMKV** is another key-value store. It is written in C++, it reads and writes **synchronously** (no `await`), and it keeps types: a number comes back as a number. It is much faster than AsyncStorage when an app reads values very often. It is native code, so it needs a **development build** — it does not run in Expo Go.
+
+<Terminal title="Terminal — install MMKV (development build)" lines={[
+  '$ npx expo install react-native-mmkv react-native-nitro-modules',
+  '$ npx expo prebuild',
+  '$ npx expo run:android',
+  '# Expo Go cannot load it: from now on you open the development build instead',
+]} />
+
+<Compare
+  title="AsyncStorage or MMKV?"
+  a={{ name: 'AsyncStorage', tag: 'Expo Go', code: "const text = await AsyncStorage.getItem('dark');\nconst dark = text === 'true';\nawait AsyncStorage.setItem('dark', String(!dark));" }}
+  b={{ name: 'MMKV', tag: 'development build', code: "const storage = createMMKV();\nconst dark = storage.getBoolean('dark') ?? false;\nstorage.set('dark', !dark);" }}
+  rows={[
+    { label: 'Reading', a: 'Later: `await getItem(key)`', b: 'At once: `getBoolean(key)`', better: 'b' },
+    { label: 'Types', a: 'Text only (JSON for objects)', b: 'Text, numbers, booleans, bytes', better: 'b' },
+    { label: 'Speed', a: 'Fine for a few reads', b: 'Much faster for many reads', better: 'b' },
+    { label: 'Setup', a: 'Works in Expo Go', b: 'Needs a development build', better: 'a' },
+    { label: 'Encryption', a: 'None', b: 'Optional `encryptionKey` (but the key must be stored safely)' },
+    { label: 'Secrets (tokens)', a: 'No', b: 'No: use SecureStore' },
+  ]}
+  picks={[
+    { situation: 'A class project that you test in Expo Go, saving the theme.', answer: 'a', why: 'AsyncStorage works in Expo Go; one setting does not need MMKV’s speed.' },
+    { situation: 'A reading app that reads the font size and position on every page turn.', answer: 'b', why: 'Many reads, and synchronous reads keep the screen smooth.' },
+  ]}
+/>
+
+<Exercise id="lab-06--settings-mmkv" />
+
+<Checkpoint>
+Settings survive a restart: saved as JSON text with AsyncStorage, or as typed values with MMKV. Neither one is a place for secrets.
+</Checkpoint>
+
+<Part n="3" title="A database on the phone: SQLite" time="27 min" />
+
+A **database** keeps data in **tables**. A table has **columns** (the fields, each with a type) and **rows** (one row per thing, for example one task). The **primary key** is a column whose value is different in every row, usually `id`, so one row can always be found.
+
+Key-value storage is not enough when the data is a list you search. To show “tasks not done, newest first” with AsyncStorage you would load the whole list, `JSON.parse` it, filter and sort it in JavaScript, and save the whole list again after every change. A database does it with one query, and changes one row at a time.
+
+**SQLite** is a database in one file on the phone. You talk to it with **SQL**, a language of short statements:
+
+<SqlLab />
+
+<Compare
+  title="Key-value or SQLite?"
+  a={{ name: 'Key-value (AsyncStorage)' }}
+  b={{ name: 'SQLite' }}
+  rows={[
+    { label: 'Shape', a: 'One value per key', b: 'Tables of rows and columns', better: 'b' },
+    { label: 'Find some items', a: 'Load everything, filter in JavaScript', b: '`SELECT … WHERE …`', better: 'b' },
+    { label: 'Change one item', a: 'Save the whole list again', b: '`UPDATE … WHERE id = ?`', better: 'b' },
+    { label: 'Setup', a: 'No setup', b: 'CREATE TABLE first', better: 'a' },
+    { label: 'Best for', a: 'A few settings', b: 'Many rows of the same shape' },
+  ]}
+  picks={[
+    { situation: 'Save the user’s language.', answer: 'a', why: 'One value under one key.' },
+    { situation: 'A notes app: 500 notes, searched by title and sorted by date.', answer: 'b', why: 'Many rows, searched and sorted: a database query.' },
+  ]}
+/>
+
+In Expo, use **expo-sqlite**. It is included in Expo Go.
+
+<Terminal title="Terminal — install" lines={['$ npx expo install expo-sqlite']} />
+
+The database code belongs in its own file, `db.ts`. Screens only call its functions (`addTask`, `getTasks`…) and never write SQL themselves.
+
+<CodeWalk file="db.ts" code={SQLITE_CODE} steps={[
+  { lines: [3, 3], text: '`openDatabaseAsync` opens the file **tasks.db** (and creates it the first time). Every function waits for this one connection.' },
+  { lines: [5, 15], text: '`execAsync` runs SQL that needs no values. **WAL** mode makes SQLite faster (Expo recommends it). `CREATE TABLE IF NOT EXISTS` makes the table once and does nothing the next time.' },
+  { lines: [17, 21], text: '`runAsync` runs a statement that **changes** data. Each `?` is filled with the value after the SQL — never paste the title into the SQL text. The result has `lastInsertRowId` (the new id) and `changes` (how many rows changed).' },
+  { lines: [23, 26], text: '`getAllAsync` **reads**: it returns an array of objects, one per row. `getFirstAsync` returns only the first row (or `null`).' },
+  { lines: [28, 35], text: 'A **transaction**: every task of the list is saved together, or — if one INSERT fails — none is. Use it when changes belong together.' },
+]} />
+
+<Demo id="sqlite-first" />
+
+<Exercise id="lab-06--sql-match" />
+
+<Exercise id="lab-06--tasks-sqlite" />
+
+<Checkpoint>
+Your tasks live in a real SQLite table on the phone. You can explain tables, rows, columns, the primary key, `?` parameters, WHERE, and why a transaction saves all or nothing.
+</Checkpoint>
+
+<Part n="4" title="Secrets: secure storage" time="20 min" />
+
+**Sensitive data** is data that lets someone act as the user or harms them if it leaks: tokens, keys, personal information. When a user signs in, the server gives the app tokens:
+
+<Cards cols={2} items={[
+  { tag: 'short-lived', icon: 'key', title: 'Access token', text: 'Proof of who the user is, sent with every request. It stops working after a short time (Supabase: about 1 hour).' },
+  { tag: 'long-lived', icon: 'key', title: 'Refresh token', text: 'Used to get a new access token without asking for the password again. Whoever has it can stay signed in as the user.' },
+]} />
+
+AsyncStorage keeps them as plain text. **Encryption at rest** means the data is stored encrypted, so the file is unreadable without a key. On iOS the **Keychain**, and on Android the **Keystore**, keep that key inside the phone’s secure hardware. **Expo SecureStore** uses them for you.
+
+<SecureVault />
+
+<Compare
+  title="AsyncStorage or SecureStore?"
+  a={{ name: 'AsyncStorage', code: "await AsyncStorage.setItem('token', token);" }}
+  b={{ name: 'SecureStore', code: "await SecureStore.setItemAsync('auth.token', token);" }}
+  rows={[
+    { label: 'On disk', a: 'Plain text', b: 'Encrypted', better: 'b' },
+    { label: 'Size', a: 'Fine for settings and small data', b: 'Small values only (some iOS versions refused values above about 2048 bytes)', better: 'a' },
+    { label: 'Keys', a: 'Any text', b: 'Letters, numbers, `.`, `-`, `_`' },
+    { label: 'Use it for', a: 'Settings', b: 'Tokens and keys', better: 'b' },
+  ]}
+  picks={[
+    { situation: 'The refresh token after sign-in.', answer: 'b', why: 'A token is a secret: it must be encrypted.' },
+    { situation: 'The app’s language.', answer: 'a', why: 'Not secret, and SecureStore is meant for a few small secrets.' },
+  ]}
+/>
+
+<Terminal title="Terminal — install" lines={['$ npx expo install expo-secure-store', '# included in Expo Go']} />
+
+```ts
+import * as SecureStore from 'expo-secure-store';
+
+await SecureStore.setItemAsync('auth.token', token);            // save (encrypted)
+const token = await SecureStore.getItemAsync('auth.token');     // read: the value, or null
+await SecureStore.deleteItemAsync('auth.token');                // delete (sign out)
+// values are strings: JSON.stringify an object first. Keep them small.
+```
+
+**react-native-keychain** does the same job with more options (for example asking for the fingerprint). It is native code, so it needs a development build:
+
+```ts
+import * as Keychain from 'react-native-keychain';
+
+const options = { service: 'com.example.session' };
+await Keychain.setGenericPassword('session', token, options);
+const credentials = await Keychain.getGenericPassword(options); // false, or { username, password }
+await Keychain.resetGenericPassword(options);
+```
+
+<Cards cols={2} items={[
+  { tone: 'bad', title: 'Common mistakes', points: ['- a token in AsyncStorage', '- `console.log(token)`: logs are copied to tools and crash reports', '- a secret key in `EXPO_PUBLIC_…`: it is built into the app', '- saving the password “to sign in again”'] },
+  { tone: 'good', title: 'What secure storage does not do', points: ['+ it protects the token **on the phone**, at rest', '+ it does not decide what the user may do: the server must check every request', '+ in Part 5, Row Level Security is that check'] },
+]} />
+
+<Demo id="secure-vs-plain" />
+
+<Exercise id="lab-06--secrets-predict" />
+
+<Exercise id="lab-06--token-store" />
+
+<Checkpoint>
+Tokens go to SecureStore with three calls, and stay out of AsyncStorage, logs and `EXPO_PUBLIC_` variables. The server still checks every request.
+</Checkpoint>
+
+<Part n="5" title="The cloud: Supabase" time="40 min" />
+
+**Supabase** is a backend you do not have to write. One project gives you a **Postgres database**, **Auth** (sign-in), **Storage** (files in buckets) and **Row Level Security** (rules inside the database that decide which rows each user may touch). Your app talks to it with the **supabase-js** library.
+
+<SupabaseMap />
+
+### A. Your project
+
+Start this first: a new project takes about two minutes to be ready, and you can read on meanwhile.
+
+<ClickPath steps={['supabase.com', 'Sign in', 'New project', 'Name + database password + region', 'Create new project']} />
+
+Then copy two values from **Project Settings → API Keys** (the **Connect** button shows them too):
+
+<Cards cols={3} items={[
+  { tone: 'good', icon: 'link', title: 'Project URL', text: '`https://<project-ref>.supabase.co`. Safe in the app.' },
+  { tone: 'good', icon: 'key', title: 'Publishable key', text: '`sb_publishable_…`. Made for apps: it reaches only what Row Level Security allows.' },
+  { tone: 'bad', icon: 'alert', title: 'Secret key', text: '`sb_secret_…` (the old name: service_role). It skips Row Level Security. **Never** put it in an app, a .env with EXPO_PUBLIC_, or Git.' },
+]} />
+
+<Terminal title="Terminal — install" lines={['$ npx expo install @supabase/supabase-js react-native-url-polyfill expo-sqlite']} />
+
+The two values go in a file named **.env** in the project folder. Expo copies every variable that starts with `EXPO_PUBLIC_` into the app (restart `npx expo start` after you change it):
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…
+```
+
+<CodeWalk file="lib/supabase.ts" code={SUPABASE_CODE} steps={[
+  { lines: [1, 1], text: 'React Native does not have the full `URL` class that supabase-js uses: this line adds it.' },
+  { lines: [3, 3], text: 'Adds `localStorage` to the phone (saved in SQLite), so supabase-js has a place to keep the session.' },
+  { lines: [5, 6], text: 'The two values from .env. The `!` tells TypeScript they are not undefined.' },
+  { lines: [8, 15], text: '`createClient` makes **one** client for the whole app. `persistSession` saves the session, `autoRefreshToken` gets a new access token before the old one stops working, and `detectSessionInUrl: false` because a phone app has no web address bar.' },
+]} />
+
+Then create the table. In the dashboard: **SQL Editor → New query**, paste, **Run**:
+
+```sql
+create table public.tasks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  title text not null check (char_length(title) > 0),
+  done boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+-- Row Level Security and its policies: see D below
+```
+
+### B. Rows: select, insert, update, delete
+
+Every call returns `{ data, error }`. Check `error` first.
+
+```ts
+// read: an array of rows (filters and order are optional)
+const { data, error } = await supabase.from('tasks').select('*').eq('done', false).order('created_at');
+
+// add: no rows come back unless you chain .select()
+const { error: addError } = await supabase.from('tasks').insert({ title: 'Buy milk' });
+const { data: created } = await supabase.from('tasks').insert({ title: 'Read' }).select().single();
+
+// change and remove: always with a filter, so only the rows you mean change
+await supabase.from('tasks').update({ done: true }).eq('id', task.id);
+await supabase.from('tasks').delete().eq('id', task.id);
+
+if (error) console.warn(error.code, error.message); // e.g. 42501 = blocked by Row Level Security
+```
+
+<Demo id="supabase-first" />
+
+<Exercise id="lab-06--supabase-parts" />
+
+<Exercise id="lab-06--cloud-tasks" />
+
+### C. Auth: users and sessions
+
+**Supabase Auth** checks the email and password and answers with a **session**: the access token and the refresh token. supabase-js keeps the session in `auth.storage` (so the user stays signed in after a restart) and sends the access token with every request.
+
+```ts
+await supabase.auth.signUp({ email, password });                 // new account
+const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+const { data: { session } } = await supabase.auth.getSession();  // the saved session, or null
+const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+  // SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED…: update the screen
+});
+listener.subscription.unsubscribe(); // in the useEffect cleanup
+await supabase.auth.signOut();
+```
+
+The quickstart above keeps the session in `localStorage`, which is not encrypted. The session holds the refresh token — a secret (Part 4). Supabase’s Expo tutorial shows how to keep it encrypted, and the final project does exactly that:
+
+<CodeWalk file="lib/largeSecureStore.ts" title="An encrypted session store" code={LARGE_SECURE_CODE} steps={[
+  { lines: [2, 8], text: 'A new random **AES-256 key** for each value. The value is encrypted with it, and the small key goes to **SecureStore** (encrypted by the phone).' },
+  { lines: [10, 13], text: 'The encrypted value is big, so it goes to **AsyncStorage**. On disk it is ciphertext: useless without the key.' },
+  { lines: [15, 19], text: 'Reading: take the ciphertext from AsyncStorage, the key from SecureStore, and decrypt. supabase-js uses it as `auth: { storage: new LargeSecureStore() }`.' },
+]} />
+
+### D. Row Level Security
+
+The publishable key is inside every copy of your app, so anyone can call your project’s API. **Row Level Security (RLS)** makes the **database** decide, for every row and every request, what this user may do. Checks in your app’s code are not enough: anyone can send requests without your app.
+
+```sql
+alter table public.tasks enable row level security; -- now nothing is allowed…
+
+create policy "Users read their own tasks" on public.tasks   -- …until a policy allows it
+  for select to authenticated
+  using ( (select auth.uid()) = user_id );
+
+create policy "Users add their own tasks" on public.tasks
+  for insert to authenticated
+  with check ( (select auth.uid()) = user_id );
+-- the same for update (using + with check) and delete (using)
+```
+
+<Explain parts={[['for select', 'the operation it allows'], ['to authenticated', 'only signed-in users'], ['using ( … )', 'checked for every existing row: which rows they may see or change'], ['with check ( … )', 'checked for every new or changed row: may it be saved?'], ['(select auth.uid())', 'the id of the user who sent the request']]} />
+
+<Exercise id="lab-06--rls-predict" />
+
+### E. Storage: files in buckets
+
+A **bucket** is a folder for files. A **public** bucket gives each file a fixed URL anyone can open: right for profile photos. A **private** bucket gives **signed URLs** that stop working after the number of seconds you choose: right for personal documents. Storage has its own policies; a common rule is “each user writes only in the folder named after their id”.
+
+```ts
+import { decode } from 'base64-arraybuffer';
+
+// the picker gives the photo as base64 text (base64: true); Storage wants bytes
+const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true });
+const photo = result.assets![0];
+const path = userId + '/avatar.png';
+
+const { error } = await supabase.storage
+  .from('avatars')
+  .upload(path, decode(photo.base64!), { contentType: 'image/png', upsert: true });
+
+const { data } = supabase.storage.from('avatars').getPublicUrl(path);   // public bucket
+const { data: signed } = await supabase.storage.from('documents').createSignedUrl(path, 60); // private, 60 s
+await supabase.storage.from('avatars').remove([path]);
+```
+
+<Compare
+  title="Supabase Database or Supabase Storage?"
+  a={{ name: 'Database' }}
+  b={{ name: 'Storage' }}
+  rows={[
+    { label: 'Holds', a: 'Rows: text, numbers, dates', b: 'Files: photos, PDFs, videos' },
+    { label: 'Read with', a: '`from(table).select()`', b: 'A URL, or `download(path)`' },
+    { label: 'Protected by', a: 'RLS policies on the table', b: 'Bucket type + policies on `storage.objects`' },
+    { label: 'Together', a: 'keeps the file’s **path** in a column…', b: '…and Storage keeps the file itself' },
+  ]}
+  picks={[
+    { situation: 'A user’s profile photo.', answer: 'b', why: 'A file belongs in a bucket; the profile row keeps its path or URL.' },
+    { situation: 'The task title and whether it is done.', answer: 'a', why: 'Small values in columns: database rows.' },
+  ]}
+/>
+
+<Exercise id="lab-06--avatar-upload" />
+
+<Checkpoint>
+Your app reads and writes rows in Supabase, uploads a file, and signs in. Row Level Security — not your app — decides what each user may touch.
+</Checkpoint>
+
+<Part n="6" title="Local and cloud together: offline basics" time="20 min" />
+
+Real apps use both: the **phone** for speed and for working offline, the **cloud** for sharing and for keeping data safe when a phone is lost.
+
+<Cards cols={2} items={[
+  { tag: 'cloud-first', title: 'Cloud-first', text: 'Send to the server, show the result when it answers. Simple, but nothing works without a connection.' },
+  { tag: 'local-first', title: 'Local-first', text: 'Save on the phone and show it at once; send to the server later. Works offline. This part builds a simple version.' },
+]} />
+
+The plan for each new or changed task:
+
+1. Save it in SQLite with a column **synced = 0**: it is a **pending operation**, waiting to be sent.
+2. **NetInfo** tells the app whether the phone is online, and when the connection comes back.
+3. When online: send every row with `synced = 0`. If the request **fails**, they stay `synced = 0` and are sent next time (a **retry**).
+4. Only after Supabase answered without an error: `synced = 1`.
+
+<Terminal title="Terminal — install" lines={['$ npx expo install @react-native-community/netinfo', '# included in Expo Go']} />
+
+```ts
+import NetInfo from '@react-native-community/netinfo';
+
+const state = await NetInfo.fetch();                 // once: state.isConnected
+const unsubscribe = NetInfo.addEventListener((state) => {
+  if (state.isConnected) syncPending();              // the connection is back: send what waits
+});
+// const net = useNetInfo();                         // or as a hook inside a component
+```
+
+**Duplicates.** Sometimes the server saves the row but its answer never reaches the phone. The phone thinks it failed and sends the task again. With `insert`, the cloud now has the task **twice**. The fix: the phone gives each task its **own id** (`Crypto.randomUUID()`), and sends with `upsert` on that id — the second send updates the same row.
+
+<SyncQueue />
+
+<CodeWalk file="sync.ts" code={SYNC_CODE} steps={[
+  { lines: [2, 4], text: 'Read only the rows that wait: `synced = 0`. Nothing waiting: stop.' },
+  { lines: [6, 8], text: '`upsert` with `onConflict: \'id\'`: the phone’s id is sent, so a row that already exists is updated instead of added again.' },
+  { lines: [9, 9], text: 'On an error, `throw`: the rows stay `synced = 0`, and the next sync tries again.' },
+  { lines: [11, 13], text: 'Only now, after a successful answer: mark them `synced = 1`.' },
+]} />
+
+**Conflicts.** If the same task is changed on two phones while both are offline, the last one to sync wins (the final project keeps an `updated_at` time for this). Apps that must not lose any change merge them or ask the user — that is a full **sync engine**, and it is beyond this lab. What you build here is the base those engines start from.
+
+<Demo id="netinfo" />
+
+<Exercise id="lab-06--sync-order" />
+
+<Exercise id="lab-06--offline-sync" />
+
+<Checkpoint title="Parts 1–6 done">
+The app works offline: it saves on the phone at once, waits with `synced = 0`, and sends each task once when the phone is back online.
+</Checkpoint>
+
+<Part n="7" title="Final project: Offline-Ready Tasks App" time="No extra time (built in the exercises)" />
+
+The final project is the exercises put together in one app. Nothing new to learn: open it, read each step, and connect your own Supabase project.
+
+<OpenInCodeEditor project="lab06-tasks" />
+
+**Requirements**
+
+- A theme setting that survives a restart (AsyncStorage)
+- Tasks saved on the phone at once, with an id made on the phone (SQLite)
+- The session saved encrypted (SecureStore + AsyncStorage: `LargeSecureStore`)
+- Sign-in, and the tasks in your Supabase project, protected by Row Level Security
+- Offline: tasks wait with `synced = 0`, are sent when online, once each
+
+<FileTree title="offline-tasks" lines={[
+  'App.tsx # the screens: sign in, and the tasks *',
+  'lib/',
+  '  supabase.ts # the client (Part 5) + the encrypted session',
+  '  largeSecureStore.ts # SecureStore + AsyncStorage (Part 4)',
+  '  preferences.ts # the theme in AsyncStorage (Part 2)',
+  '  db.ts # the tasks table in SQLite (Part 3)',
+  '  sync.ts # syncPending + pullFromCloud (Part 6) *',
+  'supabase/schema.sql # run once in your project’s SQL Editor',
+  '.env # EXPO_PUBLIC_SUPABASE_URL + _PUBLISHABLE_KEY',
+]} />
+
+<Cards cols={3} items={[
+  { tag: 'Exercise 3', icon: 'set', title: 'Step 1 · Preference', text: '`lib/preferences.ts`: the theme with getItem / setItem.' },
+  { tag: 'Exercise 6', icon: 'grid', title: 'Step 2 · Tasks on the phone', text: '`lib/db.ts`: id, title, done, synced, updated_at.' },
+  { tag: 'Exercise 8', icon: 'key', title: 'Step 3 · Encrypted session', text: '`lib/largeSecureStore.ts` as `auth.storage`.' },
+  { tag: 'Exercise 10', icon: 'cloud', title: 'Step 4 · Your project', text: 'Run schema.sql, add a user, fill .env.' },
+  { tag: 'Exercise 14', icon: 'arrow', title: 'Step 5 · Sync', text: '`lib/sync.ts`: push what waits, then pull the cloud’s tasks.' },
+  { tag: 'Test', icon: 'check', title: 'Step 6 · Airplane mode', text: 'Wi-Fi off, add, Wi-Fi on: one row each.' },
+]} />
+
+**Configuration.** In your Supabase project: run `supabase/schema.sql` in the SQL Editor; add a user in **Authentication → Users → Add user** (tick **Auto Confirm User**); copy the Project URL and the publishable key into `.env`.
+
+**On a PC (Expo Go)**, the same files run in a new project:
+
+<Terminal title="Terminal — a new project on your PC" lines={[
+  '$ npx create-expo-app@latest offline-tasks --template blank-typescript',
+  '$ cd offline-tasks',
+  '$ npx expo install @supabase/supabase-js react-native-url-polyfill expo-sqlite expo-secure-store expo-crypto @react-native-async-storage/async-storage @react-native-community/netinfo react-native-get-random-values',
+  '$ npm install aes-js',
+  '$ npm install --save-dev @types/aes-js',
+  '# copy App.tsx, the lib folder and .env from the Code Editor project, then:',
+  '$ npx expo start',
+]} />
+
+**Test it** (in the Code Editor emulator or on your phone):
+
+1. Sign in, add two tasks: each shows “in the cloud”, and **Table Editor → tasks** in Supabase has one row each.
+2. Switch Wi-Fi off (on a phone: airplane mode). Add a task: it shows “waiting”, and nothing reaches Supabase.
+3. Switch Wi-Fi on: it changes to “in the cloud”, still one row each.
+4. Restart the app: still signed in, the theme stayed, the tasks are read from SQLite.
+5. Sign out and sign in again: the tasks come back from the cloud.
+
+<Checkpoint title="Lab 06">
+You can choose where every piece of data belongs, and build it: AsyncStorage or MMKV for settings, SQLite for lists, SecureStore for secrets, Supabase for shared data and files — with Row Level Security — and the phone and the cloud working together offline.
+</Checkpoint>

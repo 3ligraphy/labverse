@@ -1,0 +1,106 @@
+---
+/**
+ * A code walk-through: the whole file, and one step at a time the lines that matter light up with what they do.
+ * Next / Back (or the arrow keys), or "Show every step" to read it as a list.
+ * <CodeWalk file="lib/supabase.ts" code={`…`} steps={[{ lines: [1, 2], text: 'what these lines do' }, …]} />
+ * `lines` are 1-based; [from, to] is a range, a single number one line.
+ */
+interface Step { lines: number[] | number; text: string }
+interface Props { file: string; code: string; steps: Step[]; title?: string }
+const { file, code, steps, title } = Astro.props;
+const lines = code.replace(/\n$/, '').split('\n');
+const range = (s: Step) => {
+  const l = Array.isArray(s.lines) ? s.lines : [s.lines];
+  if (l.length === 2 && l[1] > l[0]) return Array.from({ length: l[1] - l[0] + 1 }, (_, i) => l[0] + i);
+  return l;
+};
+const data = steps.map((s) => ({ lines: range(s), text: s.text }));
+const md = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+---
+<figure class="cw" data-cw data-reveal data-free>
+  <figcaption class="cw-head">
+    <span class="cw-file mono">{file}</span>
+    {title && <b class="cw-title">{title}</b>}
+    <span class="cw-count mono" data-cw-count>Step 1 of {data.length}</span>
+  </figcaption>
+  <pre class="cw-code" tabindex="0" aria-label={`Code of ${file}`}>{lines.map((l, i) => <span class="cw-l" data-cw-line={i + 1}><i aria-hidden="true">{i + 1}</i>{l || ' '}{'\n'}</span>)}</pre>
+  <div class="cw-foot">
+    <p class="cw-text" data-cw-text aria-live="polite" set:html={md(data[0]?.text ?? '')} />
+    <div class="cw-nav">
+      <button type="button" class="btn btn-ghost btn-sm" data-cw-prev disabled>← Back</button>
+      <button type="button" class="btn btn-primary btn-sm" data-cw-next>Next →</button>
+      <button type="button" class="cw-all" data-cw-all aria-expanded="false">Show every step</button>
+    </div>
+  </div>
+  <ol class="cw-list" data-cw-list hidden>
+    {data.map((s) => <li><span class="mono">line{s.lines.length > 1 ? 's' : ''} {s.lines.length > 1 ? `${s.lines[0]}–${s.lines[s.lines.length - 1]}` : s.lines[0]}</span> <span set:html={md(s.text)} /></li>)}
+  </ol>
+  <script type="application/json" data-cw-steps set:html={JSON.stringify(data.map((s) => ({ lines: s.lines, html: md(s.text) })))} />
+</figure>
+
+<script>
+  type Step = { lines: number[]; html: string };
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-cw]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const steps = JSON.parse(root.querySelector('[data-cw-steps]')!.textContent!) as Step[];
+      const lines = Array.from(root.querySelectorAll<HTMLElement>('[data-cw-line]'));
+      const text = root.querySelector<HTMLElement>('[data-cw-text]')!;
+      const count = root.querySelector<HTMLElement>('[data-cw-count]')!;
+      const prev = root.querySelector<HTMLButtonElement>('[data-cw-prev]')!;
+      const next = root.querySelector<HTMLButtonElement>('[data-cw-next]')!;
+      const all = root.querySelector<HTMLButtonElement>('[data-cw-all]')!;
+      const list = root.querySelector<HTMLElement>('[data-cw-list]')!;
+      const pre = root.querySelector<HTMLElement>('.cw-code')!;
+      let at = 0;
+      const show = (i: number) => {
+        at = Math.max(0, Math.min(steps.length - 1, i));
+        const s = steps[at];
+        lines.forEach((l) => l.classList.toggle('on', s.lines.includes(Number(l.dataset.cwLine))));
+        text.innerHTML = s.html;
+        count.textContent = `Step ${at + 1} of ${steps.length}`;
+        prev.disabled = at === 0;
+        next.disabled = at === steps.length - 1;
+        // keep the lit lines in view inside the code box (not the page)
+        const first = lines.find((l) => l.classList.contains('on'));
+        if (first) pre.scrollTop = Math.max(0, first.offsetTop - pre.offsetTop - 40);
+      };
+      prev.addEventListener('click', () => show(at - 1));
+      next.addEventListener('click', () => show(at + 1));
+      root.addEventListener('keydown', (e) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); show(at + 1); }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); show(at - 1); }
+      });
+      all.addEventListener('click', () => {
+        list.hidden = !list.hidden;
+        all.setAttribute('aria-expanded', String(!list.hidden));
+        all.textContent = list.hidden ? 'Show every step' : 'Hide the list';
+      });
+      show(0);
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .cw { margin: 22px 0 30px; display: grid; gap: 0; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); overflow: hidden; }
+  .cw-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .cw-file { font-size: 12.5px; color: var(--text); padding: 2px 8px; border-radius: 6px; background: var(--code-bg); border: 1px solid var(--line); }
+  .cw-title { font-size: 14px; color: var(--text); }
+  .cw-count { margin-left: auto; font-size: 12px; color: var(--text-2); }
+  .cw-code { margin: 0; max-height: 380px; overflow: auto; padding: 10px 0; background: var(--code-bg); font: 12.5px/1.7 var(--font-mono); color: var(--text-2); }
+  .cw-code:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
+  .cw-l { display: block; padding: 0 14px 0 0; white-space: pre; transition: background .25s, color .25s; }
+  .cw-l i { display: inline-block; width: 3.2em; padding-right: 1em; text-align: right; font-style: normal; color: var(--text-2); user-select: none; }
+  .cw-l.on { color: var(--text); background: color-mix(in oklab, var(--accent) 14%, transparent); }
+  .cw-l.on i { color: var(--accent-text); font-weight: 700; }
+  .cw-foot { display: grid; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line); }
+  @media (min-width: 720px) { .cw-foot { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } }
+  .cw-text { margin: 0 !important; font-size: 15px; line-height: 1.55; color: var(--text); min-height: 2.6em; }
+  .cw-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .cw-all { border: 0; background: none; padding: 4px 2px; color: var(--accent-text); font: 600 13px var(--font-body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .cw-list { margin: 0 !important; padding: 12px 14px 14px 34px !important; border-top: 1px solid var(--line); display: grid; gap: 6px; font-size: 14px; color: var(--text); }
+  .cw-list .mono { font-size: 12px; color: var(--text-2); margin-right: 6px; }
+  .cw-text :global(code), .cw-list :global(code) { font-size: .88em; }
+</style>

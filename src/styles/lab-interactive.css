@@ -318,7 +318,7 @@ a.lp-ex[href]:hover, a.lp-ex[href]:focus-visible { color: var(--text); text-deco
 .dp-wifi.is-off { border-color: color-mix(in oklab, var(--warn) 60%, var(--line)); background: color-mix(in oklab, var(--warn) 14%, var(--surface)); }
 .dp-body { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: start; }
 .dp-empty { margin: 0 !important; font-size: 13.5px; color: var(--text-2); }
-.dp-sec { display: grid; gap: 6px; min-width: 0; padding: 10px 12px; border-radius: var(--r-md); border: 1px solid var(--line-2); background: var(--bg-2); }
+.dp-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; padding: 10px 12px; border-radius: var(--r-md); border: 1px solid var(--line-2); background: var(--bg-2); }
 .dp-sec[data-place='cloud'] { border-color: color-mix(in oklab, var(--info) 45%, var(--line)); }
 .dp-sh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dp-sh b { font-size: 13.5px; color: var(--text); }
@@ -326,9 +326,11 @@ a.lp-ex[href]:hover, a.lp-ex[href]:focus-visible { color: var(--text); text-deco
 .dp-place { font-size: 12px; color: var(--text-2); padding: 1px 8px; border-radius: var(--r-full); border: 1px solid var(--line-2); }
 .dp-lock { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ok); }
 .dp-where { margin: 0 !important; font-size: 12.5px; color: var(--text-2); }
-.dp-kv, .dp-table table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+/* .dp-scoped so the lab page's .prose table rules (0.92em, min-width 520px) don't apply */
+.dp .dp-kv, .dp .dp-table table { width: 100%; min-width: 0; border-collapse: collapse; font-size: 12.5px; }
 .dp-kv th, .dp-table th { text-align: left; font-weight: 600; color: var(--text-2); padding: 4px 6px; border-bottom: 1px solid var(--line-2); font-size: 12px; }
 .dp-kv td, .dp-table td { padding: 4px 6px; border-bottom: 1px solid var(--line); color: var(--text); vertical-align: top; overflow-wrap: anywhere; }
+.dp-kv td:first-child { overflow-wrap: break-word; } /* keys break at - or _, values (tokens) anywhere */
 .dp-v small { display: block; color: var(--text-2); font-family: var(--font-body); }
 .dp-t { color: var(--text-2); white-space: nowrap; }
 .dp-tn { margin: 0 0 4px !important; display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; color: var(--text-2); }

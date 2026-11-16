@@ -66,7 +66,8 @@ export function installRun(ide: IDE, terminals: Terminals) {
   /* ================================================================== the phone emulator (React Native) */
   async function codeFiles(): Promise<Record<string, string>> {
     const out: Record<string, string> = {};
-    for (const p of await fs.walk('/')) if (CODE.test(p) && !NOT_APP.test(p.slice(1))) out[p.slice(1)] = await sourceOf(p);
+    // .env too: its EXPO_PUBLIC_ variables reach process.env in the emulator, like in Expo (Lab 06's Supabase keys)
+    for (const p of await fs.walk('/')) if ((CODE.test(p) && !NOT_APP.test(p.slice(1))) || /^\/\.env(\.local)?$/.test(p)) out[p.slice(1)] = await sourceOf(p);
     return out;
   }
   function rnEntry(files: Record<string, string>): string | null {

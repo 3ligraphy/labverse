@@ -1,0 +1,134 @@
+---
+/**
+ * Lab 06 · Part 2 — how an object is saved in AsyncStorage and read back: object → JSON.stringify → text →
+ * setItem (the phone keeps text under a key) → getItem → JSON.parse → object. Step by step, with the code line of each
+ * step lit, and the classic bug: saving the object without JSON.stringify. <KvFlow />
+ */
+const CODE = [
+  "const settings = { dark: true, size: 18 };",
+  "const text = JSON.stringify(settings);        // object → text",
+  "await AsyncStorage.setItem('settings', text); // the phone keeps text",
+  "const saved = await AsyncStorage.getItem('settings'); // text, or null",
+  "const back = JSON.parse(saved);               // text → object",
+];
+---
+<figure class="kvf" data-kvf data-reveal data-free>
+  <div class="kvf-acts" role="toolbar" aria-label="Run the steps">
+    <button type="button" class="kvf-act" data-kvf-run="save">1 · Save</button>
+    <button type="button" class="kvf-act" data-kvf-run="read">2 · Read it back</button>
+    <button type="button" class="kvf-act kvf-bug" data-kvf-run="bug">Save without JSON.stringify</button>
+  </div>
+  <div class="kvf-flow">
+    <div class="kvf-box" data-kvf-box="object"><p class="kvf-k mono">In your app: an object</p><code data-kvf-object>{'{ dark: true, size: 18 }'}</code></div>
+    <span class="kvf-arrow" data-kvf-arrow="1" aria-hidden="true"></span>
+    <div class="kvf-box" data-kvf-box="text"><p class="kvf-k mono">JSON text (a string)</p><code data-kvf-text>—</code></div>
+    <span class="kvf-arrow" data-kvf-arrow="2" aria-hidden="true"></span>
+    <div class="kvf-box kvf-disk" data-kvf-box="disk">
+      <p class="kvf-k mono">On the phone: AsyncStorage</p>
+      <table><thead><tr><th>key</th><th>value</th></tr></thead><tbody><tr data-kvf-row><td class="mono">settings</td><td class="mono" data-kvf-disk>(nothing yet)</td></tr></tbody></table>
+    </div>
+  </div>
+  <pre class="kvf-code">{CODE.map((l, i) => <span class="kvf-cl" data-kvf-line={i}>{l}{'\n'}</span>)}</pre>
+  <p class="kvf-note" data-kvf-note aria-live="polite">Press <b>Save</b>: watch the object become text, then a row on the phone.</p>
+</figure>
+
+<script>
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-kvf]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+      const lines = Array.from(root.querySelectorAll<HTMLElement>('[data-kvf-line]'));
+      const note = q('[data-kvf-note]');
+      const objectEl = q('[data-kvf-object]');
+      const textEl = q('[data-kvf-text]');
+      const diskEl = q('[data-kvf-disk]');
+      const row = q('[data-kvf-row]');
+      const boxes = (id: string) => q(`[data-kvf-box="${id}"]`);
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const STEP = reduce ? 0 : 750;
+      let timers: ReturnType<typeof setTimeout>[] = [];
+      let stored: string | null = null;
+      const md = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+      const light = (i: number[]) => lines.forEach((l, n) => l.classList.toggle('on', i.includes(n)));
+      const flash = (el: HTMLElement) => {
+        el.classList.remove('flash');
+        void el.offsetWidth;
+        el.classList.add('flash');
+      };
+      const steps = (list: (() => void)[]) => {
+        timers.forEach(clearTimeout);
+        timers = list.map((fn, i) => setTimeout(fn, i * STEP));
+      };
+      const say = (s: string, tone = '') => {
+        note.innerHTML = md(s);
+        note.dataset.tone = tone;
+      };
+
+      root.querySelectorAll<HTMLButtonElement>('[data-kvf-run]').forEach((b) =>
+        b.addEventListener('click', () => {
+          root.querySelectorAll('[data-kvf-run]').forEach((x) => x.classList.toggle('on', x === b));
+          const kind = b.dataset.kvfRun;
+          if (kind === 'save') {
+            steps([
+              () => { objectEl.textContent = '{ dark: true, size: 18 }'; light([0]); flash(boxes('object')); say('The settings are an **object** in your app’s memory.'); },
+              () => { textEl.textContent = '\'{"dark":true,"size":18}\''; light([1]); flash(boxes('text')); say('`JSON.stringify` writes the object as **text**: double quotes everywhere, no spaces.'); },
+              () => { stored = '{"dark":true,"size":18}'; diskEl.textContent = stored; light([2]); flash(row); say('`setItem` saves the text under the key **settings**. It stays after a restart.'); },
+            ]);
+          } else if (kind === 'bug') {
+            steps([
+              () => { objectEl.textContent = '{ dark: true, size: 18 }'; textEl.textContent = '— (skipped)'; light([0]); flash(boxes('object')); say('This time the object goes to `setItem` as it is…'); },
+              () => { stored = '[object Object]'; diskEl.textContent = stored; light([2]); flash(row); say('AsyncStorage keeps **text only**: the object became the text **[object Object]**. Your settings are lost.', 'bad'); },
+            ]);
+          } else {
+            if (stored === null) return say('Nothing is saved yet: press **Save** first.');
+            steps([
+              () => { textEl.textContent = `'${stored}'`; light([3]); flash(row); flash(boxes('text')); say('`getItem` gives back exactly the **text** that was saved (or `null` if nothing was).'); },
+              () => {
+                light([4]);
+                if (stored === '[object Object]') {
+                  objectEl.textContent = 'SyntaxError';
+                  flash(boxes('object'));
+                  say('`JSON.parse(\'[object Object]\')` throws **SyntaxError**: it is not JSON. Always save `JSON.stringify(value)`.', 'bad');
+                } else {
+                  objectEl.textContent = '{ dark: true, size: 18 }';
+                  flash(boxes('object'));
+                  say('`JSON.parse` turns the text back into an **object**: `back.dark` is `true` again.', 'good');
+                }
+              },
+            ]);
+          }
+        }),
+      );
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .kvf { margin: 22px 0 30px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .kvf-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .kvf-act { padding: 7px 13px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 13px var(--font-body); cursor: pointer; }
+  .kvf-act.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .kvf-bug.on { background: var(--danger); color: #fff; }
+  .kvf-act:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .kvf-flow { display: grid; gap: 8px; align-items: stretch; }
+  @media (min-width: 860px) { .kvf-flow { grid-template-columns: 1fr 34px 1fr 34px 1.2fr; align-items: center; } }
+  .kvf-box { display: grid; gap: 6px; align-content: start; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); min-width: 0; }
+  .kvf-box code { font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+  .kvf-k { margin: 0 !important; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+  .kvf-disk table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .kvf-disk th { text-align: left; color: var(--text-2); font-weight: 600; padding: 3px 6px; border-bottom: 1px solid var(--line-2); }
+  .kvf-disk td { padding: 5px 6px; color: var(--text); overflow-wrap: anywhere; }
+  .kvf-arrow { justify-self: center; width: 2px; height: 18px; background: var(--line-2); position: relative; }
+  .kvf-arrow::after { content: ''; position: absolute; left: -4px; bottom: -2px; border: 5px solid transparent; border-top-color: var(--line-2); border-bottom: 0; }
+  @media (min-width: 860px) { .kvf-arrow { width: 26px; height: 2px; } .kvf-arrow::after { left: auto; right: -2px; bottom: -4px; border: 5px solid transparent; border-left-color: var(--line-2); border-right: 0; } }
+  .kvf-code { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); color: var(--text-2); font: 12.5px/1.7 var(--font-mono); overflow-x: auto; }
+  .kvf-cl { display: block; padding: 0 4px; border-radius: 4px; transition: background .25s, color .25s; }
+  .kvf-cl.on { color: var(--text); background: color-mix(in oklab, var(--accent) 16%, transparent); }
+  .kvf-note { margin: 0 !important; font-size: 15px; color: var(--text); }
+  .kvf-note[data-tone='bad'] { color: var(--danger); }
+  .kvf-note[data-tone='good'] { color: var(--ok); }
+  .kvf .flash { animation: kvf-flash 1.1s var(--ease-out); }
+  @keyframes kvf-flash { 0% { background: color-mix(in oklab, var(--accent) 34%, transparent); } 100% { background: transparent; } }
+  @media (prefers-reduced-motion: reduce) { .kvf .flash { animation: none; } }
+</style>

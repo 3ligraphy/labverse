@@ -1,0 +1,115 @@
+---
+/**
+ * Two options side by side (Lab 06): what differs, the same task in each one's code, and "which one would you use?"
+ * situations to answer (each answer says why).
+ * <Compare title="…" a={{ name, tag, code }} b={{ … }} rows={[{ label, a, b, better: 'a' | 'b' }]} picks={[{ situation, answer: 'a', why }]} />
+ */
+interface Side { name: string; tag?: string; code?: string }
+interface Row { label: string; a: string; b: string; better?: 'a' | 'b' }
+interface Pick { situation: string; answer: 'a' | 'b'; why: string }
+interface Props { title: string; a: Side; b: Side; rows: Row[]; picks?: Pick[] }
+const { title, a, b, rows, picks = [] } = Astro.props;
+const md = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+---
+<figure class="cmp" data-cmp data-reveal data-free>
+  <figcaption class="cmp-title">{title}</figcaption>
+  <div class="cmp-scroll">
+    <table class="cmp-table">
+      <thead>
+        <tr><th scope="col"><span class="sr-only">What</span></th><th scope="col"><b>{a.name}</b>{a.tag && <span class="cmp-tag">{a.tag}</span>}</th><th scope="col"><b>{b.name}</b>{b.tag && <span class="cmp-tag">{b.tag}</span>}</th></tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr>
+            <th scope="row">{r.label}</th>
+            <td class:list={[{ 'is-better': r.better === 'a' }]}><span set:html={md(r.a)} />{r.better === 'a' && <span class="cmp-better">better here</span>}</td>
+            <td class:list={[{ 'is-better': r.better === 'b' }]}><span set:html={md(r.b)} />{r.better === 'b' && <span class="cmp-better">better here</span>}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+  {(a.code || b.code) && (
+    <div class="cmp-code">
+      <div><p class="cmp-k mono">{a.name}</p><pre>{a.code}</pre></div>
+      <div><p class="cmp-k mono">{b.name}</p><pre>{b.code}</pre></div>
+    </div>
+  )}
+  {picks.length > 0 && (
+    <div class="cmp-picks">
+      <p class="cmp-k mono">Which one would you use?</p>
+      <ol>
+        {picks.map((p) => (
+          <li data-cmp-pick data-answer={p.answer}>
+            <span class="cmp-sit" set:html={md(p.situation)} />
+            <span class="cmp-btns">
+              <button type="button" class="cmp-btn" data-pick="a">{a.name}</button>
+              <button type="button" class="cmp-btn" data-pick="b">{b.name}</button>
+            </span>
+            <p class="cmp-why" data-cmp-why hidden set:html={md(p.why)} />
+          </li>
+        ))}
+      </ol>
+    </div>
+  )}
+</figure>
+
+<script>
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-cmp]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      root.querySelectorAll<HTMLElement>('[data-cmp-pick]').forEach((li) => {
+        const why = li.querySelector<HTMLElement>('[data-cmp-why]')!;
+        li.querySelectorAll<HTMLButtonElement>('[data-pick]').forEach((btn) =>
+          btn.addEventListener('click', () => {
+            const right = btn.dataset.pick === li.dataset.answer;
+            li.querySelectorAll<HTMLButtonElement>('[data-pick]').forEach((x) => {
+              x.classList.toggle('is-right', x.dataset.pick === li.dataset.answer && right);
+              x.classList.toggle('is-wrong', x === btn && !right);
+              x.setAttribute('aria-pressed', String(x === btn));
+            });
+            why.hidden = false;
+            why.dataset.tone = right ? 'right' : 'wrong';
+            why.querySelector('.cmp-verdict')?.remove();
+            const v = document.createElement('b');
+            v.className = 'cmp-verdict';
+            v.textContent = right ? 'Right. ' : 'Not this one. ';
+            why.prepend(v);
+          }),
+        );
+      });
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .cmp { margin: 22px 0 30px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .cmp-title { font-size: 1.05rem; font-weight: 650; color: var(--text); }
+  .cmp-scroll { overflow-x: auto; }
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 520px; }
+  .cmp-table th, .cmp-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; color: var(--text); }
+  .cmp-table thead th { font-size: 14px; border-bottom: 1px solid var(--line-2); }
+  .cmp-table tbody th { font-weight: 600; color: var(--text-2); width: 26%; font-size: 13.5px; }
+  .cmp-tag { margin-left: 8px; padding: 1px 8px; border-radius: var(--r-full); border: 1px solid var(--line-2); font-size: 12px; font-weight: 600; color: var(--text-2); }
+  .cmp-table td.is-better { background: color-mix(in oklab, var(--ok) 9%, transparent); }
+  .cmp-better { display: inline-block; margin-left: 8px; font-size: 12px; font-weight: 650; color: var(--ok); white-space: nowrap; }
+  .cmp-code { display: grid; gap: 10px; }
+  @media (min-width: 760px) { .cmp-code { grid-template-columns: 1fr 1fr; } }
+  .cmp-code > div { min-width: 0; display: grid; gap: 6px; }
+  .cmp-code pre { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); color: var(--text); font: 12.5px/1.6 var(--font-mono); overflow-x: auto; white-space: pre; }
+  .cmp-k { margin: 0 !important; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+  .cmp-picks ol { list-style: none; margin: 8px 0 0 !important; padding: 0 !important; display: grid; gap: 8px; }
+  .cmp-picks li { display: grid; gap: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); }
+  @media (min-width: 720px) { .cmp-picks li { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } .cmp-why { grid-column: 1 / -1; } }
+  .cmp-sit { font-size: 14.5px; color: var(--text); }
+  .cmp-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cmp-btn { padding: 6px 12px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font: 600 13px var(--font-body); cursor: pointer; }
+  .cmp-btn:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .cmp-btn.is-right { background: var(--ok); border-color: transparent; color: #fff; }
+  .cmp-btn.is-wrong { background: color-mix(in oklab, var(--danger) 16%, var(--surface)); border-color: color-mix(in oklab, var(--danger) 60%, transparent); }
+  .cmp-why { margin: 0 !important; font-size: 14px; color: var(--text); }
+  .cmp-why[data-tone='right'] :global(.cmp-verdict) { color: var(--ok); }
+  .cmp-why[data-tone='wrong'] :global(.cmp-verdict) { color: var(--danger); }
+  .cmp :global(code) { font-size: .88em; }
+</style>

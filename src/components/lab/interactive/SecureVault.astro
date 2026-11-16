@@ -1,0 +1,144 @@
+---
+/**
+ * Lab 06 · Part 4 — the same token saved in AsyncStorage and in SecureStore, then "someone copies the app's files"
+ * (a rooted phone, a backup): what each one gives them. The SecureStore side scrambles the token into ciphertext; the
+ * key stays in the Keychain / Keystore. <SecureVault />
+ */
+---
+<figure class="sv" data-sv data-reveal data-free>
+  <div class="sv-top">
+    <label class="sv-label" for="sv-token">A sign-in token</label>
+    <input id="sv-token" class="input mono sv-input" data-sv-token value="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtb25hIn0.k2Lm9Qx" spellcheck="false" />
+  </div>
+  <div class="sv-acts" role="toolbar" aria-label="Save and attack">
+    <button type="button" class="sv-act" data-sv-act="plain">Save in AsyncStorage</button>
+    <button type="button" class="sv-act" data-sv-act="secure">Save in SecureStore</button>
+    <button type="button" class="sv-act sv-bad" data-sv-act="steal">Someone copies the app’s files</button>
+  </div>
+  <div class="sv-grid">
+    <section class="sv-col" aria-label="AsyncStorage">
+      <p class="sv-k mono">AsyncStorage · a plain file in the app’s folder</p>
+      <pre class="sv-file" data-sv-plain>(empty)</pre>
+      <p class="sv-steal" data-sv-steal-plain hidden></p>
+    </section>
+    <section class="sv-col sv-secure" aria-label="SecureStore">
+      <p class="sv-k mono">SecureStore · Keychain (iOS) / Keystore (Android)</p>
+      <pre class="sv-file" data-sv-secure>(empty)</pre>
+      <p class="sv-key"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" /></svg>The key that opens it stays inside the phone’s secure hardware. Only your app can ask for the value.</p>
+      <p class="sv-steal" data-sv-steal-secure hidden></p>
+    </section>
+  </div>
+  <p class="sv-note" data-sv-note aria-live="polite">Save the token in both places, then press <b>Someone copies the app’s files</b>.</p>
+</figure>
+
+<script>
+  const HEX = '0123456789abcdef';
+  /** deterministic "encrypted bytes" for the picture (never the token itself) */
+  function cipher(text: string) {
+    let h = 2166136261;
+    for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+    let x = h >>> 0;
+    let out = '';
+    for (let i = 0; i < Math.min(64, text.length + 16); i++) {
+      x = Math.imul(x ^ (x >>> 13), 1274126177) >>> 0;
+      out += HEX[x & 15];
+    }
+    return out.replace(/(.{32})/g, '$1\n').trim();
+  }
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-sv]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+      const token = q<HTMLInputElement>('[data-sv-token]');
+      const plain = q('[data-sv-plain]');
+      const secure = q('[data-sv-secure]');
+      const note = q('[data-sv-note]');
+      const stealPlain = q('[data-sv-steal-plain]');
+      const stealSecure = q('[data-sv-steal-secure]');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let savedPlain = false;
+      let savedSecure = false;
+      let anim = 0;
+      const flash = (el: HTMLElement) => {
+        el.classList.remove('flash');
+        void el.offsetWidth;
+        el.classList.add('flash');
+      };
+      const scramble = (target: string) => {
+        clearInterval(anim);
+        const t = token.value;
+        if (reduce) {
+          secure.textContent = target;
+          return;
+        }
+        let frame = 0;
+        anim = window.setInterval(() => {
+          frame++;
+          const done = Math.floor((frame / 10) * t.length);
+          secure.textContent = (t.slice(done) + target).slice(0, Math.max(t.length, 40)).split('').map((c, i) => (i < done ? HEX[(c.charCodeAt(0) + frame + i) & 15] : c)).join('');
+          if (frame >= 10) {
+            clearInterval(anim);
+            secure.textContent = target;
+          }
+        }, 60);
+      };
+      root.querySelectorAll<HTMLButtonElement>('[data-sv-act]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const t = token.value.trim() || 'token';
+          stealPlain.hidden = stealSecure.hidden = true;
+          if (b.dataset.svAct === 'plain') {
+            savedPlain = true;
+            plain.textContent = `@RKStorage\n{ "token": "${t}" }`;
+            flash(plain);
+            note.innerHTML = 'AsyncStorage wrote the token into a file <b>exactly as it is</b>.';
+          } else if (b.dataset.svAct === 'secure') {
+            savedSecure = true;
+            scramble(cipher(t));
+            flash(secure);
+            note.innerHTML = 'SecureStore encrypted the token first: the file holds <b>only unreadable bytes</b>. Your app still reads the real token back with <code>getItemAsync</code>.';
+          } else {
+            if (!savedPlain && !savedSecure) {
+              note.innerHTML = 'Save the token somewhere first.';
+              return;
+            }
+            stealPlain.hidden = !savedPlain;
+            stealSecure.hidden = !savedSecure;
+            stealPlain.dataset.tone = 'bad';
+            stealSecure.dataset.tone = 'good';
+            stealPlain.innerHTML = `They read: <code>${t.replace(/[&<>]/g, '')}</code> — and can now act as the user.`;
+            stealSecure.innerHTML = 'They read: unreadable bytes. Without the key from the secure hardware, they are useless.';
+            note.innerHTML = 'Same phone, same copy of the files. <b>Only the plain file leaked the token.</b>';
+          }
+        }),
+      );
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .sv { margin: 22px 0 30px; display: grid; gap: 12px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .sv-top { display: grid; gap: 6px; }
+  .sv-label { font-size: 13px; font-weight: 600; color: var(--text); }
+  .sv-input { width: 100%; height: 40px; font-size: 13px; }
+  .sv-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sv-act { padding: 7px 13px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 13px var(--font-body); cursor: pointer; }
+  .sv-act:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .sv-bad { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
+  .sv-grid { display: grid; gap: 10px; }
+  @media (min-width: 760px) { .sv-grid { grid-template-columns: 1fr 1fr; } }
+  .sv-col { display: grid; gap: 8px; align-content: start; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); min-width: 0; }
+  .sv-secure { border-color: color-mix(in oklab, var(--ok) 45%, var(--line)); }
+  .sv-k { margin: 0 !important; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+  .sv-file { margin: 0; min-height: 4.5em; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); color: var(--text); font: 12.5px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sv-key { margin: 0 !important; display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--text-2); }
+  .sv-key svg { width: 16px; height: 16px; flex: none; margin-top: 2px; fill: none; stroke: var(--ok); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .sv-steal { margin: 0 !important; padding: 8px 10px; border-radius: 8px; font-size: 13.5px; color: var(--text); }
+  .sv-steal[data-tone='bad'] { background: color-mix(in oklab, var(--danger) 14%, transparent); }
+  .sv-steal[data-tone='good'] { background: color-mix(in oklab, var(--ok) 12%, transparent); }
+  .sv-note { margin: 0 !important; font-size: 15px; color: var(--text); }
+  .sv .flash { animation: sv-flash 1.1s var(--ease-out); }
+  @keyframes sv-flash { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 50%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+  .sv :global(code) { font-size: .9em; overflow-wrap: anywhere; }
+  @media (prefers-reduced-motion: reduce) { .sv .flash { animation: none; } }
+</style>

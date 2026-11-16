@@ -1,0 +1,222 @@
+---
+/**
+ * Lab 06 · Part 6 — local first, then sync. Tasks are saved in SQLite at once (synced = 0) and sent to Supabase when
+ * the phone is online. Switch Wi-Fi off and on, make the network flaky (the server saves the row but the answer is
+ * lost, so the phone sends it again), and choose insert or upsert: with insert, the retry makes a duplicate.
+ * <SyncQueue />
+ */
+---
+<figure class="sq" data-syncq data-reveal data-free>
+  <div class="sq-acts" role="toolbar" aria-label="The phone and the network">
+    <button type="button" class="sq-btn" data-syncq-add>Add a task</button>
+    <button type="button" class="sq-btn sq-toggle" data-syncq-wifi aria-pressed="true">Wi-Fi on</button>
+    <button type="button" class="sq-btn sq-toggle" data-syncq-flaky aria-pressed="false">Flaky network: off</button>
+    <span class="sq-method" role="radiogroup" aria-label="How tasks are sent">
+      <button type="button" class="sq-btn" role="radio" aria-checked="true" data-syncq-method="upsert">upsert on id</button>
+      <button type="button" class="sq-btn" role="radio" aria-checked="false" data-syncq-method="insert">insert</button>
+    </span>
+  </div>
+  <div class="sq-grid">
+    <section class="sq-col" aria-label="On the phone: SQLite">
+      <p class="sq-k mono">On the phone · SQLite</p>
+      <ul class="sq-list" data-syncq-local><li class="sq-none">No tasks yet.</li></ul>
+    </section>
+    <section class="sq-col sq-mid" aria-label="Sync">
+      <p class="sq-k mono sq-code">syncPending()</p>
+      <ol class="sq-steps" data-syncq-steps>
+        <li data-step="read"><code>SELECT … WHERE synced = 0</code></li>
+        <li data-step="send"><code>upsert(rows, &#123; onConflict: 'id' &#125;)</code></li>
+        <li data-step="mark"><code>UPDATE … SET synced = 1</code></li>
+      </ol>
+      <p class="sq-step" data-syncq-step aria-live="polite">Waiting.</p>
+    </section>
+    <section class="sq-col sq-cloud" aria-label="In the cloud: Supabase">
+      <p class="sq-k mono">In the cloud · Supabase tasks</p>
+      <ul class="sq-list" data-syncq-cloud><li class="sq-none">No rows yet.</li></ul>
+    </section>
+  </div>
+  <p class="sq-note" data-syncq-note aria-live="polite">Add a task. Then switch Wi-Fi off, add more, and switch it on again.</p>
+</figure>
+
+<script>
+  type Local = { id: string; title: string; synced: 0 | 1; state: 'waiting' | 'sending' | 'synced' };
+  type Cloud = { id: string; from: string; title: string; dup?: boolean; fresh?: boolean };
+  const TITLES = ['Read Part 6', 'Buy milk', 'Call Omar', 'Finish Exercise 14', 'Water the plants', 'Pack the laptop'];
+  const short = () => Math.random().toString(16).slice(2, 6) + '-…';
+  const md = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-syncq]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+      const localEl = q('[data-syncq-local]');
+      const cloudEl = q('[data-syncq-cloud]');
+      const stepEl = q('[data-syncq-step]');
+      const note = q('[data-syncq-note]');
+      const wifiBtn = q<HTMLButtonElement>('[data-syncq-wifi]');
+      const flakyBtn = q<HTMLButtonElement>('[data-syncq-flaky]');
+      const sendStep = q('[data-step="send"] code');
+      const local: Local[] = [];
+      const cloud: Cloud[] = [];
+      let online = true;
+      let flaky = false;
+      let method: 'upsert' | 'insert' = 'upsert';
+      let busy = false;
+      let retry = 0;
+      let n = 0;
+      const STEP = matchMedia('(prefers-reduced-motion: reduce)').matches ? 60 : 650;
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const lit = (step: string | null) => root.querySelectorAll<HTMLElement>('[data-step]').forEach((li) => li.classList.toggle('on', li.dataset.step === step));
+      const say = (s: string) => (note.innerHTML = md(s));
+
+      const draw = () => {
+        localEl.innerHTML = local.length
+          ? local.map((t) => `<li data-state="${t.state}"><span>${t.title}</span><span class="mono">id ${t.id} · synced = ${t.synced}</span><b>${t.state === 'synced' ? 'in the cloud' : t.state === 'sending' ? 'sending…' : 'waiting'}</b></li>`).join('')
+          : '<li class="sq-none">No tasks yet.</li>';
+        cloudEl.innerHTML = cloud.length
+          ? cloud.map((r) => `<li class="${r.dup ? 'is-dup' : ''} ${r.fresh ? 'is-new' : ''}"><span>${r.title}</span><span class="mono">id ${r.id}</span>${r.dup ? '<b>duplicate!</b>' : ''}</li>`).join('')
+          : '<li class="sq-none">No rows yet.</li>';
+        cloud.forEach((r) => (r.fresh = false));
+      };
+
+      /** the server side: insert always adds a row (with a new id); upsert on id updates the row that has the same id */
+      const serverApply = (rows: Local[]) => {
+        for (const t of rows) {
+          if (method === 'upsert') {
+            if (!cloud.some((r) => r.id === t.id)) cloud.push({ id: t.id, from: t.id, title: t.title, fresh: true });
+          } else {
+            const dup = cloud.some((r) => r.from === t.id); // the same task, a second time
+            cloud.push({ id: short(), from: t.id, title: t.title, dup, fresh: true });
+          }
+        }
+      };
+
+      async function sync() {
+        if (busy) return;
+        if (!online) {
+          say('No connection: the new tasks **wait on the phone** with synced = 0. Nothing is lost.');
+          return;
+        }
+        const waiting = local.filter((t) => t.synced === 0);
+        if (!waiting.length) return;
+        busy = true;
+        lit('read');
+        stepEl.textContent = `${waiting.length} task${waiting.length === 1 ? '' : 's'} waiting`;
+        waiting.forEach((t) => (t.state = 'sending'));
+        draw();
+        await wait(STEP);
+        lit('send');
+        stepEl.textContent = `sending ${waiting.length} with ${method}…`;
+        await wait(STEP);
+        if (!online) {
+          waiting.forEach((t) => (t.state = 'waiting'));
+          lit(null);
+          stepEl.textContent = 'failed: no connection';
+          say('The connection dropped while sending: the tasks stay **synced = 0** and go next time.');
+          busy = false;
+          draw();
+          return;
+        }
+        serverApply(waiting);
+        if (flaky && retry < 1) {
+          // the server saved the rows, but the answer never reached the phone
+          retry++;
+          waiting.forEach((t) => (t.state = 'waiting'));
+          lit(null);
+          stepEl.textContent = 'no answer (timeout): try again';
+          say(method === 'insert'
+            ? 'The server **saved** the rows, but the answer was lost. The phone does not know, keeps synced = 0 and sends them **again**…'
+            : 'The server saved the rows, but the answer was lost. The phone sends them again: with **upsert on the same id**, the second send changes nothing.');
+          busy = false;
+          draw();
+          await wait(STEP * 1.4);
+          return void sync();
+        }
+        retry = 0;
+        lit('mark');
+        waiting.forEach((t) => {
+          t.synced = 1;
+          t.state = 'synced';
+        });
+        stepEl.textContent = 'OK: marked synced = 1';
+        const dups = cloud.filter((r) => r.dup).length;
+        say(dups
+          ? `**${dups} duplicate row${dups === 1 ? '' : 's'}** in the cloud: \`insert\` added the same task again on the retry. The phone’s id + \`upsert\` prevents this.`
+          : 'Sent once, marked `synced = 1`. Each task has one row in the cloud, with the same id as on the phone.');
+        busy = false;
+        draw();
+        await wait(STEP);
+        lit(null);
+      }
+
+      q('[data-syncq-add]').addEventListener('click', () => {
+        const id = short();
+        local.push({ id, title: TITLES[n++ % TITLES.length], synced: 0, state: 'waiting' });
+        draw();
+        say(online ? 'Saved in SQLite **at once** (synced = 0). Now it is sent…' : 'Saved in SQLite at once, even with no connection. It waits with **synced = 0**.');
+        if (online) setTimeout(sync, STEP / 2);
+      });
+      wifiBtn.addEventListener('click', () => {
+        online = !online;
+        wifiBtn.setAttribute('aria-pressed', String(online));
+        wifiBtn.textContent = online ? 'Wi-Fi on' : 'Wi-Fi off';
+        if (online) {
+          say('**NetInfo** says the phone is back online: the app calls `syncPending()`.');
+          setTimeout(sync, STEP / 2);
+        } else say('Offline. Add tasks: they are saved on the phone and wait.');
+      });
+      flakyBtn.addEventListener('click', () => {
+        flaky = !flaky;
+        flakyBtn.setAttribute('aria-pressed', String(flaky));
+        flakyBtn.textContent = flaky ? 'Flaky network: on' : 'Flaky network: off';
+        say(flaky ? 'Flaky: the next send reaches the server, but its **answer is lost**. Add a task and watch.' : 'The network is reliable again.');
+      });
+      root.querySelectorAll<HTMLButtonElement>('[data-syncq-method]').forEach((b) =>
+        b.addEventListener('click', () => {
+          method = b.dataset.syncqMethod as 'upsert' | 'insert';
+          root.querySelectorAll('[data-syncq-method]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+          sendStep.textContent = method === 'upsert' ? "upsert(rows, { onConflict: 'id' })" : 'insert(rows)';
+          say(method === 'insert' ? '`insert` makes a **new row every time** it is called. Turn on the flaky network and add a task.' : '`upsert` on the id: sending the same task twice changes **one** row.');
+        }),
+      );
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .sq { margin: 22px 0 30px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .sq-acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .sq-method { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--r-full); border: 1px solid var(--line-2); }
+  .sq-btn { padding: 7px 13px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 13px var(--font-body); cursor: pointer; }
+  .sq-method .sq-btn { border-color: transparent; }
+  .sq-btn[aria-checked='true'] { background: var(--accent); color: var(--accent-ink); }
+  .sq-toggle[aria-pressed='false'][data-syncq-wifi] { background: color-mix(in oklab, var(--warn) 18%, var(--surface)); border-color: color-mix(in oklab, var(--warn) 60%, var(--line)); }
+  .sq-toggle[aria-pressed='true'][data-syncq-flaky] { background: color-mix(in oklab, var(--danger) 14%, var(--surface)); border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
+  .sq-btn:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .sq-grid { display: grid; gap: 10px; }
+  @media (min-width: 900px) { .sq-grid { grid-template-columns: 1.15fr 0.9fr 1.15fr; } }
+  .sq-col { display: grid; gap: 8px; align-content: start; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); min-width: 0; }
+  .sq-cloud { border-color: color-mix(in oklab, var(--info) 45%, var(--line)); }
+  .sq-k { margin: 0 !important; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+  .sq-k.sq-code { text-transform: none; letter-spacing: 0; }
+  .sq-list { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 6px; }
+  .sq-list :global(li) { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); color: var(--text); font-size: 13.5px; }
+  .sq-list :global(li .mono) { font-size: 12px; color: var(--text-2); }
+  .sq-list :global(li b) { font-size: 12px; }
+  .sq-list :global(li[data-state='waiting'] b) { color: var(--warn); }
+  .sq-list :global(li[data-state='sending'] b) { color: var(--info); }
+  .sq-list :global(li[data-state='synced'] b) { color: var(--ok); }
+  .sq-list :global(li.is-dup) { border-color: color-mix(in oklab, var(--danger) 60%, var(--line)); background: color-mix(in oklab, var(--danger) 10%, var(--surface)); }
+  .sq-list :global(li.is-dup b) { color: var(--danger); }
+  .sq-list :global(li.is-new) { animation: sq-in .9s var(--ease-out); }
+  .sq-list :global(.sq-none) { background: none; border-style: dashed; color: var(--text-2); }
+  .sq-steps { margin: 0 !important; padding: 0 0 0 20px !important; display: grid; gap: 6px; font-size: 13px; color: var(--text-2); }
+  .sq-steps li { padding: 4px 6px; border-radius: 6px; transition: background .25s, color .25s; }
+  .sq-steps li.on { background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--text); }
+  .sq-step { margin: 0 !important; font-size: 13.5px; color: var(--text); }
+  .sq-note { margin: 0 !important; font-size: 15px; color: var(--text); }
+  .sq :global(code) { font-size: .88em; }
+  @keyframes sq-in { 0% { transform: translateY(-6px); background: color-mix(in oklab, var(--accent) 30%, var(--surface)); } 100% { transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .sq-list :global(li.is-new) { animation: none; } }
+</style>

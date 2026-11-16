@@ -7,6 +7,7 @@
 import { WorkspaceFS } from './fs';
 import { TEMPLATES } from './project';
 import { memo, workspaces } from './settings';
+import { LAB06_PROJECT } from './course-lab06';
 
 export const SITE = 'https://labverse-indol.vercel.app';
 
@@ -318,6 +319,8 @@ module.exports = {
       };
     },
   },
+  // Lab 06: the final project, Offline-Ready Tasks App (src/ide/core/course-lab06.ts)
+  LAB06_PROJECT,
 ];
 
 const KEY = (id: string) => `course:${id}`;
