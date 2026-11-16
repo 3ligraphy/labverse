@@ -1,0 +1,168 @@
+---
+/**
+ * Lab 06 · Part 5 — Row Level Security, row by row. Pick who sends the request (Mona, Omar, nobody signed in), what
+ * they do (read, add, edit, delete) and the rules on the table (owner policies, RLS on with no policy, RLS off).
+ * Each row shows whether the policy lets it through and why; the app's result is shown the way supabase-js returns
+ * it (rows, an empty list, or error 42501). <RlsSimulator />
+ */
+const OWNER = [
+  { op: 'select', sql: `create policy "Read own tasks" on tasks\nfor select to authenticated\nusing ( (select auth.uid()) = user_id );` },
+  { op: 'insert', sql: `create policy "Add own tasks" on tasks\nfor insert to authenticated\nwith check ( (select auth.uid()) = user_id );` },
+  { op: 'update', sql: `create policy "Edit own tasks" on tasks\nfor update to authenticated\nusing ( (select auth.uid()) = user_id )\nwith check ( (select auth.uid()) = user_id );` },
+  { op: 'delete', sql: `create policy "Delete own tasks" on tasks\nfor delete to authenticated\nusing ( (select auth.uid()) = user_id );` },
+];
+---
+<figure class="rls" data-rls data-reveal data-free>
+  <div class="rls-controls">
+    <fieldset class="rls-set">
+      <legend>Who sends the request?</legend>
+      <label><input type="radio" name="rls-who" value="mona" checked /><span>Mona (signed in)</span></label>
+      <label><input type="radio" name="rls-who" value="omar" /><span>Omar (signed in)</span></label>
+      <label><input type="radio" name="rls-who" value="anon" /><span>Nobody signed in</span></label>
+    </fieldset>
+    <fieldset class="rls-set">
+      <legend>What does the app do?</legend>
+      <label><input type="radio" name="rls-op" value="select" checked /><span>Read</span></label>
+      <label><input type="radio" name="rls-op" value="insert" /><span>Add</span></label>
+      <label><input type="radio" name="rls-op" value="update" /><span>Edit (tick all 3)</span></label>
+      <label><input type="radio" name="rls-op" value="delete" /><span>Delete (all 3)</span></label>
+    </fieldset>
+    <fieldset class="rls-set">
+      <legend>Rules on the tasks table</legend>
+      <label><input type="radio" name="rls-mode" value="owner" checked /><span>RLS on + owner policies</span></label>
+      <label><input type="radio" name="rls-mode" value="none" /><span>RLS on, no policy yet</span></label>
+      <label class="rls-danger-opt"><input type="radio" name="rls-mode" value="off" /><span>RLS off</span></label>
+    </fieldset>
+  </div>
+
+  <div class="rls-grid">
+    <section class="rls-box" aria-label="The request">
+      <p class="rls-k">The app sends</p>
+      <pre class="rls-code" data-rls-req></pre>
+    </section>
+    <section class="rls-box" aria-label="The rule Postgres checks">
+      <p class="rls-k">Postgres checks</p>
+      <pre class="rls-code" data-rls-policy></pre>
+      <script type="application/json" data-rls-json set:html={JSON.stringify(OWNER)} />
+    </section>
+  </div>
+
+  <div class="rls-tablewrap">
+    <table class="rls-table">
+      <thead><tr><th>owner (user_id)</th><th>title</th><th>the rule for this row</th><th>result</th></tr></thead>
+      <tbody data-rls-rows></tbody>
+    </table>
+  </div>
+  <p class="rls-result" data-rls-result aria-live="polite"></p>
+</figure>
+
+<script>
+  type Who = 'mona' | 'omar' | 'anon';
+  type Op = 'select' | 'insert' | 'update' | 'delete';
+  type Mode = 'owner' | 'none' | 'off';
+  const NAME: Record<Who, string> = { mona: 'Mona', omar: 'Omar', anon: 'nobody' };
+  const ROWS = [
+    { owner: 'mona' as Who, title: 'Read Part 5 of the lab' },
+    { owner: 'mona' as Who, title: 'Buy milk' },
+    { owner: 'omar' as Who, title: 'Omar’s private task' },
+  ];
+  const REQ: Record<Op, string> = {
+    select: "await supabase.from('tasks').select('*');",
+    insert: "await supabase.from('tasks').insert({ title: 'New task' });\n// user_id is filled in by the database: default auth.uid()",
+    update: "await supabase.from('tasks')\n  .update({ done: true })\n  .in('id', [id1, id2, id3])   // all three rows\n  .select();",
+    delete: "await supabase.from('tasks')\n  .delete()\n  .in('id', [id1, id2, id3])   // all three rows\n  .select();",
+  };
+  const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-rls]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const policies = JSON.parse(root.querySelector('[data-rls-json]')!.textContent!) as { op: Op; sql: string }[];
+      const req = root.querySelector<HTMLElement>('[data-rls-req]')!;
+      const pol = root.querySelector<HTMLElement>('[data-rls-policy]')!;
+      const body = root.querySelector<HTMLElement>('[data-rls-rows]')!;
+      const out = root.querySelector<HTMLElement>('[data-rls-result]')!;
+      const pick = <T extends string>(name: string) => root.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`)!.value as T;
+      // each figure gets its own radio group names
+      const uid = Math.random().toString(36).slice(2, 7);
+      root.querySelectorAll<HTMLInputElement>('input[type=radio]').forEach((i) => (i.name = `${i.name}-${uid}`));
+
+      const render = () => {
+        const who = pick<Who>(`rls-who-${uid}`), op = pick<Op>(`rls-op-${uid}`), mode = pick<Mode>(`rls-mode-${uid}`);
+        root.dataset.mode = mode;
+        req.textContent = `// sent ${who === 'anon' ? 'with no user signed in (publishable key only)' : `with ${NAME[who]}’s access token`}\n${REQ[op]}`;
+        const uidText = who === 'anon' ? 'null' : NAME[who];
+        // the rule for the chosen action
+        if (mode === 'off') pol.textContent = 'alter table tasks disable row level security;\n-- no rule at all: every request reaches every row';
+        else if (mode === 'none') pol.textContent = 'alter table tasks enable row level security;\n-- and no policy yet: nothing is allowed';
+        else pol.textContent = policies.find((p) => p.op === op)!.sql + (who === 'anon' ? '\n-- "to authenticated": a request with no user is not covered' : '');
+
+        // row by row
+        const passes = (owner: Who) => mode === 'off' || (mode === 'owner' && who !== 'anon' && owner === who);
+        const rowsHtml: string[] = [];
+        let ok = 0;
+        if (op === 'insert') {
+          const owner: Who = who;
+          const pass = mode === 'off' || (mode === 'owner' && who !== 'anon');
+          const why = mode === 'off' ? 'no RLS: any row may be added' : mode === 'none' ? 'no policy allows insert' : who === 'anon' ? 'not signed in: auth.uid() is null, no policy covers anon' : `with check: ${uidText} = ${NAME[owner]} → true`;
+          rowsHtml.push(`<tr class="${pass ? 'is-pass' : 'is-block'}"><td class="mono">${who === 'anon' ? 'null' : NAME[owner]}</td><td>New task</td><td class="mono rls-why">${esc(why)}</td><td>${pass ? '✓ added' : '✗ refused'}</td></tr>`);
+          ok = pass ? 1 : 0;
+          out.innerHTML = pass
+            ? `The app gets <code>{ error: null }</code> (status 201). ${mode === 'off' ? '<b>Anyone</b> can add rows, even with no account.' : 'The new row belongs to the user who sent it.'}`
+            : `The app gets <code>error.code === '42501'</code>: <i>new row violates row-level security policy for table "tasks"</i>. ${who === 'anon' ? 'Sign in first.' : 'Write an insert policy.'}`;
+        } else {
+          for (const r of ROWS) {
+            const pass = passes(r.owner);
+            if (pass) ok++;
+            const why = mode === 'off' ? 'no RLS: every row' : mode === 'none' ? 'no policy: no row' : who === 'anon' ? 'auth.uid() is null → no row' : `${uidText} = ${NAME[r.owner]} → ${pass}`;
+            const verb = op === 'select' ? (pass ? '✓ returned' : '— hidden') : op === 'update' ? (pass ? '✓ ticked' : '— not touched') : pass ? '✓ deleted' : '— not touched';
+            rowsHtml.push(`<tr class="${pass ? 'is-pass' : 'is-block'}"><td class="mono">${NAME[r.owner]}</td><td>${esc(r.title)}</td><td class="mono rls-why">${esc(why)}</td><td>${verb}</td></tr>`);
+          }
+          const n = `${ok} row${ok === 1 ? '' : 's'}`;
+          out.innerHTML =
+            op === 'select'
+              ? `The app gets <code>data</code> with <b>${n}</b> and <code>error: null</code>.${ok === 0 ? ' <b>No error:</b> RLS hides rows, it does not complain. An empty list often means "no policy" or "not signed in".' : ''}${mode === 'off' ? ' <b>Omar’s private task is readable by everyone.</b>' : ''}`
+              : `${n} ${op === 'update' ? 'changed' : 'deleted'}, <code>error: null</code>. Rows the user may not ${op} are simply not found: <b>no error</b>, so check how many rows came back.${mode === 'off' ? ' <b>With RLS off, anyone could change or delete every row.</b>' : ''}`;
+        }
+        body.innerHTML = rowsHtml.join('');
+        out.dataset.tone = mode === 'off' ? 'bad' : ok ? 'good' : 'warn';
+      };
+      root.addEventListener('change', render);
+      render();
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .rls { margin: 22px 0 30px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .rls-controls { display: grid; gap: 10px; }
+  .rls-set { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+  .rls-set legend { float: left; width: 100%; margin-bottom: 4px; font-size: 13px; font-weight: 600; color: var(--text); }
+  .rls-set label { position: relative; }
+  .rls-set input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .rls-set span { display: inline-block; padding: 6px 12px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font-size: 13px; font-weight: 600; transition: background-color 0.2s var(--ease-out), border-color 0.2s var(--ease-out); }
+  .rls-set input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .rls-set input:focus-visible + span { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .rls-danger-opt input:checked + span { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .rls-grid { display: grid; gap: 10px; }
+  @media (min-width: 820px) { .rls-grid { grid-template-columns: 1fr 1fr; } }
+  .rls-box { display: grid; gap: 6px; align-content: start; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); }
+  .rls-k { margin: 0 !important; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .rls-code { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); color: var(--text); font: 12.5px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .rls[data-mode='off'] .rls-box:nth-child(2) { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
+  .rls-tablewrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--line-2); }
+  .rls .rls-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13.5px; }
+  .rls .rls-table th { text-align: left; padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--text-2); background: var(--bg-2); border-bottom: 1px solid var(--line-2); text-transform: none; letter-spacing: 0; font-family: var(--font-body); }
+  .rls .rls-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); color: var(--text); vertical-align: top; }
+  .rls .rls-table tr:last-child td { border-bottom: 0; }
+  .rls-table tr.is-pass td:last-child { color: var(--ok); font-weight: 600; }
+  .rls-table tr.is-block td { color: var(--text-2); }
+  .rls-why { font-size: 12.5px; }
+  .rls-result { margin: 0 !important; padding: 10px 12px; border-radius: 10px; font-size: 14.5px; line-height: 1.6; color: var(--text); }
+  .rls-result[data-tone='good'] { background: color-mix(in oklab, var(--ok) 12%, transparent); }
+  .rls-result[data-tone='warn'] { background: color-mix(in oklab, var(--warn) 14%, transparent); }
+  .rls-result[data-tone='bad'] { background: color-mix(in oklab, var(--danger) 14%, transparent); }
+  .rls :global(code) { font-size: .9em; }
+  @media (prefers-reduced-motion: reduce) { .rls-set span { transition: none; } }
+</style>

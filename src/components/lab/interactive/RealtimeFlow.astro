@@ -1,0 +1,186 @@
+---
+/**
+ * Lab 06 · Part 5 — Supabase Realtime: the same user adds a task on a tablet; the row goes into the database, Realtime
+ * checks who may see it (RLS) and which phones listen (open channels), and the phone's list updates without a reload.
+ * Switches: the phone's channel (subscribed or not), the phone's Wi-Fi (an event missed offline is never sent again),
+ * and a task from another user (RLS: not sent). <RealtimeFlow />
+ */
+const CODE = `useEffect(() => {
+  const channel = supabase
+    .channel('my-tasks')
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'tasks' },
+      (payload) => setTasks((list) => [...list, payload.new as Task]))
+    .subscribe();
+  return () => { supabase.removeChannel(channel); };
+}, []);`;
+---
+<figure class="rt" data-rt data-reveal data-free>
+  <div class="rt-acts" role="toolbar" aria-label="Realtime">
+    <button type="button" class="rt-act" data-rt-do="mine">Mona adds a task on her tablet</button>
+    <button type="button" class="rt-act" data-rt-do="other">Omar adds a task (another user)</button>
+    <label class="rt-switch"><input type="checkbox" data-rt-sub checked /><span>Phone listens (channel subscribed)</span></label>
+    <label class="rt-switch"><input type="checkbox" data-rt-wifi checked /><span>Phone Wi-Fi on</span></label>
+  </div>
+
+  <div class="rt-flow">
+    <section class="rt-node rt-device" data-node="tablet" aria-label="Mona's tablet">
+      <p class="rt-name">Mona’s tablet</p>
+      <ul class="rt-list" data-rt-tablet><li>Read Part 5 of the lab</li></ul>
+    </section>
+    <span class="rt-link" data-link="1" aria-hidden="true"></span>
+    <section class="rt-node rt-cloud" data-node="db" aria-label="Database">
+      <p class="rt-name">Database</p>
+      <p class="rt-what" data-rt-db>tasks · INSERT saves the row</p>
+    </section>
+    <span class="rt-link" data-link="2" aria-hidden="true"></span>
+    <section class="rt-node rt-cloud" data-node="rt" aria-label="Realtime">
+      <p class="rt-name">Realtime</p>
+      <p class="rt-what" data-rt-rt>who may see this row (RLS)? which phones listen?</p>
+    </section>
+    <span class="rt-link" data-link="3" aria-hidden="true"></span>
+    <section class="rt-node rt-device" data-node="phone" aria-label="Mona's phone">
+      <p class="rt-name">Mona’s phone</p>
+      <ul class="rt-list" data-rt-phone><li>Read Part 5 of the lab</li></ul>
+    </section>
+  </div>
+
+  <div class="rt-grid">
+    <section class="rt-box">
+      <p class="rt-k">The phone’s code</p>
+      <pre class="rt-code" data-rt-code>{CODE}</pre>
+    </section>
+    <section class="rt-box">
+      <p class="rt-k">The payload the callback gets</p>
+      <pre class="rt-code" data-rt-payload>—</pre>
+    </section>
+  </div>
+  <p class="rt-note" data-rt-note aria-live="polite">Press <b>Mona adds a task on her tablet</b> and watch the phone.</p>
+</figure>
+
+<script>
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-rt]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+      const sub = q<HTMLInputElement>('[data-rt-sub]'), wifi = q<HTMLInputElement>('[data-rt-wifi]');
+      const tablet = q('[data-rt-tablet]'), phone = q('[data-rt-phone]'), payload = q('[data-rt-payload]'), note = q('[data-rt-note]'), rtWhat = q('[data-rt-rt]');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const step = reduce ? 0 : 380;
+      let n = 0;
+      let busy = false;
+      const say = (html: string, tone: 'good' | 'warn' | 'bad' | '' = '') => {
+        note.innerHTML = html;
+        note.dataset.tone = tone;
+      };
+      const light = (sel: string, cls = 'on') => {
+        const el = root.querySelector(sel);
+        el?.classList.add(cls);
+        return el;
+      };
+      const clear = () => root.querySelectorAll('.on, .stop').forEach((el) => el.classList.remove('on', 'stop'));
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const add = (list: HTMLElement, text: string, cls = '') => {
+        const li = document.createElement('li');
+        li.textContent = text;
+        if (cls) li.className = cls;
+        list.append(li);
+        return li;
+      };
+
+      const send = async (mine: boolean) => {
+        if (busy) return;
+        busy = true;
+        clear();
+        rtWhat.textContent = 'who may see this row (RLS)? which phones listen?';
+        n++;
+        const title = mine ? `Task from the tablet ${n}` : `Omar’s task ${n}`;
+        if (mine) add(tablet, title, 'fresh');
+        light('[data-node="tablet"]');
+        if (!mine) say('Omar adds a task on his own phone…');
+        await wait(step); light('[data-link="1"]');
+        await wait(step); light('[data-node="db"]');
+        await wait(step); light('[data-link="2"]');
+        await wait(step); light('[data-node="rt"]');
+        await wait(step);
+        if (!mine) {
+          rtWhat.textContent = 'RLS: Mona may not read Omar’s row → not sent';
+          light('[data-node="rt"]', 'stop');
+          payload.textContent = '— (nothing was sent to Mona’s phone)';
+          say('Realtime checks Row Level Security for every listener: <b>Mona never receives Omar’s rows</b>, just like a <code>select</code> would never return them.', 'good');
+        } else if (!sub.checked) {
+          rtWhat.textContent = 'no channel open on the phone → nothing to send';
+          light('[data-node="rt"]', 'stop');
+          payload.textContent = '— (the phone is not listening)';
+          say('The phone has <b>no open channel</b>, so it hears nothing. Its list only changes when it loads the tasks again.', 'warn');
+        } else if (!wifi.checked) {
+          rtWhat.textContent = 'the phone is offline → the event is lost';
+          light('[data-link="3"]', 'stop');
+          payload.textContent = '— (lost: Realtime never sends it again)';
+          say('The phone is offline, so the event is <b>lost</b>. Realtime does <b>not</b> keep it for later. When the phone is back online, load the list again with <code>select</code>.', 'bad');
+        } else {
+          rtWhat.textContent = 'Mona may read it, her phone listens → sent';
+          light('[data-link="3"]');
+          await wait(step);
+          light('[data-node="phone"]');
+          add(phone, title, 'fresh');
+          payload.textContent = JSON.stringify({ schema: 'public', table: 'tasks', eventType: 'INSERT', new: { id: `9f3c…${n}`, user_id: 'c0ffee00…', title, done: false }, old: {}, errors: null }, null, 2);
+          root.querySelector('[data-rt-code]')?.classList.add('on');
+          say('The callback ran with <code>payload.new</code>: the phone added the task to its list <b>without loading anything</b>.', 'good');
+        }
+        busy = false;
+      };
+      root.querySelector('[data-rt-do="mine"]')!.addEventListener('click', () => void send(true));
+      root.querySelector('[data-rt-do="other"]')!.addEventListener('click', () => void send(false));
+      wifi.addEventListener('change', () => {
+        clear();
+        say(wifi.checked ? 'Back online: the channel joins again (<code>SUBSCRIBED</code>). Changes made while offline are <b>not</b> sent: load the list again after reconnecting.' : 'Wi-Fi off: the phone’s connection to Realtime drops (<code>CHANNEL_ERROR</code>).', wifi.checked ? 'good' : 'warn');
+      });
+      sub.addEventListener('change', () => {
+        clear();
+        say(sub.checked ? '<code>.subscribe()</code>: the channel is open again (<code>SUBSCRIBED</code>).' : '<code>supabase.removeChannel(channel)</code>: the phone stopped listening. Do this in the <code>useEffect</code> cleanup so a screen that closes does not keep listening.');
+      });
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .rt { margin: 22px 0 30px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .rt-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .rt-act { padding: 7px 13px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 13px var(--font-body); cursor: pointer; }
+  .rt-act:hover { border-color: var(--text-3); }
+  .rt-act:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .rt-switch { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
+  .rt-switch input { width: 17px; height: 17px; accent-color: var(--accent); }
+
+  .rt-flow { display: grid; gap: 8px; align-items: stretch; }
+  @media (min-width: 900px) { .rt-flow { grid-template-columns: 1fr 36px 1fr 36px 1.2fr 36px 1fr; align-items: center; } }
+  .rt-node { display: grid; gap: 6px; align-content: start; min-width: 0; min-height: 96px; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); transition: border-color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out); }
+  .rt-cloud { border-color: color-mix(in oklab, var(--info) 40%, var(--line)); }
+  .rt-node.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent); }
+  .rt-node.stop { border-color: var(--danger); box-shadow: 0 0 0 3px color-mix(in oklab, var(--danger) 20%, transparent); }
+  .rt-name { margin: 0 !important; font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .rt-what { margin: 0 !important; font-size: 13px; color: var(--text-2); }
+  .rt-list { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 4px; }
+  .rt-list li { margin: 0 !important; padding: 5px 8px; border-radius: 7px; background: var(--surface); font-size: 13px; color: var(--text); }
+  .rt-list li.fresh { animation: rt-in 0.9s var(--ease-out); }
+  @keyframes rt-in { from { background: color-mix(in oklab, var(--accent) 35%, var(--surface)); transform: translateY(-3px); } }
+  .rt-link { justify-self: center; width: 2px; height: 18px; background: var(--line-2); border-radius: 2px; transition: background-color 0.25s var(--ease-out); }
+  @media (min-width: 900px) { .rt-link { width: 100%; height: 2px; } }
+  .rt-link.on { background: var(--accent); }
+  .rt-link.stop { background: var(--danger); }
+
+  .rt-grid { display: grid; gap: 10px; }
+  @media (min-width: 820px) { .rt-grid { grid-template-columns: 1.15fr 1fr; } }
+  .rt-box { display: grid; gap: 6px; align-content: start; min-width: 0; }
+  .rt-k { margin: 0 !important; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .rt-code { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); color: var(--text); font: 12px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; transition: border-color 0.3s var(--ease-out); }
+  .rt-code.on { border-color: var(--accent); }
+  .rt-note { margin: 0 !important; padding: 10px 12px; border-radius: 10px; font-size: 14.5px; line-height: 1.6; color: var(--text); background: var(--bg-2); }
+  .rt-note[data-tone='good'] { background: color-mix(in oklab, var(--ok) 12%, transparent); }
+  .rt-note[data-tone='warn'] { background: color-mix(in oklab, var(--warn) 14%, transparent); }
+  .rt-note[data-tone='bad'] { background: color-mix(in oklab, var(--danger) 14%, transparent); }
+  .rt :global(code) { font-size: .9em; }
+  @media (prefers-reduced-motion: reduce) { .rt-node, .rt-link, .rt-code { transition: none; } .rt-list li.fresh { animation: none; } }
+</style>

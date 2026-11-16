@@ -1,0 +1,177 @@
+---
+/**
+ * Lab 06 · Part 5 — Supabase Auth step by step: sign up (with or without "Confirm email"), sign in, the session the
+ * phone saves (access token for 1 hour + refresh token), requests that carry the access token, the token refreshed
+ * while the app is open (startAutoRefresh) and not while it is in the background (stopAutoRefresh), and sign out.
+ * The events onAuthStateChange reports are listed as they happen. <AuthFlow />
+ */
+---
+<figure class="af" data-af data-reveal data-free>
+  <div class="af-top">
+    <label class="af-switch"><input type="checkbox" data-af-confirm /><span>“Confirm email” is on in the project</span></label>
+  </div>
+  <div class="af-acts" role="toolbar" aria-label="Auth actions">
+    <button type="button" class="af-act" data-af-do="signup">Sign up</button>
+    <button type="button" class="af-act" data-af-do="confirm" hidden>Open the link in the email</button>
+    <button type="button" class="af-act" data-af-do="signin">Sign in</button>
+    <button type="button" class="af-act" data-af-do="request">Read my tasks</button>
+    <button type="button" class="af-act" data-af-do="hour">1 hour passes</button>
+    <button type="button" class="af-act" data-af-do="background">App goes to the background</button>
+    <button type="button" class="af-act" data-af-do="sign-out">Sign out</button>
+  </div>
+
+  <div class="af-grid">
+    <section class="af-box" aria-label="The phone">
+      <p class="af-k">On the phone</p>
+      <p class="af-state" data-af-state>No session: nobody is signed in.</p>
+      <p class="af-k">Saved in auth.storage</p>
+      <pre class="af-code" data-af-store>(nothing)</pre>
+    </section>
+    <section class="af-box" aria-label="Supabase Auth">
+      <p class="af-k">Supabase Auth (in the cloud)</p>
+      <p class="af-state" data-af-user>No user with this email.</p>
+      <p class="af-k">Last request</p>
+      <pre class="af-code" data-af-req>—</pre>
+    </section>
+  </div>
+
+  <div class="af-log">
+    <p class="af-k">onAuthStateChange(event, session)</p>
+    <ol class="af-events mono" data-af-events><li class="af-none">INITIAL_SESSION · session: null</li></ol>
+  </div>
+  <p class="af-note" data-af-note aria-live="polite">Press <b>Sign up</b>. Then try the other buttons in any order.</p>
+</figure>
+
+<script>
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-af]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+      const confirmOn = q<HTMLInputElement>('[data-af-confirm]');
+      const confirmBtn = q<HTMLButtonElement>('[data-af-do="confirm"]');
+      const bgBtn = q<HTMLButtonElement>('[data-af-do="background"]');
+      const state = q('[data-af-state]'), store = q('[data-af-store]'), user = q('[data-af-user]'), req = q('[data-af-req]'), note = q('[data-af-note]'), events = q('[data-af-events]');
+
+      const s = { exists: false, confirmed: false, session: false, minute: 0, expires: 60, background: false, n: 0 };
+      const token = () => `eyJhbGciOiJIUzI1NiJ9.${btoa(`{"sub":"mona","n":${s.n}}`).replace(/=+$/, '')}.k2Lm9Qx`;
+      const event = (name: string, detail: string) => {
+        events.querySelector('.af-none')?.remove();
+        const li = document.createElement('li');
+        li.innerHTML = `<b>${name}</b> · ${detail}`;
+        events.prepend(li);
+        li.classList.add('flash');
+      };
+      const say = (html: string, tone: 'good' | 'warn' | 'bad' | '' = '') => {
+        note.innerHTML = html;
+        note.dataset.tone = tone;
+      };
+      const render = () => {
+        const left = s.expires - s.minute;
+        state.textContent = s.session ? `Signed in as mona@example.com. Access token valid for ${Math.max(left, 0)} more min.${s.background ? ' (The app is in the background.)' : ''}` : 'No session: nobody is signed in.';
+        store.textContent = s.session
+          ? `sb-<project-ref>-auth-token\n{\n  "access_token": "${token().slice(0, 34)}…",   // 1 hour\n  "refresh_token": "v8f2kq${s.n}x",           // gets a new access token\n  "expires_at": ${1700000000 + s.expires * 60},\n  "user": { "email": "mona@example.com", … }\n}`
+          : '(nothing)';
+        user.textContent = !s.exists ? 'No user with this email.' : s.confirmed ? 'User mona@example.com · email confirmed.' : 'User mona@example.com · waiting for the email link.';
+        confirmBtn.hidden = !(s.exists && !s.confirmed);
+        bgBtn.textContent = s.background ? 'App comes back' : 'App goes to the background';
+      };
+
+      root.querySelectorAll<HTMLButtonElement>('[data-af-do]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const act = b.dataset.afDo;
+          if (act === 'signup') {
+            if (s.exists) return say('This email already has a user. Use <b>Sign in</b>.', 'warn');
+            s.exists = true;
+            req.textContent = "supabase.auth.signUp({ email, password })\n→ POST /auth/v1/signup";
+            if (confirmOn.checked) {
+              s.confirmed = false;
+              say('A user was created, but <b>no session</b>: <code>data.session</code> is null until the link in the email is opened.', 'warn');
+            } else {
+              s.confirmed = true;
+              s.session = true; s.minute = 0; s.expires = 60; s.n++;
+              event('SIGNED_IN', 'session: { access_token, refresh_token, user }');
+              say('“Confirm email” is off, so sign up also signs the user in: the session is saved on the phone.', 'good');
+            }
+          } else if (act === 'confirm') {
+            s.confirmed = true;
+            say('Email confirmed. Now <b>Sign in</b> works.', 'good');
+          } else if (act === 'signin') {
+            req.textContent = "supabase.auth.signInWithPassword({ email, password })\n→ POST /auth/v1/token?grant_type=password";
+            if (!s.exists) return say('<code>error.message</code>: <b>Invalid login credentials</b>. There is no user with this email (or the password is wrong). Sign up first.', 'bad');
+            if (!s.confirmed) return say('<code>error.message</code>: <b>Email not confirmed</b>. Open the link in the email first.', 'bad');
+            if (s.session) return say('Already signed in: the saved session is used. No need to sign in again after a restart.', 'good');
+            s.session = true; s.minute = 0; s.expires = 60; s.n++;
+            event('SIGNED_IN', 'session: { access_token, refresh_token, user }');
+            say('Signed in. supabase-js saved the session in <code>auth.storage</code>, so it is still there after the app restarts.', 'good');
+          } else if (act === 'request') {
+            if (!s.session) {
+              req.textContent = "supabase.from('tasks').select('*')\n→ GET /rest/v1/tasks\n   apikey: sb_publishable_…   (no user)\n← 200  []";
+              return say('Not signed in: the request has no user, so RLS returns <b>an empty list</b> (no error).', 'warn');
+            }
+            req.textContent = `supabase.from('tasks').select('*')\n→ GET /rest/v1/tasks\n   apikey: sb_publishable_…\n   Authorization: Bearer ${token().slice(0, 22)}…\n← 200  [ …your rows… ]`;
+            say('Every request carries the <b>access token</b>. Postgres reads the user from it: that is <code>auth.uid()</code> in your policies.', 'good');
+          } else if (act === 'hour') {
+            s.minute += 60;
+            if (!s.session) return say('An hour passed. Nobody is signed in, so nothing happens.');
+            if (s.background) {
+              render();
+              return say('The app is in the background: <code>stopAutoRefresh()</code> was called, so the token is <b>not</b> refreshed now. It will be refreshed when the app comes back.', 'warn');
+            }
+            s.expires = s.minute + 60; s.n++;
+            event('TOKEN_REFRESHED', 'a new access_token (the refresh_token was used)');
+            say('The app is open, so <code>startAutoRefresh()</code> keeps the session fresh: a new access token came <b>before</b> the old one ran out. The user stays signed in.', 'good');
+          } else if (act === 'background') {
+            s.background = !s.background;
+            if (s.background) say('<code>AppState</code> changed to <b>background</b>: the app calls <code>supabase.auth.stopAutoRefresh()</code> (no timers while the phone sleeps).');
+            else {
+              if (s.session && s.minute >= s.expires) {
+                s.expires = s.minute + 60; s.n++;
+                event('TOKEN_REFRESHED', 'refreshed as soon as the app came back');
+              }
+              say('<code>AppState</code> is <b>active</b> again: <code>supabase.auth.startAutoRefresh()</code>. An expired token is refreshed straight away.', 'good');
+            }
+          } else if (act === 'sign-out') {
+            if (!s.session) return say('Nobody is signed in.');
+            s.session = false;
+            req.textContent = 'supabase.auth.signOut()\n→ POST /auth/v1/logout';
+            event('SIGNED_OUT', 'session: null');
+            say('Signed out: the session was removed from the phone. The next request has no user again.');
+          }
+          render();
+        }),
+      );
+      confirmOn.addEventListener('change', () => say(confirmOn.checked ? '“Confirm email” on: a new user must open a link in their email before they can sign in.' : '“Confirm email” off: a new user is signed in straight away (good for practice projects).'));
+      render();
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .af { margin: 22px 0 30px; display: grid; gap: 12px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .af-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--text); cursor: pointer; }
+  .af-switch input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .af-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .af-act { padding: 7px 13px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 13px var(--font-body); cursor: pointer; }
+  .af-act:hover { border-color: var(--text-3); }
+  .af-act:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .af-grid { display: grid; gap: 10px; }
+  @media (min-width: 760px) { .af-grid { grid-template-columns: 1fr 1fr; } }
+  .af-box { display: grid; gap: 6px; align-content: start; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); }
+  .af-box:nth-child(2) { border-color: color-mix(in oklab, var(--info) 45%, var(--line)); }
+  .af-k { margin: 0 !important; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+  .af-state { margin: 0 0 4px !important; font-size: 14px; color: var(--text); }
+  .af-code { margin: 0; min-height: 3.2em; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); color: var(--text); font: 12px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .af-log { display: grid; gap: 6px; }
+  .af-events { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 4px; font-size: 12.5px; max-height: 9.5em; overflow: auto; }
+  .af-events li { margin: 0 !important; padding: 5px 9px; border-radius: 8px; background: var(--bg-2); color: var(--text-2); }
+  .af-events li b { color: var(--text); }
+  .af-note { margin: 0 !important; padding: 10px 12px; border-radius: 10px; font-size: 14.5px; line-height: 1.6; color: var(--text); background: var(--bg-2); }
+  .af-note[data-tone='good'] { background: color-mix(in oklab, var(--ok) 12%, transparent); }
+  .af-note[data-tone='warn'] { background: color-mix(in oklab, var(--warn) 14%, transparent); }
+  .af-note[data-tone='bad'] { background: color-mix(in oklab, var(--danger) 14%, transparent); }
+  .af .flash { animation: af-flash 1.2s var(--ease-out); }
+  @keyframes af-flash { from { background: color-mix(in oklab, var(--accent) 30%, transparent); } }
+  .af :global(code) { font-size: .9em; }
+  @media (prefers-reduced-motion: reduce) { .af .flash { animation: none; } }
+</style>

@@ -49,3 +49,11 @@ test('the final project opens in the Code Editor, and the plan is built from the
 test('no caching topics (out of scope for this lab)', () => {
   for (const banned of [/TanStack/i, /React Query/i, /stale-while-revalidate/i, /staleTime/i, /cache invalidation/i]) assert.doesNotMatch(mdx, banned);
 });
+
+test('the Lab 06 visuals for real screenshots, RLS, Auth and Realtime are available to lab pages', () => {
+  const map = /const components = \{([\s\S]*?)\};/.exec(page)![1];
+  for (const name of ['Shot', 'RlsSimulator', 'AuthFlow', 'RealtimeFlow']) {
+    assert.match(map, new RegExp(`\\b${name}\\b`), `${name} is in the components map`);
+    assert.match(page, new RegExp(`import ${name} from '@/components/lab/interactive/${name}.astro'`), `${name} is imported`);
+  }
+});

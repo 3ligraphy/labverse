@@ -1,0 +1,118 @@
+---
+/**
+ * A real screenshot (Lab 06): a phone screen from the Android emulator or a page of the Supabase dashboard, in a
+ * phone or browser frame, with numbered notes on the picture and the same numbers in a list under it.
+ *
+ * <Shot src="/labs/lab-06/phone-restart.webp" alt="…" w={360} h={780} frame="phone" caption="…" />
+ * <Shot src="/labs/lab-06/dash-keys.webp" alt="…" w={1280} h={760} frame="browser" url="supabase.com/dashboard/…"
+ *       notes={[{ x: 22, y: 31, label: 'Project URL' }]} />
+ * Several phone screens side by side: shots={[{ src, alt, label }, …]} (w/h are each picture's size).
+ * Notes use percentages of the picture (x from the left, y from the top). Click a picture to open it full size.
+ */
+import { inline } from '@/lib/content';
+
+type Note = { x: number; y: number; label: string };
+type One = { src: string; alt: string; label?: string };
+interface Props {
+  src?: string;
+  alt?: string;
+  shots?: One[];
+  w: number;
+  h: number;
+  frame?: 'phone' | 'browser' | 'none';
+  url?: string;
+  caption?: string;
+  notes?: Note[];
+}
+const { src, alt = '', shots, w, h, frame = 'none', url, caption, notes = [] } = Astro.props;
+const list: One[] = shots ?? (src ? [{ src, alt }] : []);
+if (!list.length) throw new Error('<Shot>: give src + alt, or shots');
+for (const s of list) if (!s.alt?.trim()) throw new Error(`<Shot src="${s.src}">: alt text is required`);
+---
+<figure class:list={['shot', `shot-${frame}`, { 'shot-row': list.length > 1 }]} data-shot data-reveal data-free>
+  <div class="shot-items">
+    {list.map((s, i) => (
+      <div class="shot-item">
+        <div class="shot-frame">
+          {frame === 'browser' && (
+            <div class="shot-bar" aria-hidden="true"><span class="shot-dots"><i></i><i></i><i></i></span>{url && <span class="shot-url mono">{url}</span>}</div>
+          )}
+          <a class="shot-pic" href={s.src} target="_blank" rel="noopener" aria-label={`${s.alt} (open full size)`}>
+            <img src={s.src} alt={s.alt} width={w} height={h} loading="lazy" decoding="async" />
+            {i === 0 && notes.map((n, k) => <span class="shot-pin" data-pin={k + 1} style={`left:${n.x}%;top:${n.y}%`} aria-hidden="true">{k + 1}</span>)}
+          </a>
+        </div>
+        {s.label && <p class="shot-label">{s.label}</p>}
+      </div>
+    ))}
+  </div>
+  {(notes.length > 0 || caption) && (
+    <figcaption class="shot-cap">
+      {notes.length > 0 && (
+        <ol class="shot-notes">
+          {notes.map((n, k) => <li data-note={k + 1}><span class="shot-num mono" aria-hidden="true">{k + 1}</span><span set:html={inline(n.label)} /></li>)}
+        </ol>
+      )}
+      {caption && <p class="shot-text" set:html={inline(caption)} />}
+    </figcaption>
+  )}
+</figure>
+
+<script>
+  // pointing at a note lights its number on the picture (and the other way round)
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-shot]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const light = (n: string | undefined, on: boolean) => {
+        if (!n) return;
+        root.querySelectorAll(`[data-pin="${n}"], [data-note="${n}"]`).forEach((el) => el.classList.toggle('on', on));
+      };
+      root.querySelectorAll<HTMLElement>('[data-note], [data-pin]').forEach((el) => {
+        const n = el.dataset.note ?? el.dataset.pin;
+        el.addEventListener('pointerenter', () => light(n, true));
+        el.addEventListener('pointerleave', () => light(n, false));
+      });
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .shot { margin: 22px 0 30px; display: grid; gap: 14px; justify-items: center; }
+  .shot-items { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; width: 100%; }
+  .shot-item { display: grid; gap: 8px; justify-items: center; min-width: 0; }
+  .shot-frame { position: relative; overflow: hidden; background: var(--surface); }
+  .shot-pic { position: relative; display: block; cursor: zoom-in; }
+  .shot-pic img { display: block; width: 100%; height: auto; }
+  .shot-pic:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
+
+  /* phone: the emulator's screen inside a dark bezel */
+  .shot-phone .shot-item { width: min(290px, 78vw); }
+  .shot-phone.shot-row .shot-item { width: min(250px, 42vw); }
+  .shot-phone .shot-frame { width: 100%; padding: 7px; border-radius: 30px; background: #0c0f14; box-shadow: 0 1px 0 color-mix(in oklab, #fff 14%, transparent) inset, 0 18px 40px -22px rgb(0 0 0 / 0.55); }
+  .shot-phone .shot-pic, .shot-phone .shot-pic img { border-radius: 23px; }
+  .shot-phone .shot-pic { overflow: hidden; }
+
+  /* browser: the dashboard in a window with an address bar */
+  .shot-browser, .shot-none { justify-items: stretch; }
+  .shot-browser .shot-item, .shot-none .shot-item { width: 100%; justify-items: stretch; }
+  .shot-browser .shot-frame { border-radius: var(--r-lg); border: 1px solid var(--line-2); box-shadow: 0 16px 36px -26px rgb(0 0 0 / 0.5); }
+  .shot-none .shot-frame { border-radius: var(--r-md); border: 1px solid var(--line); }
+  .shot-bar { display: flex; align-items: center; gap: 12px; height: 34px; padding: 0 12px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
+  .shot-dots { display: inline-flex; gap: 6px; flex: none; }
+  .shot-dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-2); }
+  .shot-url { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 12px; border-radius: var(--r-full); background: var(--surface); color: var(--text-2); font-size: 12px; }
+
+  /* numbered notes */
+  .shot-pin { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font: 700 12px/1 var(--font-body); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 30%, transparent), 0 4px 10px -4px rgb(0 0 0 / 0.5); transition: transform 0.2s var(--ease-out); }
+  .shot-pin.on { transform: translate(-50%, -50%) scale(1.25); }
+  .shot-label { margin: 0 !important; font-size: 13.5px; font-weight: 600; color: var(--text); text-align: center; }
+  .shot-cap { width: 100%; max-width: 72ch; display: grid; gap: 8px; justify-self: center; }
+  .shot-notes { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 6px 18px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+  .shot-notes li { display: flex; gap: 10px; align-items: baseline; margin: 0 !important; padding: 4px 6px; border-radius: 8px; font-size: 14.5px; line-height: 1.5; color: var(--text); transition: background-color 0.2s var(--ease-out); }
+  .shot-notes li.on { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+  .shot-num { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 700; transform: translateY(2px); }
+  .shot-text { margin: 0 !important; font-size: 14.5px; line-height: 1.6; color: var(--text-2); text-align: center; }
+  .shot-notes + .shot-text { text-align: left; }
+  @media (prefers-reduced-motion: reduce) { .shot-pin, .shot-notes li { transition: none; } }
+</style>
