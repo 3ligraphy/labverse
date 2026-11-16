@@ -1,4 +1,4 @@
-/** Lab 06 · Part 6 — local and cloud together: offline basics. Exercises 13–14 (3 + 7 = 10 min). */
+/** Lab 06 · Part 6 — local and cloud together: offline basics. Exercises 17–18 (3 + 7 = 10 min). */
 import type { CodeExercise, OrderExercise } from '../types.ts';
 import { LAB_ID } from './meta.ts';
 import { cloudRows, code, sqliteRows, STUDENT, SUPABASE_CLIENT, until, waitForText } from './shared.ts';
@@ -7,7 +7,7 @@ const id = (name: string) => `${LAB_ID}--${name}`;
 
 export const ex13: OrderExercise = {
   id: id('sync-order'),
-  n: 13,
+  n: 17,
   title: 'The sync steps, in order',
   minutes: 3,
   level: 3,
@@ -30,10 +30,10 @@ export const ex13: OrderExercise = {
     explain: 'Local first: the task is saved and shown at once. Sending is a separate step that can fail and try again, and `synced` remembers what is still waiting.',
     text: 'Save in SQLite (synced = 0) → check NetInfo → read WHERE synced = 0 → upsert to Supabase with the same id → UPDATE synced = 1 → on failure keep synced = 0 and retry later',
   },
-  success: 'This is the plan of Exercise 14 and of the final project. The two ideas that make it work: the `synced` column (what is waiting) and the id made on the phone (the same task never becomes two rows).',
+  success: 'This is the plan of Exercise 18 and of the final project. The two ideas that make it work: the `synced` column (what is waiting) and the id made on the phone (the same task never becomes two rows).',
 };
 
-/* -------------------------------------------------------------- Exercise 14 */
+/* -------------------------------------------------------------- Exercise 18 */
 
 const OFFLINE_DB = `import * as SQLite from 'expo-sqlite';
 import * as Crypto from 'expo-crypto';
@@ -196,7 +196,7 @@ const cloudCount = async (app: Parameters<typeof cloudRows>[0], title: string) =
 
 export const ex14: CodeExercise = {
   id: id('offline-sync'),
-  n: 14,
+  n: 18,
   title: 'Offline-ready tasks',
   minutes: 7,
   level: 6,

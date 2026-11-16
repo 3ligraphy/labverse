@@ -1,4 +1,4 @@
-/** Lab 06 · Part 5 — the cloud: Supabase. Exercises 9–12 (3 + 8 + 3 + 6 = 20 min). */
+/** Lab 06 · Part 5 — the cloud: Supabase. Exercises 9, 10, 12 and 14 (3 + 8 + 3 + 6 min); 11, 13, 15, 16 are in part5b.ts. */
 import type { CodeExercise, MatchExercise, PredictExercise } from '../types.ts';
 import { LAB_ID } from './meta.ts';
 import { cloudFiles, cloudRows, code, STUDENT, SUPABASE_CLIENT, until, waitForText } from './shared.ts';
@@ -32,7 +32,7 @@ export const ex09: MatchExercise = {
     explain: 'The app only ever holds the project URL and the publishable key; everything it may do is decided by Auth (who you are) and Row Level Security (what you may touch).',
     text: 'sb_publishable_… → in the app · sb_secret_… → server only · a row → Database · avatar.png → Storage · user and session → Auth · `auth.uid() = user_id` → Row Level Security. Left out: a service_role key in EXPO_PUBLIC_.',
   },
-  success: 'Exercises 10 to 12 use each part: the Database (tasks), Auth (signing in), Storage (a photo) and RLS (only your rows).',
+  success: 'Exercises 10 to 16 use each part: the Database (tasks), Auth (signing in), Storage (a photo) and RLS (only your rows).',
 };
 
 /* -------------------------------------------------------------- Exercise 10 */
@@ -233,11 +233,11 @@ export const ex10: CodeExercise = {
   success: 'This is the cloud half of the final project. Look at Device storage: the cloud table holds Omar’s task too, but your app never received it. That is Row Level Security, enforced by the database, not by your app.',
 };
 
-/* -------------------------------------------------------------- Exercise 11 */
+/* -------------------------------------------------------------- Exercise 12 */
 
 export const ex11: PredictExercise = {
   id: id('rls-predict'),
-  n: 11,
+  n: 12,
   title: 'Debug Row Level Security',
   minutes: 3,
   level: 4,
@@ -302,7 +302,7 @@ const mine = data.filter((t) => t.user_id === me.id);`,
   success: 'When a Supabase list is unexpectedly empty, check RLS first: is it on, and is there a `select` policy that matches your rows?',
 };
 
-/* -------------------------------------------------------------- Exercise 12 */
+/* -------------------------------------------------------------- Exercise 14 */
 
 const AVATAR_STARTER = `import { useEffect, useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
@@ -370,7 +370,7 @@ export const AVATAR_SOLUTION = AVATAR_STARTER.replace(
 
 export const ex12: CodeExercise = {
   id: id('avatar-upload'),
-  n: 12,
+  n: 14,
   title: 'Upload a profile photo',
   minutes: 6,
   level: 5,

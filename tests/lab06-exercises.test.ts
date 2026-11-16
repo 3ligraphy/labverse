@@ -71,6 +71,9 @@ function nodeRunner() {
       resetDevice: async () => {
         await runtime.rpc('reset-device', []);
       },
+      remote: async (op: object) => {
+        await runtime.rpc('remote', [op]);
+      },
     },
   };
 }
@@ -78,7 +81,7 @@ function nodeRunner() {
 type Ex = (typeof exercises)[number];
 const codeExercises = exercises.filter((e): e is Extract<Ex, { kind: 'code' | 'fix' }> => e.kind === 'code' || e.kind === 'fix');
 
-test('registry: ids match meta.ts in page order, numbered 1…14, three hints and a full solution each', () => {
+test('registry: ids match meta.ts in page order, numbered 1…18, three hints and a full solution each', () => {
   assert.deepEqual(exercises.map((e) => e.id), EXERCISE_IDS);
   assert.deepEqual(exercises.map((e) => e.n), exercises.map((_, i) => i + 1));
   for (const e of exercises) {
@@ -87,15 +90,18 @@ test('registry: ids match meta.ts in page order, numbered 1…14, three hints an
     assert.ok(e.solution!.files || e.solution!.text, `${e.id}'s solution shows the answer`);
     assert.ok(e.success.length > 20, `${e.id} explains why it works`);
   }
+  assert.equal(exercises.length, 18);
+  // Part 5 (Supabase) in page order: keys, rows, auth, RLS (two), storage, realtime, errors
+  assert.deepEqual(EXERCISES.filter((e) => e.block === 5).map((e) => e.id.replace('lab-06--', '')), ['supabase-parts', 'cloud-tasks', 'auth-screen', 'rls-predict', 'rls-policies', 'avatar-upload', 'realtime-tasks', 'supabase-errors']);
   assert.equal(FINAL_ID, 'lab-06--offline-sync');
   assert.ok(INTERACTIVE_LABS['lab-06'], 'Lab 06 is registered as an interactive lab');
   assert.equal(EXERCISES.filter((e) => e.final).map((e) => e.id).join(), FINAL_ID);
 });
 
-test('time: practice is 5 · 15 · 15 · 10 · 20 · 10 minutes per part (75 of the 150)', () => {
+test('time: practice is 5 · 15 · 15 · 10 · 41 · 10 minutes per part (96 of the 180)', () => {
   const perPart = BLOCKS.map((b) => EXERCISES.filter((m) => m.block === b.part).reduce((sum, m) => sum + exercises.find((e) => e.id === m.id)!.minutes, 0));
-  assert.deepEqual(perPart, [5, 15, 15, 10, 20, 10]);
-  assert.equal(perPart.reduce((a, b) => a + b, 0), 75);
+  assert.deepEqual(perPart, [5, 15, 15, 10, 41, 10]);
+  assert.equal(perPart.reduce((a, b) => a + b, 0), 96);
 });
 
 for (const ex of codeExercises) {
@@ -150,6 +156,20 @@ test('typical mistakes are caught with their own message', async () => {
   const f5 = await failedOf(o, { ...o.files, 'sync.ts': inserting });
   assert.ok(f5.upsert, 'the static check sees insert');
   assert.match(f5.twice ?? '', /copies/, 'and the running app really makes duplicates');
+
+  // Realtime without the cleanup: every time the list opens, one more channel keeps listening
+  const r = find('realtime-tasks');
+  const noCleanup = r.solution!.files!['App.tsx'].replace(/return \(\) => \{\s*supabase\.removeChannel\(channel\);\s*\};/, '');
+  assert.notEqual(noCleanup, r.solution!.files!['App.tsx'], 'the cleanup was taken out');
+  const f6 = await failedOf(r, { ...r.files, 'App.tsx': noCleanup });
+  assert.match(f6.cleanup ?? '', /removeChannel/);
+
+  // the auth screen that ignores error.message: a wrong password shows nothing
+  const au = find('auth-screen');
+  const silent = au.solution!.files!['App.tsx'].replace('if (error) setMessage(error.message);', '');
+  assert.notEqual(silent, au.solution!.files!['App.tsx'], 'the error line was taken out');
+  const f7 = await failedOf(au, { ...au.files, 'App.tsx': silent });
+  assert.match(f7['wrong-password'] ?? '', /error\.message/);
 });
 
 test('every starter compiles, and every demo runs and shows something', async () => {

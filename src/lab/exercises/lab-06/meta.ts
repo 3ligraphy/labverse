@@ -1,7 +1,7 @@
 /**
  * Lab 06 exercise list — plain data shared by the lab page, the progress API and /admin.
  * Keep ids stable: progress is stored by id. `block` is the Part number the exercise belongs to.
- * Practice time per Part (the lab's 150-minute plan): 5 · 15 · 15 · 10 · 20 · 10 = 75 minutes.
+ * Practice time per Part (the lab's 180-minute plan): 5 · 15 · 15 · 10 · 41 · 10 = 96 minutes.
  */
 import type { ExerciseMeta } from '../lab-02/meta.ts';
 
@@ -28,10 +28,14 @@ export const EXERCISES: ExerciseMeta[] = [
   { id: id('token-store'), n: 8, block: 4, kind: 'code', title: 'A token service with SecureStore' },
   { id: id('supabase-parts'), n: 9, block: 5, kind: 'match', title: 'Keys and parts of Supabase' },
   { id: id('cloud-tasks'), n: 10, block: 5, kind: 'code', title: 'Tasks in the cloud' },
-  { id: id('rls-predict'), n: 11, block: 5, kind: 'predict', title: 'Debug Row Level Security' },
-  { id: id('avatar-upload'), n: 12, block: 5, kind: 'code', title: 'Upload a profile photo' },
-  { id: id('sync-order'), n: 13, block: 6, kind: 'order', title: 'The sync steps, in order' },
-  { id: id('offline-sync'), n: 14, block: 6, kind: 'code', title: 'Offline-ready tasks', final: true },
+  { id: id('auth-screen'), n: 11, block: 5, kind: 'code', title: 'Sign in, stay signed in, sign out' },
+  { id: id('rls-predict'), n: 12, block: 5, kind: 'predict', title: 'Debug Row Level Security' },
+  { id: id('rls-policies'), n: 13, block: 5, kind: 'match', title: 'What does each policy allow?' },
+  { id: id('avatar-upload'), n: 14, block: 5, kind: 'code', title: 'Upload a profile photo' },
+  { id: id('realtime-tasks'), n: 15, block: 5, kind: 'code', title: 'A list that updates by itself' },
+  { id: id('supabase-errors'), n: 16, block: 5, kind: 'match', title: 'Read the error, find the fix' },
+  { id: id('sync-order'), n: 17, block: 6, kind: 'order', title: 'The sync steps, in order' },
+  { id: id('offline-sync'), n: 18, block: 6, kind: 'code', title: 'Offline-ready tasks', final: true },
 ];
 
 export const EXERCISE_IDS = EXERCISES.map((e) => e.id);

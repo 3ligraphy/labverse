@@ -156,7 +156,7 @@ export const dbPromise = SQLite.openDatabaseAsync('offline-tasks.db').then(async
 
 const now = () => new Date().toISOString();
 
-// The phone makes the id: the same task has the same id here and in the cloud (Exercise 14)
+// The phone makes the id: the same task has the same id here and in the cloud (Exercise 18)
 export async function addLocal(title: string) {
   const db = await dbPromise;
   await db.runAsync('INSERT INTO tasks (id, title, updated_at) VALUES (?, ?, ?)', Crypto.randomUUID(), title, now());
@@ -177,7 +177,7 @@ export async function getLocal(): Promise<LocalTask[]> {
 const SYNC = `import { supabase } from './supabase';
 import { dbPromise, type LocalTask } from './db';
 
-// PUSH: sends every task that changed on this phone (Exercise 14). Returns how many it sent.
+// PUSH: sends every task that changed on this phone (Exercise 18). Returns how many it sent.
 export async function syncPending(): Promise<number> {
   const db = await dbPromise;
   const waiting = await db.getAllAsync<LocalTask>('SELECT * FROM tasks WHERE synced = 0');
@@ -409,7 +409,7 @@ create policy "Users update their own tasks" on public.tasks
 create policy "Users delete their own tasks" on public.tasks
   for delete to authenticated using ( (select auth.uid()) = user_id );
 
--- 3. Optional (Exercise 12): profile photos in a public bucket, one folder per user
+-- 3. Optional (Exercise 14): profile photos in a public bucket, one folder per user
 insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true);
 create policy "Users upload their own avatar" on storage.objects
   for insert to authenticated with check ( bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text );
@@ -439,7 +439,7 @@ Open [lib/largeSecureStore.ts](lib/largeSecureStore.ts) and [lib/supabase.ts](li
 4. Press **▶ Play** and sign in with the user you created. Your tasks now go to your project: watch them appear in **Table Editor → tasks**.
 
 ## Step 5 · Offline and sync
-Open [lib/sync.ts](lib/sync.ts). \`syncPending\` is Exercise 14: read \`WHERE synced = 0\`, **upsert** on the id, mark \`synced = 1\` only after no error. \`pullFromCloud\` copies the cloud's tasks to the phone, and never overwrites a change that is still waiting.
+Open [lib/sync.ts](lib/sync.ts). \`syncPending\` is Exercise 18: read \`WHERE synced = 0\`, **upsert** on the id, mark \`synced = 1\` only after no error. \`pullFromCloud\` copies the cloud's tasks to the phone, and never overwrites a change that is still waiting.
 
 ## Step 6 · Test it
 - Switch the emulator's **Wi-Fi off**, add two tasks: they show "waiting".
