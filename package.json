@@ -34,6 +34,7 @@
     "@vercel/blob": "^2.8.1",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "aes-js": "^3.1.2",
     "astro": "^7.3.5",
     "client-zip": "^2.5.1",
     "codemirror": "^6.0.2",

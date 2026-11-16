@@ -157,6 +157,11 @@ export function compileAll(files: Record<string, string>): CompileResult {
   const out: Record<string, string> = {};
   const errors: CompileError[] = [];
   for (const [path, code] of Object.entries(files)) {
+    // .env stays as it is: the preview reads its EXPO_PUBLIC_ variables into process.env, like Expo does
+    if (/(^|\/)\.env(\.local)?$/.test(path)) {
+      out[path] = code;
+      continue;
+    }
     if (!/\.(tsx?|jsx?)$/.test(path)) continue; // e.g. index.html shown for reading only
     const result = compileFile(path, code);
     if (result.ok) out[path] = result.code;

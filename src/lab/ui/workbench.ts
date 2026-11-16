@@ -9,6 +9,7 @@ import { LabPreview } from '../engine/preview.ts';
 import type { CodeExercise, Demo } from '../exercises/types.ts';
 import type { LabErrorInfo, LogLevel } from '../runtime/protocol.ts';
 import { createEditor, type LabEditor } from './editor.ts';
+import { DevicePanel, NETWORK_IMPORT, STORAGE_IMPORT } from './device-panel.ts';
 import { debounce, h, md } from './dom.ts';
 import { ExerciseShell } from './shell.ts';
 import { loadExercise, saveExercise } from './store.ts';
@@ -35,6 +36,8 @@ export class Workbench {
   private runSeq = 0;
   private screen: HTMLElement;
   private asleep = false;
+  /** Lab 06: what the preview phone saved (only for code that uses phone storage) */
+  private device: DevicePanel | null = null;
 
   constructor(
     host: HTMLElement,
@@ -78,6 +81,18 @@ export class Workbench {
         h('details', { class: 'wb-console', open: opts.mode === 'demo' && /useEffect|console\./.test(Object.values(this.starter).join('')) }, h('summary', {}, 'Console ', this.consoleCount), this.consoleList),
       ),
     );
+    const starterCode = Object.values(this.starter).join('\n');
+    if (STORAGE_IMPORT.test(starterCode)) {
+      this.device = new DevicePanel({
+        restart: () => this.preview.rerun(),
+        network: NETWORK_IMPORT.test(starterCode) ? (online) => this.preview.network(online) : undefined,
+        erase: async () => {
+          await this.preview.resetDevice();
+          await this.refresh();
+        },
+      });
+      this.wb.append(this.device.root);
+    }
 
     // build UI first, then the editor and preview inside it
     if (opts.mode === 'exercise') {
@@ -127,6 +142,7 @@ export class Workbench {
     return new LabPreview(this.screen, this.frame, {
       onLog: (level, text) => this.log(level, text),
       onError: (error) => this.showError(error),
+      onDevice: (snapshot) => this.device?.render(snapshot),
     });
   }
 
@@ -209,6 +225,7 @@ export class Workbench {
     if (seq !== this.runSeq) return;
     if (result.ok) this.hideError();
     else if (result.error) this.showError(result.error);
+    if (this.device) void this.preview.storage().then((s) => this.device?.render(s), () => {});
   }
 
   private showError(error: LabErrorInfo, extra?: string) {

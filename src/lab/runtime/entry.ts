@@ -3,7 +3,23 @@
  * The parent page sends { type: 'run' | 'rpc' } messages; we answer with ready / rendered / error / log / rpc-result.
  */
 import { createRuntime } from './core.ts';
+import { isOnline, networkError } from './device.ts';
 import type { FromRuntime, LogLevel, ToRuntime } from './protocol.ts';
+
+// Wi-Fi off (the preview's switch, Lab 06): every request fails like on a phone without a connection
+const realFetch = window.fetch.bind(window);
+window.fetch = ((...args: Parameters<typeof fetch>) => (isOnline() ? realFetch(...args) : Promise.reject(networkError()))) as typeof fetch;
+
+/** Files the preview cannot fetch itself (a sandboxed iframe has no origin): the lab page sends them. */
+let assetSeq = 0;
+const assetWaits = new Map<number, { resolve: (b: ArrayBuffer) => void; reject: (e: Error) => void }>();
+function loadAsset(name: string): Promise<ArrayBuffer> {
+  const id = ++assetSeq;
+  return new Promise((resolve, reject) => {
+    assetWaits.set(id, { resolve, reject });
+    window.parent.postMessage({ __lab: 1, type: 'asset', id, name }, '*');
+  });
+}
 
 const CSS = `
 html,body{margin:0;height:100%;background:#fff;color:#11181c;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
@@ -52,6 +68,7 @@ const runtime = createRuntime({
   onFrame: (frame) => {
     document.body.dataset.frame = frame;
   },
+  loadAsset,
 });
 
 // Show console.log / warnings from student code (and from twrnc for unknown classes) in the console panel.
@@ -70,7 +87,12 @@ window.addEventListener('message', async (event) => {
   if (event.source !== window.parent) return;
   const message = event.data as ToRuntime;
   if (!message || message.__lab !== 1) return;
-  if (message.type === 'run') {
+  if (message.type === 'asset-result') {
+    const wait = assetWaits.get(message.id);
+    assetWaits.delete(message.id);
+    if (message.ok && message.value) wait?.resolve(message.value);
+    else wait?.reject(new Error(message.error ?? 'could not load a file'));
+  } else if (message.type === 'run') {
     await runtime.run(message);
   } else if (message.type === 'rpc') {
     try {

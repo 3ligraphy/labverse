@@ -2,7 +2,7 @@
  * The live preview on the lab page: a sandboxed iframe (no access to the site, its cookies or storage)
  * that runs the student's compiled files. Implements PreviewDriver so checks can press/type/read it.
  */
-import type { Found, Frame, FromRuntime, LabErrorInfo, LogLevel, PreviewDriver, Query, ToRuntime } from '../runtime/protocol.ts';
+import type { DeviceSnapshot, Found, Frame, FromRuntime, LabErrorInfo, LogLevel, PreviewDriver, Query, ToRuntime } from '../runtime/protocol.ts';
 
 /** A runtime message without its `__lab` marker (Omit on each member of the union, not on the union). */
 type WithoutLab<T> = T extends unknown ? Omit<T, '__lab'> : never;
@@ -11,7 +11,27 @@ type Handlers = {
   onLog?: (level: LogLevel, text: string) => void;
   /** errors that happen after rendering (e.g. inside an onPress handler) */
   onError?: (error: LabErrorInfo) => void;
+  /** Lab 06: the phone's storage changed (for the Device storage panel) */
+  onDevice?: (snapshot: DeviceSnapshot) => void;
 };
+
+/** Files the preview may ask for (it cannot fetch them itself): SQLite's engine and the real supabase-js. */
+const ASSETS = new Set(['sql-wasm-browser.wasm', 'supabase.js']);
+const assetCache = new Map<string, Promise<ArrayBuffer>>();
+function loadAsset(name: string): Promise<ArrayBuffer> {
+  if (!ASSETS.has(name)) return Promise.reject(new Error(`unknown file ${name}`));
+  const version = typeof __LAB_RUNTIME_VERSION__ === 'string' ? __LAB_RUNTIME_VERSION__ : 'dev';
+  let p = assetCache.get(name);
+  if (!p) {
+    p = fetch(`/lab-runtime/${name}?v=${version}`).then((r) => {
+      if (!r.ok) throw new Error(`${name}: ${r.status}`);
+      return r.arrayBuffer();
+    });
+    p.catch(() => assetCache.delete(name));
+    assetCache.set(name, p);
+  }
+  return p;
+}
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
 
@@ -108,8 +128,22 @@ export class LabPreview implements PreviewDriver {
         else p.reject(new Error(msg.error));
         break;
       }
+      case 'device':
+        this.handlers.onDevice?.(msg.snapshot);
+        break;
+      case 'asset': {
+        // the preview is loading a big file (SQLite's engine): the run it belongs to gets more time
+        this.loadingUntil = Date.now() + 25_000;
+        const target = this.iframe.contentWindow;
+        loadAsset(msg.name).then(
+          (value) => target?.postMessage({ __lab: 1, type: 'asset-result', id: msg.id, ok: true, value }, '*'),
+          (error: Error) => target?.postMessage({ __lab: 1, type: 'asset-result', id: msg.id, ok: false, error: error.message }, '*'),
+        );
+        break;
+      }
     }
   };
+  private loadingUntil = 0;
 
   private send(message: WithoutLab<ToRuntime>) {
     this.iframe.contentWindow?.postMessage({ __lab: 1, ...message }, '*');
@@ -122,12 +156,15 @@ export class LabPreview implements PreviewDriver {
     const id = ++this.seq;
     const result = new Promise<{ ok: boolean; error?: LabErrorInfo }>((resolve) => {
       this.runs.set(id, resolve);
-      setTimeout(() => {
-        if (!this.runs.has(id)) return;
-        this.runs.delete(id);
-        this.create(); // the old page is stuck — start a fresh one
-        resolve({ ok: false, error: { message: 'Your app took too long to start.', hint: 'Is there an endless loop, or state being set during render?' } });
-      }, RUN_TIMEOUT);
+      const arm = () =>
+        setTimeout(() => {
+          if (!this.runs.has(id)) return;
+          if (Date.now() < this.loadingUntil) return void arm(); // still loading SQLite / supabase-js: not stuck
+          this.runs.delete(id);
+          this.create(); // the old page is stuck — start a fresh one
+          resolve({ ok: false, error: { message: 'Your app took too long to start.', hint: 'Is there an endless loop, or state being set during render?' } });
+        }, RUN_TIMEOUT);
+      arm();
     });
     this.send({ type: 'run', id, files, entry, frame });
     return result;
@@ -168,6 +205,18 @@ export class LabPreview implements PreviewDriver {
   }
   async rerun() {
     if (this.last) await this.run(this.last.files, this.last.entry);
+  }
+  /** Lab 06: what the phone has stored */
+  storage() {
+    return this.rpc<DeviceSnapshot>('storage');
+  }
+  /** Lab 06: the phone's Wi-Fi switch */
+  async network(online: boolean) {
+    await this.rpc('network', online);
+  }
+  /** Lab 06: erase everything the phone stored */
+  async resetDevice() {
+    await this.rpc('reset-device');
   }
 
   destroy() {

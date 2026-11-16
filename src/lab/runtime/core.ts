@@ -11,7 +11,22 @@ import { createDomDriver } from './driver-dom.ts';
 import { createRouterApp } from '../../runner/router-shim.tsx';
 import { setPlatform } from './tw.ts';
 import { setSafeArea } from './safe-area.ts';
+import { onDeviceChange, resetDevice, setOnline, snapshot } from './device.ts';
+import { loadSqlite, setAssetLoader } from './sqlite.ts';
+import { needsRealSupabase } from './supabase.ts';
 import type { FromRuntime, LabErrorInfo, LogLevel, RunRequest } from './protocol.ts';
+
+/** Loads what the student's code needs before it runs: SQLite's engine, the real supabase-js for their own project. */
+async function prepare(files: Record<string, string>, loadAsset?: (name: string) => Promise<ArrayBuffer>) {
+  const all = Object.values(files).join('\n');
+  const waits: Promise<unknown>[] = [];
+  if (/['"]expo-sqlite['"]/.test(all)) waits.push(loadSqlite());
+  const g = globalThis as { __labSupabaseReal?: unknown };
+  if (loadAsset && /['"]@supabase\/supabase-js['"]/.test(all) && needsRealSupabase(all) && !g.__labSupabaseReal) {
+    waits.push(loadAsset('supabase.js').then((buf) => new Function(new TextDecoder().decode(buf))()));
+  }
+  await Promise.all(waits);
+}
 
 type Outgoing = FromRuntime extends infer M ? (M extends { __lab: 1 } ? Omit<M, '__lab'> : never) : never;
 export type Post = (message: Outgoing) => void;
@@ -62,8 +77,11 @@ function ErrorScreen({ info }: { info: LabErrorInfo }) {
   );
 }
 
-export function createRuntime(opts: { container: HTMLElement; post: Post; onFrame?: (frame: RunRequest['frame']) => void }) {
+export function createRuntime(opts: { container: HTMLElement; post: Post; onFrame?: (frame: RunRequest['frame']) => void; loadAsset?: (name: string) => Promise<ArrayBuffer> }) {
   const { container, post } = opts;
+  if (opts.loadAsset) setAssetLoader(opts.loadAsset);
+  // the Device storage panel follows every change of the phone's storage
+  onDeviceChange(() => post({ type: 'device', snapshot: snapshot() }));
   let root: Root | null = null;
   let last: RunRequest | null = null;
   let current = 0;
@@ -110,12 +128,24 @@ export function createRuntime(opts: { container: HTMLElement; post: Post; onFram
     root.render(createElement(Boundary, null, node));
   }
 
-  function run(request: RunRequest): Promise<void> {
+  async function run(request: RunRequest): Promise<void> {
     last = request;
     current = request.id;
     errored = false;
     logs.length = 0;
     unmount();
+    try {
+      await prepare(request.files, opts.loadAsset);
+    } catch (error) {
+      const info = report(Object.assign(new Error('A package this app imports could not load in the preview.'), { hint: `Check your internet connection, then run it again. (${error instanceof Error ? error.message : String(error)})` }), request.id);
+      mount(createElement(ErrorScreen, { info }));
+      return;
+    }
+    // a newer run started while this one was loading: answer anyway (the page only shows the newest run)
+    if (current !== request.id) {
+      post({ type: 'rendered', id: request.id });
+      return;
+    }
     RN.resetClassWarnings();
     RN.setInsets(request.frame === 'phone' ? PHONE_INSETS : NO_INSETS);
     setPlatform(request.frame);
@@ -189,6 +219,15 @@ export function createRuntime(opts: { container: HTMLElement; post: Post; onFram
         return [...logs];
       case 'rerun':
         if (last) await run({ ...last, id: last.id });
+        return null;
+      // Lab 06: what the phone has stored, the Wi-Fi switch, and "erase this phone"
+      case 'storage':
+        return snapshot();
+      case 'network':
+        setOnline(Boolean(args[0]));
+        return snapshot().online;
+      case 'reset-device':
+        resetDevice();
         return null;
       default:
         throw new Error(`Unknown preview method: ${method}`);

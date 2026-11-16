@@ -2,7 +2,7 @@
  * Expo / community packages the lab previews provide besides react-native and the navigators, so
  * the code students copy from the docs runs in the browser too:
  * @expo/vector-icons, expo-linear-gradient, @react-native-async-storage/async-storage, expo-constants,
- * expo-haptics, expo-font, expo-splash-screen, expo-image, react-native-gesture-handler,
+ * expo-haptics, expo-font, expo-splash-screen, expo-image, react-native-gesture-handler, the storage packages of Lab 06,
  * react-native-screens and react-native-safe-area-context.
  */
 import { createElement } from 'react';
@@ -10,6 +10,10 @@ import { Image, Text, View } from 'react-native-web';
 import * as Navigation from './navigation.tsx';
 import { PREVIEW_ENV } from '../engine/guard.ts';
 import { axios } from './axios.ts';
+import aesjs from 'aes-js';
+import * as SQLite from './sqlite.ts';
+import { AsyncStorage, decode, encode, ExpoCrypto, ImagePicker, KvStore, MMKVModule, NetInfoModule, SecureStore } from './storage.ts';
+import { createClient as createSupabaseClient } from './supabase.ts';
 
 type AnyProps = Record<string, any>;
 
@@ -66,24 +70,9 @@ function LinearGradient({ colors = [], start, end, locations, style, children, .
   );
 }
 
-/* ----------------------------------------------------------- async storage */
-
-/** Kept for this preview only (the sandboxed preview has no browser storage); survives re-runs. */
-const memory = new Map<string, string>();
-const AsyncStorage = {
-  getItem: async (key: string) => memory.get(key) ?? null,
-  setItem: async (key: string, value: string) => void memory.set(key, String(value)),
-  removeItem: async (key: string) => void memory.delete(key),
-  mergeItem: async (key: string, value: string) => {
-    const merged = { ...JSON.parse(memory.get(key) ?? '{}'), ...JSON.parse(value) };
-    memory.set(key, JSON.stringify(merged));
-  },
-  clear: async () => memory.clear(),
-  getAllKeys: async () => [...memory.keys()],
-  multiGet: async (keys: string[]) => keys.map((k) => [k, memory.get(k) ?? null] as const),
-  multiSet: async (pairs: [string, string][]) => pairs.forEach(([k, v]) => memory.set(k, String(v))),
-  multiRemove: async (keys: string[]) => keys.forEach((k) => memory.delete(k)),
-};
+/* --------------------------------------------------------- storage (Lab 06) */
+// AsyncStorage, MMKV, SecureStore, NetInfo, SQLite and Supabase keep their data in the preview's "phone" (device.ts):
+// it survives Restart app, and the Device storage panel shows it. See storage.ts, sqlite.ts, supabase.ts.
 
 /* -------------------------------------------------------------- the rest */
 
@@ -138,6 +127,21 @@ export function createPackages(rn: { SafeAreaView: unknown; insets: Record<strin
     },
     // HTTP requests the Axios way (Lab 05), on top of fetch
     axios: { default: axios, ...axios },
+    // storage (Lab 06): the same APIs as the real packages
+    'react-native-mmkv': MMKVModule,
+    'expo-secure-store': { ...SecureStore },
+    '@react-native-community/netinfo': NetInfoModule,
+    'expo-sqlite': { ...SQLite },
+    'expo-sqlite/kv-store': { default: KvStore, ...KvStore },
+    'expo-sqlite/localStorage/install': {},
+    'expo-image-picker': { ...ImagePicker },
+    'expo-crypto': { ...ExpoCrypto },
+    'base64-arraybuffer': { decode, encode },
+    'react-native-url-polyfill/auto': {},
+    'react-native-url-polyfill': { setupURLPolyfill: noop },
+    'react-native-get-random-values': {},
+    'aes-js': aesjs,
+    '@supabase/supabase-js': { createClient: createSupabaseClient },
     nativewind: { useColorScheme: () => ({ colorScheme: 'light', setColorScheme: noop, toggleColorScheme: noop }), cssInterop: noop, remapProps: noop },
   };
 }
@@ -147,5 +151,8 @@ export const PACKAGE_NAMES = [
   'react', 'react-native', 'expo-router', '@react-navigation/native', '@react-navigation/native-stack', '@react-navigation/bottom-tabs',
   '@react-navigation/drawer', '@expo/vector-icons', 'expo-linear-gradient', '@react-native-async-storage/async-storage', 'expo-constants',
   'expo-haptics', 'expo-image', 'react-native-safe-area-context', 'nativewind', 'axios',
+  'react-native-mmkv', 'expo-secure-store', '@react-native-community/netinfo', 'expo-sqlite', 'expo-sqlite/kv-store',
+  'expo-sqlite/localStorage/install', 'expo-image-picker', 'expo-crypto', 'base64-arraybuffer', 'react-native-url-polyfill/auto',
+  'react-native-get-random-values', 'aes-js', '@supabase/supabase-js',
 ];
 

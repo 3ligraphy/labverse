@@ -5,6 +5,7 @@
 import type { Outcome } from '../engine/checks.ts';
 import type { Exercise } from '../exercises/types.ts';
 import { h, md } from './dom.ts';
+import { highlightHTML } from './highlight.ts';
 import { getStudent, loadExercise, saveExercise, type ExerciseState } from './store.ts';
 import { track } from './tracker.ts';
 
@@ -33,6 +34,8 @@ export class ExerciseShell {
   private feedbackEl: HTMLElement;
   private hintsEl: HTMLOListElement;
   private hintBtn: HTMLButtonElement;
+  /** "Show the solution": appears once every hint is open */
+  private solutionEl: HTMLElement;
   checkBtn: HTMLButtonElement;
   private busy = false;
 
@@ -47,6 +50,7 @@ export class ExerciseShell {
     this.feedbackEl = h('div', { class: 'ex-feedback', 'aria-live': 'polite' });
     this.hintsEl = h('ol', { class: 'ex-hints' });
     this.hintBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => this.revealHint() });
+    this.solutionEl = h('div', { class: 'ex-sol', hidden: true });
     this.checkBtn = h('button', { class: 'btn btn-primary btn-sm ex-check', type: 'button', onclick: () => void this.check() }, opts.checkLabel ?? 'Check');
 
     if (opts.checklist?.length) {
@@ -84,10 +88,12 @@ export class ExerciseShell {
       ),
       this.feedbackEl,
       this.hintsEl,
+      this.solutionEl,
     );
     host.replaceChildren(this.root);
     for (let i = 0; i < Math.min(state.hints, ex.hints.length); i++) this.appendHint(i);
     this.updateHintButton(state.hints);
+    this.offerSolution(state.hints);
     if (state.status === 'solved') this.root.classList.add('is-solved');
   }
 
@@ -109,7 +115,27 @@ export class ExerciseShell {
     const next = saveExercise(lab, ex.id, { hints: state.hints + 1, status: state.status === 'new' ? 'trying' : state.status });
     this.updateHintButton(next.hints);
     this.renderStatus(next);
+    this.offerSolution(next.hints);
     track({ lab, event: 'hint', exercise: ex.id });
+  }
+
+  /** After the last hint, a button offers the complete solution and why it works (never before). */
+  private offerSolution(shown: number) {
+    const { ex } = this.opts;
+    if (!ex.solution || shown < ex.hints.length || !this.solutionEl.hidden) return;
+    this.solutionEl.hidden = false;
+    const open = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, 'Show the full solution');
+    open.addEventListener('click', () => {
+      const s = ex.solution!;
+      const parts: (HTMLElement | null)[] = [h('p', { class: 'ex-sol-k mono' }, 'The full solution'), h('p', { html: md(s.explain) })];
+      if (s.text) parts.push(h('p', { html: md(s.text) }));
+      for (const [file, code] of Object.entries(s.files ?? {})) {
+        parts.push(h('p', { class: 'ex-sol-file mono' }, file));
+        parts.push(h('pre', { class: 'ex-sol-code', html: highlightHTML(code) }));
+      }
+      this.solutionEl.replaceChildren(h('div', { class: 'ex-solution' }, ...parts));
+    });
+    this.solutionEl.replaceChildren(h('p', { class: 'ex-sol-ask' }, 'Still stuck after every hint? ', open));
   }
 
   renderStatus(state: ExerciseState) {

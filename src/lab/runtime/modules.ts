@@ -13,6 +13,22 @@ export class LabError extends Error {
 
 import { createLoopGuard, PREVIEW_ENV } from '../engine/guard.ts';
 import { PACKAGE_NAMES } from './packages.tsx';
+import { localStoragePolyfill } from './storage.ts';
+
+/**
+ * The EXPO_PUBLIC_ variables of the project's .env file (Expo puts exactly these into the app; other variables stay
+ * on the computer). `KEY=value`, quotes optional, # comments ignored.
+ */
+export function expoEnv(files: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of ['.env', '.env.local']) {
+    for (const line of (files[name] ?? '').split(/\r?\n/)) {
+      const m = /^\s*(EXPO_PUBLIC_[A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
+      if (m) out[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+    }
+  }
+  return out;
+}
 
 export type Builtins = Record<string, unknown>;
 
@@ -74,7 +90,7 @@ export function createModuleSystem(builtins: Builtins, files: Record<string, str
   const shadows = SHADOWED.map(missingImport);
   // stops a loop that never ends (see compile.ts) instead of freezing the preview
   const loopGuard = createLoopGuard((line) => new LabError(`The loop on line ${line} never stopped, so it was halted.`, 'Check its condition: something inside the loop must change so the condition becomes false.'));
-  const process = { env: { ...PREVIEW_ENV } };
+  const process = { env: { ...PREVIEW_ENV, ...expoEnv(files) } };
 
   function resolveFile(from: string, spec: string): string | null {
     const target = spec.startsWith('@/') ? spec.slice(2) : spec.startsWith('/') ? spec.slice(1) : join(dirname(from), spec);
@@ -104,8 +120,9 @@ export function createModuleSystem(builtins: Builtins, files: Record<string, str
     if (code === undefined) throw new LabError(`The file '${path}' doesn't exist.`);
     const module = { exports: {} as Record<string, unknown> };
     cache.set(path, module);
-    const factory = new Function('require', 'module', 'exports', '__labLoop', 'process', ...SHADOWED, `${code}\n//# sourceURL=lab:///${path}`);
-    factory(requireFrom(path), module, module.exports, loopGuard, process, ...shadows);
+    // `localStorage`: the sandboxed preview has none; this is the one `import 'expo-sqlite/localStorage/install'` adds on a phone
+    const factory = new Function('require', 'module', 'exports', '__labLoop', 'process', 'localStorage', ...SHADOWED, `${code}\n//# sourceURL=lab:///${path}`);
+    factory(requireFrom(path), module, module.exports, loopGuard, process, localStoragePolyfill, ...shadows);
     return module.exports;
   }
 

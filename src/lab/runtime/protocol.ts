@@ -4,9 +4,14 @@
  */
 export type Frame = 'phone' | 'web';
 
+import type { DeviceSnapshot } from './device.ts';
+export type { DeviceSnapshot, DeviceSection, DeviceRow, DeviceTable, DeviceFile } from './device.ts';
+
 export type RunRequest = { type: 'run'; id: number; files: Record<string, string>; entry: string; frame: Frame };
 export type RpcRequest = { type: 'rpc'; id: number; method: string; args: unknown[] };
-export type ToRuntime = (RunRequest | RpcRequest) & { __lab: 1 };
+/** the page's answer to an `asset` request: a file the preview cannot fetch itself (it has no origin), e.g. SQLite's .wasm */
+export type AssetResult = { type: 'asset-result'; id: number; ok: boolean; value?: ArrayBuffer; error?: string };
+export type ToRuntime = (RunRequest | RpcRequest | AssetResult) & { __lab: 1 };
 
 export type LabErrorInfo = {
   message: string;
@@ -24,6 +29,10 @@ export type FromRuntime = (
   | { type: 'error'; id?: number; error: LabErrorInfo }
   | { type: 'log'; level: LogLevel; text: string }
   | { type: 'rpc-result'; id: number; ok: boolean; value?: unknown; error?: string }
+  /** the phone's storage changed (Lab 06's Device storage panel) */
+  | { type: 'device'; snapshot: DeviceSnapshot }
+  /** please send this file from /lab-runtime/ (answered with asset-result) */
+  | { type: 'asset'; id: number; name: string }
 ) & { __lab: 1 };
 
 /** How checks address something on the preview screen. */
@@ -66,4 +75,8 @@ export interface PreviewDriver {
   /** render the app again from scratch (fresh state) */
   rerun(): Promise<void>;
   wait(ms: number): Promise<void>;
+  /** Lab 06: what the phone has stored (AsyncStorage, MMKV, SecureStore, SQLite, the practice Supabase project) */
+  storage?(): Promise<DeviceSnapshot>;
+  /** Lab 06: switch the phone's Wi-Fi on or off (NetInfo, fetch and Supabase follow it) */
+  network?(online: boolean): Promise<void>;
 }

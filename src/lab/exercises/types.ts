@@ -22,6 +22,11 @@ type Base = {
   success: string;
   /** optional extra mini-challenge after solving */
   challenge?: string;
+  /**
+   * The complete solution, offered only after every hint was opened (never at the start): the code (code exercises:
+   * file → full code; others: the answers as text) and why it is right.
+   */
+  solution?: { files?: Record<string, string>; text?: string; explain: string };
 };
 
 export type CodeExercise = Base & {

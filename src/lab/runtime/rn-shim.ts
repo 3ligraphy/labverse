@@ -95,9 +95,16 @@ const SafeAreaBase = forwardRef<unknown, AnyProps>(function SafeAreaBase({ style
   });
 });
 
+/** An image whose `source.uri` may be a file of the practice Supabase project (Lab 06): the project turns it into the stored file. */
+const ImageBase = forwardRef<unknown, AnyProps>(function ImageBase({ source, ...rest }, ref) {
+  const resolve = (globalThis as { __labResolveUri?: (uri: string) => string }).__labResolveUri;
+  const mapped = resolve && source && typeof source === 'object' && !Array.isArray(source) && typeof source.uri === 'string' ? { ...source, uri: resolve(source.uri) } : source;
+  return createElement(RNW.Image, { ...rest, source: mapped, ref });
+});
+
 export const View = lab('View', RNW.View, true);
 export const Text = lab('Text', RNW.Text);
-export const Image = lab('Image', RNW.Image);
+export const Image = lab('Image', ImageBase);
 export const ImageBackground = lab('ImageBackground', RNW.ImageBackground, true);
 export const TextInput = lab('TextInput', RNW.TextInput);
 export const Pressable = lab('Pressable', RNW.Pressable, true, true);
