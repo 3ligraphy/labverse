@@ -88,7 +88,7 @@ export function scoreOf(results: CheckResult[]): { status: Status; score: number
   return { status: passed === results.length && results.length > 0 ? 'pass' : passed > 0 ? 'partial' : 'fail', score };
 }
 
-export async function evaluate(exercise: { checks: Check[]; entry: string; frame: Frame }, files: Files, runner: AppRunner): Promise<Outcome> {
+export async function evaluate(exercise: { checks: Check[]; entry: string; frame: Frame; freshDevice?: boolean }, files: Files, runner: AppRunner): Promise<Outcome> {
   const { checks, entry, frame } = exercise;
 
   const compiled = compileAll(files);
@@ -121,6 +121,8 @@ export async function evaluate(exercise: { checks: Check[]; entry: string; frame
   const runChecks = checks.filter((c) => c.run && !c.static);
   if (runChecks.length) {
     const lint = lintFiles(files).find((d) => d.severity === 'error');
+    // storage exercises (Lab 06) are checked on an empty phone: what the student tried before does not count
+    if (exercise.freshDevice) await runner.driver.resetDevice?.();
     const started = await runner.run(compiled.files, entry, frame);
     const problem = !started.ok ? started.error : lint ? { message: lint.message, file: lint.file, line: lint.line } : undefined;
     if (problem) {

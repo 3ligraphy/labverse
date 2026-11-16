@@ -79,4 +79,6 @@ export interface PreviewDriver {
   storage?(): Promise<DeviceSnapshot>;
   /** Lab 06: switch the phone's Wi-Fi on or off (NetInfo, fetch and Supabase follow it) */
   network?(online: boolean): Promise<void>;
+  /** Lab 06: erase what the phone stored (the practice Supabase project goes back to its first rows) */
+  resetDevice?(): Promise<void>;
 }

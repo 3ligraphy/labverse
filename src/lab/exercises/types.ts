@@ -39,6 +39,8 @@ export type CodeExercise = Base & {
   checks: Check[];
   /** optional picture of the goal (small HTML mock drawn next to the task) */
   target?: { html: string; caption: string };
+  /** Lab 06: Check starts on an empty phone (storage erased, Wi-Fi on, the practice cloud back to its first rows) */
+  freshDevice?: boolean;
 };
 
 export type OrderExercise = Base & {

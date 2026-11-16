@@ -5,11 +5,12 @@
 import * as lab02 from './lab-02/meta.ts';
 import * as lab03 from './lab-03/meta.ts';
 import * as lab05 from './lab-05/meta.ts';
+import * as lab06 from './lab-06/meta.ts';
 import type { ExerciseMeta } from './lab-02/meta.ts';
 
 type LabMeta = { LAB_ID: string; EXERCISES: ExerciseMeta[]; BLOCKS: readonly { n: number; part: number; time: string; title: string }[]; FINAL_ID: string };
 
-export const INTERACTIVE_LABS: Record<string, LabMeta> = { 'lab-02': lab02, 'lab-03': lab03, 'lab-05': lab05 };
+export const INTERACTIVE_LABS: Record<string, LabMeta> = { 'lab-02': lab02, 'lab-03': lab03, 'lab-05': lab05, 'lab-06': lab06 };
 
 /** An exercise's metadata, whichever lab it belongs to (ids are unique across labs). */
 export function exerciseMeta(id: string): ExerciseMeta | undefined {

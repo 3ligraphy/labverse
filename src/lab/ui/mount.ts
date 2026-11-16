@@ -6,6 +6,7 @@
 import * as lab02 from '../exercises/lab-02/index.ts';
 import * as lab03 from '../exercises/lab-03/index.ts';
 import * as lab05 from '../exercises/lab-05/index.ts';
+import * as lab06 from '../exercises/lab-06/index.ts';
 import type { Exercise } from '../exercises/types.ts';
 import { mountFlex } from './flex.ts';
 import { initProgress } from './progress.ts';
@@ -14,7 +15,7 @@ import { mountLabel, mountMatch, mountOrder, mountPredict } from './widgets.ts';
 import { Workbench } from './workbench.ts';
 
 /** by the lab's content id (data-lab-interactive); each registry's LAB_ID is where progress is stored */
-const LABS = { 'lab-02': lab02, 'lab-03': lab03, 'lab-05': lab05 } as const;
+const LABS = { 'lab-02': lab02, 'lab-03': lab03, 'lab-05': lab05, 'lab-06': lab06 } as const;
 
 export function mountLab(): (() => void) | undefined {
   const root = document.querySelector<HTMLElement>('[data-lab-interactive]');

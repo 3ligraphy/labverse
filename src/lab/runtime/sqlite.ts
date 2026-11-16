@@ -82,10 +82,9 @@ registerStore({
       place: 'phone' as const,
       tables: tablesOf(db),
     })),
-  reset: () => {
-    for (const db of files.values()) db.close();
-    files.clear();
-  },
+  // "Erase phone": forget every file. They are not closed: an app that is still running may hold one for a moment
+  // (its next query then works on a database nobody shows), and the next run opens new, empty files.
+  reset: () => files.clear(),
 });
 
 /* ------------------------------------------------------------ parameters */
