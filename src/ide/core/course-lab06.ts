@@ -265,7 +265,9 @@ function SignIn({ c }: { c: Colors }) {
       <TextInput style={[s.input, c.input]} placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
       <Pressable style={s.button} onPress={signIn}><Text style={s.buttonText}>Sign in</Text></Pressable>
       {message ? <Text style={s.error}>{message}</Text> : null}
-      <Text style={[s.small, c.muted]}>Practice project: student@practice.dev · practice-123</Text>
+      {process.env.EXPO_PUBLIC_SUPABASE_URL?.includes('practice.supabase.co') ? (
+        <Text style={[s.small, c.muted]}>Practice project: student@practice.dev · practice-123</Text>
+      ) : null}
     </View>
   );
 }
@@ -395,9 +397,7 @@ create table public.tasks (
   updated_at timestamptz not null default now()
 );
 
--- 2. Only signed-in users reach it, and Row Level Security decides which rows
-revoke all on table public.tasks from anon;
-grant select, insert, update, delete on table public.tasks to authenticated;
+-- 2. Row Level Security decides which rows each user may reach (the policies are "to authenticated": no rows for anon)
 alter table public.tasks enable row level security;
 
 create policy "Users read their own tasks" on public.tasks

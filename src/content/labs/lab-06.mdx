@@ -532,7 +532,7 @@ The words on this form:
 - The **region** is where the computer that runs your project is. Choose the one closest to your users: for Egypt, **Central EU (Frankfurt)**.
 - A free project **pauses** after about a week with no use. Open it in the dashboard to start it again.
 
-<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/new" src="/labs/lab-06/dash-new-project.webp" alt="The Supabase dashboard form for a new project with the organization, project name, database password and region fields" />
+The form also has two switches under **Security**: **Enable Data API** (on: supabase-js needs it) and **Enable automatic RLS** (turns Row Level Security on for every new table — a good habit).
 
 ### B. Keys: publishable and secret
 
@@ -544,7 +544,9 @@ When the project is ready, copy two values from **Project Settings → API Keys*
   { tone: 'bad', icon: 'alert', title: 'Secret key', text: '`sb_secret_…` (the old name: service_role). It skips Row Level Security. **Never** put it in an app, a .env with EXPO_PUBLIC_, or Git.' },
 ]} />
 
-<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/settings/api-keys" src="/labs/lab-06/dash-api-keys.webp" alt="The API Keys page of the Supabase dashboard with the publishable key shown and the secret key hidden" caption="The publishable key is shown in full. The secret key stays hidden until you press its eye button: it is meant for servers only. (The project’s own values are blurred in this picture.)" />
+<Shot frame="browser" w={1280} h={605} url="supabase.com/dashboard/project/…/settings/api-keys" src="/labs/lab-06/dash-api-keys.webp" alt="The API Keys page of the Supabase dashboard with the publishable key shown and the secret key hidden" caption="The publishable key is shown in full. The secret key stays hidden until you press its eye button: it is meant for servers only. (The project’s own values are blurred in this picture.)" />
+
+The page also says **Legacy API keys will be retired in early 2027**: the old `anon` and `service_role` keys are being replaced by these two kinds.
 
 Why is the publishable key safe in an app? It only says **which project** the request is for. It does not say **who** sends it. A request with only the publishable key is treated as **anon** (nobody signed in). What anon and signed-in users may do is decided by Row Level Security, in section F.
 
@@ -585,7 +587,11 @@ In the dashboard: **SQL Editor → New query**, paste, **Run**:
   { lines: [6, 7], text: '`timestamptz`: a date and time with its time zone. `default now()` fills it in.' },
 ]} />
 
-<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/sql" src="/labs/lab-06/dash-sql-editor.webp" alt="The Supabase SQL Editor with the create table statement for tasks and the result Success. No rows returned" caption="“Success. No rows returned” is the right answer: `create table` makes a table, it does not read rows." />
+Supabase checks the SQL before it runs. A `create table` without Row Level Security gets this warning. Choose **Run and enable RLS**:
+
+<Shot frame="browser" w={1280} h={605} url="supabase.com/dashboard/project/…/sql" src="/labs/lab-06/dash-sql-rls-warning.webp" alt="The Supabase SQL Editor warning Potential issue detected: this query creates a table without enabling Row Level Security, with the buttons Run without RLS and Run and enable RLS" caption="**Run and enable RLS** creates the table with Row Level Security already on: nobody reaches it until you write policies (section F)." />
+
+<Shot frame="browser" w={1280} h={605} url="supabase.com/dashboard/project/…/sql" src="/labs/lab-06/dash-sql-editor.webp" alt="The Supabase SQL Editor with the create table statement for tasks and the result Success. No rows returned" caption="“Success. No rows returned” is the right answer: `create table` makes a table, it does not read rows." />
 
 ### D. Rows: select, insert, update, delete
 
@@ -612,7 +618,7 @@ if (error) console.warn(error.code, error.message); // e.g. 42501 = blocked by R
 
 After the app added tasks, they are in **Table Editor → tasks**. Every row has the `user_id` of the user who added it:
 
-<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/editor" src="/labs/lab-06/dash-table-editor.webp" alt="The Supabase Table Editor showing the tasks table with rows added from the phone app, with id, user_id, title, done and created_at columns" caption="The Table Editor shows every row, because the dashboard is the project’s owner. Your app only sees what Row Level Security allows." />
+<Shot frame="browser" w={1280} h={605} url="supabase.com/dashboard/project/…/editor" src="/labs/lab-06/dash-table-editor.webp" alt="The Supabase Table Editor showing the tasks table with three rows added from the phone app: Buy milk, Call Omar and Read Part 6 of the lab, all with the same user_id" caption="Three tasks sent from a real phone: one row each, all with the same `user_id`. The bar shows **4 RLS policies** and **Role postgres**: the dashboard reads as the project’s owner, so it sees every row." />
 
 ### E. Auth: users and sessions
 
@@ -633,13 +639,12 @@ Try every step, in any order:
 
 <AuthFlow />
 
-**Confirm email.** A new project asks every new user to confirm their email address: `signUp` creates the user and sends an email, but returns **no session** until the user opens the link. For a class project you can turn it off in **Authentication → Sign In / Providers → Email**. Then `signUp` signs the user in at once.
+**Confirm email.** A new project asks every new user to confirm their email address: `signUp` creates the user and sends an email, but returns **no session** until the user opens the link. For a class project you can turn it off in **Authentication → Sign In / Providers**, section **User Signups**: switch off **Confirm email** and press **Save changes**. Then `signUp` signs the user in at once.
 
-<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/auth/providers" src="/labs/lab-06/dash-auth-email.webp" alt="The Email provider settings in Supabase Authentication with the Confirm email switch" />
 
 **Users.** **Authentication → Users** lists every account: its email, when it was created and when it last signed in. You can add a user here (tick **Auto Confirm User**) or delete one. Passwords are never shown: Supabase keeps only a scrambled form of them (a hash).
 
-<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/auth/users" src="/labs/lab-06/dash-auth-users.webp" alt="The Users page of Supabase Authentication listing test accounts with their sign-in times" />
+<Shot frame="browser" w={1280} h={605} url="supabase.com/dashboard/project/…/auth/users" src="/labs/lab-06/dash-auth-users.webp" alt="The Users page of Supabase Authentication with the Add user button and one test user" caption="**Add user** (top right) creates an account by hand. This practice project’s only user signed in as a guest, so its provider type is Anonymous and it has no email; your users will show their email here." />
 
 **Keeping the session fresh.** The access token works for about one hour. supabase-js gets a new one with a timer before it runs out. On a phone, that timer should only run while the app is on the screen — this is in Supabase’s Expo guide:
 
@@ -678,7 +683,7 @@ One policy per action. Run this in the SQL Editor after the table:
 
 <Explain parts={[['for select', 'the operation it allows'], ['to authenticated', 'only signed-in users'], ['using ( … )', 'checked for every existing row: which rows they may see or change'], ['with check ( … )', 'checked for every new or changed row: may it be saved?'], ['(select auth.uid())', 'the id of the user who sent the request']]} />
 
-<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/auth/policies" src="/labs/lab-06/dash-policies.webp" alt="The Policies page of the Supabase dashboard showing the tasks table with RLS enabled and its four policies" caption="The Policies page lists every table: whether RLS is on, and each policy with its action. A table with RLS off is shown with a warning." />
+In the dashboard, **Database → Policies** lists every table: whether RLS is on, and each policy with its command (SELECT, INSERT, UPDATE, DELETE) and the roles it applies to. It also offers to turn RLS on automatically for every new table.
 
 Two things that surprise everyone:
 
@@ -732,7 +737,7 @@ await supabase.storage.from('avatars').remove([path]);
   ]}
 />
 
-<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/storage/buckets/avatars" src="/labs/lab-06/dash-storage.webp" alt="Supabase Storage showing the public avatars bucket with a folder named after a user id that holds avatar.png" caption="The path is the folder (the user’s id) and the file name. The bucket is marked Public, so the file has a fixed URL." />
+<Shot frame="browser" w={1280} h={605} url="supabase.com/dashboard/project/…/storage/buckets/avatars" src="/labs/lab-06/dash-storage.webp" alt="Supabase Storage showing the public avatars bucket with a folder named after a user id that holds avatar.png" caption="The path is the folder (the user’s id) and the file name. The bucket is marked Public, so the file has a fixed URL." />
 
 <Exercise id="lab-06--avatar-upload" />
 
@@ -747,7 +752,7 @@ Four rules:
 3. Realtime does **not** keep changes for later. A phone that was offline must load the list again with `select` when it is back (Part 6 does this).
 4. Close what you open: remove the channel in the `useEffect` cleanup, or every visit to the screen adds one more listener.
 
-<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/database/publications" src="/labs/lab-06/dash-realtime.webp" alt="The supabase_realtime publication in the Supabase dashboard with the tasks table switched on" />
+<Shot frame="browser" w={1280} h={605} url="supabase.com/dashboard/project/…/database/publications" src="/labs/lab-06/dash-realtime.webp" alt="The supabase_realtime publication in the Supabase dashboard with the tasks table switched on" />
 
 <RealtimeFlow />
 
@@ -774,9 +779,9 @@ When something fails, read `error` first. The code says where to look:
 | `Invalid login credentials` | wrong email or password | what the user typed; whether the user exists |
 | `TypeError: Network request failed` | the phone is offline | NetInfo (Part 6) |
 
-The dashboard keeps a record of every request in **Logs**. Each line shows the time, the method and path (for example `POST /rest/v1/tasks`) and the **status code**: `200`/`201` worked, `401` and `403` were refused by Auth or RLS, `400` means the request itself was wrong, `5xx` is a problem on the server.
+The dashboard keeps a record of every request in **Logs → API Gateway** (type `rest/v1` in the search to see only your table requests). Each line shows the time, the method and path (for example `POST /rest/v1/tasks`) and the **status code**: `200`/`201` worked, `401` and `403` were refused by Auth or RLS, `400` means the request itself was wrong, `5xx` is a problem on the server.
 
-<Shot frame="browser" w={1280} h={800} url="supabase.com/dashboard/project/…/logs/explorer" src="/labs/lab-06/dash-logs.webp" alt="The API logs of a Supabase project listing requests from the phone app with their method, path and status code" caption="Open the logs when the app gets an error you do not understand: the request that failed is there, with its status." />
+<Shot frame="browser" w={1280} h={605} url="supabase.com/dashboard/project/…/logs/edge-logs" src="/labs/lab-06/dash-logs.webp" alt="The API Gateway logs of a Supabase project listing GET and POST requests to /rest/v1/tasks from the phone app with status 200 and 201" caption="The phone’s requests: `POST` (add, 201 Created) and `GET` (read, 200 OK). Open the logs when the app gets an error you do not understand: the request that failed is there, with its status." />
 
 <Exercise id="lab-06--supabase-errors" />
 
