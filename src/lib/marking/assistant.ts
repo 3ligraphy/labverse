@@ -8,7 +8,7 @@
 import { CRITERIA, type CriterionId } from './rubric.ts';
 
 export const RULES: Record<CriterionId, string> = {
-  uc_actors: 'At least two actors, each drawn once.',
+  uc_actors: 'The brief asks for at least one primary actor. Every role in the requirements (admin, staff…) is an actor, each drawn once.',
   uc_logic: 'One diagram, correct notation, include and extend used the right way. Wrong notation = 0.',
   uc_mapping: 'Every functional requirement (at least 5, login and sign-up not counted) has its use case.',
   ad_reqs: 'The flow covers every functional requirement.',
@@ -31,7 +31,8 @@ const REQS_MIN = 'List at least 5 functional requirements (login and sign-up do 
 
 export const HELPERS: Record<CriterionId, Question[]> = {
   uc_actors: [
-    { key: 'actors', kind: 'count', label: 'Different actors in the diagram', max: 20 },
+    { key: 'noPrimary', kind: 'yes', label: 'No primary actor (the user of the app)', deduction: 1, sentence: 'The use case diagram needs its primary actor: the person who uses the app.' },
+    { key: 'missingRoles', kind: 'count', label: 'Roles in the requirements with no actor (−0.5 each)', max: 5 },
     { key: 'twice', kind: 'yes', label: 'An actor is drawn more than once', deduction: 0.3, sentence: 'Draw each actor only once in the use case diagram.' },
   ],
   uc_logic: [
@@ -109,11 +110,9 @@ const LEVEL_MARK: Record<Level, number> = { clear: 2, partly: 1, none: 0 };
 function raw(id: CriterionId, a: Answers): number | null {
   const n = (key: string) => count(id, a, key);
   switch (id) {
-    case 'uc_actors': {
-      const actors = n('actors');
-      if (actors === undefined) return null;
-      return (actors >= 2 ? 1 : actors === 1 ? 0.5 : 0) - deductions(id, a);
-    }
+    case 'uc_actors':
+      if (!answered(id, a)) return null;
+      return yes(a, 'noPrimary') ? 0 : 1 - deductions(id, a) - 0.5 * (n('missingRoles') ?? 0);
     case 'uc_logic':
       if (!answered(id, a)) return null;
       return yes(a, 'wrongNotation') ? 0 : 1.5 - deductions(id, a) - 0.5 * (n('problems') ?? 0);
@@ -162,9 +161,12 @@ export function explain(id: CriterionId, a: Answers): string[] {
     for (const q of HELPERS[id]) if (q.kind === 'yes' && yes(a, q.key)) out.push(q.sentence);
   };
   if (id === 'uc_actors') {
-    const actors = n('actors');
-    if (actors !== undefined && actors < 2) out.push('The use case diagram needs at least two actors.');
-    yesSentences();
+    const missing = n('missingRoles') ?? 0;
+    if (yes(a, 'noPrimary')) out.push((ask(id, 'noPrimary') as { sentence: string }).sentence);
+    else {
+      if (missing) out.push(`${plural(missing, 'role from your requirements has', 'roles from your requirements have')} no actor in the use case diagram: draw every role that uses the system (for example an admin).`);
+      if (yes(a, 'twice')) out.push((ask(id, 'twice') as { sentence: string }).sentence);
+    }
   } else if (id === 'uc_logic') {
     if (yes(a, 'wrongNotation')) out.push((ask(id, 'wrongNotation') as { sentence: string }).sentence);
     else {

@@ -86,8 +86,9 @@ test('each TA downloads their own groups (Excel or CSV) and the file reads back'
 
 test('the assistant’s calculators turn counts and choices into the rubric’s marks', () => {
   for (const c of CRITERIA) assert.ok(HELPERS[c.id] && HELPERS[c.id].length, `${c.id} has a calculator`);
-  assert.equal(suggest('uc_actors', { actors: 2 }), 1);
-  assert.equal(suggest('uc_actors', { actors: 1 }), 0.5);
+  assert.equal(suggest('uc_actors', { missingRoles: 0 }), 1, 'one primary actor is enough (the brief)');
+  assert.equal(suggest('uc_actors', { missingRoles: 1 }), 0.5, 'a role of the requirements with no actor');
+  assert.equal(suggest('uc_actors', { noPrimary: true, missingRoles: 0 }), 0);
   assert.equal(suggest('uc_logic', { wrongNotation: true, problems: 0 }), 0, 'wrong notation = 0');
   assert.equal(suggest('uc_logic', { wrongNotation: false, problems: 1 }), 1);
   assert.equal(suggest('uc_mapping', { reqs: 6, mapped: 5 }), 4.17);
@@ -131,12 +132,12 @@ test('a file fills marks but never clears them: empty cells keep the saved marks
   const d = emptyDoc();
   d.tas = [{ name: 'TA One', email: 'one@uni.test', groups: [1, 2] }];
   const ta = { role: 'ta' as const, email: 'one@uni.test', name: 'TA One' };
-  applyMarks(d, ta, 1, { scores: full, comment: 'Saved comment.', help: { ui_screens: { screens: 9 }, uc_actors: { actors: 2 } } }, []);
+  applyMarks(d, ta, 1, { scores: full, comment: 'Saved comment.', help: { ui_screens: { screens: 9 }, uc_actors: { missingRoles: 0 } } }, []);
   const out = applyImport(d, ta, [{ group: 1, scores: { ui_screens: 8 }, comment: '' }, { group: 2, scores: { uc_actors: 1 } }], () => []);
   assert.deepEqual(out.imported, [1, 2]);
   assert.deepEqual(d.marks['1'].scores, { ...full, ui_screens: 8 });
   assert.equal(d.marks['1'].comment, 'Saved comment.');
-  assert.deepEqual(d.marks['1'].help, { uc_actors: { actors: 2 } }, 'answers for a mark the file changed are dropped');
+  assert.deepEqual(d.marks['1'].help, { uc_actors: { missingRoles: 0 } }, 'answers for a mark the file changed are dropped');
   assert.deepEqual(d.marks['2'].scores, { uc_actors: 1 });
 });
 

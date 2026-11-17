@@ -8,6 +8,7 @@ import { CRITERIA, MAX_COMMENT, SECTIONS, TOTAL_MAX, cleanScore, totals, type Cr
 import { HELPERS, LEVELS, RULES, explain, suggest, type Answers, type Question } from '@/lib/marking/assistant';
 import { canEdit, myRow, type MarkingDoc, type Marker } from '@/lib/marking/doc';
 import { parseMarkingFile, type ParsedRow } from '@/lib/marking/xlsx-read';
+import { createProjectPanel, wireAppBuilds } from '@/scripts/project-panel';
 
 type Group = { number: number; members: { id: string; name: string }[]; idea: string };
 type Data = {
@@ -80,6 +81,7 @@ export function initMarking(root: HTMLElement) {
   async function load() {
     try {
       data = await api();
+      if (!buildsWired) { buildsWired = true; wireAppBuilds($('[data-mk-builds]'), project); }
       if (firstLoad && myGroups().length) filter = 'mine';
       firstLoad = false;
       render();
@@ -180,6 +182,17 @@ export function initMarking(root: HTMLElement) {
   const panel = $('[data-mk-assist]');
   const aside = $('[data-mk-aside]');
   const narrow = window.matchMedia('(max-width: 879px)');
+  /* the group's project (app, report, hand-in) beside the form; on by default, remembered in this browser */
+  const project = createProjectPanel($('[data-mk-proj]'), { item: () => data?.doc.source ?? null });
+  const projToggle = $<HTMLButtonElement>('[data-mk-proj-toggle]');
+  const projOn = () => dlg.dataset.proj === 'on';
+  const setProj = (on: boolean) => {
+    dlg.dataset.proj = on ? 'on' : 'off';
+    projToggle.setAttribute('aria-pressed', String(on));
+    try { localStorage.setItem('mk-proj', on ? 'on' : 'off'); } catch { /* private mode */ }
+  };
+  setProj((() => { try { return localStorage.getItem('mk-proj') !== 'off'; } catch { return true; } })());
+  let buildsWired = false;
   const commentBox = () => $<HTMLTextAreaElement>('[data-mk-comment]');
   const inputOf = (id: CriterionId) => root.querySelector<HTMLInputElement>(`[data-mk-in="${id}"]`)!;
   let current = 0;
@@ -255,6 +268,7 @@ export function initMarking(root: HTMLElement) {
     renderAssist();
     if (!dlg.open) dlg.showModal();
     dlg.style.setProperty('--mk-head', `${$('.mk-d-head').offsetHeight}px`);
+    if (projOn()) void project.show(n);
     (root.querySelector<HTMLInputElement>('[data-mk-in]:not([disabled])') ?? $('[data-mk-close]')).focus({ preventScroll: true });
   }
   function formScores(): Scores {
@@ -336,9 +350,9 @@ export function initMarking(root: HTMLElement) {
     const say = explain(active, a).filter((x) => !dismissed.has(x));
     $('[data-mk-say]').innerHTML = say.length ? `<p class="mk-chk-h">In the comment</p><ul class="mk-say">${say.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
   }
-  /** desktop: the assistant sits beside the form; phones: right under the criterion it is about */
+  /** desktop: the assistant sits beside the form; phones, or with the project open: right under the criterion it is about */
   function placePanel() {
-    if (narrow.matches) root.querySelector(`[data-mk-row="${active}"]`)?.after(panel);
+    if (narrow.matches || projOn()) root.querySelector(`[data-mk-row="${active}"]`)?.after(panel);
     else if (panel.parentElement !== aside) aside.append(panel);
   }
   function select(id: CriterionId) {
@@ -641,6 +655,12 @@ export function initMarking(root: HTMLElement) {
       drafts.del(current);
       renderMarks();
       return openGroup(current);
+    }
+    if (t.closest('[data-mk-proj-toggle]')) {
+      setProj(!projOn());
+      placePanel();
+      if (projOn() && current) void project.show(current);
+      return;
     }
     if (t.closest('[data-mk-close]')) return dlg.close();
     if (t.closest('[data-mk-save-next]')) return save(true);
