@@ -531,6 +531,7 @@ The words on this form:
 - The **database password** is for connecting to Postgres directly (from a server or a database tool). The app never uses it. Press **Generate a password** and keep it in a password manager.
 - The **region** is where the computer that runs your project is. Choose the one closest to your users: for Egypt, **Central EU (Frankfurt)**.
 - A free project **pauses** after about a week with no use. Open it in the dashboard to start it again.
+- A free account can have **2 active projects**. The form refuses a third: pause or delete one first (Project Settings → General).
 
 The form also has two switches under **Security**: **Enable Data API** (on: supabase-js needs it) and **Enable automatic RLS** (turns Row Level Security on for every new table — a good habit).
 
@@ -641,6 +642,8 @@ Try every step, in any order:
 
 **Confirm email.** A new project asks every new user to confirm their email address: `signUp` creates the user and sends an email, but returns **no session** until the user opens the link. For a class project you can turn it off in **Authentication → Sign In / Providers**, section **User Signups**: switch off **Confirm email** and press **Save changes**. Then `signUp` signs the user in at once.
 
+<Shot frame="browser" w={1280} h={605} url="supabase.com/dashboard/project/…/auth/providers" src="/labs/lab-06/dash-auth-email.webp" alt="Supabase Authentication, Sign In / Providers, User Signups: Allow new users to sign up on, anonymous sign-ins off, Confirm email off, and Save changes" caption="**Confirm email** is off in this practice project, so a new user is signed in as soon as they sign up. Leave it on in a real app." />
+
 
 **Users.** **Authentication → Users** lists every account: its email, when it was created and when it last signed in. You can add a user here (tick **Auto Confirm User**) or delete one. Passwords are never shown: Supabase keeps only a scrambled form of them (a hash).
 
@@ -684,6 +687,8 @@ One policy per action. Run this in the SQL Editor after the table:
 <Explain parts={[['for select', 'the operation it allows'], ['to authenticated', 'only signed-in users'], ['using ( … )', 'checked for every existing row: which rows they may see or change'], ['with check ( … )', 'checked for every new or changed row: may it be saved?'], ['(select auth.uid())', 'the id of the user who sent the request']]} />
 
 In the dashboard, **Database → Policies** lists every table: whether RLS is on, and each policy with its command (SELECT, INSERT, UPDATE, DELETE) and the roles it applies to. It also offers to turn RLS on automatically for every new table.
+
+<Shot frame="browser" w={1280} h={605} url="supabase.com/dashboard/project/…/database/policies" src="/labs/lab-06/dash-policies.webp" alt="Supabase Database, Policies: the tasks table with RLS enabled and its four policies Add, Delete, Edit and Read own tasks for INSERT, DELETE, UPDATE and SELECT, applied to authenticated" caption="The four policies of section F, one per command, all for `authenticated`. **Disable RLS** would open the table to every request: never do it for private data." />
 
 Two things that surprise everyone:
 
