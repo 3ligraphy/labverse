@@ -239,11 +239,14 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
       if (needGroup && sent?.group && !notATeamNumber(sent.group)) field('group').value ||= sent.group;
     } catch { /* ignore */ }
 
-    const showDone = (at: string, late: boolean, replaced: boolean) => {
+    /** `group`: the student's group number on the proposal (the course's items file every hand-in under it), if known. */
+    const showDone = (at: string, late: boolean, replaced: boolean, group: number | null = null, typed = '') => {
       form.hidden = true;
       done.hidden = false;
+      const differs = group !== null && typed && typed.replace(/\D+/g, '') !== String(group);
       done.querySelector('[data-sb-done-text]')!.textContent =
-        `${replaced ? 'Your file was replaced' : 'Your file was received'} on ${when(at)}${late ? ' (late)' : ''}. Your TA can see it now.`;
+        `${replaced ? 'Your file was replaced' : 'Your file was received'} on ${when(at)}${late ? ' (late)' : ''}. Your TA can see it now.` +
+        (group === null ? '' : differs ? ` You typed ${typed}, but your group on the proposal is ${group}: your hand-in is filed under Group ${group}.` : ` It is filed under Group ${group}, your group on the proposal.`);
     };
     done.querySelector('[data-sb-again]')!.addEventListener('click', () => { done.hidden = true; form.hidden = false; say('Choose the new file. It will replace the one you handed in.', 'warn'); });
 
@@ -322,7 +325,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 
         store.set('submit:me', JSON.stringify({ name, id: studentId, group }));
         say('');
         fileIn.value = ''; pick(null);
-        showDone(data.at, data.late, data.replaced);
+        showDone(data.at, data.late, data.replaced, typeof data.group === 'number' ? data.group : null, group);
       } catch (error) {
         say(error instanceof Error ? error.message : 'Upload failed. Check your connection and try again.', 'err');
       } finally {

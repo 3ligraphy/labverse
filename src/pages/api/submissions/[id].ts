@@ -3,6 +3,8 @@
  *   GET  ?studentId=…&deviceKey=…   { submitted, at, late } so the page can warn before uploading
  *   POST JSON { name, studentId, group, note, deviceKey, url }   url = the file already uploaded to Blob
  *   POST multipart (same fields + file)                          on a laptop without Blob
+ *        → { ok, at, late, replaced, group }  group: on the course's items, the student's group number on the
+ *          proposal (what the hand-in is filed under everywhere), or null when they are in no group there yet
  */
 import type { APIRoute } from 'astro';
 import { clientIp } from '@/lib/attendance/server';
@@ -10,6 +12,7 @@ import { getProgressStore, json } from '@/lib/progress/server';
 import { ID_RE, canSubmit, describeTypes, extensionsFor, isBlobUrl, isLate, matchesSignature, maxBytes, needsGroup, parseEntry, pastCutoff, safeFileName, typeForName } from '@/lib/project-files/core';
 import { isLocked } from '@/lib/accounts/enrolment';
 import { deleteStored, entryFolder, getFilesStore, saveLocal, storageMode, verifyUpload } from '@/lib/project-files/server';
+import { loadCanon } from '@/lib/project-files/course-groups';
 
 export const prerender = false;
 
@@ -86,7 +89,10 @@ export const POST: APIRoute = async ({ params, request, clientAddress }) => {
 
     const { entry, replaced } = await store.saveEntry(file.id, who.value, stored);
     if (replaced) await deleteStored(replaced);
-    return json({ ok: true, at: entry.updated_at, late: isLate(file, entry.updated_at), replaced: Boolean(existing) }, existing ? 200 : 201);
+    // the course's items: the student's group on the proposal, which their hand-in is filed under (whatever they typed)
+    const key = needsGroup(file) ? (await loadCanon(store).catch(() => null))?.members[who.value.studentId] : undefined;
+    const group = key ? Number(key.slice(1)) : null;
+    return json({ ok: true, at: entry.updated_at, late: isLate(file, entry.updated_at), replaced: Boolean(existing), group }, existing ? 200 : 201);
   } catch (error) {
     console.error('[submissions] hand-in failed', error);
     return json({ error: 'Could not save your submission. Try again.' }, 500);

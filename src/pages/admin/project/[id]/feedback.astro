@@ -27,6 +27,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         <p class="fb-k mono"><a href="/admin/project">← Project submissions</a> · <a href={`/admin/project/${file.id}`}>{file.title}</a> · <a href={`/admin/project/${file.id}/groups`}>Groups &amp; ideas</a></p>
         <h1>Group feedback</h1>
         <p class="muted">Write feedback for each group. It saves as you type. When you're done, generate the PDF report with every group's members, approved idea and feedback.</p>
+        <p class="fb-course" data-fb-course hidden></p>
       </div>
       <div class="fb-actions">
         <span class="live mono" data-fb-live>loading…</span>
@@ -99,6 +100,8 @@ if (!file) return Astro.redirect('/admin/project', 303);
 </Base>
 
 <style is:global>
+  .fb-course { margin: 10px 0 0; padding: 10px 14px; border-radius: var(--r-md); border: 1px solid color-mix(in oklab, var(--accent-text) 40%, var(--line)); background: var(--accent-soft); color: var(--text); font-size: 14px; max-width: 80ch; }
+  .fb-course a, .fb-idea a { color: var(--accent-text); font-weight: 600; }
   .fb-shell { min-height: 85dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; gap: 20px; align-content: start; }
   .fb-k { color: var(--accent-text); font-size: 12px; }
   .fb-k a:hover { text-decoration: underline; }
@@ -225,7 +228,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
-  import { buildGroups, emptyPlan, randomIdea, type Group, type Plan, type Student } from '@/lib/project-files/groups';
+  import { buildGroups, emptyPlan, ideasAsChoices, randomIdea, type Canon, type Group, type Plan, type Student } from '@/lib/project-files/groups';
   import type { IdeaDetails } from '@/lib/project-files/idea-details';
   import type { DocText } from '@/scripts/doc-text';
   import { placeNotes, reportRows, reportFileName, type Feedback, type Note } from '@/lib/project-files/feedback';
@@ -253,6 +256,8 @@ if (!file) return Astro.redirect('/admin/project', 303);
 
     let entries: Entry[] = [];
     let plan: Plan = emptyPlan();
+    /** The course groups when this item is not the proposal: its group numbers, members and ideas are the proposal's. */
+    let canon: Canon | null = null;
     let groups: Group[] = [];
     /** Group key → the feedback text on screen (what is typed, saved or not). */
     const texts = new Map<string, string>();
@@ -261,7 +266,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
     let filter: 'all' | 'todo' | 'done' = 'all';
 
     const has = (key: string) => Boolean(texts.get(key)?.trim());
-    const idea = (g: Group) => plan.choices[g.key]?.idea ?? '';
+    const idea = (g: Group) => (canon ? canon.ideas[g.key] ?? '' : plan.choices[g.key]?.idea ?? '');
 
     const renderSummary = () => {
       const done = groups.filter((g) => has(g.key)).length;
@@ -300,6 +305,12 @@ if (!file) return Astro.redirect('/admin/project', 303);
     const DICE = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>';
 
     const ideaBlock = (g: Group) => {
+      // another item of the course: the idea approved on the proposal, read-only
+      if (canon) {
+        const approved = idea(g);
+        return `<div class="fb-ideas-head"><p class="fb-label">Idea</p><span class="fb-mode ${approved ? 'on' : ''}">${g.numbered ? 'Approved on the proposal' : 'In no group on the proposal'}</span></div>
+          <div class="fb-idea ${approved ? '' : 'none'}">${approved ? esc(approved) : `No idea approved on the proposal yet. <a href="/admin/project/${encodeURIComponent(canon.source)}/feedback">Approve it there</a>`}</div>`;
+      }
       const choice = plan.choices[g.key];
       const list = options(g);
       const groupsLink = `/admin/project/${encodeURIComponent(fileId)}/groups`;
@@ -487,7 +498,9 @@ if (!file) return Astro.redirect('/admin/project', 303);
           <span class="fb-num"><small>Group</small><b>${esc(num)}</b></span>
           <span class="fb-state" data-state>${has(g.key) ? 'Feedback written' : 'Needs feedback'}</span>
         </div>
-        ${g.numbered ? '' : `<p class="small faint">${esc(g.title)}: number it on the Groups page to include it in the report.</p>`}
+        ${g.numbered ? '' : canon
+          ? `<p class="small faint">${esc(g.title)}: in no group on <a href="/admin/project/${encodeURIComponent(canon.source)}/groups">${esc(canon.title)}</a>. Add the student to their group there to include it in the report.</p>`
+          : `<p class="small faint">${esc(g.title)}: number it on the Groups page to include it in the report.</p>`}
         <div>
           <p class="fb-label">Members · ${g.members.length}</p>
           <ul class="fb-members">${g.members.map((m) => `<li>${esc(m.name)}<span>${esc(m.id)}${seenDot(m.id)}</span></li>`).join('') || '<li class="muted">No members</li>'}</ul>
@@ -577,7 +590,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
           const note = saved.get(g.key);
           return [g.key, { text: texts.get(g.key) ?? '', entries: g.entries, updatedAt: note?.updatedAt ?? '', by: note?.by ?? '' } as Note];
         }));
-        const rows = reportRows(groups, plan, reportNotes);
+        const rows = reportRows(groups, canon ? { choices: ideasAsChoices(canon) } : plan, reportNotes);
         const { feedbackPdf } = await import('@/scripts/feedback-pdf');
         const bytes = await feedbackPdf({ title, rows, generatedAt: new Date() });
         const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
@@ -729,10 +742,14 @@ if (!file) return Astro.redirect('/admin/project', 303);
         if (!res.ok) throw new Error(data.error ?? 'Could not load.');
         entries = data.entries;
         plan = data.plan;
+        canon = data.canon ?? null;
         if (data.release) showRelease(data.release);
         setViews(data.views);
         const roster: Student[] = data.roster;
-        groups = buildGroups(entries, roster, plan);
+        groups = buildGroups(entries, roster, plan, canon);
+        const note = $('[data-fb-course]');
+        note.hidden = !canon;
+        if (canon) note.innerHTML = `Group numbers, members and approved ideas come from <a href="/admin/project/${encodeURIComponent(canon.source)}/groups">${esc(canon.title)}</a> (the proposal report), whatever number a student typed here.`;
         const { notes, orphans } = placeNotes(groups, data.feedback as Feedback);
         for (const [key, note] of notes) { saved.set(key, note); texts.set(key, note.text); }
         const box = $('[data-fb-orphans]');

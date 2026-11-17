@@ -153,7 +153,9 @@ import AdminShell from '@/components/admin/AdminShell.astro';
   };
 
 
-  type Hit = { id: string; file_id: string; file_title: string; student_id: string; name: string; group_name: string; url: string; size: number; updated_at: string; late: boolean };
+  type Hit = { id: string; file_id: string; file_title: string; student_id: string; name: string; group_name: string; group?: string; url: string; size: number; updated_at: string; late: boolean };
+  /** On the course's items, the hand-in's group on the proposal; elsewhere what was typed. */
+  const hitGroup = (h: Hit) => (h.group === undefined ? h.group_name : h.group ? `Group ${h.group.replace(/^G/, '')}` : 'no group number');
 
   /** Cross-item search: one student's hand-ins wherever they are. */
   function wireFind() {
@@ -178,7 +180,7 @@ import AdminShell from '@/components/admin/AdminShell.astro';
         out.innerHTML = hits.length ? hits.map((h) => `
           <li>
             <div>
-              <b>${esc(h.name)}</b> <span class="mono faint">${esc(h.student_id)} · ${esc(h.group_name)}</span>
+              <b>${esc(h.name)}</b> <span class="mono faint">${esc(h.student_id)} · ${esc(hitGroup(h))}</span>
               <span class="meta mono">${esc(h.file_title)} · ${when(h.updated_at)}${h.late ? ' · <span class="pf-late">late</span>' : ''} · ${mb(h.size)}</span>
             </div>
             <div class="actions">

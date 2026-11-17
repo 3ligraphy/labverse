@@ -1,6 +1,7 @@
 /**
  * Admin: project groups (/admin/project/[id]/groups).
- *   GET ?file=…          { file, entries, roster, plan } for one item
+ *   GET ?file=…          { file, entries, roster, plan, canon } for one item; `canon` (the course groups: the
+ *                        proposal's numbers, members and ideas) is set on every course item except the proposal
  *   PUT ?file=…          { plan }    saves the item's group plan (added members, ideas, choices, file scans)
  *   PUT                  { roster }  saves the class list (shared by every item)
  * The rules (who is in which group, random picks) run in the browser and live in src/lib/project-files/groups.ts;
@@ -11,6 +12,7 @@ import { canManageSubmissions } from '@/lib/accounts/labscope';
 import { json } from '@/lib/progress/server';
 import { cleanPlan, cleanRoster, emptyPlan, type Student } from '@/lib/project-files/groups';
 import { getFilesStore } from '@/lib/project-files/server';
+import { canonFor, loadCanon } from '@/lib/project-files/course-groups';
 import { renumbered } from '@/lib/marking/doc';
 import { keysByEntry, loadMarking } from '@/lib/marking/server';
 
@@ -25,12 +27,13 @@ export const GET: APIRoute = async ({ url, cookies }) => {
   try {
     const file = await store.get(url.searchParams.get('file') ?? '');
     if (!file) return json({ error: 'Not found.' }, 404);
-    const [entries, roster, plan] = await Promise.all([
+    const [entries, roster, plan, canon] = await Promise.all([
       store.listEntries(file.id),
       store.getGroupData<Student[]>('roster'),
       store.getGroupData<unknown>(`plan:${file.id}`),
+      loadCanon(store),
     ]);
-    return json({ file, entries, roster: roster ?? [], plan: plan ? cleanPlan(plan) : emptyPlan() });
+    return json({ file, entries, roster: roster ?? [], plan: plan ? cleanPlan(plan) : emptyPlan(), canon: canonFor(file, canon) });
   } catch (error) {
     console.error('[project-groups] could not load', error);
     return json({ error: 'Could not load the groups.' }, 500);

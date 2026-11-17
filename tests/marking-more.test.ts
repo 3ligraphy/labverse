@@ -14,10 +14,11 @@ const { CRITERIA } = await import('../src/lib/marking/rubric.ts');
 const full = { uc_actors: 1, uc_logic: 1.5, uc_mapping: 5, ad_reqs: 5, ad_flow: 2.5, ui_screens: 9, ar_pattern: 2, ar_impl: 2, ar_reason: 2 };
 const enc = (s: string) => new TextEncoder().encode(s);
 
-test('the default load is the team list: 4 TAs, 11 + 11 + 12 + 12 groups, every group 1–46 exactly once', () => {
-  assert.deepEqual(DEFAULT_TAS.map((t) => [t.name, t.groups.length]), [['Amr', 11], ['Ramy', 11], ['Ali', 12], ['Youssef', 12]]);
+test('the default load is the team list: 4 TAs, 11 + 11 + 12 + 13 groups, every group 1–47 exactly once', () => {
+  assert.deepEqual(DEFAULT_TAS.map((t) => [t.name, t.groups.length]), [['Amr', 11], ['Ramy', 11], ['Ali', 12], ['Youssef', 13]]);
   const all = DEFAULT_TAS.flatMap((t) => t.groups).sort((a, b) => a - b);
-  assert.deepEqual(all, Array.from({ length: 46 }, (_, i) => i + 1));
+  assert.deepEqual(all, Array.from({ length: 47 }, (_, i) => i + 1));
+  assert.ok(DEFAULT_TAS.find((t) => t.name === 'Youssef')!.groups.includes(47), 'group 47 (a later hand-in) is Youssef’s');
   assert.deepEqual(DEFAULT_TAS.find((t) => t.name === 'Amr')!.groups, [3, 5, 9, 12, 18, 20, 21, 30, 33, 39, 41]);
   const d = withDefaultLoad(emptyDoc());
   assert.equal(d.tas.length, 4);

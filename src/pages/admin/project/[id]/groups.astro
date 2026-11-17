@@ -3,6 +3,8 @@
  * Groups & ideas for one submission item (usually the proposal). Builds each group from the students who handed
  * in and everyone named in their file's contribution table, adds random unassigned students from the class list
  * to groups under the team size, lets the admin pick (or draw) each group's idea, and exports the sheet.
+ * Every other item of the course (Phase 1, Phase 2, …) uses the proposal's groups: its page shows them read-only,
+ * with the proposal's numbers, members and approved ideas (src/lib/project-files/course-groups.ts).
  * Rules: src/lib/project-files/groups.ts · files are read in the browser by src/scripts/doc-text.ts.
  */
 import Base from '@/layouts/Base.astro';
@@ -27,6 +29,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
         <p class="gp-k mono"><a href="/admin/project">← Project submissions</a> · <a href={`/admin/project/${file.id}`}>{file.title}</a></p>
         <h1>Groups &amp; ideas</h1>
         <p class="muted">Each group is built from the students who handed in and everyone named in their file's contribution table. Teams have up to {TEAM_SIZE} members.</p>
+        <p class="gp-course" data-gp-course hidden></p>
       </div>
       <div class="gp-row">
         <span class="live mono" data-gp-live>loading…</span>
@@ -83,22 +86,22 @@ if (!file) return Astro.redirect('/admin/project', 303);
       <div class="gp-head">
         <div>
           <p class="gp-step mono">Step 3</p>
-          <h2>Add random members</h2>
-          <p class="muted small">Select groups with fewer than {MIN_TEAM_SIZE} members. Random assignment fills each selected group to at most {MIN_TEAM_SIZE}. Only students who are in no group can be picked, and each one goes to one group.</p>
+          <h2 data-gp-step3-h>Add random members</h2>
+          <p class="muted small" data-gp-step3-p>Select groups with fewer than {MIN_TEAM_SIZE} members. Random assignment fills each selected group to at most {MIN_TEAM_SIZE}. Only students who are in no group can be picked, and each one goes to one group.</p>
         </div>
       </div>
       <div class="gp-tools">
         <div class="gp-row gp-sort-row"><label class="gp-sort small">Sort <select class="input" data-gp-sort aria-label="Sort groups">{Object.entries(SORTS).map(([k, v]) => <option value={k}>{v}</option>)}</select></label><span class="small faint" data-gp-new-sum></span></div>
-        <div class="gp-row">
+        <div class="gp-row" data-gp-own>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-select-under>Select all under {MIN_TEAM_SIZE}</button>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-select-none>Clear</button>
           <label class="gp-num small">Members to add per group
             <input class="input mono" type="number" min="1" max={MIN_TEAM_SIZE - 1} value={MIN_TEAM_SIZE - 1} data-gp-count /></label>
         </div>
         <div class="gp-row">
-          <button class="btn btn-primary btn-sm" type="button" data-gp-assign disabled>Assign random members</button>
-          <button class="btn btn-ghost btn-sm" type="button" data-gp-undo>Undo additions</button>
-          <button class="btn btn-ghost btn-sm" type="button" data-gp-renumber>Renumber all</button>
+          <button class="btn btn-primary btn-sm" type="button" data-gp-assign data-gp-own disabled>Assign random members</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-undo data-gp-own>Undo additions</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-gp-renumber data-gp-own>Renumber all</button>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-sheet="groups">Download sheet</button>
         </div>
       </div>
@@ -116,10 +119,10 @@ if (!file) return Astro.redirect('/admin/project', 303);
       <div class="gp-head">
         <div>
           <p class="gp-step mono">Step 4</p>
-          <h2>Choose each group's idea</h2>
-          <p class="muted small">Pick an idea yourself, or let the system draw one at random, for each group.</p>
+          <h2 data-gp-step4-h>Choose each group's idea</h2>
+          <p class="muted small" data-gp-step4-p>Pick an idea yourself, or let the system draw one at random, for each group.</p>
         </div>
-        <div class="gp-row">
+        <div class="gp-row" data-gp-own>
           <label class="gp-sort small">Sort <select class="input" data-gp-sort aria-label="Sort groups">{Object.entries(SORTS).map(([k, v]) => <option value={k}>{v}</option>)}</select></label>
           <label class="gp-check"><input type="checkbox" data-gp-auto-all /> Choose every group's idea at random</label>
           <button class="btn btn-ghost btn-sm" type="button" data-gp-redraw-all hidden>Draw again for all</button>
@@ -186,6 +189,11 @@ if (!file) return Astro.redirect('/admin/project', 303);
   .gp-chip.document { border-style: dashed; }
   .gp-chip.added { border-color: var(--accent-text); background: var(--accent-soft); }
   .gp-chip.clash { border-color: var(--warn); }
+  .gp-chip.group { background: none; color: var(--text-2); }
+  .gp-course { margin: 10px 0 0; padding: 10px 14px; border-radius: var(--r-md); border: 1px solid color-mix(in oklab, var(--accent-text) 40%, var(--line)); background: var(--accent-soft); color: var(--text); font-size: 14px; max-width: 80ch; }
+  .gp-course a { color: var(--accent-text); font-weight: 600; }
+  .gp-approved { margin: 4px 0 0; padding: 10px 12px; border-radius: var(--r-md); background: var(--surface-2); font-size: 14px; }
+  .gp-approved small { display: block; color: var(--text-3); font-size: 12px; }
   .gp-chip button { border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 0 0 0 2px; font-size: 14px; line-height: 1; }
   .gp-chip button:hover { color: var(--danger); }
   .gp-nonum { color: var(--warn); }
@@ -378,14 +386,14 @@ if (!file) return Astro.redirect('/admin/project', 303);
   import { playBox } from '@/scripts/box-shuffle';
   import {
     SCAN_VERSION, TEAM_SIZE, MIN_TEAM_SIZE, assignRandom, autoNumber, buildGroups, cleanTeam, numberGroup, conflicts, emptyPlan, extractIdeas, findStudents, documentStudents, groupsCsv, openSeats, parseRoster,
-    normId, randomIdea, unassigned, lastHandIn, sortGroups, SORTS, type Group, type Plan, type Sort, type Student,
+    normId, randomIdea, unassigned, lastHandIn, sortGroups, ideasAsChoices, SORTS, type Canon, type Group, type Plan, type Sort, type Student,
   } from '@/lib/project-files/groups';
   import { notATeamNumber, type Entry } from '@/lib/project-files/core';
 
   const PARALLEL = 3;
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
-  const SOURCE_LABEL = { submitted: 'handed in', document: 'named in the file', added: 'added here' } as const;
+  const SOURCE_LABEL = { submitted: 'handed in', document: 'named in the file', added: 'added here', group: 'in this group on the proposal' } as const;
 
   onPageLoad(() => {
     const root = document.querySelector<HTMLElement>('[data-gp]');
@@ -399,8 +407,13 @@ if (!file) return Astro.redirect('/admin/project', 303);
     let roster: Student[] = [];
     const addOpen = new Set<string>(); // groups whose "+ Add student" form is open in the table
     let plan: Plan = emptyPlan();
+    /** The course groups when this item is not the proposal: its numbers, members and ideas are the proposal's. */
+    let canon: Canon | null = null;
     let groups: Group[] = [];
     const selected = new Set<string>();
+    /** The approved idea: this item's own choice on the proposal, the proposal's on every other item. */
+    const ideaOf = (key: string) => (canon ? canon.ideas[key] ?? '' : plan.choices[key]?.idea ?? '');
+    const proposalLink = () => (canon ? `<a href="/admin/project/${encodeURIComponent(canon.source)}/groups">${esc(canon.title)}</a>` : '');
     const counts = new Map<string, number>();
     let scanning = false;
 
@@ -469,17 +482,19 @@ if (!file) return Astro.redirect('/admin/project', 303);
       const items: string[] = [];
       const unnumbered = groups.filter((g) => !g.numbered);
       const codes = entries.filter((e) => notATeamNumber(e.group_name)).length;
-      if (unnumbered.length) items.push(`<li>${plural(unnumbered.reduce((n, g) => n + g.entries.length, 0), 'hand-in')} typed a student ID or lab group code instead of a group number. They are grouped by who is named in their contribution tables, and get a group number from the platform once every file is read${roster.length ? '' : ' and the class list (step 1) is saved'}.</li>`);
-      else if (codes) items.push(`<li class="info">${plural(codes, 'hand-in')} typed a student ID or lab group code instead of a group number. Their groups were put together from the contribution tables and given a group number by the platform, drawn at random. Change any number in step 3.</li>`);
+      if (canon) {
+        if (unnumbered.length) items.push(`<li>${plural(unnumbered.reduce((n, g) => n + g.entries.length, 0), 'hand-in')} ${unnumbered.length === 1 ? 'is' : 'are'} from students in no group on ${proposalLink()} (nobody named in the file is either). Add them to their group there: they get its number here too.</li>`);
+      } else if (unnumbered.length) items.push(`<li>${plural(unnumbered.reduce((n, g) => n + g.entries.length, 0), 'hand-in')} typed a student ID or lab group code instead of a group number. They are grouped by who is named in their contribution tables, and get a group number from the platform once every file is read${roster.length ? '' : ' and the class list (step 1) is saved'}.</li>`);
+      else if (codes && !canon) items.push(`<li class="info">${plural(codes, 'hand-in')} typed a student ID or lab group code instead of a group number. Their groups were put together from the contribution tables and given a group number by the platform, drawn at random. Change any number in step 3.</li>`);
       for (const c of conflicts(groups)) items.push(`<li><b>${esc(c.name)}</b> (${esc(c.id)}) is listed in ${c.groups.map(esc).join(' and ')}. Check the files; a student should be in one group.</li>`);
-      for (const e of failed) items.push(`<li>${esc(e.group_name)} · ${esc(e.name)}: ${esc(plan.scans[e.id]!.error!)} <a href="${esc(e.url)}" target="_blank" rel="noopener">Open file ↗</a></li>`);
+      for (const e of failed) items.push(`<li>${esc(groups.find((g) => g.entries.includes(e.id))?.title ?? e.group_name)} · ${esc(e.name)}:${esc(plan.scans[e.id]!.error!)} <a href="${esc(e.url)}" target="_blank" rel="noopener">Open file ↗</a></li>`);
       if (!roster.length && entries.length) items.push('<li class="info">Add the class list (step 1) so names and IDs in the contribution tables can be recognised.</li>');
       $('[data-gp-warn]').innerHTML = items.join('');
     }
 
     const titleOf = (key: string) => groups.find((g) => g.key === key)?.title ?? key;
     /** Group-number box: open for a group without a number, behind "Change number" for the others. */
-    const teamForm = (g: Group) => `<form class="gp-team ${g.numbered ? '' : 'need'}" data-team-for="${esc(g.key)}" ${g.numbered ? 'hidden' : ''}>
+    const teamForm = (g: Group) => canon ? '' : `<form class="gp-team ${g.numbered ? '' : 'need'}" data-team-for="${esc(g.key)}" ${g.numbered ? 'hidden' : ''}>
         <input class="input mono" maxlength="20" placeholder="Group no." aria-label="Group number for ${esc(g.title)}" value="" />
         <button class="btn btn-ghost btn-sm" type="submit">${g.numbered ? 'Save' : 'Set number'}</button></form>${
         g.numbered ? `<button class="gp-link" type="button" data-team-edit="${esc(g.key)}">Change number</button>` : ''}`;
@@ -516,13 +531,13 @@ if (!file) return Astro.redirect('/admin/project', 303);
         const open = openSeats(g);
         const on = selected.has(g.key);
         return `<tr class="${on ? 'sel' : ''} ${open ? '' : 'full'} ${isNew(g) ? 'is-new' : ''}">
-          <td class="gp-cb"><input type="checkbox" data-pick="${esc(g.key)}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'} aria-label="Select ${esc(g.title)}" /></td>
+          <td class="gp-cb">${canon ? '' : `<input type="checkbox" data-pick="${esc(g.key)}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'} aria-label="Select ${esc(g.title)}" />`}</td>
           <td><b class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</b>${stamp(g)}${g.labels.length && g.labels.join() !== g.key ? `<br><small class="faint">typed: ${g.labels.map(esc).join(' / ')}</small>` : ''}${teamForm(g)}</td>
-          <td><ul class="gp-chips">${g.members.map((m) => chip(m, g.key, clash)).join('')}<li><button type="button" class="gp-chip gp-add-chip" data-add-open="${esc(g.key)}" aria-expanded="${addOpen.has(g.key)}">+ Add student</button></li></ul>${addOpen.has(g.key) ? `<form class="gp-add-id" data-add-id="${esc(g.key)}"><input class="input mono" name="sid" maxlength="20" placeholder="Student ID" aria-label="Student ID to add to ${esc(g.title)}" autocomplete="off" inputmode="numeric" /><input class="input" name="sname" maxlength="80" placeholder="Name (if not in the class list)" aria-label="Their name, if they are not in the class list" autocomplete="off" /><button class="btn btn-primary btn-sm" type="submit">Add</button><button class="btn btn-ghost btn-sm" type="button" data-add-close="${esc(g.key)}">Cancel</button></form>` : ''}${g.unread ? `<small class="faint">${plural(g.unread, 'file')} could not be read</small>` : ''}${plan.removed[g.key]?.length ? `<small class="faint">${plural(plan.removed[g.key].length, 'student')} taken out · <button class="btn btn-ghost btn-sm" type="button" data-restore="${esc(g.key)}">Restore</button></small>` : ''}</td>
+          <td><ul class="gp-chips">${g.members.map((m) => chip(m, g.key, clash)).join('')}${canon ? '' : `<li><button type="button" class="gp-chip gp-add-chip" data-add-open="${esc(g.key)}" aria-expanded="${addOpen.has(g.key)}">+ Add student</button></li>`}</ul>${addOpen.has(g.key) ? `<form class="gp-add-id" data-add-id="${esc(g.key)}"><input class="input mono" name="sid" maxlength="20" placeholder="Student ID" aria-label="Student ID to add to ${esc(g.title)}" autocomplete="off" inputmode="numeric" /><input class="input" name="sname" maxlength="80" placeholder="Name (if not in the class list)" aria-label="Their name, if they are not in the class list" autocomplete="off" /><button class="btn btn-primary btn-sm" type="submit">Add</button><button class="btn btn-ghost btn-sm" type="button" data-add-close="${esc(g.key)}">Cancel</button></form>` : ''}${g.unread ? `<small class="faint">${plural(g.unread, 'file')} could not be read</small>` : ''}${plan.removed[g.key]?.length ? `<small class="faint">${plural(plan.removed[g.key].length, 'student')} taken out · <button class="btn btn-ghost btn-sm" type="button" data-restore="${esc(g.key)}">Restore</button></small>` : ''}</td>
           <td><span class="gp-size ${open ? 'short' : ''}">${g.members.length} / ${TEAM_SIZE}</span></td>
-          <td>${open ? `<input class="input mono gp-add" type="number" min="1" max="${open}" value="${wantFor(g)}" data-count-for="${esc(g.key)}" aria-label="Members to add to ${esc(g.title)}" />` : '<small class="faint">minimum met</small>'}</td>
+          <td>${canon ? '' : open ? `<input class="input mono gp-add" type="number" min="1" max="${open}" value="${wantFor(g)}" data-count-for="${esc(g.key)}" aria-label="Members to add to ${esc(g.title)}" />` : '<small class="faint">minimum met</small>'}</td>
         </tr>`;
-      }).join('') + `<tr><td colspan="5"><div class="gp-legend"><span class="gp-chip">handed in</span><span class="gp-chip document">named in the file</span><span class="gp-chip added">added here</span><span class="gp-chip clash">in two groups</span></div></td></tr>`
+      }).join('') + `<tr><td colspan="5"><div class="gp-legend"><span class="gp-chip">handed in</span><span class="gp-chip document">named in the file</span><span class="gp-chip added">added here</span>${canon ? '<span class="gp-chip group">in this group on the proposal</span>' : ''}<span class="gp-chip clash">in two groups</span></div></td></tr>`
         : `<tr><td colspan="5" class="muted">${entries.length ? 'Reading files…' : 'No hand-ins yet.'}</td></tr>`;
       for (const t of typed) {
         const f = rows.querySelector<HTMLFormElement>(`[data-add-id="${CSS.escape(t.key)}"]`);
@@ -535,6 +550,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
     }
 
     function renderIdeas() {
+      if (canon) return renderCourseIdeas();
       const auto = plan.autoAll;
       $<HTMLInputElement>('[data-gp-auto-all]').checked = auto;
       $('[data-gp-redraw-all]').hidden = !auto;
@@ -574,8 +590,34 @@ if (!file) return Astro.redirect('/admin/project', 303);
       $('[data-gp-ideas-sum]').textContent = groups.length ? `${chosen} of ${plural(groups.length, 'group')} have an idea selected.` : '';
     }
 
+    /** Another item of the course: each group with the idea approved on the proposal (read-only). */
+    function renderCourseIdeas() {
+      $('[data-gp-ideas]').innerHTML = view().map((g) => `<article class="gp-group ${isNew(g) ? 'is-new' : ''}" data-group="${esc(g.key)}">
+          <h3><span><span class="${g.numbered ? 'mono' : 'gp-nonum'}">${esc(g.title)}</span>${stamp(g)}</span><span class="gp-size">${g.members.length} / ${TEAM_SIZE}</span></h3>
+          <button class="btn btn-ghost btn-sm gp-view" type="button" data-view="${esc(g.key)}">View file &amp; extracted text</button>
+          <p class="members">${g.members.map((m) => esc(m.name)).join(', ') || 'No members found'}</p>
+          <p class="gp-approved">${ideaOf(g.key) ? esc(ideaOf(g.key)) : '<span class="faint">No idea approved on the proposal yet.</span>'}<small>${g.numbered ? 'Approved on the proposal' : 'In no group on the proposal'}</small></p>
+        </article>`).join('') || '<p class="muted">Groups appear here once students hand in.</p>';
+      const chosen = groups.filter((g) => ideaOf(g.key)).length;
+      $('[data-gp-ideas-sum]').textContent = groups.length ? `${chosen} of ${plural(groups.length, 'group')} have an approved idea.` : '';
+    }
+
+    /** Another item of the course: the numbering, members and ideas tools belong to the proposal's page. */
+    function applyCourseMode() {
+      const on = Boolean(canon);
+      root!.querySelectorAll<HTMLElement>('[data-gp-own]').forEach((el) => (el.hidden = on));
+      const box = $('[data-gp-course]');
+      box.hidden = !on;
+      if (!canon) return;
+      box.innerHTML = `Group numbers, members and ideas come from ${proposalLink()} (the proposal report): each hand-in is in its student's group there, whatever number they typed. To move a student or change an idea, do it on that page.`;
+      $('[data-gp-step3-h]').textContent = 'Groups';
+      $('[data-gp-step3-p]').textContent = 'Each hand-in with its group on the proposal, and every member of that group.';
+      $('[data-gp-step4-h]').textContent = "Each group's idea";
+      $('[data-gp-step4-p]').textContent = 'The idea approved on the proposal.';
+    }
+
     function render() {
-      groups = buildGroups(entries, roster, plan);
+      groups = buildGroups(entries, roster, plan, canon);
       for (const k of [...selected]) if (!groups.some((g) => g.key === k && openSeats(g))) selected.delete(k);
       renderRoster();
       renderWarnings();
@@ -614,10 +656,12 @@ if (!file) return Astro.redirect('/admin/project', 303);
       } finally {
         scanning = false;
         bar.hidden = true;
-        // Choices for ideas that no longer exist (a re-submitted file) are dropped.
+        // Choices for ideas that no longer exist (a re-submitted file) are dropped (the proposal only: other items use its ideas).
         render();
-        for (const g of groups) if (plan.choices[g.key]?.idea && !g.ideas.includes(plan.choices[g.key].idea)) plan.choices[g.key].idea = '';
-        if (plan.autoAll) drawAll(false);
+        if (!canon) {
+          for (const g of groups) if (plan.choices[g.key]?.idea && !g.ideas.includes(plan.choices[g.key].idea)) plan.choices[g.key].idea = '';
+          if (plan.autoAll) drawAll(false);
+        }
         render();
         numberNew();
         save();
@@ -627,7 +671,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
     /** The platform's group numbers: once every file is read, groups still without a number get one at random. */
     function numberNew() {
       const pending = entries.some((e) => plan.scans[e.id]?.updatedAt !== e.updated_at || plan.scans[e.id]?.v !== SCAN_VERSION);
-      if (scanning || pending || !roster.length || !groups.some((g) => !g.numbered)) return;
+      if (canon || scanning || pending || !roster.length || !groups.some((g) => !g.numbered)) return;
       const titles = new Map(groups.map((g) => [g.key, g.title]));
       const moves = autoNumber(groups, plan);
       render();
@@ -644,6 +688,8 @@ if (!file) return Astro.redirect('/admin/project', 303);
         entries = data.entries;
         roster = data.roster;
         plan = data.plan;
+        canon = data.canon ?? null;
+        applyCourseMode();
         $<HTMLTextAreaElement>('[data-gp-roster-text]').value = roster.map((s) => `${s.name}, ${s.id}`).join('\n');
         // Hand-ins that were deleted take their scans with them.
         for (const id of Object.keys(plan.scans)) if (!entries.some((e) => e.id === id)) delete plan.scans[id];
@@ -724,7 +770,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
     });
     $('[data-gp-renumber]').addEventListener('click', (e) => {
       const btn = e.currentTarget as HTMLButtonElement;
-      if (!groups.length) return;
+      if (!groups.length || canon) return;
       if (btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Confirm renumber'; setTimeout(() => { btn.dataset.armed = ''; btn.textContent = 'Renumber all'; }, 4000); return; }
       btn.dataset.armed = ''; btn.textContent = 'Renumber all';
       autoNumber(groups, plan, undefined, true);
@@ -896,9 +942,9 @@ if (!file) return Astro.redirect('/admin/project', 303);
 
     /* --------------------------------------------------------------- sheet */
     function download(kind: 'groups' | 'ideas') {
-      const missing = kind === 'ideas' ? groups.filter((g) => !plan.choices[g.key]?.idea).length : 0;
+      const missing = kind === 'ideas' ? groups.filter((g) => !ideaOf(g.key)).length : 0;
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project';
-      const blob = new Blob(['﻿' + groupsCsv(groups, plan)], { type: 'text/csv;charset=utf-8' });
+      const blob = new Blob(['﻿' + groupsCsv(groups, canon ? { ...plan, choices: ideasAsChoices(canon) } : plan)], { type: 'text/csv;charset=utf-8' });
       const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${slug}-${kind === 'ideas' ? 'groups-and-ideas' : 'groups'}.csv` });
       document.body.append(a);
       a.click();
@@ -996,7 +1042,7 @@ if (!file) return Astro.redirect('/admin/project', 303);
       vGroup = g;
       const list = entries.filter((e) => g.entries.includes(e.id)).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
       $('[data-v-k]').textContent = `${g.title} · ${plural(list.length, 'hand-in')}`;
-      $('[data-v-title]').textContent = plan.choices[g.key]?.idea || g.ideas[0] || 'Hand-in';
+      $('[data-v-title]').textContent = ideaOf(g.key) || g.ideas[0] || 'Hand-in';
       vFiles.innerHTML = list.length > 1 ? list.map((e) => `<button type="button" role="tab" data-v-entry="${esc(e.id)}" aria-selected="false">${esc(e.name)} · ${esc(when(e.updated_at))}</button>`).join('') : '';
       vTab = 'file';
       if (!viewer.open) viewer.showModal();

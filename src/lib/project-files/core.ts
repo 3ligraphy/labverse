@@ -251,15 +251,25 @@ export function isBlobUrl(url: string, exts: readonly string[] = ['pdf']): boole
   }
 }
 
+/**
+ * A hand-in with its course group (`group`: "G12", or '' when it is in no group with a number), for the course's
+ * items: their lists, CSV and ZIP use that number, never the one the student typed (kept as "Group typed").
+ */
+export type WithGroup = { group?: string };
+/** "G12" → "Group 12". */
+export const groupTitle = (key: string) => (/^G(\d+)$/.test(key) ? `Group ${key.slice(1)}` : key);
+
 /** CSV for the admin export (RFC 4180 quoting; formulas neutralised for spreadsheet apps). */
-export function entriesCsv(file: Pick<ProjectFile, 'due_at'>, entries: Entry[]): string {
+export function entriesCsv(file: Pick<ProjectFile, 'due_at'>, entries: (Entry & WithGroup)[]): string {
   const cell = (v: string) => {
     const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
     return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   };
-  const rows = [['Name', 'Student ID', 'Group', 'Submitted at', 'Late', 'Size (KB)', 'Note', 'File']];
+  const course = entries.some((e) => e.group !== undefined);
+  const rows = [['Name', 'Student ID', 'Group', ...(course ? ['Group typed'] : []), 'Submitted at', 'Late', 'Size (KB)', 'Note', 'File']];
   for (const e of entries) {
-    rows.push([e.name, e.student_id, e.group_name, e.updated_at, isLate(file, e.updated_at) ? 'yes' : 'no', String(Math.round(e.size / 1024)), e.note, e.url]);
+    const group = course ? [e.group ? groupTitle(e.group) : '', e.group_name] : [e.group_name];
+    rows.push([e.name, e.student_id, ...group, e.updated_at, isLate(file, e.updated_at) ? 'yes' : 'no', String(Math.round(e.size / 1024)), e.note, e.url]);
   }
   return rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
 }
@@ -268,10 +278,11 @@ export function entriesCsv(file: Pick<ProjectFile, 'due_at'>, entries: Entry[]):
  * Path of one hand-in inside a batch ZIP: `G1/23CS0042 - Sara Ali.pdf` (the extension follows the stored file).
  * Characters that are illegal in Windows/macOS file names are dropped, and duplicates get " (2)", " (3)"… via `used`.
  */
-export function zipPath(e: Pick<Entry, 'group_name' | 'student_id' | 'name'> & Partial<Pick<Entry, 'pathname'>>, used: Set<string>): string {
+export function zipPath(e: Pick<Entry, 'group_name' | 'student_id' | 'name'> & Partial<Pick<Entry, 'pathname'>> & WithGroup, used: Set<string>): string {
   const clean = (s: string) => s.normalize('NFC').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().replace(/^\.+/, '').slice(0, 60);
   const ext = extOf(e.pathname ?? '') || 'pdf';
-  const folder = clean(e.group_name) || 'No group';
+  // the course's items: folders by course group ("Group 12"), never by what the student typed
+  const folder = e.group !== undefined ? (e.group ? clean(groupTitle(e.group)) : 'No group number') : clean(e.group_name) || 'No group';
   const base = `${folder}/${clean(e.student_id)} - ${clean(e.name) || 'Student'}`;
   let path = `${base}.${ext}`;
   for (let n = 2; used.has(path.toLowerCase()); n++) path = `${base} (${n}).${ext}`;

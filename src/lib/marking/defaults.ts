@@ -1,5 +1,6 @@
 /**
- * The Phase 1 marking load the course team agreed (TA → project group numbers, as in the proposal report), used
+ * The Phase 1 marking load the course team agreed (TA → project group numbers, as in the proposal report; group 47,
+ * a later hand-in, went to Youssef), used
  * until an admin saves another load. Staff accounts are linked to a TA row by first name when exactly one staff
  * account has that first name; an admin can change any link on the Marking load tab.
  * Pure functions, unit-tested (tests/marking-more.test.ts).
@@ -10,7 +11,7 @@ export const DEFAULT_TAS: readonly { name: string; groups: number[] }[] = [
   { name: 'Amr', groups: [3, 5, 9, 12, 18, 20, 21, 30, 33, 39, 41] },
   { name: 'Ramy', groups: [4, 13, 19, 23, 29, 32, 36, 37, 43, 45, 46] },
   { name: 'Ali', groups: [1, 6, 8, 11, 14, 22, 26, 27, 34, 35, 42, 44] },
-  { name: 'Youssef', groups: [2, 7, 10, 15, 16, 17, 24, 25, 28, 31, 38, 40] },
+  { name: 'Youssef', groups: [2, 7, 10, 15, 16, 17, 24, 25, 28, 31, 38, 40, 47] },
 ];
 
 /** The saved load, or the team's default load when none was saved yet. */

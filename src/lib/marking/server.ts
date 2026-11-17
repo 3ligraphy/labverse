@@ -4,7 +4,8 @@
  */
 import type { Access } from '@/lib/accounts/access';
 import { getAccountStore } from '@/lib/accounts/server';
-import { buildGroups, cleanPlan, emptyPlan, type Group, type Student } from '@/lib/project-files/groups';
+import { masterItem, type Group } from '@/lib/project-files/groups';
+import { canonFor, itemGroups, loadCanon } from '@/lib/project-files/course-groups';
 import type { getFilesStore } from '@/lib/project-files/server';
 import { MARKING_KEY, cleanDoc, type MarkingDoc, type Marker } from './doc';
 import { autoLink, withDefaultLoad } from './defaults';
@@ -41,17 +42,19 @@ export type MarkGroup = { number: number; members: { id: string; name: string }[
 
 const numberOf = (g: Pick<Group, 'key' | 'numbered'>) => (g.numbered ? Number(/^G(\d+)$/.exec(g.key)?.[1] ?? NaN) : NaN);
 
+/** An item's groups; on an item other than the proposal, with the course groups (so the numbers are the proposal's). */
 async function groupsRaw(store: Store, fileId: string, plan?: unknown) {
-  const [entries, roster, saved] = await Promise.all([store.listEntries(fileId), store.getGroupData<Student[]>('roster'), plan === undefined ? store.getGroupData<unknown>(`plan:${fileId}`) : Promise.resolve(plan)]);
-  const p = saved ? cleanPlan(saved) : emptyPlan();
-  return { groups: buildGroups(entries, roster ?? [], p), plan: p };
+  const files = await store.list();
+  const file = files.find((f) => f.id === fileId) ?? { id: fileId, module: MARKING_MODULE };
+  const canon = canonFor(file, await loadCanon(store, files));
+  return { ...(await itemGroups(store, file, canon, plan === undefined ? undefined : { plan })), canon };
 }
 
 /** The item's numbered groups (number, members, approved idea), in number order. */
 export async function markGroups(store: Store, fileId: string): Promise<MarkGroup[]> {
-  const { groups, plan } = await groupsRaw(store, fileId);
+  const { groups, plan, canon } = await groupsRaw(store, fileId);
   return groups
-    .map((g) => ({ number: numberOf(g), members: g.members.map((m) => ({ id: m.id, name: m.name })), idea: plan.choices[g.key]?.idea ?? '' }))
+    .map((g) => ({ number: numberOf(g), members: g.members.map((m) => ({ id: m.id, name: m.name })), idea: (canon ? canon.ideas[g.key] : plan.choices[g.key]?.idea) ?? '' }))
     .filter((g) => Number.isInteger(g.number))
     .sort((a, b) => a.number - b.number);
 }
@@ -64,8 +67,8 @@ export async function keysByEntry(store: Store, fileId: string, plan?: unknown):
   return out;
 }
 
-/** The item a new marking document starts from: the one called "proposal", else the first. */
+/** The item a new marking document starts from: the course's proposal (whose numbers every item uses), else the first. */
 export async function defaultSource(store: Store): Promise<string | null> {
   const files = await store.list();
-  return (files.find((f) => /proposal/i.test(f.title)) ?? files[0])?.id ?? null;
+  return (masterItem(files) ?? files[0])?.id ?? null;
 }

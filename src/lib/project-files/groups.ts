@@ -4,7 +4,7 @@
  * contribution table of their file), random members for groups under the team size, and the idea each group
  * works on. Pure functions only, so they are unit-tested (tests/project-groups.test.ts).
  */
-import { ID_RE, notATeamNumber, type Entry } from './core.ts';
+import { COURSE_MODULE, ID_RE, notATeamNumber, type Entry } from './core.ts';
 
 /** The largest team size. */
 export const TEAM_SIZE = 4;
@@ -14,8 +14,11 @@ export const MAX_IDEAS = 12;
 const MAX_IDEA_LEN = 200;
 
 export type Student = { id: string; name: string };
-/** How a member got into a group: they handed in, they are named in a group's file, or they were added here. */
-export type Source = 'submitted' | 'document' | 'added';
+/**
+ * How a member got into a group: they handed in, they are named in a group's file, they were added here, or (on
+ * items other than the proposal) they are in this group on the proposal.
+ */
+export type Source = 'submitted' | 'document' | 'added' | 'group';
 export type Member = Student & { source: Source };
 
 /** Bump when reading files changes (e.g. better idea finding), so saved results are refreshed automatically. */
@@ -386,15 +389,76 @@ export type Group = {
 
 type EntryLike = Pick<Entry, 'id' | 'student_id' | 'name' | 'group_name' | 'note'>;
 
+/* ------------------------------------------------------- course groups */
+
 /**
- * Which group each hand-in belongs to. The team number the admin typed wins, then the one the student typed.
- * A hand-in whose "group" is really a student ID or lab group code has no number: it joins the numbered group
- * that shares the most people with it (by the submitter and the contribution table), or else the hand-ins that
- * share people with each other form one group, keyed "?<smallest submitter ID>" until the admin numbers it.
+ * The course's groups: the groups of the proposal item (its numbers, its members, its approved ideas). Every other
+ * item of the course (Phase 1, Phase 2, …) uses them, whatever group number a student typed, so a group has one
+ * number everywhere: marking, feedback, results, downloads.
  */
-export function entryKeys(entries: readonly EntryLike[], plan: Plan): Map<string, string> {
+export type Canon = {
+  /** the item whose groups these are (the proposal) */
+  source: string;
+  title: string;
+  /** student ID → group key ("G12") */
+  members: Record<string, string>;
+  /** student ID → name, as the proposal's groups list it */
+  names: Record<string, string>;
+  /** group key → the idea approved on the proposal */
+  ideas: Record<string, string>;
+};
+
+/** The course's groups from the proposal's built groups and plan (numbered groups only; the first group wins a student listed twice). */
+export function makeCanon(source: { id: string; title: string }, groups: readonly Group[], plan: Pick<Plan, 'choices'>): Canon {
+  const canon: Canon = { source: source.id, title: source.title, members: {}, names: {}, ideas: {} };
+  for (const g of [...groups].sort((a, b) => compareGroups(a.key, b.key))) {
+    if (!g.numbered) continue;
+    for (const m of g.members) if (!(m.id in canon.members)) { canon.members[m.id] = g.key; canon.names[m.id] = m.name; }
+    const idea = plan.choices[g.key]?.idea;
+    if (idea) canon.ideas[g.key] = idea;
+  }
+  return canon;
+}
+
+/** The course group most of these students are in (the lowest number on a tie), or null when none is. */
+export function canonKey(canon: Pick<Canon, 'members'>, ids: Iterable<string>): string | null {
+  const count = new Map<string, number>();
+  for (const id of ids) { const key = canon.members[normId(id)]; if (key) count.set(key, (count.get(key) ?? 0) + 1); }
+  return [...count].sort((a, b) => b[1] - a[1] || compareGroups(a[0], b[0]))[0]?.[0] ?? null;
+}
+
+/** The approved ideas as choices (for the report, the results and the cards of the other items). */
+export const ideasAsChoices = (canon: Pick<Canon, 'ideas'>): Record<string, Choice> =>
+  Object.fromEntries(Object.entries(canon.ideas).map(([key, idea]) => [key, { mode: 'manual' as const, idea }]));
+
+/** The course's proposal item: the item of kind "proposal", else one called proposal (the oldest), or null. */
+export function masterItem<T extends { id: string; title: string; kind: string; module: string; created_at: string }>(files: readonly T[]): T | null {
+  const course = files.filter((f) => f.module === COURSE_MODULE).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  return course.find((f) => f.kind === 'proposal') ?? course.find((f) => /proposal/i.test(f.title)) ?? null;
+}
+
+/**
+ * Which group each hand-in belongs to.
+ * - On the proposal (no `canon`): the team number the admin typed wins, then the one the student typed. A hand-in
+ *   whose "group" is really a student ID or lab group code has no number: it joins the numbered group that shares
+ *   the most people with it (by the submitter and the contribution table).
+ * - On any other item (`canon`): the submitter's course group, else the course group of the students named in the
+ *   file. Typed numbers are not used, so they can never give a group another number.
+ * The rest: hand-ins that share people with each other form one group, keyed "?<smallest submitter ID>", with no
+ * number.
+ */
+export function entryKeys(entries: readonly EntryLike[], plan: Plan, canon?: Canon | null): Map<string, string> {
   const keys = new Map<string, string>();
   const people = (e: EntryLike) => new Set([normId(e.student_id), ...(plan.scans[e.id]?.ids ?? [])]);
+  if (canon) {
+    const left: EntryLike[] = [];
+    for (const e of entries) {
+      const key = canon.members[normId(e.student_id)] ?? canonKey(canon, people(e));
+      if (key) keys.set(e.id, key); else left.push(e);
+    }
+    joinLeft(left, people, keys);
+    return keys;
+  }
   const pending: EntryLike[] = [];
   for (const e of entries) {
     const team = cleanTeam(plan.teams[e.id]) ?? (notATeamNumber(e.group_name) ? null : e.group_name);
@@ -416,7 +480,12 @@ export function entryKeys(entries: readonly EntryLike[], plan: Plan): Map<string
     }
     if (best) keys.set(e.id, best[0]); else left.push(e);
   }
-  // The rest: hand-ins that share anyone end up together (union-find over shared people).
+  joinLeft(left, people, keys);
+  return keys;
+}
+
+/** Hand-ins with no group yet: those that share anyone end up together (union-find over shared people), keyed "?<smallest ID>". */
+function joinLeft(left: readonly EntryLike[], people: (e: EntryLike) => Set<string>, keys: Map<string, string>) {
   const parent = left.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
   const sets = left.map(people);
@@ -430,19 +499,19 @@ export function entryKeys(entries: readonly EntryLike[], plan: Plan): Map<string
     if (!keyOf.has(root) || id < keyOf.get(root)!.slice(1)) keyOf.set(root, NO_NUMBER + id);
   });
   left.forEach((e, i) => keys.set(e.id, keyOf.get(find(i))!));
-  return keys;
 }
 
 /**
- * Builds the groups: submitters, then students named in the group's files, then students added on this page.
+ * Builds the groups: submitters, then students named in the group's files, then students added on this page, then
+ * (with `canon`, on items other than the proposal) the rest of the group's members on the proposal.
  * A student is listed once per group (the first source wins).
  */
-export function buildGroups(entries: readonly EntryLike[], roster: readonly Student[], plan: Plan): Group[] {
+export function buildGroups(entries: readonly EntryLike[], roster: readonly Student[], plan: Plan, canon?: Canon | null): Group[] {
   const byId = new Map(roster.map((s) => [s.id, s]));
   for (const scan of Object.values(plan.scans)) for (const s of scan.members ?? []) {
     if (!byId.has(s.id) || s.name.split(' ').length > byId.get(s.id)!.name.split(' ').length) byId.set(s.id, s);
   }
-  const keys = entryKeys(entries, plan);
+  const keys = entryKeys(entries, plan, canon);
   const groups = new Map<string, Group>();
   const get = (key: string) => {
     let g = groups.get(key);
@@ -469,6 +538,12 @@ export function buildGroups(entries: readonly EntryLike[], roster: readonly Stud
     const g = groups.get(key);
     if (!g) continue;
     for (const id of ids) add(g, id, byId.get(id)?.name ?? id, 'added');
+  }
+  if (canon) {
+    for (const [id, key] of Object.entries(canon.members)) {
+      const g = groups.get(key);
+      if (g) add(g, id, byId.get(id)?.name ?? canon.names[id] ?? id, 'group');
+    }
   }
   for (const g of groups.values()) {
     if (!g.numbered) g.title = `No number · ${g.members[0]?.name ?? g.key.slice(1)}`;

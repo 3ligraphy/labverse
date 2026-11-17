@@ -1,10 +1,11 @@
 /**
  * Admin: written feedback for each project group (/admin/project/[id]/feedback).
- *   GET ?file=…   { file, entries, roster, plan, feedback, release, views } — everything the cards and the PDF report
- *                 need, plus which students have looked up their published result
+ *   GET ?file=…   { file, entries, roster, plan, feedback, release, views, canon } — everything the cards and the PDF
+ *                 report need, plus which students have looked up their published result; `canon` (the course groups)
+ *                 is set on every course item except the proposal, whose numbers, members and ideas they then use
  *   PUT ?file=…   { key, text, entries }  saves (or, with empty text, clears) one group's feedback
  *   PUT ?file=…   { action: 'choice', key, idea, mode }  approves one group's idea (empty idea clears it); the rest
- *                 of the group plan is left as it is
+ *                 of the group plan is left as it is. Only on the proposal: the other items show the proposal's ideas.
  *   PUT ?file=…   { action: 'release', published }  shows (or hides) each group's approved idea and feedback to its
  *                 students on /project, where a student looks up their own group by ID
  * Groups are built in the browser from the group plan (src/lib/project-files/groups.ts); feedback is stored
@@ -16,6 +17,7 @@ import { json } from '@/lib/progress/server';
 import { cleanFeedback, parseNote, setNote } from '@/lib/project-files/feedback';
 import { cleanPlan, emptyPlan, setChoice, type Student } from '@/lib/project-files/groups';
 import { getFilesStore } from '@/lib/project-files/server';
+import { canonFor, loadCanon } from '@/lib/project-files/course-groups';
 import { cleanRelease } from '@/lib/project-files/results';
 
 export const prerender = false;
@@ -32,15 +34,16 @@ export const GET: APIRoute = async ({ url, cookies }) => {
   try {
     const file = await store.get(url.searchParams.get('file') ?? '');
     if (!file) return json({ error: 'Not found.' }, 404);
-    const [entries, roster, plan, feedback, release, views] = await Promise.all([
+    const [entries, roster, plan, feedback, release, views, canon] = await Promise.all([
       store.listEntries(file.id),
       store.getGroupData<Student[]>('roster'),
       store.getGroupData<unknown>(`plan:${file.id}`),
       store.getGroupData<unknown>(`feedback:${file.id}`),
       store.getGroupData<unknown>(`release:${file.id}`),
       store.listViews(file.id),
+      loadCanon(store),
     ]);
-    return json({ file, entries, roster: roster ?? [], plan: plan ? cleanPlan(plan) : emptyPlan(), feedback: cleanFeedback(feedback), release: cleanRelease(release), views });
+    return json({ file, entries, roster: roster ?? [], plan: plan ? cleanPlan(plan) : emptyPlan(), feedback: cleanFeedback(feedback), release: cleanRelease(release), views, canon: canonFor(file, canon) });
   } catch (error) {
     console.error('[project-feedback] could not load', error);
     return json({ error: 'Could not load the feedback.' }, 500);
@@ -69,6 +72,8 @@ export const PUT: APIRoute = async ({ url, request, cookies }) => {
     try {
       const file = await store.get(url.searchParams.get('file') ?? '');
       if (!file) return json({ error: 'Not found.' }, 404);
+      const canon = canonFor(file, await loadCanon(store));
+      if (canon) return json({ error: `Ideas are approved on “${canon.title}”: every item uses the idea approved there.` }, 400);
       const key = `plan:${file.id}`;
       let changed = { ok: false, error: 'Unknown group.' } as ReturnType<typeof setChoice>;
       // atomic: an approval and a save from the Groups page at the same moment don't overwrite each other

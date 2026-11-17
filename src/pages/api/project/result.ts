@@ -10,7 +10,8 @@ import { clientIp } from '@/lib/attendance/server';
 import { getProgressStore, json } from '@/lib/progress/server';
 import { ID_RE } from '@/lib/project-files/core';
 import { cleanFeedback, placeNotes } from '@/lib/project-files/feedback';
-import { buildGroups, cleanPlan, emptyPlan, type Student } from '@/lib/project-files/groups';
+import { buildGroups, cleanPlan, emptyPlan, ideasAsChoices, type Student } from '@/lib/project-files/groups';
+import { canonFor, loadCanon } from '@/lib/project-files/course-groups';
 import { cleanRelease, resultFor } from '@/lib/project-files/results';
 import { getFilesStore } from '@/lib/project-files/server';
 import { normId } from '@/lib/project-files/groups';
@@ -43,15 +44,18 @@ export const GET: APIRoute = async ({ url, request, clientAddress }) => {
     const tries = (await getProgressStore()?.hit(`result:${clientIp(request, clientAddress)}`, WINDOW_SEC).catch(() => 0)) ?? 0;
     if (tries > LOOKUPS_PER_WINDOW) return json({ error: 'Too many lookups from this device. Wait a few minutes and try again.' }, 429);
     const roster = (await store.getGroupData<Student[]>('roster')) ?? [];
+    // the course groups: every item shows the proposal's group number, members and approved idea
+    const course = await loadCanon(store, files);
     const results = [];
     for (const file of published) {
       const [entries, plan, feedback] = await Promise.all([
         store.listEntries(file.id), store.getGroupData<unknown>(`plan:${file.id}`), store.getGroupData<unknown>(`feedback:${file.id}`),
       ]);
       const p = plan ? cleanPlan(plan) : emptyPlan();
-      const groups = buildGroups(entries, roster, p);
+      const canon = canonFor(file, course);
+      const groups = buildGroups(entries, roster, p, canon);
       const { notes } = placeNotes(groups, cleanFeedback(feedback));
-      const r = resultFor(groups, p, notes, studentId);
+      const r = resultFor(groups, canon ? { choices: ideasAsChoices(canon) } : p, notes, studentId);
       if (!r) continue;
       let phase1 = null;
       if (marking && file.id === marksOn) {
