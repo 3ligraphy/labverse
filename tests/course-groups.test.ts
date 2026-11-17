@@ -50,6 +50,16 @@ test('another item uses the proposal’s numbers: typed and admin-typed numbers 
   assert.equal(r?.idea, 'Idea One');
 });
 
+test('a student in no proposal group keeps the group staff put them in on that item, if the proposal has that number', () => {
+  const plan = cleanPlan({ teams: { q5: '3', q6: '48', q2: '1' } });
+  const entries = [e('q5', '240098', '99'), e('q6', '240099', '2'), e('q2', '240003', '2')];
+  const groups = buildGroups(entries, roster, plan, canon);
+  const keyOf = (entry: string) => groups.find((g) => g.entries.includes(entry))?.key;
+  assert.equal(keyOf('q5'), 'G3', 'staff put them in group 3, which the proposal has');
+  assert.equal(groups.find((g) => g.entries.includes('q6'))?.numbered, false, 'group 48 is not on the proposal: no number');
+  assert.equal(keyOf('q2'), 'G2', 'a student who is in a proposal group stays there, whatever staff typed here');
+});
+
 test('the proposal itself keeps its own numbering (no course groups applied to it)', () => {
   const plan = emptyPlan();
   const groups = buildGroups([e('p1', '240001', '4')], roster, plan);

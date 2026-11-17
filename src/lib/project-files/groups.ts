@@ -442,8 +442,9 @@ export function masterItem<T extends { id: string; title: string; kind: string; 
  * - On the proposal (no `canon`): the team number the admin typed wins, then the one the student typed. A hand-in
  *   whose "group" is really a student ID or lab group code has no number: it joins the numbered group that shares
  *   the most people with it (by the submitter and the contribution table).
- * - On any other item (`canon`): the submitter's course group, else the course group of the students named in the
- *   file. Typed numbers are not used, so they can never give a group another number.
+ * - On any other item (`canon`): the submitter's course group; for a student in no course group, the group staff
+ *   put them in on this item (only a number the proposal has), else the course group of the students named in the
+ *   file. Numbers students typed are not used, so they can never give a group another number.
  * The rest: hand-ins that share people with each other form one group, keyed "?<smallest submitter ID>", with no
  * number.
  */
@@ -451,9 +452,12 @@ export function entryKeys(entries: readonly EntryLike[], plan: Plan, canon?: Can
   const keys = new Map<string, string>();
   const people = (e: EntryLike) => new Set([normId(e.student_id), ...(plan.scans[e.id]?.ids ?? [])]);
   if (canon) {
+    const numbers = new Set(Object.values(canon.members));
+    // a student in no proposal group whom staff put in a group on this item: only a number the proposal has
+    const staffTeam = (e: EntryLike) => { const t = cleanTeam(plan.teams[e.id]); return t && numbers.has(groupKey(t)) ? groupKey(t) : null; };
     const left: EntryLike[] = [];
     for (const e of entries) {
-      const key = canon.members[normId(e.student_id)] ?? canonKey(canon, people(e));
+      const key = canon.members[normId(e.student_id)] ?? staffTeam(e) ?? canonKey(canon, people(e));
       if (key) keys.set(e.id, key); else left.push(e);
     }
     joinLeft(left, people, keys);
