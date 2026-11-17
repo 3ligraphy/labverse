@@ -1,0 +1,230 @@
+---
+/**
+ * /admin/marking — Phase 1 project marking: the groups (numbers from the proposal item), the marking form with
+ * the grading assistant, the workbook upload (Phase1_Marking.xlsx or one TA's sheet), the marking load, the
+ * summary, the merged Excel download and Publish to students.
+ * Rules: src/lib/marking/* · API: src/pages/api/admin/marking · browser: src/scripts/marking.ts
+ */
+import Base from '@/layouts/Base.astro';
+import AdminShell from '@/components/admin/AdminShell.astro';
+import { canManageSubmissions } from '@/lib/accounts/labscope';
+
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store, max-age=0');
+if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin', 303);
+---
+<Base title="Marking" noindex>
+<AdminShell active="marking">
+  <section class="mk-shell container" data-mk>
+    <header class="mk-top">
+      <div>
+        <p class="mk-k mono">Mobile Development · Project · Phase 1 (30 marks)</p>
+        <h1>Marking</h1>
+        <p class="muted" data-mk-role>Loading…</p>
+      </div>
+      <div class="mk-actions">
+        <a class="btn btn-ghost btn-sm" href="/api/admin/marking/export">Download Excel ↓</a>
+        <button class="btn btn-primary btn-sm" type="button" data-mk-publish hidden aria-pressed="false">Publish marks to students</button>
+      </div>
+    </header>
+    <div class="mk-bar">
+      <span data-mk-source></span>
+      <span class="mk-pub" data-mk-pubnote></span>
+    </div>
+    <p class="mk-msg" role="status" data-mk-msg></p>
+
+    <div class="mk-tabs" role="tablist" aria-label="Marking">
+      <button type="button" role="tab" aria-selected="true" data-mk-tab="marks">Marks</button>
+      <button type="button" role="tab" aria-selected="false" data-mk-tab="load">Marking load</button>
+      <button type="button" role="tab" aria-selected="false" data-mk-tab="summary">Summary</button>
+    </div>
+
+    <div role="tabpanel" data-mk-panel="marks" class="mk-panel">
+      <div class="mk-upload">
+        <div>
+          <b>Upload a marking sheet</b>
+          <p class="small muted">The Phase1_Marking.xlsx workbook, or one TA’s sheet. You see what will change before anything is saved. Only your own groups are imported.</p>
+        </div>
+        <label class="btn btn-ghost btn-sm mk-file">Choose .xlsx<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-mk-file /></label>
+      </div>
+      <div class="mk-preview" data-mk-preview hidden></div>
+
+      <div class="mk-tools">
+        <div class="mk-chips" role="group" aria-label="Show groups">
+          <button type="button" class="mk-chip" aria-pressed="false" data-mk-filter="mine" hidden>My groups <span></span></button>
+          <button type="button" class="mk-chip" aria-pressed="true" data-mk-filter="all">All <span></span></button>
+          <button type="button" class="mk-chip" aria-pressed="false" data-mk-filter="todo">Not marked <span></span></button>
+          <button type="button" class="mk-chip" aria-pressed="false" data-mk-filter="done">Marked <span></span></button>
+        </div>
+        <input class="input mk-search" type="search" placeholder="Search group, TA, student, ID or idea" data-mk-search aria-label="Search groups" />
+      </div>
+      <div class="mk-tablewrap">
+        <table class="mk-table mk-groups">
+          <thead><tr><th scope="col">Group</th><th scope="col">TA</th><th scope="col">Members</th><th scope="col">Idea</th><th scope="col">/30</th><th scope="col">Grade</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Open</span></th></tr></thead>
+          <tbody data-mk-rows><tr><td colspan="8" class="faint">Loading groups…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div role="tabpanel" data-mk-panel="load" class="mk-panel" hidden>
+      <div data-mk-load></div>
+    </div>
+
+    <div role="tabpanel" data-mk-panel="summary" class="mk-panel" hidden>
+      <div data-mk-summary></div>
+    </div>
+
+    <dialog class="mk-dlg" data-mk-dlg aria-labelledby="mk-d-title">
+      <div class="mk-d-head">
+        <div>
+          <h2 id="mk-d-title" data-mk-d-title></h2>
+          <p class="small muted" data-mk-d-meta></p>
+        </div>
+        <button type="button" class="mk-x" data-mk-close aria-label="Close">✕</button>
+      </div>
+      <div class="mk-d-body">
+        <div class="mk-d-form">
+          <div data-mk-form></div>
+          <p class="mk-total" data-mk-total></p>
+          <label class="mk-comment"><span>Comments <span class="mono faint" data-mk-count></span></span><textarea class="input" rows="7" data-mk-comment placeholder="What to fix next phase. Ticking a checklist item adds a ready sentence here."></textarea></label>
+          <ul class="mk-warn" data-mk-warn></ul>
+          <p class="mk-flag" data-mk-ro hidden>Read only: this is not one of your groups in the marking load.</p>
+          <div class="mk-actions"><button type="button" class="btn btn-primary btn-sm" data-mk-save>Save marks</button><button type="button" class="btn btn-ghost btn-sm" data-mk-close>Close</button><span class="mk-d-msg small" role="status" data-mk-d-msg></span></div>
+        </div>
+        <aside class="mk-assist" aria-label="Grading assistant">
+          <p class="mk-assist-h">Grading assistant</p>
+          <p class="mk-rule small" data-mk-rule></p>
+          <p class="small muted">Tick what you see. It lowers that mark and adds a sentence to the comments; you can change both.</p>
+          <div data-mk-check></div>
+        </aside>
+      </div>
+    </dialog>
+  </section>
+</AdminShell>
+</Base>
+
+<script>
+  import { initMarking } from '@/scripts/marking';
+  const root = document.querySelector<HTMLElement>('[data-mk]');
+  if (root && !root.dataset.wired) {
+    root.dataset.wired = '1';
+    initMarking(root);
+  }
+</script>
+
+<style is:global>
+  .mk-shell { min-height: 85dvh; padding-top: calc(var(--nav-h) + 44px); padding-bottom: 100px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-content: start; }
+  .mk-k { color: var(--accent-text); font-size: 12px; }
+  .mk-top { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
+  .mk-top h1 { font-size: var(--fs-xl); letter-spacing: -.04em; margin-top: 3px; }
+  .mk-top p.muted { max-width: 70ch; margin-top: 4px; }
+  .mk-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .mk-bar { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; font-size: 14px; color: var(--text-2); }
+  .mk-src { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mk-select { height: 36px; padding: 0 10px; max-width: 100%; }
+  .mk-msg { min-height: 20px; margin: 0; font-size: 14px; color: var(--text-2); }
+  .mk-msg[data-tone='ok'] { color: var(--ok); }
+  .mk-msg[data-tone='err'] { color: var(--danger); }
+
+  .mk-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+  .mk-tabs button { padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-2); font: 600 14px var(--font-body); cursor: pointer; }
+  .mk-tabs button[aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent-text); }
+  .mk-tabs button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
+  .mk-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+
+  .mk-upload { display: flex; justify-content: space-between; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding: 14px 16px; border: 1px dashed var(--line-2); border-radius: var(--r-lg); background: var(--surface); }
+  .mk-upload p { margin: 2px 0 0; max-width: 70ch; }
+  .mk-file { position: relative; overflow: hidden; }
+  .mk-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .mk-file:focus-within { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .mk-preview { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid color-mix(in oklab, var(--accent-text) 40%, var(--line)); border-radius: var(--r-lg); background: var(--surface); }
+  .mk-preview p { margin: 0; }
+  .mk-loadchk { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--text); }
+
+  .mk-tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .mk-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mk-chip { padding: 6px 12px; border: 1px solid var(--line-2); border-radius: 999px; background: none; color: var(--text-2); font: 500 12.5px var(--font-body); cursor: pointer; }
+  .mk-chip span { color: var(--text-3); font-family: var(--font-mono); font-size: 11px; margin-left: 2px; }
+  .mk-chip[aria-pressed='true'] { border-color: var(--accent-text); background: var(--accent-soft); color: var(--accent-text); }
+  .mk-search { max-width: 320px; height: 40px; padding: 0 14px; }
+
+  .mk-tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+  .mk-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .mk-table th, .mk-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  .mk-table thead th { font: 600 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); background: var(--surface-2); }
+  .mk-table tbody tr:last-child > * { border-bottom: 0; }
+  .mk-table .input { height: 36px; min-width: 120px; }
+  .mk-groups { min-width: 900px; }
+  .mk-members { max-width: 260px; color: var(--text-2); }
+  .mk-idea { max-width: 220px; }
+  .mk-grade { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 6px; border-radius: 6px; font: 700 12px var(--font-mono); background: var(--surface-2); color: var(--text); }
+  .mk-grade[data-g='A'] { background: color-mix(in oklab, var(--ok) 22%, transparent); }
+  .mk-grade[data-g='B'] { background: color-mix(in oklab, var(--info) 22%, transparent); }
+  .mk-grade[data-g='C'] { background: color-mix(in oklab, var(--warn) 22%, transparent); }
+  .mk-grade[data-g='D'], .mk-grade[data-g='F'] { background: color-mix(in oklab, var(--danger) 22%, transparent); }
+  .mk-flag { display: inline-block; margin: 0; padding: 2px 8px; border-radius: 999px; font-size: 12.5px; color: var(--text-2); background: var(--surface-2); }
+  .mk-flag.ok { color: var(--ok); background: color-mix(in oklab, var(--ok) 12%, transparent); }
+  .mk-flag.warn { color: var(--text); background: color-mix(in oklab, var(--warn) 18%, transparent); }
+  .mk-meter { display: inline-block; width: 90px; height: 6px; margin-right: 8px; border-radius: 99px; background: var(--line); overflow: hidden; vertical-align: middle; }
+  .mk-meter i { display: block; height: 100%; width: var(--w); background: var(--accent); border-radius: inherit; transition: width .3s var(--ease-out); }
+  .mk-numbers summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+  /* phones: each group is a card (a 900px table would widen the whole page) */
+  @media (max-width: 720px) {
+    .mk-groups { min-width: 0; display: block; }
+    .mk-groups thead { display: none; }
+    .mk-groups tbody { display: grid; }
+    .mk-groups tbody tr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 6px 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+    .mk-groups tbody tr > * { padding: 0; border: 0; }
+    .mk-groups tbody th { font-size: 1.15rem; }
+    .mk-groups .mk-members { grid-column: 1 / -1; grid-row: 2; max-width: none; }
+    .mk-groups .mk-idea { display: none; }
+    .mk-groups td:nth-child(7) { grid-column: 1 / 3; grid-row: 3; }
+    .mk-groups td:last-child { grid-column: 3 / -1; grid-row: 3; justify-self: end; }
+  }
+
+  .mk-kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .mk-kpi { padding: 16px 18px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); }
+  .mk-kpi span { font: 500 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .mk-kpi b { display: block; margin: 6px 0 8px; font: 600 32px/1 var(--font-display); letter-spacing: -.04em; }
+  .mk-kpi small { font-size: 15px; color: var(--text-3); }
+  .mk-kpi .mk-meter { width: 100%; }
+  .mk-grades { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; align-items: end; height: 150px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+  .mk-gbar { display: grid; grid-template-rows: auto 1fr auto; justify-items: center; gap: 6px; height: 100%; }
+  .mk-gbar i { align-self: end; width: 60%; height: var(--h); min-height: 2px; border-radius: 6px 6px 2px 2px; background: var(--accent); transition: height .4s var(--ease-out); }
+
+  .mk-dlg { width: min(1100px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--bg); color: var(--text); }
+  .mk-dlg::backdrop { background: rgb(0 0 0 / .55); }
+  .mk-d-head { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .mk-d-head h2 { margin: 0; font-size: 1.25rem; }
+  .mk-d-head p { margin: 4px 0 0; }
+  .mk-x { width: 36px; height: 36px; border: 1px solid var(--line-2); border-radius: 10px; background: none; color: var(--text); cursor: pointer; }
+  .mk-d-body { display: grid; gap: 18px; padding: 16px 18px 20px; }
+  @media (min-width: 880px) { .mk-d-body { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); } }
+  .mk-d-form { display: grid; gap: 12px; align-content: start; }
+  .mk-sec { margin: 0; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: var(--r-md); }
+  .mk-sec legend { display: flex; gap: 12px; padding: 0 6px; font-weight: 600; font-size: 14px; }
+  .mk-sec legend .mono { color: var(--text-2); font-weight: 500; }
+  .mk-crit { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .mk-crit:last-child { border-bottom: 0; }
+  .mk-crit-l { display: grid; font-size: 14px; }
+  .mk-crit-l small { font-size: 11.5px; }
+  .mk-crit-in { display: flex; align-items: center; gap: 6px; flex: none; }
+  .mk-crit-in .input { width: 76px; height: 38px; text-align: right; }
+  .mk-crit-in > span { min-width: 3.4em; }
+  .mk-crit-in .input[aria-invalid='true'] { border-color: var(--warn); }
+  .mk-total { margin: 0; font-size: 1.05rem; }
+  .mk-comment { display: grid; gap: 6px; font-weight: 600; font-size: 14px; }
+  .mk-comment textarea { min-height: 150px; resize: vertical; font: 400 14px/1.55 var(--font-body); }
+  .mk-warn { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--text-2); }
+  .mk-warn:empty { display: none; }
+  .mk-d-msg { color: var(--text-2); }
+  .mk-assist { display: grid; gap: 10px; align-content: start; padding: 14px; border-radius: var(--r-md); border: 1px solid color-mix(in oklab, var(--accent-text) 30%, var(--line)); background: var(--surface); }
+  .mk-assist-h { margin: 0; font-weight: 700; }
+  .mk-rule { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); }
+  .mk-chk-sec { display: grid; gap: 2px; }
+  .mk-chk-h { margin: 6px 0 2px; font: 600 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .mk-chk { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: start; padding: 5px 4px; border-radius: 6px; font-size: 13.5px; cursor: pointer; }
+  .mk-chk:hover { background: var(--surface-2); }
+  .mk-chk input { margin-top: 3px; accent-color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { .mk-meter i, .mk-gbar i { transition: none; } }
+</style>

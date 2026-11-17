@@ -46,7 +46,7 @@ deliverables:
   - Signed coursework submission form + Statement of Academic Honesty
   - Live presentation & demo. **Attendance is mandatory**
 evaluation:
-  - { criterion: 'Phase 1 — Analysis, architecture & prototype', weight: 30, detail: 'Use case 5 · Activity 5 · UI 9 · Architecture 6 (+ report).' }
+  - { criterion: 'Phase 1 — Analysis, architecture & prototype', weight: 30, detail: 'Use case 7.5 · Activity 7.5 · UI 9 · Architecture 6.' }
   - { criterion: 'Phase 2 — Implementation, testing & AI log', weight: 50, detail: 'Architecture 5 · Storage 10 · APIs & errors 11 · Tests 9 · AI log 15.' }
   - { criterion: Presentation & demo, weight: 20, detail: 'Individual questions on functionality, architecture (group) and AI decisions. Marks can differ between members.' }
 resources:

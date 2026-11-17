@@ -11,6 +11,8 @@ import { canManageSubmissions } from '@/lib/accounts/labscope';
 import { json } from '@/lib/progress/server';
 import { cleanPlan, cleanRoster, emptyPlan, type Student } from '@/lib/project-files/groups';
 import { getFilesStore } from '@/lib/project-files/server';
+import { renumbered } from '@/lib/marking/doc';
+import { keysByEntry, loadMarking } from '@/lib/marking/server';
 
 export const prerender = false;
 
@@ -53,6 +55,12 @@ export const PUT: APIRoute = async ({ url, request, cookies }) => {
     const file = await store.get(url.searchParams.get('file') ?? '');
     if (!file) return json({ error: 'Not found.' }, 404);
     const plan = cleanPlan(body.plan);
+    // Phase 1 marks are saved by group number: while marks exist, a plan that would renumber a group is refused
+    const marking = await loadMarking(store);
+    if (marking.source === file.id && Object.keys(marking.marks).length && !marking.unlocked) {
+      const [before, after] = await Promise.all([keysByEntry(store, file.id), keysByEntry(store, file.id, plan)]);
+      if (renumbered(before, after)) return json({ error: 'Group numbers are locked: Phase 1 marking has started (Admin → Marking). An admin can unlock them there.' }, 409);
+    }
     await store.setGroupData(`plan:${file.id}`, plan);
     return json({ ok: true });
   } catch (error) {

@@ -13,6 +13,9 @@ import { cleanFeedback, placeNotes } from '@/lib/project-files/feedback';
 import { buildGroups, cleanPlan, emptyPlan, type Student } from '@/lib/project-files/groups';
 import { cleanRelease, resultFor } from '@/lib/project-files/results';
 import { getFilesStore } from '@/lib/project-files/server';
+import { normId } from '@/lib/project-files/groups';
+import { loadMarking } from '@/lib/marking/server';
+import { CRITERIA, SECTIONS, totals } from '@/lib/marking/rubric';
 
 export const prerender = false;
 
@@ -26,7 +29,10 @@ export const GET: APIRoute = async ({ url, request, clientAddress }) => {
   try {
     const files = await store.list();
     const releases = await Promise.all(files.map((f) => store.getGroupData<unknown>(`release:${f.id}`)));
-    const published = files.filter((_, i) => cleanRelease(releases[i]).published);
+    // Phase 1 marks (Admin → Marking) are shown with the item whose group numbers they use, once staff publish them
+    const marking = await loadMarking(store).catch(() => null);
+    const marksOn = marking?.published ? marking.source : null;
+    const published = files.filter((f, i) => cleanRelease(releases[i]).published || f.id === marksOn);
     const studentId = (url.searchParams.get('studentId') ?? '').trim().toUpperCase();
     if (!studentId) {
       return new Response(JSON.stringify({ items: published.map((f) => ({ id: f.id, title: f.title })) }), {
@@ -47,7 +53,20 @@ export const GET: APIRoute = async ({ url, request, clientAddress }) => {
       const { notes } = placeNotes(groups, cleanFeedback(feedback));
       const r = resultFor(groups, p, notes, studentId);
       if (!r) continue;
-      results.push({ item: file.title, ...r });
+      let phase1 = null;
+      if (marking && file.id === marksOn) {
+        const g = groups.find((x) => x.numbered && x.members.some((m) => m.id === normId(studentId)));
+        const m = g ? marking.marks[/^G(\d+)$/.exec(g.key)?.[1] ?? ''] : undefined;
+        const t = m ? totals(m.scores) : null;
+        if (m && t && t.grade && !t.missing.length) {
+          phase1 = {
+            sections: SECTIONS.map((s) => ({ title: s.title, max: s.max, score: t.sections[s.id] })),
+            criteria: CRITERIA.map((c) => ({ label: c.label, max: c.max, score: m.scores[c.id] ?? null })),
+            total: t.total, percent: t.percent, grade: t.grade, comment: m.comment || null,
+          };
+        }
+      }
+      results.push({ item: file.title, ...r, phase1 });
       // never fail the student's lookup over the record
       await store.recordView(file.id, studentId).catch((error) => console.error('[project-result] could not record the view', error));
     }

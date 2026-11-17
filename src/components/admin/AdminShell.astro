@@ -38,6 +38,7 @@ const teaching: Item[] = [
   { key: 'stats', label: 'Statistics', href: '/admin/stats', icon: '◫', show: any('module.progress') },
   { key: 'banner', label: 'Banners', href: `/admin/banner/${encodeURIComponent(firstModule)}`, icon: '⚑', show: any('module.build') || any('module.submissions') },
   { key: 'submissions', label: 'Submissions', href: '/admin/project', icon: '⇪', show: any('module.submissions') },
+  { key: 'marking', label: 'Marking', href: '/admin/marking', icon: '✎', show: any('module.submissions') },
 ];
 // anyone who teaches (TA, doctor, module staff, super admin) handles students' forgot-password requests
 const teachingStaff = a.master || (a.user !== null && a.user.role !== 'student') || modules.length > 0;

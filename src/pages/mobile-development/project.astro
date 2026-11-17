@@ -270,6 +270,10 @@ const nav = d ? [
   :global(.pjr-idea) { margin: 0 !important; font-size: 1.15rem; font-weight: 600; color: var(--text); }
   :global(.pjr-fb) { margin: 0 !important; white-space: pre-wrap; color: var(--text); line-height: 1.6; }
   :global(.pjr-none) { margin: 0 !important; color: var(--text-3); }
+  :global(.pjr-score) { margin: 0 !important; font-size: 1.05rem; color: var(--text); }
+  :global(.pjr-marks) { width: 100%; min-width: 0 !important; border-collapse: collapse; font-size: 14px; }
+  :global(.pjr-marks td) { padding: 5px 0 !important; border-bottom: 1px solid var(--line); color: var(--text-2); }
+  :global(.pjr-marks td.mono) { text-align: right; color: var(--text); white-space: nowrap; }
 </style>
 
 <script>
@@ -332,7 +336,14 @@ const nav = d ? [
     const input = form.querySelector<HTMLInputElement>('input')!;
     const msg = sec.querySelector<HTMLElement>('[data-pjr-msg]')!;
     const out = sec.querySelector<HTMLElement>('[data-pjr-out]')!;
-    type Result = { item: string; group: string; members: { name: string; id: string }[]; idea: string; feedback: string | null };
+    type Phase1 = { sections: { title: string; max: number; score: number }[]; criteria: { label: string; max: number; score: number | null }[]; total: number; percent: number; grade: string; comment: string | null };
+    type Result = { item: string; group: string; members: { name: string; id: string }[]; idea: string; feedback: string | null; phase1?: Phase1 | null };
+    const marks = (p: Phase1) => `
+        <div class="pjr-block"><span class="pjr-label">Phase 1 marks</span>
+          <p class="pjr-score"><b>${p.total}</b> / 30 · ${p.percent} / 100 · grade <b>${esc(p.grade)}</b></p>
+          <table class="pjr-marks"><tbody>${p.criteria.map((c) => `<tr><td>${esc(c.label)}</td><td class="mono">${c.score ?? '–'} / ${c.max}</td></tr>`).join('')}</tbody></table>
+          ${p.comment ? `<p class="pjr-fb">${esc(p.comment)}</p>` : ''}
+        </div>`;
     const card = (r: Result) => `
       <article class="pjr-card">
         <p class="pjr-item mono">${esc(r.item)}</p>
@@ -340,6 +351,7 @@ const nav = d ? [
         <div class="pjr-block pjr-team"><span class="pjr-label">Members</span><ul class="pjr-members">${r.members.map((m) => `<li><span>${esc(m.name)}</span><span class="mono">${esc(m.id)}</span></li>`).join('')}</ul></div>
         <div class="pjr-block"><span class="pjr-label">Approved idea</span>${r.idea ? `<p class="pjr-idea">${esc(r.idea)}</p>` : '<p class="pjr-none">No idea approved yet. Check again later or ask your TA.</p>'}</div>
         <div class="pjr-block"><span class="pjr-label">Feedback</span>${r.feedback ? `<p class="pjr-fb">${esc(r.feedback)}</p>` : '<p class="pjr-none">No feedback.</p>'}</div>
+        ${r.phase1 ? marks(r.phase1) : ''}
       </article>`;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
