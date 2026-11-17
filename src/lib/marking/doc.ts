@@ -5,12 +5,14 @@
  * Rules: admins edit every group and the load; a TA edits only the groups of the load row linked to their email.
  * Pure functions, unit-tested (tests/marking.test.ts).
  */
-import { MAX_COMMENT, cleanScores, type Scores } from './rubric.ts';
+import { MAX_COMMENT, cleanScores, type CriterionId, type Scores } from './rubric.ts';
+import { cleanAnswers, type Answers } from './assistant.ts';
 
 export const MARKING_KEY = 'marking:phase1';
 
 export type TA = { name: string; email: string | null; groups: number[] };
-export type GroupMarks = { scores: Scores; comment: string; by: string; at: string; members: string[] };
+/** `help`: the grading assistant's answers behind the marks (how they were reached), when the TA used it. */
+export type GroupMarks = { scores: Scores; comment: string; by: string; at: string; members: string[]; help?: Partial<Record<CriterionId, Answers>> };
 export type MarkingDoc = {
   v: 1;
   /** the submission item (usually the proposal) whose group numbers are used */
@@ -28,8 +30,9 @@ export type ImportRow = { group: number; ta?: string; scores: Record<string, unk
 
 export const emptyDoc = (): MarkingDoc => ({ v: 1, source: null, tas: [], marks: {}, published: false, publishedAt: '', publishedBy: '', unlocked: false });
 
+/** A group number from a cell or a form: 12, "12", "G12" or "Group 12". */
 export const groupNumber = (v: unknown): number | null => {
-  const n = typeof v === 'number' ? v : Number(String(v ?? '').trim());
+  const n = typeof v === 'number' ? v : Number(String(v ?? '').trim().replace(/^(?:group|grp|g)\s*#?\s*(?=\d)/i, ''));
   return Number.isInteger(n) && n > 0 && n < 1000 ? n : null;
 };
 const cleanEmail = (v: unknown) => (typeof v === 'string' && /^[^\s@]+@[^\s@]+$/.test(v.trim()) ? v.trim().toLowerCase().slice(0, 200) : null);
@@ -62,6 +65,8 @@ export function cleanDoc(input: unknown): MarkingDoc {
         at: String(m.at ?? '').slice(0, 40),
         members: Array.isArray(m.members) ? m.members.map((x) => String(x).slice(0, 32)).slice(0, 12) : [],
       };
+      const help = cleanAnswers(m.help);
+      if (Object.keys(help).length) doc.marks[String(n)].help = help;
     }
   }
   doc.published = i.published === true;
@@ -81,19 +86,26 @@ export function canEdit(m: Marker, doc: MarkingDoc, group: number): boolean {
 }
 
 /** Saves one group's marks (scores clamped, comment trimmed) with the members it was marked for. */
-export function applyMarks(doc: MarkingDoc, m: Marker, group: number, input: { scores: unknown; comment?: unknown }, members: string[], now = new Date()): { ok: true } | { ok: false; error: string } {
+export function applyMarks(doc: MarkingDoc, m: Marker, group: number, input: { scores: unknown; comment?: unknown; help?: unknown }, members: string[], now = new Date()): { ok: true } | { ok: false; error: string } {
   if (!canEdit(m, doc, group)) return { ok: false, error: `Group ${group} is not one of your groups in the marking load.` };
+  const scores = cleanScores(input.scores);
+  // the assistant's answers are kept only for criteria that still have a mark
+  const help = Object.fromEntries(Object.entries(cleanAnswers(input.help)).filter(([id]) => id in scores));
   doc.marks[String(group)] = {
-    scores: cleanScores(input.scores),
+    scores,
     comment: cleanText(input.comment, MAX_COMMENT),
     by: cleanName(m.name) || (m.email ?? ''),
     at: now.toISOString(),
     members: [...members],
+    ...(Object.keys(help).length ? { help } : {}),
   };
   return { ok: true };
 }
 
-/** Imports the rows read from a workbook: only groups the uploader may edit, only rows with marks or a comment. */
+/**
+ * Imports the rows read from a marking file: only groups the uploader may edit, only rows with marks or a comment.
+ * A file fills, it never clears: an empty cell keeps the saved mark, an empty comment keeps the saved comment.
+ */
 export function applyImport(doc: MarkingDoc, m: Marker, rows: readonly ImportRow[], membersOf: (group: number) => string[], now = new Date()) {
   const imported: number[] = [];
   const skipped: { group: number; reason: string }[] = [];
@@ -109,7 +121,9 @@ export function applyImport(doc: MarkingDoc, m: Marker, rows: readonly ImportRow
       skipped.push({ group: n, reason: 'There are no marks in this row yet.' });
       continue;
     }
-    applyMarks(doc, m, n, { scores, comment: row.comment }, membersOf(n), now);
+    const old = doc.marks[String(n)];
+    const help = Object.fromEntries(Object.entries(old?.help ?? {}).filter(([id]) => !(id in scores)));
+    applyMarks(doc, m, n, { scores: { ...old?.scores, ...scores }, comment: cleanText(row.comment, MAX_COMMENT) || old?.comment || '', help }, membersOf(n), now);
     imported.push(n);
   }
   return { imported: uniqueSorted(imported), skipped };

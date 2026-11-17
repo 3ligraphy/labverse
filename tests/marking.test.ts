@@ -194,7 +194,7 @@ test('a file that is not a marking workbook says so', async () => {
 /* ------------------------------------------------------------------ the merged download, and the assistant */
 
 const { markingSheets } = await import('../src/lib/marking/export.ts');
-const { RULES, CHECKLIST } = await import('../src/lib/marking/assistant.ts');
+const { RULES, HELPERS } = await import('../src/lib/marking/assistant.ts');
 
 test('the download: final sheet + one sheet per TA + summary, and it reads back to the same marks', async () => {
   const d = doc();
@@ -215,13 +215,15 @@ test('the download: final sheet + one sheet per TA + summary, and it reads back 
   assert.deepEqual(summary[1], ['TA One', 2, 100, 1], 'TA, groups, average % of marked groups, marked');
 });
 
-test('the assistant: a rule for every criterion, and every checklist item points at a real criterion', () => {
-  for (const c of CRITERIA) assert.ok(RULES[c.id] && RULES[c.id].length > 10, `${c.id} has its rule`);
-  assert.ok(CHECKLIST.length >= 12);
-  for (const item of CHECKLIST) {
-    assert.ok(CRITERIA.some((c) => c.id === item.criterion), `${item.id} → ${item.criterion}`);
-    const max = CRITERIA.find((c) => c.id === item.criterion)!.max;
-    assert.ok(item.deduction >= 0 && item.deduction <= max, `${item.id} deduction within the criterion`);
-    assert.ok(item.sentence.length > 15, `${item.id} has a ready sentence`);
+test('the assistant: a rule and questions for every criterion; every yes / no finding has a fair deduction and a sentence', () => {
+  for (const c of CRITERIA) {
+    assert.ok(RULES[c.id] && RULES[c.id].length > 10, `${c.id} has its rule`);
+    assert.ok(HELPERS[c.id].length >= 1, `${c.id} has questions`);
+    for (const q of HELPERS[c.id]) {
+      if (q.kind === 'yes') {
+        assert.ok(q.deduction >= 0 && q.deduction <= c.max, `${c.id}.${q.key} deduction within the criterion`);
+        assert.ok(q.sentence.length > 15, `${c.id}.${q.key} has a ready sentence`);
+      }
+    }
   }
 });

@@ -1,8 +1,8 @@
 ---
 /**
  * /admin/marking — Phase 1 project marking: the groups (numbers from the proposal item), the marking form with
- * the grading assistant, the workbook upload (Phase1_Marking.xlsx or one TA's sheet), the marking load, the
- * summary, the merged Excel download and Publish to students.
+ * the grading assistant, the upload (Phase1_Marking.xlsx, one TA's sheet, or a CSV), each TA's own sheet to fill
+ * offline, the marking load, the summary with marking consistency, the merged Excel download and Publish.
  * Rules: src/lib/marking/* · API: src/pages/api/admin/marking · browser: src/scripts/marking.ts
  */
 import Base from '@/layouts/Base.astro';
@@ -41,11 +41,18 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
 
     <div role="tabpanel" data-mk-panel="marks" class="mk-panel">
       <div class="mk-upload">
-        <div>
-          <b>Upload a marking sheet</b>
-          <p class="small muted">The Phase1_Marking.xlsx workbook, or one TA’s sheet. You see what will change before anything is saved. Only your own groups are imported.</p>
+        <div class="mk-upload-t">
+          <b>Upload your marks: Excel or CSV</b>
+          <p class="small muted">Phase1_Marking.xlsx, one TA’s sheet, or a CSV with a Group column and the criteria columns. You see what changes before anything is saved. Only your own groups are imported, and empty cells keep the marks already saved.</p>
+          <p class="small" data-mk-mine-dl hidden></p>
+          <details class="mk-csvhelp small">
+            <summary>CSV format</summary>
+            <p class="muted">First row: the column names below (any order, commas or semicolons, decimal points or commas). Then one row per group. <b>Group</b> can be 12 or G12; leave a cell empty if you have not marked it yet.</p>
+            <code class="mk-code">Group,Actors,Correct logic,Mapping to functional reqs,Functional reqs included,Correct &amp; logical flow,Screens,Pattern selected,Correct implementation in structure,Reasoning,Comments</code>
+            <button type="button" class="btn btn-ghost btn-sm" data-mk-copy>Copy the header</button>
+          </details>
         </div>
-        <label class="btn btn-ghost btn-sm mk-file">Choose .xlsx<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-mk-file /></label>
+        <label class="btn btn-primary btn-sm mk-file">Choose a file<input type="file" accept=".xlsx,.csv,.tsv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-mk-file /></label>
       </div>
       <div class="mk-preview" data-mk-preview hidden></div>
 
@@ -84,18 +91,25 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
       </div>
       <div class="mk-d-body">
         <div class="mk-d-form">
+          <p class="mk-draft small" data-mk-draft hidden></p>
+          <div class="mk-formtools"><button type="button" class="mk-link" data-mk-full>Fill the empty marks with full marks</button></div>
           <div data-mk-form></div>
           <p class="mk-total" data-mk-total></p>
-          <label class="mk-comment"><span>Comments <span class="mono faint" data-mk-count></span></span><textarea class="input" rows="7" data-mk-comment placeholder="What to fix next phase. Ticking a checklist item adds a ready sentence here."></textarea></label>
+          <label class="mk-comment"><span>Comments <span class="mono faint" data-mk-count></span></span><textarea class="input" rows="7" data-mk-comment placeholder="What to fix next phase. The assistant adds a ready sentence here for each finding that costs marks."></textarea></label>
           <ul class="mk-warn" data-mk-warn></ul>
           <p class="mk-flag" data-mk-ro hidden>Read only: this is not one of your groups in the marking load.</p>
-          <div class="mk-actions"><button type="button" class="btn btn-primary btn-sm" data-mk-save>Save marks</button><button type="button" class="btn btn-ghost btn-sm" data-mk-close>Close</button><span class="mk-d-msg small" role="status" data-mk-d-msg></span></div>
+          <div class="mk-actions">
+            <button type="button" class="btn btn-primary btn-sm" data-mk-save>Save marks</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-mk-save-next>Save &amp; next group</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-mk-close>Close</button>
+            <span class="mk-d-msg small" role="status" data-mk-d-msg></span>
+          </div>
+          <p class="small faint" data-mk-hint>Ctrl + Enter saves · Ctrl + Shift + Enter saves and opens the next group. Unsaved changes stay in this browser as a draft.</p>
         </div>
-        <aside class="mk-assist" aria-label="Grading assistant">
+        <aside class="mk-assist-wrap" aria-label="Grading assistant" data-mk-aside>
           <p class="mk-assist-h">Grading assistant</p>
-          <p class="mk-rule small" data-mk-rule></p>
-          <p class="small muted">Tick what you see. It lowers that mark and adds a sentence to the comments; you can change both.</p>
-          <div data-mk-check></div>
+          <p class="small muted">Answer what you see for each mark: it suggests the mark from the brief’s rule and writes the comment sentences. You can change both.</p>
+          <div class="mk-assist" data-mk-assist></div>
         </aside>
       </div>
     </dialog>
@@ -132,12 +146,18 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
   .mk-tabs button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
   .mk-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 
-  .mk-upload { display: flex; justify-content: space-between; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding: 14px 16px; border: 1px dashed var(--line-2); border-radius: var(--r-lg); background: var(--surface); }
-  .mk-upload p { margin: 2px 0 0; max-width: 70ch; }
+  .mk-upload { display: flex; justify-content: space-between; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding: 14px 16px; border: 1px dashed var(--line-2); border-radius: var(--r-lg); background: var(--surface); transition: border-color .15s, background-color .15s; }
+  .mk-upload[data-over] { border-color: var(--accent-text); background: var(--accent-soft); }
+  .mk-upload-t { display: grid; gap: 6px; min-width: 0; flex: 1 1 420px; }
+  .mk-upload p { margin: 0; max-width: 75ch; }
+  .mk-csvhelp summary { cursor: pointer; color: var(--accent-text); font-weight: 600; width: max-content; }
+  .mk-csvhelp[open] { display: grid; gap: 8px; justify-items: start; }
+  .mk-csvhelp p { margin-top: 6px; }
+  .mk-code { display: block; max-width: 100%; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font: 12px/1.5 var(--font-mono); overflow-wrap: anywhere; user-select: all; }
   .mk-file { position: relative; overflow: hidden; }
   .mk-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .mk-file:focus-within { outline: 2px solid var(--accent-text); outline-offset: 2px; }
-  .mk-preview { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid color-mix(in oklab, var(--accent-text) 40%, var(--line)); border-radius: var(--r-lg); background: var(--surface); }
+  .mk-preview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px 16px; border: 1px solid color-mix(in oklab, var(--accent-text) 40%, var(--line)); border-radius: var(--r-lg); background: var(--surface); }
   .mk-preview p { margin: 0; }
   .mk-loadchk { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--text); }
 
@@ -165,6 +185,19 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
   .mk-flag { display: inline-block; margin: 0; padding: 2px 8px; border-radius: 999px; font-size: 12.5px; color: var(--text-2); background: var(--surface-2); }
   .mk-flag.ok { color: var(--ok); background: color-mix(in oklab, var(--ok) 12%, transparent); }
   .mk-flag.warn { color: var(--text); background: color-mix(in oklab, var(--warn) 18%, transparent); }
+  .mk-flag.draft { color: var(--text); background: color-mix(in oklab, var(--info) 16%, transparent); }
+  .mk-note { margin: 0; font-size: 14px; color: var(--text-2); max-width: 80ch; }
+  .mk-dl { white-space: nowrap; font-size: 13px; }
+  .mk-loadt { min-width: 860px; }
+  .mk-loadt td:nth-child(1) .input { width: 120px; min-width: 0; }
+  .mk-loadt td:nth-child(2) .mk-select { width: 210px; }
+  .mk-loadt td:nth-child(3) { width: 40%; }
+  .mk-loadt td:nth-child(3) .input { width: 100%; min-width: 220px; }
+  .mk-loadt td:nth-child(5) { white-space: nowrap; }
+  .mk-loadt .mk-meter { width: 60px; }
+  .mk-h2 { margin: 10px 0 0; font-size: 1.1rem; }
+  .mk-cons td.mk-off { background: color-mix(in oklab, var(--warn) 16%, transparent); font-weight: 600; }
+  .mk-warn-box { padding: 10px 12px 10px 28px; border-radius: var(--r-md); background: color-mix(in oklab, var(--warn) 10%, transparent); }
   .mk-meter { display: inline-block; width: 90px; height: 6px; margin-right: 8px; border-radius: 99px; background: var(--line); overflow: hidden; vertical-align: middle; }
   .mk-meter i { display: block; height: 100%; width: var(--w); background: var(--accent); border-radius: inherit; transition: width .3s var(--ease-out); }
   .mk-numbers summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
@@ -204,13 +237,20 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
   .mk-sec { margin: 0; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: var(--r-md); }
   .mk-sec legend { display: flex; gap: 12px; padding: 0 6px; font-weight: 600; font-size: 14px; }
   .mk-sec legend .mono { color: var(--text-2); font-weight: 500; }
-  .mk-crit { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
-  .mk-crit:last-child { border-bottom: 0; }
-  .mk-crit-l { display: grid; font-size: 14px; }
+  .mk-crit { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 8px; margin: 0 -8px; border-bottom: 1px solid var(--line); border-radius: 8px; }
+  .mk-crit:last-of-type { border-bottom: 0; }
+  .mk-crit[data-active] { background: var(--accent-soft); }
+  .mk-crit-l { display: grid; font-size: 14px; cursor: pointer; }
   .mk-crit-l small { font-size: 11.5px; }
   .mk-crit-in { display: flex; align-items: center; gap: 6px; flex: none; }
   .mk-crit-in .input { width: 76px; height: 38px; text-align: right; }
   .mk-crit-in > span { min-width: 3.4em; }
+  .mk-pick { width: 28px; height: 28px; flex: none; border: 1px solid var(--line-2); border-radius: 50%; background: var(--surface); color: var(--text-2); font: 700 13px var(--font-body); cursor: pointer; }
+  .mk-pick:hover, .mk-crit[data-active] .mk-pick { border-color: var(--accent-text); color: var(--accent-text); }
+  .mk-pick:focus-visible, .mk-step:focus-visible, .mk-link:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .mk-formtools { display: flex; justify-content: flex-end; }
+  .mk-link { padding: 0; border: 0; background: none; color: var(--accent-text); font: 600 13px var(--font-body); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .mk-draft { margin: 0; padding: 8px 12px; border-radius: var(--r-md); background: color-mix(in oklab, var(--info) 14%, transparent); }
   .mk-crit-in .input[aria-invalid='true'] { border-color: var(--warn); }
   .mk-total { margin: 0; font-size: 1.05rem; }
   .mk-comment { display: grid; gap: 6px; font-weight: 600; font-size: 14px; }
@@ -218,13 +258,42 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
   .mk-warn { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--text-2); }
   .mk-warn:empty { display: none; }
   .mk-d-msg { color: var(--text-2); }
-  .mk-assist { display: grid; gap: 10px; align-content: start; padding: 14px; border-radius: var(--r-md); border: 1px solid color-mix(in oklab, var(--accent-text) 30%, var(--line)); background: var(--surface); }
-  .mk-assist-h { margin: 0; font-weight: 700; }
+  .mk-assist-wrap { display: grid; gap: 8px; align-content: start; align-self: start; }
+  .mk-assist-wrap > p { margin: 0; }
+  .mk-assist-h { font-weight: 700; }
+  .mk-assist { display: grid; gap: 10px; align-content: start; padding: 14px; border-radius: var(--r-md); border: 1px solid color-mix(in oklab, var(--accent-text) 35%, var(--line)); background: var(--surface); }
+  .mk-assist:empty { display: none; }
+  @media (min-width: 880px) { .mk-assist-wrap { position: sticky; top: calc(var(--mk-head, 90px) + 12px); max-height: calc(100dvh - var(--mk-head, 90px) - 60px); overflow: auto; } }
+  /* phones: the assistant moves under the mark it is about, so the side column is not needed */
+  @media (max-width: 879px) { .mk-assist-wrap { display: none; } }
+  .mk-sec .mk-assist { margin: 4px 0 10px; }
+  .mk-as-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+  .mk-as-nav p { margin: 0; }
+  .mk-as-k { font-size: 11px; color: var(--text-3); }
+  .mk-as-t { font-weight: 700; }
+  .mk-step { width: 34px; height: 34px; border: 1px solid var(--line-2); border-radius: 10px; background: none; color: var(--text); cursor: pointer; }
+  .mk-step:disabled { opacity: .35; cursor: default; }
   .mk-rule { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); }
-  .mk-chk-sec { display: grid; gap: 2px; }
-  .mk-chk-h { margin: 6px 0 2px; font: 600 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
-  .mk-chk { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: start; padding: 5px 4px; border-radius: 6px; font-size: 13.5px; cursor: pointer; }
-  .mk-chk:hover { background: var(--surface-2); }
-  .mk-chk input { margin-top: 3px; accent-color: var(--accent); }
+  .mk-qs { display: grid; gap: 4px; }
+  .mk-q { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 5px 4px; border-radius: 6px; font-size: 13.5px; }
+  .mk-q .input { width: 72px; height: 36px; text-align: right; }
+  .mk-q-yes { grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; cursor: pointer; }
+  .mk-q-yes:hover { background: var(--surface-2); }
+  .mk-q-yes input { margin-top: 3px; accent-color: var(--accent); }
+  .mk-q-level { display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; padding: 0; border: 0; }
+  .mk-q-level legend { padding: 0 0 6px; font-size: 13.5px; }
+  .mk-seg { display: grid; gap: 6px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mk-seg label { position: relative; cursor: pointer; }
+  .mk-seg input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+  .mk-seg span { display: grid; gap: 2px; height: 100%; padding: 7px 8px; border: 1px solid var(--line-2); border-radius: 8px; font-size: 12.5px; line-height: 1.3; }
+  .mk-seg b { font-size: 12px; color: var(--text-3); }
+  .mk-seg input:checked + span { border-color: var(--accent-text); background: var(--accent-soft); color: var(--accent-text); }
+  .mk-seg input:checked + span b { color: inherit; }
+  .mk-seg input:focus-visible + span { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .mk-as-out { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 36px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font-size: 14px; }
+  .mk-as-out b { font-size: 1.1rem; }
+  .mk-say { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-2); }
+  .mk-as-avg { margin: 0; }
+  .mk-chk-h { margin: 2px 0; font: 600 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
   @media (prefers-reduced-motion: reduce) { .mk-meter i, .mk-gbar i { transition: none; } }
 </style>

@@ -1,21 +1,22 @@
 /**
  * Admin → Marking (Phase 1).
- *   GET   { doc, me, files, groups, staff, changes }   everyone with submissions access (TAs see every group)
- *   PUT   { action: 'marks', group, scores, comment }     a TA for the groups of their load row; admins any group
+ *   GET   { doc, me, files, groups, staff, changes, loadSaved }   everyone with submissions access (TAs see every group)
+ *   PUT   { action: 'marks', group, scores, comment, help }   a TA for the groups of their load row; admins any group
  *         { action: 'import', rows: [{ group, ta, scores, comment }] }   rows read from a marking workbook
  *         { action: 'source', fileId }                  admin: the item whose group numbers are used
  *         { action: 'load', tas } | { action: 'load-rows', rows }   admin: the marking load
  *         { action: 'publish', published } | { action: 'unlock', unlocked }   admin
+ * Until an admin saves a marking load, the team's default load is used (src/lib/marking/defaults.ts); rows are
+ * linked to staff accounts by first name. Every save stores the load as it was shown.
  * Rules: src/lib/marking/doc.ts. Saves are read-change-write, so two TAs saving at once never lose a mark.
  */
 import type { APIRoute } from 'astro';
 import { access } from '@/lib/accounts/access';
 import { canManageSubmissions } from '@/lib/accounts/labscope';
-import { getAccountStore } from '@/lib/accounts/server';
 import { json } from '@/lib/progress/server';
 import { getFilesStore } from '@/lib/project-files/server';
 import { MARKING_KEY, applyImport, applyMarks, cleanDoc, groupNumber, loadFromRows, memberChanges, myRow, type ImportRow } from '@/lib/marking/doc';
-import { defaultSource, loadMarking, markGroups, markerOf } from '@/lib/marking/server';
+import { defaultSource, loadMarking, markGroups, markerOf, prepared, staffList } from '@/lib/marking/server';
 
 export const prerender = false;
 
@@ -35,14 +36,14 @@ export const GET: APIRoute = async ({ cookies }) => {
   if (c instanceof Response) return c;
   const { store, me } = c;
   try {
-    const doc = await loadMarking(store);
+    const staff = await staffList();
+    const saved = await loadMarking(store);
+    const doc = prepared(saved, staff);
     const files = (await store.list()).map((f) => ({ id: f.id, title: f.title }));
     const source = doc.source && files.some((f) => f.id === doc.source) ? doc.source : await defaultSource(store);
     const groups = source ? await markGroups(store, source) : [];
-    const users = (await getAccountStore()?.list().catch(() => [])) ?? [];
-    const staff = users.filter((u) => u.active && u.role !== 'student').map((u) => ({ name: u.name, email: u.email })).sort((x, y) => x.name.localeCompare(y.name));
     const changes = memberChanges(doc, groups.map((g) => ({ number: g.number, members: g.members.map((m) => m.id) })));
-    return json({ doc: { ...doc, source }, me: { ...me, row: myRow(doc, me.email)?.name ?? null }, files, groups, staff, changes });
+    return json({ doc: { ...doc, source }, me: { ...me, row: myRow(doc, me.email)?.name ?? null }, files, groups, staff, changes, loadSaved: saved.tas.length > 0 });
   } catch (error) {
     console.error('[marking] could not load', error);
     return json({ error: 'Could not load the marking.' }, 500);
@@ -65,7 +66,7 @@ export const PUT: APIRoute = async ({ cookies, request }) => {
   const action = String(body.action ?? '');
   if (ADMIN_ONLY.has(action) && me.role !== 'admin') return json({ error: 'Only an admin can change this.' }, 403);
   try {
-    const files = await store.list();
+    const [files, staff] = await Promise.all([store.list(), staffList()]);
     const before = await loadMarking(store);
     const source = before.source && files.some((f) => f.id === before.source) ? before.source : await defaultSource(store);
     const groups = source ? await markGroups(store, source) : [];
@@ -73,19 +74,18 @@ export const PUT: APIRoute = async ({ cookies, request }) => {
     const membersOf = (n: number) => groups.find((g) => g.number === n)?.members.map((m) => m.id) ?? [];
     let extra: Record<string, unknown> = {};
     const doc = await store.updateGroupData(MARKING_KEY, (current) => {
-      const d = cleanDoc(current);
+      const d = prepared(cleanDoc(current), staff);
       d.source = d.source ?? source;
       extra = {};
       if (action === 'marks') {
         const n = groupNumber(body.group);
         if (n === null || !known.has(n)) extra.error = 'There is no such group.';
         else {
-          const r = applyMarks(d, me, n, { scores: body.scores, comment: body.comment }, membersOf(n));
+          const r = applyMarks(d, me, n, { scores: body.scores, comment: body.comment, help: body.help }, membersOf(n));
           if (!r.ok) extra.error = r.error;
         }
       } else if (action === 'import') {
         const rows = (Array.isArray(body.rows) ? body.rows.slice(0, 300) : []) as ImportRow[];
-        if (me.role === 'admin' && !d.tas.length) loadFromRows(d, rows);
         const unknown = rows.filter((r) => !known.has(groupNumber(r.group) ?? -1)).map((r) => ({ group: groupNumber(r.group) ?? 0, reason: 'This group number is not in the groups of the item.' }));
         const out = applyImport(d, me, rows.filter((r) => known.has(groupNumber(r.group) ?? -1)), membersOf);
         extra = { imported: out.imported, skipped: [...out.skipped, ...unknown] };
@@ -104,7 +104,7 @@ export const PUT: APIRoute = async ({ cookies, request }) => {
       } else if (action === 'unlock') {
         d.unlocked = body.unlocked === true;
       } else extra.error = 'Unknown action.';
-      return d;
+      return prepared(d, staff);
     });
     if (extra.error) return json({ error: extra.error }, 400);
     return json({ ok: true, doc, ...extra });

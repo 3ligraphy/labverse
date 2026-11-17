@@ -1,12 +1,13 @@
 /**
- * Admin → Marking (Phase 1) in the browser: the group list, the marking form with the grading assistant, the
- * workbook upload (read here, imported by the API), the marking load and the summary.
+ * Admin → Marking (Phase 1) in the browser: the group list, the marking form with the grading assistant
+ * (questions per criterion → a suggested mark and ready comment sentences), drafts kept in this browser until
+ * saved, the Excel / CSV upload (read here, imported by the API), the downloads, the marking load and the summary.
  * The API (src/pages/api/admin/marking) checks every permission again; this file only shows what you may do.
  */
-import { CRITERIA, MAX_COMMENT, SECTIONS, cleanScore, totals, type CriterionId, type Scores } from '@/lib/marking/rubric';
-import { CHECKLIST, RULES } from '@/lib/marking/assistant';
-import { canEdit, type MarkingDoc, type Marker } from '@/lib/marking/doc';
-import { parseMarkingWorkbook, type ParsedRow } from '@/lib/marking/xlsx-read';
+import { CRITERIA, MAX_COMMENT, SECTIONS, TOTAL_MAX, cleanScore, totals, type CriterionId, type Scores } from '@/lib/marking/rubric';
+import { HELPERS, LEVELS, RULES, explain, suggest, type Answers, type Question } from '@/lib/marking/assistant';
+import { canEdit, myRow, type MarkingDoc, type Marker } from '@/lib/marking/doc';
+import { parseMarkingFile, type ParsedRow } from '@/lib/marking/xlsx-read';
 
 type Group = { number: number; members: { id: string; name: string }[]; idea: string };
 type Data = {
@@ -16,15 +17,51 @@ type Data = {
   groups: Group[];
   staff: { name: string; email: string }[];
   changes: { group: number; added: string[]; removed: string[] }[];
+  loadSaved: boolean;
 };
+type Help = Partial<Record<CriterionId, Answers>>;
+type Draft = { by: string | null; at: string; scores: Partial<Record<CriterionId, string>>; comment: string; help: Help; manual: CriterionId[] };
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const fmt = (n: number | null | undefined) => (n === null || n === undefined ? '–' : String(Math.round(n * 100) / 100));
 const when = (iso: string) => (iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '');
+const time = (iso: string) => (iso ? new Date(iso).toLocaleTimeString([], { timeStyle: 'short' }) : '');
+const crit = (id: CriterionId) => CRITERIA.find((c) => c.id === id)!;
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const LEVEL_MARK = { clear: 2, partly: 1, none: 0 } as const;
+const CSV_HEADER = 'Group,Actors,Correct logic,Mapping to functional reqs,Functional reqs included,Correct & logical flow,Screens,Pattern selected,Correct implementation in structure,Reasoning,Comments';
+
+/** Drafts: what a TA typed and has not saved yet, in this browser only (gone after Save or Discard). */
+const drafts = {
+  key: (n: number) => `mk-draft:v1:${n}`,
+  get(n: number): Draft | null {
+    try {
+      const v = localStorage.getItem(this.key(n));
+      return v ? (JSON.parse(v) as Draft) : null;
+    } catch {
+      return null;
+    }
+  },
+  set(n: number, d: Draft) {
+    try {
+      localStorage.setItem(this.key(n), JSON.stringify(d));
+    } catch {
+      /* storage full or blocked: the form still works, only without a draft */
+    }
+  },
+  del(n: number) {
+    try {
+      localStorage.removeItem(this.key(n));
+    } catch {
+      /* nothing to remove */
+    }
+  },
+};
 
 export function initMarking(root: HTMLElement) {
   let data: Data;
   let filter: 'mine' | 'all' | 'todo' | 'done' = 'all';
+  let firstLoad = true;
   let query = '';
   let preview: ParsedRow[] | null = null;
   const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
@@ -43,20 +80,27 @@ export function initMarking(root: HTMLElement) {
   async function load() {
     try {
       data = await api();
-      if (data.me.role === 'ta' && data.me.row) filter = 'mine';
+      if (firstLoad && myGroups().length) filter = 'mine';
+      firstLoad = false;
       render();
     } catch (error) {
       say((error as Error).message, 'err');
     }
   }
   const me = () => data.me as Marker;
+  const admin = () => data.me.role === 'admin';
   const editable = (n: number) => canEdit(me(), data.doc, n);
+  const mine = () => myRow(data.doc, data.me.email);
+  const myGroups = () => {
+    const row = mine();
+    return row ? data.groups.filter((g) => row.groups.includes(g.number)) : [];
+  };
   const taOf = (n: number) => data.doc.tas.find((t) => t.groups.includes(n))?.name ?? '';
   const marksOf = (n: number) => data.doc.marks[String(n)];
   /** complete: all 9 marks; started: some marks */
   const isMarked = (n: number) => !!marksOf(n) && totals(marksOf(n)!.scores).missing.length === 0;
   const markCount = (n: number) => (marksOf(n) ? CRITERIA.length - totals(marksOf(n)!.scores).missing.length : 0);
-  const admin = () => data.me.role === 'admin';
+  const exportUrl = (q: Record<string, string>) => `/api/admin/marking/export?${new URLSearchParams(q)}`;
 
   /* ------------------------------------------------------------------ header */
   function renderHead() {
@@ -71,102 +115,152 @@ export function initMarking(root: HTMLElement) {
     $('[data-mk-pubnote]').innerHTML = data.doc.published
       ? `<b>Published</b>: a student who types their ID on the Project page sees their group’s marks, grade and comments${data.doc.publishedBy ? ` (published by ${esc(data.doc.publishedBy)}, ${esc(when(data.doc.publishedAt))})` : ''}.`
       : 'Not published: students see nothing yet.';
-    $('[data-mk-role]').textContent =
-      data.me.role === 'admin' ? 'You are an admin: you can mark every group and change the marking load.' : data.me.row ? `You mark the groups of ${data.me.row}. Other groups are read-only for you.` : 'Your account is not linked to a row of the marking load yet: ask an admin to link it (Marking load tab). Until then every group is read-only.';
+    const row = mine();
+    $('[data-mk-role]').textContent = admin()
+      ? `You are an admin: you can mark every group and change the marking load.${row ? ` Your own groups (${row.name}): ${row.groups.length}.` : ''}`
+      : row
+        ? `You mark the ${plural(row.groups.length, 'group')} of ${row.name}. Other groups are read-only for you.`
+        : 'Your account is not linked to a row of the marking load yet: ask an admin to link it (Marking load tab). Until then every group is read-only.';
+    const dl = $('[data-mk-mine-dl]');
+    dl.hidden = !row;
+    if (row) dl.innerHTML = `Your groups as a sheet to fill offline: <a href="${exportUrl({ mine: '1' })}" download>Excel</a> · <a href="${exportUrl({ mine: '1', format: 'csv' })}" download>CSV</a>`;
   }
 
   /* ------------------------------------------------------------------ marks tab */
   function visibleGroups() {
     const q = query.toLowerCase();
+    const own = new Set(myGroups().map((g) => g.number));
     return data.groups.filter((g) => {
-      if (filter === 'mine' && !editable(g.number)) return false;
+      if (filter === 'mine' && !own.has(g.number)) return false;
       if (filter === 'todo' && isMarked(g.number)) return false;
       if (filter === 'done' && !isMarked(g.number)) return false;
       if (!q) return true;
-      return `group ${g.number} ${taOf(g.number)} ${g.idea} ${g.members.map((m) => `${m.name} ${m.id}`).join(' ')}`.toLowerCase().includes(q);
+      return `group ${g.number} g${g.number} ${taOf(g.number)} ${g.idea} ${g.members.map((m) => `${m.name} ${m.id}`).join(' ')}`.toLowerCase().includes(q);
     });
   }
   function renderMarks() {
-    const mine = data.groups.filter((g) => editable(g.number));
-    const counts = { mine: mine.length, all: data.groups.length, todo: data.groups.filter((g) => !isMarked(g.number)).length, done: data.groups.filter((g) => isMarked(g.number)).length };
+    const own = myGroups();
+    const counts = { mine: own.length, all: data.groups.length, todo: data.groups.filter((g) => !isMarked(g.number)).length, done: data.groups.filter((g) => isMarked(g.number)).length };
+    if (filter === 'mine' && !own.length) filter = 'all';
     root.querySelectorAll<HTMLButtonElement>('[data-mk-filter]').forEach((b) => {
       const f = b.dataset.mkFilter as typeof filter;
       b.setAttribute('aria-pressed', String(f === filter));
       b.querySelector('span')!.textContent = String(counts[f]);
-      if (f === 'mine') b.hidden = !mine.length;
+      if (f === 'mine') b.hidden = !own.length;
     });
     const changed = new Map(data.changes.map((c) => [c.group, c]));
     const rows = visibleGroups().map((g) => {
       const m = marksOf(g.number);
       const t = m ? totals(m.scores) : null;
       const done = isMarked(g.number);
-      const status = changed.has(g.number) ? '<span class="mk-flag warn">Members changed since marked</span>' : done ? `<span class="mk-flag ok">Marked${m!.by ? ` by ${esc(m!.by)}` : ''}</span>` : markCount(g.number) ? `<span class="mk-flag">Started · ${markCount(g.number)} / ${CRITERIA.length}</span>` : '<span class="mk-flag">Not marked</span>';
+      const draft = editable(g.number) && drafts.get(g.number)?.by === data.me.email;
+      const status = changed.has(g.number)
+        ? '<span class="mk-flag warn">Members changed since marked</span>'
+        : done
+          ? `<span class="mk-flag ok">Marked${m!.by ? ` by ${esc(m!.by)}` : ''}</span>`
+          : markCount(g.number)
+            ? `<span class="mk-flag">Started · ${markCount(g.number)} / ${CRITERIA.length}</span>`
+            : '<span class="mk-flag">Not marked</span>';
       return `<tr>
         <th scope="row" class="mono">${g.number}</th>
         <td>${esc(taOf(g.number)) || '<span class="faint">—</span>'}</td>
         <td class="mk-members">${g.members.map((x) => esc(x.name)).join(', ')}</td>
         <td class="mk-idea">${esc(g.idea) || '<span class="faint">—</span>'}</td>
-        <td class="mono">${t && t.grade ? `${fmt(t.total)}` : '–'}</td>
-        <td>${t && t.grade ? `<span class="mk-grade" data-g="${t.grade}">${t.grade}</span>` : ''}</td>
-        <td>${status}</td>
+        <td class="mono">${done ? fmt(t!.total) : '–'}</td>
+        <td>${done ? `<span class="mk-grade" data-g="${t!.grade}">${t!.grade}</span>` : ''}</td>
+        <td>${status}${draft ? ' <span class="mk-flag draft">Unsaved draft</span>' : ''}</td>
         <td><button type="button" class="btn btn-sm ${editable(g.number) ? 'btn-primary' : 'btn-ghost'}" data-mk-open="${g.number}">${editable(g.number) ? (m ? 'Edit' : 'Mark') : 'View'}</button></td>
       </tr>`;
     });
     $('[data-mk-rows]').innerHTML = rows.join('') || `<tr><td colspan="8" class="faint">No groups here.</td></tr>`;
   }
 
-  /* ------------------------------------------------------------------ the marking form + assistant */
+  /* ------------------------------------------------------------------ the marking form */
   const dlg = $<HTMLDialogElement>('[data-mk-dlg]');
+  const panel = $('[data-mk-assist]');
+  const aside = $('[data-mk-aside]');
+  const narrow = window.matchMedia('(max-width: 879px)');
+  const commentBox = () => $<HTMLTextAreaElement>('[data-mk-comment]');
+  const inputOf = (id: CriterionId) => root.querySelector<HTMLInputElement>(`[data-mk-in="${id}"]`)!;
   let current = 0;
-  let ticked = new Set<string>();
-  const averages = () => {
-    const out: Partial<Record<CriterionId, number>> = {};
-    for (const c of CRITERIA) {
-      const vals = Object.values(data.doc.marks).map((m) => m.scores[c.id]).filter((v): v is number => typeof v === 'number');
-      if (vals.length) out[c.id] = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100;
-    }
-    return out;
+  let active: CriterionId = 'uc_actors';
+  /** the assistant's answers per criterion (saved with the marks) */
+  let help: Help = {};
+  /** criteria whose mark the TA typed: the assistant suggests but does not overwrite them */
+  let manual = new Set<CriterionId>();
+  /** the sentences the assistant put in the comment, per criterion; sentences the TA removed stay out */
+  let auto = new Map<CriterionId, string[]>();
+  let dismissed = new Set<string>();
+  let draftTimer = 0;
+
+  const average = (id: CriterionId, groups?: readonly number[]) => {
+    const vals = (groups ? groups.map((g) => marksOf(g)) : Object.values(data.doc.marks)).map((m) => m?.scores[id]).filter((v): v is number => typeof v === 'number');
+    return vals.length ? { avg: Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100, n: vals.length } : null;
   };
+
   function openGroup(n: number) {
     current = n;
-    ticked = new Set();
     const g = data.groups.find((x) => x.number === n)!;
     const m = marksOf(n);
     const can = editable(n);
-    const avg = averages();
+    const draft = can ? drafts.get(n) : null;
+    const use = draft && draft.by === data.me.email ? draft : null;
+    help = JSON.parse(JSON.stringify(use?.help ?? m?.help ?? {})) as Help;
     const change = data.changes.find((c) => c.group === n);
     $('[data-mk-d-title]').textContent = `Group ${n}${g.idea ? ` · ${g.idea}` : ''}`;
     $('[data-mk-d-meta]').innerHTML = `${esc(taOf(n)) ? `TA: <b>${esc(taOf(n))}</b> · ` : ''}${g.members.map((x) => `${esc(x.name)} <span class="mono faint">${esc(x.id)}</span>`).join(' · ')}${change ? `<br><span class="mk-flag warn">Members changed since it was marked: +${change.added.length} / −${change.removed.length}. Check the group before you save.</span>` : ''}${m?.at ? `<br><span class="faint">Last saved ${esc(when(m.at))}${m.by ? ` by ${esc(m.by)}` : ''}</span>` : ''}`;
+    aside.append(panel);
     $('[data-mk-form]').innerHTML = SECTIONS.map((s) => `
       <fieldset class="mk-sec">
         <legend><span>${esc(s.title)}</span><span class="mono" data-mk-sub="${s.id}"></span></legend>
-        ${CRITERIA.filter((c) => c.section === s.id).map((c) => `
-          <label class="mk-crit">
-            <span class="mk-crit-l">${esc(c.label)}<small class="faint">${avg[c.id] !== undefined ? `class avg ${fmt(avg[c.id])}` : ''}</small></span>
-            <span class="mk-crit-in"><input class="input mono" type="text" inputmode="decimal" autocomplete="off" data-mk-in="${c.id}" value="${m?.scores[c.id] ?? ''}" ${can ? '' : 'disabled'} aria-label="${esc(c.label)}, out of ${c.max}" /><span class="mono faint">/ ${c.max}</span></span>
-          </label>`).join('')}
+        ${CRITERIA.filter((c) => c.section === s.id).map((c) => {
+          const avg = average(c.id);
+          const value = use ? use.scores[c.id] ?? '' : m?.scores[c.id] ?? '';
+          return `
+          <div class="mk-crit" data-mk-row="${c.id}">
+            <label class="mk-crit-l" for="mk-in-${c.id}">${esc(c.label)}<small class="faint">${avg ? `class avg ${fmt(avg.avg)}` : ''}</small></label>
+            <span class="mk-crit-in">
+              <input id="mk-in-${c.id}" class="input mono" type="text" inputmode="decimal" autocomplete="off" data-mk-in="${c.id}" value="${esc(value)}" ${can ? '' : 'disabled'} aria-label="${esc(c.label)}, out of ${c.max}" />
+              <span class="mono faint">/ ${c.max}</span>
+              <button type="button" class="mk-pick" data-mk-pick="${c.id}" aria-label="Grading assistant for ${esc(c.label)}" title="Grading assistant">?</button>
+            </span>
+          </div>`;
+        }).join('')}
       </fieldset>`).join('');
-    const comment = $<HTMLTextAreaElement>('[data-mk-comment]');
-    comment.value = m?.comment ?? '';
-    comment.disabled = !can;
-    comment.maxLength = MAX_COMMENT;
-    $<HTMLButtonElement>('[data-mk-save]').hidden = !can;
+    const box = commentBox();
+    box.value = use ? use.comment : m?.comment ?? '';
+    box.disabled = !can;
+    box.maxLength = MAX_COMMENT;
+    // typed marks stay the TA's own; marks the assistant gave follow its answers
+    manual = new Set(
+      use
+        ? use.manual
+        : CRITERIA.filter((c) => {
+            const v = m?.scores[c.id];
+            return typeof v === 'number' && (!help[c.id] || suggest(c.id, help[c.id]!) !== v);
+          }).map((c) => c.id),
+    );
+    const lines = new Set(box.value.split('\n').map((l) => l.trim()));
+    auto = new Map(CRITERIA.filter((c) => help[c.id]).map((c) => [c.id, explain(c.id, help[c.id]!).filter((x) => lines.has(`• ${x}`))]));
+    dismissed = new Set();
+    root.querySelectorAll<HTMLButtonElement>('[data-mk-save], [data-mk-save-next], [data-mk-full]').forEach((b) => (b.hidden = !can));
     $('[data-mk-ro]').hidden = can;
-    $('[data-mk-check]').innerHTML = SECTIONS.map((s) => `
-      <div class="mk-chk-sec"><p class="mk-chk-h">${esc(s.title)}</p>
-        ${CHECKLIST.filter((i) => CRITERIA.find((c) => c.id === i.criterion)!.section === s.id).map((i) => `
-          <label class="mk-chk"><input type="checkbox" data-mk-tick="${i.id}" ${can ? '' : 'disabled'} /><span>${esc(i.label)}</span><span class="mono faint">${i.deduction ? `−${i.deduction}` : 'note'}</span></label>`).join('')}
-      </div>`).join('');
-    $('[data-mk-rule]').innerHTML = '<span class="faint">Click a mark to see its rule from the brief.</span>';
+    $('[data-mk-hint]').hidden = !can;
+    const bar = $('[data-mk-draft]');
+    bar.hidden = !use;
+    if (use) bar.innerHTML = `Your unsaved changes from ${esc(when(use.at))} are back. <button type="button" class="mk-link" data-mk-discard>Discard them</button>`;
     $('[data-mk-d-msg]').textContent = '';
+    active = CRITERIA.find((c) => cleanScore(inputOf(c.id).value, c.max) === null)?.id ?? 'uc_actors';
     updateTotals();
+    renderAssist();
     if (!dlg.open) dlg.showModal();
-    (root.querySelector<HTMLInputElement>('[data-mk-in]:not([disabled])') ?? $('[data-mk-close]')).focus();
+    dlg.style.setProperty('--mk-head', `${$('.mk-d-head').offsetHeight}px`);
+    (root.querySelector<HTMLInputElement>('[data-mk-in]:not([disabled])') ?? $('[data-mk-close]')).focus({ preventScroll: true });
   }
   function formScores(): Scores {
     const s: Scores = {};
     root.querySelectorAll<HTMLInputElement>('[data-mk-in]').forEach((i) => {
-      const c = CRITERIA.find((x) => x.id === i.dataset.mkIn)!;
+      const c = crit(i.dataset.mkIn as CriterionId);
       const v = cleanScore(i.value, c.max);
       if (v !== null) s[c.id] = v;
     });
@@ -175,74 +269,212 @@ export function initMarking(root: HTMLElement) {
   function updateTotals() {
     const t = totals(formScores());
     for (const s of SECTIONS) $(`[data-mk-sub="${s.id}"]`).textContent = `${fmt(t.sections[s.id])} / ${s.max}`;
-    $('[data-mk-total]').innerHTML = t.grade ? `<b>${fmt(t.total)}</b> / 30 · ${fmt(t.percent)} / 100 · grade <span class="mk-grade" data-g="${t.grade}">${t.grade}</span>` : 'No marks yet';
+    const done = data.groups.filter((g) => g.number !== current && isMarked(g.number));
+    const classAvg = done.length ? done.reduce((a, g) => a + totals(marksOf(g.number)!.scores).total, 0) / done.length : null;
+    $('[data-mk-total]').innerHTML = !t.grade
+      ? 'No marks yet'
+      : t.missing.length
+        ? `<b>${fmt(t.total)}</b> / ${TOTAL_MAX} so far · the grade shows when all ${CRITERIA.length} marks are in`
+        : `<b>${fmt(t.total)}</b> / ${TOTAL_MAX} · ${fmt(t.percent)} / 100 · grade <span class="mk-grade" data-g="${t.grade}">${t.grade}</span>${classAvg !== null ? ` <span class="faint small">· class average ${fmt(classAvg)} / ${TOTAL_MAX}</span>` : ''}`;
     const warn: string[] = [];
-    if (t.missing.length && t.missing.length < CRITERIA.length) warn.push(`${t.missing.length} mark${t.missing.length === 1 ? '' : 's'} still empty: ${t.missing.map((id) => CRITERIA.find((c) => c.id === id)!.label).join(', ')}.`);
+    if (t.missing.length && t.missing.length < CRITERIA.length) warn.push(`${t.missing.length} mark${t.missing.length === 1 ? '' : 's'} still empty: ${t.missing.map((id) => crit(id).label).join(', ')}.`);
     root.querySelectorAll<HTMLInputElement>('[data-mk-in]').forEach((i) => {
-      const c = CRITERIA.find((x) => x.id === i.dataset.mkIn)!;
+      const c = crit(i.dataset.mkIn as CriterionId);
       const raw = i.value.trim();
       const v = cleanScore(raw, c.max);
       const bad = raw !== '' && (v === null || Number(raw.replace(',', '.')) !== v);
       i.setAttribute('aria-invalid', String(bad));
       if (bad) warn.push(`${c.label}: “${raw}” is saved as ${v === null ? 'empty' : v} (0 to ${c.max}).`);
+      i.closest('.mk-crit')?.toggleAttribute('data-active', c.id === active);
     });
-    if (!$<HTMLTextAreaElement>('[data-mk-comment]').value.trim() && !t.missing.length) warn.push('The comment is empty: students learn most from it.');
+    if (!commentBox().value.trim() && !t.missing.length) warn.push('The comment is empty: students learn most from it.');
     $('[data-mk-warn]').innerHTML = warn.map((w) => `<li>${esc(w)}</li>`).join('');
-    $('[data-mk-count]').textContent = `${$<HTMLTextAreaElement>('[data-mk-comment]').value.length} / ${MAX_COMMENT}`;
+    $('[data-mk-count]').textContent = `${commentBox().value.length} / ${MAX_COMMENT}`;
   }
-  function tick(id: string, on: boolean) {
-    const item = CHECKLIST.find((i) => i.id === id)!;
-    const c = CRITERIA.find((x) => x.id === item.criterion)!;
-    const input = root.querySelector<HTMLInputElement>(`[data-mk-in="${c.id}"]`)!;
-    const now = cleanScore(input.value, c.max);
-    if (item.deduction) {
-      const base = now ?? c.max;
-      const next = on ? Math.max(0, base - item.deduction) : Math.min(c.max, base + item.deduction);
-      input.value = String(Math.round(next * 100) / 100);
-    }
-    const box = $<HTMLTextAreaElement>('[data-mk-comment]');
-    const line = `• ${item.sentence}`;
-    if (on && !box.value.includes(item.sentence)) box.value = `${box.value.trim() ? `${box.value.trim()}\n` : ''}${line}`;
-    if (!on) box.value = box.value.split('\n').filter((l) => l.trim() !== line).join('\n');
-    on ? ticked.add(id) : ticked.delete(id);
+
+  /* ------------------------------------------------------------------ the grading assistant */
+  function question(q: Question, a: Answers, dis: string) {
+    const id = `mk-q-${active}-${q.key}`;
+    if (q.kind === 'count') return `<label class="mk-q" for="${id}"><span>${esc(q.label)}</span><input id="${id}" class="input mono" type="number" min="0" max="${q.max}" step="1" inputmode="numeric" data-mk-q="${q.key}" data-kind="count" value="${esc(a[q.key] ?? '')}" ${dis} /></label>`;
+    if (q.kind === 'yes') return `<label class="mk-q mk-q-yes"><input type="checkbox" data-mk-q="${q.key}" data-kind="yes" ${a[q.key] === true ? 'checked' : ''} ${dis} /><span>${esc(q.label)}</span><span class="mono faint">${q.deduction ? `−${q.deduction}` : 'note'}</span></label>`;
+    return `<fieldset class="mk-q mk-q-level"><legend>${esc(q.label)}</legend><div class="mk-seg">${LEVELS.map((l) => `<label><input type="radio" name="mk-q-${active}" value="${l}" data-mk-q="${q.key}" data-kind="level" ${a[q.key] === l ? 'checked' : ''} ${dis} /><span>${esc(q.options[l])}<b class="mono">${LEVEL_MARK[l]}</b></span></label>`).join('')}</div></fieldset>`;
+  }
+  function renderAssist() {
+    const c = crit(active);
+    const i = CRITERIA.findIndex((x) => x.id === active);
+    const section = SECTIONS.find((s) => s.id === c.section)!;
+    const dis = editable(current) ? '' : 'disabled';
+    const cls = average(active);
+    const own = mine() ? average(active, mine()!.groups.filter((g) => g !== current)) : null;
+    panel.innerHTML = `
+      <div class="mk-as-nav">
+        <button type="button" class="mk-step" data-mk-step="-1" ${i === 0 ? 'disabled' : ''} aria-label="Previous criterion">←</button>
+        <div><p class="mk-as-k mono">${i + 1} / ${CRITERIA.length} · ${esc(section.title)}</p><p class="mk-as-t">${esc(c.label)} <span class="mono faint">/ ${c.max}</span></p></div>
+        <button type="button" class="mk-step" data-mk-step="1" ${i === CRITERIA.length - 1 ? 'disabled' : ''} aria-label="Next criterion">→</button>
+      </div>
+      <p class="mk-rule small">${esc(RULES[active])}</p>
+      <div class="mk-qs">${HELPERS[active].map((q) => question(q, help[active] ?? {}, dis)).join('')}</div>
+      <div class="mk-as-out" aria-live="polite" data-mk-out></div>
+      <div data-mk-say></div>
+      <p class="mk-as-avg small faint">${cls ? `Class average ${fmt(cls.avg)} / ${c.max} (${plural(cls.n, 'group')})` : 'No marks for this yet in the class.'}${own ? ` · your groups ${fmt(own.avg)}` : ''}</p>`;
+    renderOut();
+    placePanel();
     updateTotals();
   }
-  async function save() {
-    const btn = $<HTMLButtonElement>('[data-mk-save]');
-    btn.disabled = true;
+  /** the suggestion and the sentences only, so typing in a question keeps its focus */
+  function renderOut() {
+    const c = crit(active);
+    const a = help[active] ?? {};
+    const s = suggest(active, a);
+    const now = cleanScore(inputOf(active).value, c.max);
+    $('[data-mk-out]').innerHTML =
+      s === null
+        ? '<span class="faint">Answer the questions to get a suggested mark.</span>'
+        : now === s
+          ? `<span>Suggested <b class="mono">${fmt(s)}</b> / ${c.max}</span><span class="mk-flag ok">In the form</span>`
+          : `<span>Suggested <b class="mono">${fmt(s)}</b> / ${c.max}</span>${editable(current) ? `<button type="button" class="btn btn-primary btn-sm" data-mk-use>Use ${fmt(s)}</button>` : ''}${now !== null ? `<span class="small faint">The form has ${fmt(now)}${manual.has(active) ? ' (typed by you, kept until you press Use)' : ''}.</span>` : ''}`;
+    const say = explain(active, a).filter((x) => !dismissed.has(x));
+    $('[data-mk-say]').innerHTML = say.length ? `<p class="mk-chk-h">In the comment</p><ul class="mk-say">${say.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+  }
+  /** desktop: the assistant sits beside the form; phones: right under the criterion it is about */
+  function placePanel() {
+    if (narrow.matches) root.querySelector(`[data-mk-row="${active}"]`)?.after(panel);
+    else if (panel.parentElement !== aside) aside.append(panel);
+  }
+  function select(id: CriterionId) {
+    if (id === active && panel.innerHTML) return;
+    active = id;
+    renderAssist();
+  }
+  function setMark(id: CriterionId, v: number) {
+    inputOf(id).value = String(v);
+  }
+  function answer(key: string, value: Answers[string]) {
+    const a = { ...(help[active] ?? {}) };
+    if (value === undefined || value === '' || (typeof value === 'number' && !Number.isFinite(value))) delete a[key];
+    else a[key] = value;
+    if (Object.keys(a).length) help[active] = a;
+    else delete help[active];
+    const s = suggest(active, a);
+    if (s !== null && !manual.has(active)) setMark(active, s);
+    syncComment(active);
+    updateTotals();
+    renderOut();
+    saveDraft();
+  }
+  /**
+   * The comment keeps the TA's own lines first, then the assistant's sentences in rubric order. A sentence the TA
+   * deleted or rewrote is not added again.
+   */
+  function syncComment(changed?: CriterionId) {
+    const box = commentBox();
+    const lines = box.value.split('\n');
+    const present = new Set(lines.map((l) => l.trim()));
+    const ours = new Set<string>();
+    for (const [id, list] of auto) {
+      const kept = list.filter((x) => present.has(`• ${x}`));
+      for (const x of list) if (!kept.includes(x)) dismissed.add(x);
+      for (const x of kept) ours.add(`• ${x}`);
+      auto.set(id, kept);
+    }
+    if (changed) auto.set(changed, explain(changed, help[changed] ?? {}).filter((x) => !dismissed.has(x)));
+    const own = lines.filter((l) => !ours.has(l.trim()));
+    while (own.length && !own[own.length - 1].trim()) own.pop();
+    const ownSet = new Set(own.map((l) => l.trim()));
+    const add: string[] = [];
+    for (const c of CRITERIA) for (const x of auto.get(c.id) ?? []) if (!ownSet.has(`• ${x}`) && !add.includes(`• ${x}`)) add.push(`• ${x}`);
+    box.value = [...own, ...add].join('\n').slice(0, MAX_COMMENT);
+  }
+
+  /* ------------------------------------------------------------------ drafts, save */
+  function snapshot(): Draft {
+    const scores: Draft['scores'] = {};
+    root.querySelectorAll<HTMLInputElement>('[data-mk-in]').forEach((i) => {
+      if (i.value.trim()) scores[i.dataset.mkIn as CriterionId] = i.value.trim();
+    });
+    return { by: data.me.email, at: new Date().toISOString(), scores, comment: commentBox().value, help, manual: [...manual] };
+  }
+  function writeDraft() {
+    window.clearTimeout(draftTimer);
+    if (!current || !editable(current)) return;
+    const m = marksOf(current);
+    const s = formScores();
+    const same = CRITERIA.every((c) => s[c.id] === m?.scores[c.id]) && commentBox().value.trim() === (m?.comment ?? '').trim();
+    if (same) drafts.del(current);
+    else drafts.set(current, snapshot());
+  }
+  function saveDraft() {
+    window.clearTimeout(draftTimer);
+    draftTimer = window.setTimeout(writeDraft, 300);
+  }
+  function nextGroup(): number | null {
+    const list = visibleGroups().map((g) => g.number).filter(editable);
+    const i = list.indexOf(current);
+    return [...list.slice(i + 1), ...list.slice(0, Math.max(0, i))].find((n) => !isMarked(n) && n !== current) ?? null;
+  }
+  async function save(next = false) {
+    const btns = root.querySelectorAll<HTMLButtonElement>('[data-mk-save], [data-mk-save-next]');
+    btns.forEach((b) => (b.disabled = true));
+    window.clearTimeout(draftTimer);
+    const saved = current;
     try {
-      const j = await api({ action: 'marks', group: current, scores: formScores(), comment: $<HTMLTextAreaElement>('[data-mk-comment]').value });
+      const j = await api({ action: 'marks', group: saved, scores: formScores(), comment: commentBox().value, help });
       data.doc = j.doc;
-      data.changes = data.changes.filter((c) => c.group !== current);
-      $('[data-mk-d-msg]').textContent = `Saved ${new Date().toLocaleTimeString([], { timeStyle: 'short' })}.`;
+      drafts.del(saved);
+      data.changes = data.changes.filter((c) => c.group !== saved);
       renderMarks();
       renderSummary();
+      if (next) {
+        const n = nextGroup();
+        if (n === null) {
+          dlg.close();
+          say(`Saved group ${saved}. Every group in this list is marked.`, 'ok');
+        } else {
+          openGroup(n);
+          $('[data-mk-d-msg]').textContent = `Saved group ${saved}.`;
+        }
+      } else $('[data-mk-d-msg]').textContent = `Saved ${time(new Date().toISOString())}.`;
     } catch (error) {
       $('[data-mk-d-msg]').textContent = (error as Error).message;
     } finally {
-      btn.disabled = false;
+      btns.forEach((b) => (b.disabled = false));
     }
   }
 
   /* ------------------------------------------------------------------ upload */
-  function showPreview(rows: ParsedRow[], warnings: string[]) {
+  const hasData = (r: ParsedRow) => Object.keys(r.scores).length > 0 || r.comment !== '';
+  function showPreview(rows: ParsedRow[], warnings: string[], file: string) {
     preview = rows;
     const box = $('[data-mk-preview]');
     const known = new Set(data.groups.map((g) => g.number));
-    const marked = rows.filter((r) => Object.keys(r.scores).length);
-    const lines = marked.map((r) => {
-      const t = totals(r.scores);
-      const why = !known.has(r.group) ? 'not a group of this item' : !editable(r.group) ? 'not one of your groups: skipped' : marksOf(r.group) ? 'replaces the saved marks' : 'new';
-      return `<tr><th scope="row" class="mono">${r.group}</th><td>${esc(r.ta)}</td><td class="mono">${fmt(t.total)} / 30</td><td><span class="mk-grade" data-g="${t.grade}">${t.grade}</span></td><td class="faint">${esc(r.sheet)}</td><td>${esc(why)}</td></tr>`;
+    const withData = rows.filter(hasData);
+    const ok = (r: ParsedRow) => known.has(r.group) && editable(r.group);
+    const lines = withData.map((r) => {
+      const after = totals({ ...(ok(r) ? marksOf(r.group)?.scores : {}), ...r.scores });
+      const count = CRITERIA.length - after.missing.length;
+      const why = !known.has(r.group) ? 'Not a group of this item: skipped' : !editable(r.group) ? 'Not one of your groups: skipped' : marksOf(r.group) ? 'Updates the saved marks' : 'New';
+      return `<tr><th scope="row" class="mono">${r.group}</th><td>${esc(r.ta) || '<span class="faint">—</span>'}</td><td class="mono">${Object.keys(r.scores).length} / ${CRITERIA.length}</td><td class="mono">${!ok(r) || !after.grade ? '–' : after.missing.length ? `${fmt(after.total)} so far` : `${fmt(after.total)} <span class="mk-grade" data-g="${after.grade}">${after.grade}</span>`}</td><td>${r.comment ? 'Yes' : '<span class="faint">—</span>'}</td><td>${esc(why)}${ok(r) && count < CRITERIA.length ? ` <span class="mk-flag">${count} / ${CRITERIA.length} marks after import</span>` : ''}</td></tr>`;
     });
-    const importable = marked.filter((r) => known.has(r.group) && editable(r.group)).length;
+    const importable = withData.filter(ok).length;
     box.hidden = false;
     box.innerHTML = `
-      <p><b>${marked.length}</b> group${marked.length === 1 ? '' : 's'} with marks in the file · <b>${importable}</b> you can import${rows.length > marked.length ? ` · ${rows.length - marked.length} without marks yet` : ''}.</p>
-      ${warnings.map((w) => `<p class="mk-flag warn">${esc(w)}</p>`).join('')}
-      ${lines.length ? `<div class="mk-tablewrap"><table class="mk-table"><thead><tr><th>Group</th><th>TA in the file</th><th>Total</th><th>Grade</th><th>Sheet</th><th>What happens</th></tr></thead><tbody>${lines.join('')}</tbody></table></div>` : ''}
+      <p><b>${esc(file)}</b>: ${plural(withData.length, 'group')} with marks or comments · <b>${importable}</b> you can import${rows.length > withData.length ? ` · ${rows.length - withData.length} still empty` : ''}. Empty cells keep the saved marks.</p>
+      ${warnings.length ? `<ul class="mk-warn mk-warn-box">${warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+      ${lines.length ? `<div class="mk-tablewrap"><table class="mk-table"><thead><tr><th>Group</th><th>TA in the file</th><th>Marks</th><th>Total after</th><th>Comment</th><th>What happens</th></tr></thead><tbody>${lines.join('')}</tbody></table></div>` : ''}
       ${admin() && rows.some((r) => r.ta) ? '<label class="mk-loadchk"><input type="checkbox" data-mk-useload /> Also set the marking load from this file’s “Assigned TA” column</label>' : ''}
-      <div class="mk-actions"><button type="button" class="btn btn-primary btn-sm" data-mk-import ${importable ? '' : 'disabled'}>Import ${importable} group${importable === 1 ? '' : 's'}</button><button type="button" class="btn btn-ghost btn-sm" data-mk-cancel>Cancel</button></div>`;
+      <div class="mk-actions"><button type="button" class="btn btn-primary btn-sm" data-mk-import ${importable ? '' : 'disabled'}>Import ${plural(importable, 'group')}</button><button type="button" class="btn btn-ghost btn-sm" data-mk-cancel>Cancel</button></div>`;
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  async function readFile(f: File) {
+    try {
+      if (f.size > 5 * 1024 * 1024) throw new Error('This file is too big (over 5 MB) for a marking sheet.');
+      const out = parseMarkingFile(new Uint8Array(await f.arrayBuffer()), f.name);
+      if (!out.rows.length) throw new Error(out.warnings[0] ?? 'No marking rows were found in this file.');
+      say('');
+      showPreview(out.rows, out.warnings, f.name);
+    } catch (error) {
+      say((error as Error).message, 'err');
+    }
   }
   async function doImport() {
     if (!preview) return;
@@ -253,10 +485,11 @@ export function initMarking(root: HTMLElement) {
         const j = await api({ action: 'load-rows', rows: preview.map((r) => ({ group: r.group, ta: r.ta })) });
         data.doc = j.doc;
       }
-      const j = await api({ action: 'import', rows: preview.filter((r) => Object.keys(r.scores).length || r.comment).map((r) => ({ group: r.group, ta: r.ta, scores: r.scores, comment: r.comment })) });
+      const rows = preview.filter(hasData).map((r) => ({ group: r.group, ta: r.ta, scores: r.scores, comment: r.comment }));
+      const j = await api({ action: 'import', rows });
       data.doc = j.doc;
-      const skipped = (j.skipped as { group: number; reason: string }[]).filter((s) => preview!.some((r) => r.group === s.group && Object.keys(r.scores).length));
-      say(`Imported ${j.imported.length} group${j.imported.length === 1 ? '' : 's'}${j.imported.length ? ` (${j.imported.join(', ')})` : ''}.${skipped.length ? ` Skipped ${skipped.length}: ${skipped.map((s) => `${s.group}`).join(', ')} (not your groups or no marks).` : ''}`, 'ok');
+      const skipped = j.skipped as { group: number; reason: string }[];
+      say(`Imported ${plural(j.imported.length, 'group')}${j.imported.length ? ` (${j.imported.join(', ')})` : ''}.${skipped.length ? ` Skipped ${skipped.length}: ${skipped.map((s) => s.group).join(', ')} (not your groups, not in this item, or empty).` : ''}`, 'ok');
       preview = null;
       $('[data-mk-preview]').hidden = true;
       render();
@@ -269,59 +502,86 @@ export function initMarking(root: HTMLElement) {
   /* ------------------------------------------------------------------ marking load */
   function renderLoad() {
     const all = data.groups.map((g) => g.number);
+    const known = new Set(all);
     const count = new Map<number, number>();
     for (const t of data.doc.tas) for (const g of t.groups) count.set(g, (count.get(g) ?? 0) + 1);
     const none = all.filter((g) => !count.get(g));
     const twice = [...count].filter(([, c]) => c > 1).map(([g]) => g);
+    const extra = [...count.keys()].filter((g) => !known.has(g)).sort((a, b) => a - b);
+    const account = (email: string | null) => (email ? data.staff.find((s) => s.email === email)?.name ?? email : null);
     const rows = data.doc.tas.map((t, i) => {
       const marked = t.groups.filter(isMarked).length;
+      const linkedElsewhere = t.email && !data.staff.some((s) => s.email === t.email);
       return `<tr>
         <td>${admin() ? `<input class="input" data-mk-ta-name="${i}" value="${esc(t.name)}" aria-label="TA name" />` : esc(t.name)}</td>
-        <td>${admin() ? `<select class="input mk-select" data-mk-ta-email="${i}" aria-label="Account of ${esc(t.name)}"><option value="">— not linked —</option>${data.staff.map((s) => `<option value="${esc(s.email)}" ${s.email === t.email ? 'selected' : ''}>${esc(s.name)} · ${esc(s.email)}</option>`).join('')}</select>` : t.email ? esc(data.staff.find((s) => s.email === t.email)?.name ?? t.email) : '<span class="faint">not linked</span>'}</td>
+        <td>${admin() ? `<select class="input mk-select" data-mk-ta-email="${i}" aria-label="Account of ${esc(t.name)}"><option value="">— not linked —</option>${linkedElsewhere ? `<option value="${esc(t.email)}" selected>${esc(t.email)} (not an active staff account)</option>` : ''}${data.staff.map((s) => `<option value="${esc(s.email)}" ${s.email === t.email ? 'selected' : ''}>${esc(s.name)} · ${esc(s.email)}</option>`).join('')}</select>` : t.email ? esc(account(t.email)) : '<span class="faint">not linked</span>'}</td>
         <td>${admin() ? `<input class="input mono" data-mk-ta-groups="${i}" value="${esc(t.groups.join(', '))}" aria-label="Groups of ${esc(t.name)}" />` : `<span class="mono">${esc(t.groups.join(', '))}</span>`}</td>
         <td class="mono">${t.groups.length}</td>
         <td><div class="mk-meter" title="${marked} of ${t.groups.length} marked"><i style="--w:${t.groups.length ? (marked / t.groups.length) * 100 : 0}%"></i></div><span class="mono faint">${marked} / ${t.groups.length}</span></td>
+        <td class="mk-dl"><a href="${exportUrl({ ta: t.name })}" download>Excel</a> · <a href="${exportUrl({ ta: t.name, format: 'csv' })}" download>CSV</a></td>
         ${admin() ? `<td><button type="button" class="btn btn-ghost btn-sm" data-mk-ta-del="${i}" aria-label="Remove ${esc(t.name)}">Remove</button></td>` : ''}
       </tr>`;
     });
     $('[data-mk-load]').innerHTML = `
-      <div class="mk-tablewrap"><table class="mk-table">
-        <thead><tr><th>TA</th><th>Account</th><th>Groups</th><th>Count</th><th>Marked</th>${admin() ? '<th></th>' : ''}</tr></thead>
-        <tbody>${rows.join('') || `<tr><td colspan="6" class="faint">No marking load yet. ${admin() ? 'Upload the marking sheet on the Marks tab and tick “Also set the marking load”, or add the TAs here.' : 'An admin sets it.'}</td></tr>`}</tbody>
+      <p class="mk-note">${data.loadSaved ? 'The marking load as saved by an admin.' : 'The team’s marking load (from the TA list) is in use. It is saved with the first marks or when an admin saves it here.'} Each row is linked to a staff account by first name when exactly one account has that name; an admin can change the link.</p>
+      <div class="mk-tablewrap"><table class="mk-table mk-loadt">
+        <thead><tr><th>TA</th><th>Account</th><th>Groups</th><th>Count</th><th>Marked</th><th>Sheet</th>${admin() ? '<th></th>' : ''}</tr></thead>
+        <tbody>${rows.join('') || `<tr><td colspan="7" class="faint">No marking load yet. ${admin() ? 'Add the TAs here.' : 'An admin sets it.'}</td></tr>`}</tbody>
       </table></div>
       ${admin() ? '<div class="mk-actions"><button type="button" class="btn btn-ghost btn-sm" data-mk-ta-add>Add a TA</button><button type="button" class="btn btn-primary btn-sm" data-mk-ta-save>Save the marking load</button></div>' : ''}
-      ${none.length ? `<p class="mk-flag warn">Groups with no TA: ${none.join(', ')}</p>` : data.doc.tas.length ? '<p class="mk-flag ok">Every group has a TA.</p>' : ''}
+      ${none.length ? `<p class="mk-flag warn">Groups with no TA: ${none.join(', ')}</p>` : data.doc.tas.length ? `<p class="mk-flag ok">Every group (${all.length}) has a TA.</p>` : ''}
       ${twice.length ? `<p class="mk-flag warn">Groups in two rows: ${twice.join(', ')}</p>` : ''}
+      ${extra.length && all.length ? `<p class="mk-flag warn">In the load but not groups of this item: ${extra.join(', ')}</p>` : ''}
       ${admin() ? `<label class="mk-loadchk"><input type="checkbox" data-mk-unlock ${data.doc.unlocked ? 'checked' : ''} /> Allow renumbering groups on the Groups page while marks exist (not recommended: marks are saved by group number)</label>` : ''}
       <details class="mk-numbers"><summary>Numbers check: every group with its members (compare with the proposal report)</summary>
-        <div class="mk-tablewrap"><table class="mk-table"><thead><tr><th>Group</th><th>Members</th></tr></thead><tbody>${data.groups.map((g) => `<tr><th scope="row" class="mono">${g.number}</th><td>${g.members.map((m) => `${esc(m.name)} <span class="mono faint">${esc(m.id)}</span>`).join(' · ')}</td></tr>`).join('')}</tbody></table></div>
+        <div class="mk-tablewrap"><table class="mk-table"><thead><tr><th>Group</th><th>TA</th><th>Members</th></tr></thead><tbody>${data.groups.map((g) => `<tr><th scope="row" class="mono">${g.number}</th><td>${esc(taOf(g.number)) || '<span class="faint">—</span>'}</td><td>${g.members.map((m) => `${esc(m.name)} <span class="mono faint">${esc(m.id)}</span>`).join(' · ')}</td></tr>`).join('')}</tbody></table></div>
       </details>`;
   }
   function readLoad() {
     return data.doc.tas.map((t, i) => ({
       name: root.querySelector<HTMLInputElement>(`[data-mk-ta-name="${i}"]`)?.value ?? t.name,
       email: root.querySelector<HTMLSelectElement>(`[data-mk-ta-email="${i}"]`)?.value || null,
-      groups: (root.querySelector<HTMLInputElement>(`[data-mk-ta-groups="${i}"]`)?.value ?? t.groups.join(',')).split(/[\s,;]+/).map(Number).filter((n) => Number.isInteger(n) && n > 0),
+      groups: (root.querySelector<HTMLInputElement>(`[data-mk-ta-groups="${i}"]`)?.value ?? t.groups.join(','))
+        .split(/[\s,;]+/)
+        .map((x) => Number(x.replace(/^g/i, '')))
+        .filter((n) => Number.isInteger(n) && n > 0),
     }));
   }
 
   /* ------------------------------------------------------------------ summary */
   function renderSummary() {
     const total = data.groups.length;
-    const marked = data.groups.filter((g) => isMarked(g.number)).length;
+    const done = data.groups.filter((g) => isMarked(g.number));
     const grades = { A: 0, B: 0, C: 0, D: 0, F: 0 } as Record<string, number>;
-    for (const g of data.groups) if (isMarked(g.number)) grades[totals(marksOf(g.number)!.scores).grade]++;
+    for (const g of done) grades[totals(marksOf(g.number)!.scores).grade]++;
     const max = Math.max(1, ...Object.values(grades));
     const tas = data.doc.tas.map((t) => {
-      const done = t.groups.filter(isMarked);
-      const avg = done.length ? done.reduce((a, g) => a + totals(marksOf(g)!.scores).percent, 0) / done.length : null;
-      return `<tr><th scope="row">${esc(t.name)}</th><td class="mono">${done.length} / ${t.groups.length}</td><td class="mono">${avg === null ? '–' : `${fmt(avg)} %`}</td><td><div class="mk-meter"><i style="--w:${t.groups.length ? (done.length / t.groups.length) * 100 : 0}%"></i></div></td></tr>`;
+      const own = t.groups.filter(isMarked);
+      const avg = own.length ? own.reduce((a, g) => a + totals(marksOf(g)!.scores).percent, 0) / own.length : null;
+      return `<tr><th scope="row">${esc(t.name)}</th><td class="mono">${own.length} / ${t.groups.length}</td><td class="mono">${avg === null ? '–' : `${fmt(avg)} %`}</td><td><div class="mk-meter"><i style="--w:${t.groups.length ? (own.length / t.groups.length) * 100 : 0}%"></i></div></td></tr>`;
     });
+    // consistency: each TA's average per criterion next to the class average; far-off cells are flagged
+    const markers = data.doc.tas.filter((t) => t.groups.some((g) => marksOf(g)));
+    const consistency = markers.length >= 2
+      ? `<h2 class="mk-h2">Marking consistency</h2>
+        <p class="small muted">Each TA’s average mark per criterion. Cells at least 15% of the criterion’s marks away from the class average are flagged: worth a second look, not always wrong.</p>
+        <div class="mk-tablewrap"><table class="mk-table mk-cons"><thead><tr><th>Criterion</th><th>Class</th>${markers.map((t) => `<th>${esc(t.name)}</th>`).join('')}</tr></thead><tbody>${CRITERIA.map((c) => {
+          const cls = average(c.id);
+          return `<tr><th scope="row">${esc(c.label)} <span class="mono faint">/ ${c.max}</span></th><td class="mono">${cls ? fmt(cls.avg) : '–'}</td>${markers
+            .map((t) => {
+              const a = average(c.id, t.groups);
+              const off = a && cls && Math.abs(a.avg - cls.avg) >= 0.15 * c.max;
+              return `<td class="mono${off ? ' mk-off' : ''}"${off ? ` title="${a!.avg > cls!.avg ? 'Above' : 'Below'} the class average by ${fmt(Math.abs(a!.avg - cls!.avg))}"` : ''}>${a ? fmt(a.avg) : '–'}${off ? (a!.avg > cls!.avg ? ' ▲' : ' ▼') : ''}</td>`;
+            })
+            .join('')}</tr>`;
+        }).join('')}</tbody></table></div>`
+      : '';
     $('[data-mk-summary]').innerHTML = `
-      <div class="mk-kpis"><div class="mk-kpi"><span>Marked</span><b>${marked}<small> / ${total}</small></b><div class="mk-meter"><i style="--w:${total ? (marked / total) * 100 : 0}%"></i></div></div>
-      <div class="mk-kpi"><span>Average</span><b>${(() => { const done = data.groups.filter((g) => isMarked(g.number)); return done.length ? `${fmt(done.reduce((a, g) => a + totals(marksOf(g.number)!.scores).percent, 0) / done.length)}<small> %</small>` : '–'; })()}</b></div></div>
+      <div class="mk-kpis"><div class="mk-kpi"><span>Marked</span><b>${done.length}<small> / ${total}</small></b><div class="mk-meter"><i style="--w:${total ? (done.length / total) * 100 : 0}%"></i></div></div>
+      <div class="mk-kpi"><span>Average</span><b>${done.length ? `${fmt(done.reduce((a, g) => a + totals(marksOf(g.number)!.scores).percent, 0) / done.length)}<small> %</small>` : '–'}</b></div></div>
       <div class="mk-grades" role="img" aria-label="Grades: ${Object.entries(grades).map(([g, n]) => `${g} ${n}`).join(', ')}">${Object.entries(grades).map(([g, n]) => `<div class="mk-gbar"><span class="mk-grade" data-g="${g}">${g}</span><i style="--h:${(n / max) * 100}%"></i><b class="mono">${n}</b></div>`).join('')}</div>
-      <div class="mk-tablewrap"><table class="mk-table"><thead><tr><th>TA</th><th>Marked</th><th>Average</th><th>Progress</th></tr></thead><tbody>${tas.join('') || '<tr><td colspan="4" class="faint">No marking load yet.</td></tr>'}</tbody></table></div>`;
+      <div class="mk-tablewrap"><table class="mk-table"><thead><tr><th>TA</th><th>Marked</th><th>Average</th><th>Progress</th></tr></thead><tbody>${tas.join('') || '<tr><td colspan="4" class="faint">No marking load yet.</td></tr>'}</tbody></table></div>
+      ${consistency}`;
   }
 
   function render() {
@@ -347,12 +607,55 @@ export function initMarking(root: HTMLElement) {
       root.querySelectorAll<HTMLElement>('[data-mk-panel]').forEach((p) => (p.hidden = p.dataset.mkPanel !== tab.dataset.mkTab));
       return;
     }
+    const pick = t.closest<HTMLElement>('[data-mk-pick]');
+    if (pick) {
+      select(pick.dataset.mkPick as CriterionId);
+      return panel.querySelector<HTMLElement>('[data-mk-q]:not([disabled]), .mk-step')?.focus();
+    }
+    const step = t.closest<HTMLElement>('[data-mk-step]');
+    if (step) {
+      const i = CRITERIA.findIndex((c) => c.id === active) + Number(step.dataset.mkStep);
+      if (CRITERIA[i]) select(CRITERIA[i].id);
+      (panel.querySelector<HTMLElement>(`[data-mk-step="${step.dataset.mkStep}"]:not([disabled])`) ?? panel.querySelector<HTMLElement>('.mk-step:not([disabled])'))?.focus();
+      if (narrow.matches) panel.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (t.closest('[data-mk-use]')) {
+      const s = suggest(active, help[active] ?? {});
+      if (s !== null) {
+        setMark(active, s);
+        manual.delete(active);
+        updateTotals();
+        renderOut();
+        saveDraft();
+      }
+      return;
+    }
+    if (t.closest('[data-mk-full]')) {
+      for (const c of CRITERIA) if (!inputOf(c.id).value.trim()) setMark(c.id, c.max);
+      updateTotals();
+      renderOut();
+      return saveDraft();
+    }
+    if (t.closest('[data-mk-discard]')) {
+      drafts.del(current);
+      renderMarks();
+      return openGroup(current);
+    }
     if (t.closest('[data-mk-close]')) return dlg.close();
+    if (t.closest('[data-mk-save-next]')) return save(true);
     if (t.closest('[data-mk-save]')) return save();
     if (t.closest('[data-mk-import]')) return doImport();
     if (t.closest('[data-mk-cancel]')) {
       preview = null;
       $('[data-mk-preview]').hidden = true;
+      return;
+    }
+    if (t.closest('[data-mk-copy]')) {
+      navigator.clipboard?.writeText(CSV_HEADER).then(
+        () => say('The CSV header is copied: paste it in the first row of your sheet.', 'ok'),
+        () => say('Copy did not work: select the header text and copy it.', 'err'),
+      );
       return;
     }
     if (t.closest('[data-mk-publish]')) {
@@ -379,6 +682,7 @@ export function initMarking(root: HTMLElement) {
       try {
         const j = await api({ action: 'load', tas: readLoad() });
         data.doc = j.doc;
+        data.loadSaved = true;
         render();
         say('Marking load saved.', 'ok');
       } catch (error) {
@@ -388,14 +692,12 @@ export function initMarking(root: HTMLElement) {
   });
   root.addEventListener('change', async (e) => {
     const t = e.target as HTMLInputElement;
-    if (t.matches('[data-mk-tick]')) return tick(t.dataset.mkTick!, t.checked);
+    if (t.matches('[data-mk-q]')) {
+      const kind = t.dataset.kind;
+      return answer(t.dataset.mkQ!, kind === 'yes' ? t.checked : kind === 'level' ? t.value : t.value === '' ? undefined : Number(t.value));
+    }
     if (t.matches('[data-mk-file]') && t.files?.[0]) {
-      try {
-        const out = parseMarkingWorkbook(new Uint8Array(await t.files[0].arrayBuffer()));
-        showPreview(out.rows, out.warnings);
-      } catch (error) {
-        say((error as Error).message, 'err');
-      }
+      await readFile(t.files[0]);
       t.value = '';
       return;
     }
@@ -420,25 +722,50 @@ export function initMarking(root: HTMLElement) {
     }
   });
   root.addEventListener('input', (e) => {
-    const t = e.target as HTMLElement;
-    if (t.matches('[data-mk-in], [data-mk-comment]')) updateTotals();
-    if (t.matches('[data-mk-in]')) showRule(t.dataset.mkIn as CriterionId);
+    const t = e.target as HTMLInputElement;
+    if (t.matches('[data-mk-q][data-kind="count"]')) return answer(t.dataset.mkQ!, t.value === '' ? undefined : Number(t.value));
+    if (t.matches('[data-mk-in]')) {
+      const id = t.dataset.mkIn as CriterionId;
+      manual.add(id);
+      if (id !== active) select(id);
+      else renderOut();
+    }
+    if (t.matches('[data-mk-in], [data-mk-comment]')) {
+      updateTotals();
+      saveDraft();
+    }
     if (t.matches('[data-mk-search]')) {
-      query = (t as HTMLInputElement).value;
+      query = t.value;
       renderMarks();
     }
   });
-  function showRule(id: CriterionId) {
-    const c = CRITERIA.find((x) => x.id === id)!;
-    $('[data-mk-rule]').innerHTML = `<b>${esc(c.label)}</b> (out of ${c.max}): ${esc(RULES[id])}`;
-  }
   root.addEventListener('focusin', (e) => {
     const id = (e.target as HTMLElement).dataset?.mkIn as CriterionId | undefined;
-    if (id) showRule(id);
+    if (id && dlg.open) select(id);
   });
-  root.addEventListener('pointerdown', (e) => {
-    const id = (e.target as HTMLElement).closest<HTMLElement>('[data-mk-in]')?.dataset.mkIn as CriterionId | undefined;
-    if (id) showRule(id);
+  dlg.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && editable(current)) {
+      e.preventDefault();
+      save(e.shiftKey);
+    }
+  });
+  dlg.addEventListener('close', () => {
+    writeDraft();
+    renderMarks();
+  });
+  narrow.addEventListener('change', () => dlg.open && placePanel());
+  // drop a file anywhere on the upload box
+  const drop = $('.mk-upload');
+  drop.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    drop.dataset.over = '1';
+  });
+  drop.addEventListener('dragleave', () => delete drop.dataset.over);
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    delete drop.dataset.over;
+    const f = e.dataTransfer?.files?.[0];
+    if (f) readFile(f);
   });
   load();
 }

@@ -3,9 +3,11 @@
  * project-files store, and the numbered groups of the item whose numbers are used (the proposal).
  */
 import type { Access } from '@/lib/accounts/access';
+import { getAccountStore } from '@/lib/accounts/server';
 import { buildGroups, cleanPlan, emptyPlan, type Group, type Student } from '@/lib/project-files/groups';
 import type { getFilesStore } from '@/lib/project-files/server';
 import { MARKING_KEY, cleanDoc, type MarkingDoc, type Marker } from './doc';
+import { autoLink, withDefaultLoad } from './defaults';
 
 type Store = NonNullable<ReturnType<typeof getFilesStore>>;
 
@@ -17,6 +19,20 @@ export function markerOf(a: Access): Marker {
   const admin = a.master || a.who.platformRole === 'super_admin' || a.who.platformRole === 'doctor' || moduleRole === 'leader' || moduleRole === 'admin';
   const ta = a.who.platformRole === 'ta' || moduleRole === 'ta';
   return { role: admin ? 'admin' : ta ? 'ta' : 'none', email: a.user?.email ?? null, name: a.by };
+}
+
+export type Staff = { name: string; email: string };
+
+/** Active staff accounts (everyone who is not a student), by name: the accounts a marking-load row can link to. */
+export async function staffList(): Promise<Staff[]> {
+  const users = (await getAccountStore()?.list().catch(() => [])) ?? [];
+  return users.filter((u) => u.active && u.role !== 'student').map((u) => ({ name: u.name, email: u.email.toLowerCase() })).sort((x, y) => x.name.localeCompare(y.name));
+}
+
+/** The document as everyone sees it: the team's default load until an admin saves one, rows linked to accounts by first name. */
+export function prepared(doc: MarkingDoc, staff: readonly Staff[]): MarkingDoc {
+  const d = withDefaultLoad(doc);
+  return { ...d, tas: autoLink(d.tas, staff) };
 }
 
 export const loadMarking = async (store: Store): Promise<MarkingDoc> => cleanDoc(await store.getGroupData<unknown>(MARKING_KEY));
