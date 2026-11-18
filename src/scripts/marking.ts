@@ -61,8 +61,8 @@ const drafts = {
 
 export function initMarking(root: HTMLElement) {
   let data: Data;
+  // every TA sees and may mark every group, so the list opens on All ("My groups" is one click away)
   let filter: 'mine' | 'all' | 'todo' | 'done' = 'all';
-  let firstLoad = true;
   let query = '';
   let preview: ParsedRow[] | null = null;
   const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
@@ -82,8 +82,6 @@ export function initMarking(root: HTMLElement) {
     try {
       data = await api();
       if (!buildsWired) { buildsWired = true; wireAppBuilds($('[data-mk-builds]'), project); }
-      if (firstLoad && myGroups().length) filter = 'mine';
-      firstLoad = false;
       render();
     } catch (error) {
       say((error as Error).message, 'err');
@@ -232,7 +230,7 @@ export function initMarking(root: HTMLElement) {
     help = JSON.parse(JSON.stringify(use?.help ?? m?.help ?? {})) as Help;
     const change = data.changes.find((c) => c.group === n);
     $('[data-mk-d-title]').textContent = `Group ${n}${g.idea ? ` · ${g.idea}` : ''}`;
-    $('[data-mk-d-meta]').innerHTML = `${esc(taOf(n)) ? `TA: <b>${esc(taOf(n))}</b> · ` : ''}${g.members.map((x) => `${esc(x.name)} <span class="mono faint">${esc(x.id)}</span>`).join(' · ')}${change ? `<br><span class="mk-flag warn">Members changed since it was marked: +${change.added.length} / −${change.removed.length}. Check the group before you save.</span>` : ''}${m?.at ? `<br><span class="faint">Last saved ${esc(when(m.at))}${m.by ? ` by ${esc(m.by)}` : ''}${(m.editors?.length ?? 0) > 1 ? ` · marked by ${esc(markers(m))}` : ''}</span>` : ''}<span data-mk-d-call></span>`;
+    $('[data-mk-d-meta]').innerHTML = `${esc(taOf(n)) ? `TA: <b>${esc(taOf(n))}</b> · ` : ''}${g.members.map((x) => `${esc(x.name)} <span class="mono faint">${esc(x.id)}</span>`).join(' · ')}${change ? `<br><span class="mk-flag warn">Members changed since it was marked: +${change.added.length} / −${change.removed.length}. Check the group before you save.</span>` : ''}${m?.at ? `<br><span class="faint">Last saved ${esc(when(m.at))}${m.by ? ` by ${esc(m.by)}` : ''}${(m.editors?.length ?? 0) > 1 ? ` · marked by ${esc(markers(m))}` : ''}</span>` : ''}${can && taOf(n) && taOf(n) !== mine()?.name ? `<br><span class="mk-flag">This is ${esc(taOf(n))}’s group. You can change it: your save is recorded and your name is added to “Marked by”.</span>` : ''}<span data-mk-d-call></span>`;
     showCall(n);
     aside.append(panel);
     $('[data-mk-form]').innerHTML = SECTIONS.map((s) => `
