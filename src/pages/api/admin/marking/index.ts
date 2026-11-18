@@ -1,7 +1,7 @@
 /**
  * Admin → Marking (Phase 1).
  *   GET   { doc, me, files, groups, staff, changes, loadSaved }   everyone with submissions access (TAs see every group)
- *   PUT   { action: 'marks', group, scores, comment, help }   a TA for the groups of their load row; admins any group
+ *   PUT   { action: 'marks', group, scores, comment, help }   any TA or admin, any group (each save records who made it)
  *         { action: 'call', group, on }   the AI button: call the group to discuss its project (students see only the call)
  *         { action: 'import', rows: [{ group, ta, scores, comment }] }   rows read from a marking workbook
  *         { action: 'source', fileId }                  admin: the item whose group numbers are used

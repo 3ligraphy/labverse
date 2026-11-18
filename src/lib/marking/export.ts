@@ -8,11 +8,11 @@ import { CRITERIA, totals } from './rubric.ts';
 import type { MarkingDoc, TA } from './doc.ts';
 
 const HEADER: XCell[][] = [
-  ['Group', 'Assigned TA', 'Use Case Diagram', null, null, null, 'Activity Diagram', null, null, 'UI Design & Implementation', 'Architecture / Design Pattern', null, null, null, 'Total (/30)', 'Total (/100)', 'Grade', 'Comments'],
-  [null, null, 'Actors', 'Correct logic', 'Mapping to functional reqs', 'Subtotal', 'Functional reqs included', 'Correct & logical flow', 'Subtotal', 'Screens (1 each, 9 screens)', 'Pattern selected', 'Correct implementation in structure', 'Reasoning', 'Subtotal', null, null, null, null],
-  [null, null, 1, 1.5, 5, 7.5, 5, 2.5, 7.5, 9, 2, 2, 2, 6, null, null, null, null],
+  ['Group', 'Assigned TA', 'Use Case Diagram', null, null, null, 'Activity Diagram', null, null, 'UI Design & Implementation', 'Architecture / Design Pattern', null, null, null, 'Total (/30)', 'Total (/100)', 'Grade', 'Comments', 'Marked by'],
+  [null, null, 'Actors', 'Correct logic', 'Mapping to functional reqs', 'Subtotal', 'Functional reqs included', 'Correct & logical flow', 'Subtotal', 'Screens (1 each, 9 screens)', 'Pattern selected', 'Correct implementation in structure', 'Reasoning', 'Subtotal', null, null, null, null, null],
+  [null, null, 1, 1.5, 5, 7.5, 5, 2.5, 7.5, 9, 2, 2, 2, 6, null, null, null, null, null],
 ].map((r) => r.map((v) => (v === null ? null : { v, s: 'header' as const })));
-const WIDTHS = [8, 14, 9, 9, 12, 9, 12, 12, 9, 14, 11, 14, 10, 9, 10, 11, 7, 80];
+const WIDTHS = [8, 14, 9, 9, 12, 9, 12, 12, 9, 14, 11, 14, 10, 9, 10, 11, 7, 80, 22];
 
 const taOf = (doc: MarkingDoc, group: number) => doc.tas.find((t) => t.groups.includes(group))?.name ?? '';
 
@@ -31,6 +31,8 @@ function groupRow(doc: MarkingDoc, group: number): XCell[] {
     v('ar_pattern'), v('ar_impl'), v('ar_reason'), marked ? t.sections.ar : null,
     marked ? t.total : null, marked ? t.percent : null, marked ? t.grade : null,
     m?.comment ?? null,
+    // everyone who saved this group's marks (part of its marking)
+    m ? (m.editors?.length ? m.editors : m.by ? [m.by] : []).join(', ') || null : null,
   ];
 }
 

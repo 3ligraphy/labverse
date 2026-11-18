@@ -101,6 +101,8 @@ export function initMarking(root: HTMLElement) {
   const marksOf = (n: number) => data.doc.marks[String(n)];
   /** the AI button: the group is called in to discuss its project (its students see only the call) */
   const callOf = (n: number) => data.doc.calls?.[String(n)];
+  /** everyone who saved the group's marks (part of its marking), first to last */
+  const markers = (m: { by: string; editors?: string[] }) => (m.editors?.length ? m.editors : m.by ? [m.by] : []).join(', ');
   /** complete: all 9 marks; started: some marks */
   const isMarked = (n: number) => !!marksOf(n) && totals(marksOf(n)!.scores).missing.length === 0;
   const markCount = (n: number) => (marksOf(n) ? CRITERIA.length - totals(marksOf(n)!.scores).missing.length : 0);
@@ -125,8 +127,8 @@ export function initMarking(root: HTMLElement) {
     $('[data-mk-role]').textContent = admin()
       ? `You are an admin: you can mark every group and change the marking load.${row ? ` Your own groups (${row.name}): ${row.groups.length}.` : ''}`
       : row
-        ? `You mark the ${plural(row.groups.length, 'group')} of ${row.name}. Other groups are read-only for you.`
-        : 'Your account is not linked to a row of the marking load yet: ask an admin to link it (Marking load tab). Until then every group is read-only.';
+        ? `You can mark every group. Your own groups (${row.name}): ${row.groups.length}, under “My groups”. Every save records who made it.`
+        : 'You can mark every group; every save records who made it. Your account is not linked to a row of the marking load yet, so “My groups” is empty: ask an admin to link it (Marking load tab).';
     const dl = $('[data-mk-mine-dl]');
     dl.hidden = !row;
     if (row) dl.innerHTML = `Your groups as a sheet to fill offline: <a href="${exportUrl({ mine: '1' })}" download>Excel</a> · <a href="${exportUrl({ mine: '1', format: 'csv' })}" download>CSV</a>`;
@@ -163,7 +165,7 @@ export function initMarking(root: HTMLElement) {
       const status = (callOf(g.number) ? '<span class="mk-flag ai">Called to discuss</span> ' : '') + (changed.has(g.number)
         ? '<span class="mk-flag warn">Members changed since marked</span>'
         : done
-          ? `<span class="mk-flag ok">Marked${m!.by ? ` by ${esc(m!.by)}` : ''}</span>`
+          ? `<span class="mk-flag ok">Marked${markers(m!) ? ` by ${esc(markers(m!))}` : ''}</span>`
           : markCount(g.number)
             ? `<span class="mk-flag">Started · ${markCount(g.number)} / ${CRITERIA.length}</span>`
             : '<span class="mk-flag">Not marked</span>');
@@ -230,7 +232,7 @@ export function initMarking(root: HTMLElement) {
     help = JSON.parse(JSON.stringify(use?.help ?? m?.help ?? {})) as Help;
     const change = data.changes.find((c) => c.group === n);
     $('[data-mk-d-title]').textContent = `Group ${n}${g.idea ? ` · ${g.idea}` : ''}`;
-    $('[data-mk-d-meta]').innerHTML = `${esc(taOf(n)) ? `TA: <b>${esc(taOf(n))}</b> · ` : ''}${g.members.map((x) => `${esc(x.name)} <span class="mono faint">${esc(x.id)}</span>`).join(' · ')}${change ? `<br><span class="mk-flag warn">Members changed since it was marked: +${change.added.length} / −${change.removed.length}. Check the group before you save.</span>` : ''}${m?.at ? `<br><span class="faint">Last saved ${esc(when(m.at))}${m.by ? ` by ${esc(m.by)}` : ''}</span>` : ''}<span data-mk-d-call></span>`;
+    $('[data-mk-d-meta]').innerHTML = `${esc(taOf(n)) ? `TA: <b>${esc(taOf(n))}</b> · ` : ''}${g.members.map((x) => `${esc(x.name)} <span class="mono faint">${esc(x.id)}</span>`).join(' · ')}${change ? `<br><span class="mk-flag warn">Members changed since it was marked: +${change.added.length} / −${change.removed.length}. Check the group before you save.</span>` : ''}${m?.at ? `<br><span class="faint">Last saved ${esc(when(m.at))}${m.by ? ` by ${esc(m.by)}` : ''}${(m.editors?.length ?? 0) > 1 ? ` · marked by ${esc(markers(m))}` : ''}</span>` : ''}<span data-mk-d-call></span>`;
     showCall(n);
     aside.append(panel);
     $('[data-mk-form]').innerHTML = SECTIONS.map((s) => `
@@ -489,7 +491,7 @@ export function initMarking(root: HTMLElement) {
     const lines = withData.map((r) => {
       const after = totals({ ...(ok(r) ? marksOf(r.group)?.scores : {}), ...r.scores });
       const count = CRITERIA.length - after.missing.length;
-      const why = !known.has(r.group) ? 'Not a group of this item: skipped' : !editable(r.group) ? 'Not one of your groups: skipped' : marksOf(r.group) ? 'Updates the saved marks' : 'New';
+      const why = !known.has(r.group) ? 'Not a group of this item: skipped' : !editable(r.group) ? 'Only TAs and admins can mark: skipped' : marksOf(r.group) ? `Updates the saved marks${marksOf(r.group)!.by ? ` (last saved by ${marksOf(r.group)!.by})` : ''}` : 'New';
       return `<tr><th scope="row" class="mono">${r.group}</th><td>${esc(r.ta) || '<span class="faint">—</span>'}</td><td class="mono">${Object.keys(r.scores).length} / ${CRITERIA.length}</td><td class="mono">${!ok(r) || !after.grade ? '–' : after.missing.length ? `${fmt(after.total)} so far` : `${fmt(after.total)} <span class="mk-grade" data-g="${after.grade}">${after.grade}</span>`}</td><td>${r.comment ? 'Yes' : '<span class="faint">—</span>'}</td><td>${esc(why)}${ok(r) && count < CRITERIA.length ? ` <span class="mk-flag">${count} / ${CRITERIA.length} marks after import</span>` : ''}</td></tr>`;
     });
     const importable = withData.filter(ok).length;
@@ -526,7 +528,7 @@ export function initMarking(root: HTMLElement) {
       const j = await api({ action: 'import', rows });
       data.doc = j.doc;
       const skipped = j.skipped as { group: number; reason: string }[];
-      say(`Imported ${plural(j.imported.length, 'group')}${j.imported.length ? ` (${j.imported.join(', ')})` : ''}.${skipped.length ? ` Skipped ${skipped.length}: ${skipped.map((s) => s.group).join(', ')} (not your groups, not in this item, or empty).` : ''}`, 'ok');
+      say(`Imported ${plural(j.imported.length, 'group')}${j.imported.length ? ` (${j.imported.join(', ')})` : ''}.${skipped.length ? ` Skipped ${skipped.length}: ${skipped.map((s) => s.group).join(', ')} (not in this item, or empty).` : ''}`, 'ok');
       preview = null;
       $('[data-mk-preview]').hidden = true;
       render();

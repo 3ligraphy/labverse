@@ -43,7 +43,7 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
       <div class="mk-upload">
         <div class="mk-upload-t">
           <b>Upload your marks: Excel or CSV</b>
-          <p class="small muted">Phase1_Marking.xlsx, one TA’s sheet, or a CSV with a Group column and the criteria columns. You see what changes before anything is saved. Only your own groups are imported, and empty cells keep the marks already saved.</p>
+          <p class="small muted">Phase1_Marking.xlsx, one TA’s sheet, or a CSV with a Group column and the criteria columns. You see what changes before anything is saved. Every TA can import any group, empty cells keep the marks already saved, and each import records who made it.</p>
           <p class="small" data-mk-mine-dl hidden></p>
           <details class="mk-csvhelp small">
             <summary>CSV format</summary>
@@ -112,7 +112,7 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
           <p class="mk-total" data-mk-total></p>
           <label class="mk-comment"><span>Comments <span class="mono faint" data-mk-count></span></span><textarea class="input" rows="7" data-mk-comment placeholder="What to fix next phase. The assistant adds a ready sentence here for each finding that costs marks."></textarea></label>
           <ul class="mk-warn" data-mk-warn></ul>
-          <p class="mk-flag" data-mk-ro hidden>Read only: this is not one of your groups in the marking load.</p>
+          <p class="mk-flag" data-mk-ro hidden>Read only: only TAs and admins can mark.</p>
           <div class="mk-actions">
             <button type="button" class="btn btn-primary btn-sm" data-mk-save>Save marks</button>
             <button type="button" class="btn btn-ghost btn-sm" data-mk-save-next>Save &amp; next group</button>

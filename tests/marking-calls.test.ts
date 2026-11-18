@@ -14,18 +14,18 @@ function doc(): MarkingDoc {
   return d;
 }
 
-test('a TA calls only their own groups; an admin calls any; off lifts the call', () => {
+test('any TA or admin calls any group and the caller is recorded; off lifts the call; non-staff change nothing', () => {
   const d = doc();
   assert.deepEqual(setCall(d, ta, 3, true, new Date('2026-11-18T10:00:00Z')), { ok: true });
   assert.deepEqual(d.calls['3'], { by: 'One', at: '2026-11-18T10:00:00.000Z' });
-  assert.equal(setCall(d, ta, 7, true).ok, false, 'not in the TA’s load');
-  assert.equal(d.calls['7'], undefined);
+  assert.equal(setCall(d, ta, 7, true).ok, true, 'a group outside the TA’s load too');
+  assert.equal(d.calls['7'].by, 'One');
   assert.equal(setCall(d, { role: 'none', email: 'one@uni.test' }, 3, false).ok, false, 'no role, no change');
   assert.ok(d.calls['3'], 'the refused change left the call');
-  assert.equal(setCall(d, admin, 7, true).ok, true);
+  assert.equal(setCall(d, admin, 8, true).ok, true);
   assert.equal(setCall(d, ta, 3, false).ok, true);
   assert.equal(d.calls['3'], undefined);
-  assert.deepEqual(Object.keys(d.calls), ['7']);
+  assert.deepEqual(Object.keys(d.calls).sort(), ['7', '8']);
 });
 
 test('saving marks keeps the call: they are stored apart', () => {

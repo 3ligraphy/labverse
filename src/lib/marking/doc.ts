@@ -3,7 +3,8 @@
  * (key `marking:phase1`): the item whose group numbers are used, the marking load (TA name → linked account
  * email → group numbers), each group's marks and comment, the groups called in to discuss their project
  * (the AI button: those students see only the call), and whether students may see the marks.
- * Rules: admins edit every group and the load; a TA edits only the groups of the load row linked to their email.
+ * Rules: every TA and admin may mark every group (the load only says whose groups they are: "My groups"); only
+ * admins change the load, the item and publishing. Everyone who saves a group's marks is kept in its `editors`.
  * Pure functions, unit-tested (tests/marking.test.ts).
  */
 import { CRITERIA, MAX_COMMENT, SECTIONS, cleanScores, totals, type CriterionId, type Scores } from './rubric.ts';
@@ -12,8 +13,11 @@ import { cleanAnswers, type Answers } from './assistant.ts';
 export const MARKING_KEY = 'marking:phase1';
 
 export type TA = { name: string; email: string | null; groups: number[] };
-/** `help`: the grading assistant's answers behind the marks (how they were reached), when the TA used it. */
-export type GroupMarks = { scores: Scores; comment: string; by: string; at: string; members: string[]; help?: Partial<Record<CriterionId, Answers>> };
+/**
+ * `by`: who saved last. `editors`: everyone who saved this group's marks, first to last (they are part of its
+ * marking). `help`: the grading assistant's answers behind the marks (how they were reached), when the TA used it.
+ */
+export type GroupMarks = { scores: Scores; comment: string; by: string; at: string; members: string[]; editors?: string[]; help?: Partial<Record<CriterionId, Answers>> };
 /** A group called in to discuss its project with its TA (the AI button: for example, when the work looks AI-made). */
 export type Call = { by: string; at: string };
 export type MarkingDoc = {
@@ -44,6 +48,9 @@ const cleanEmail = (v: unknown) => (typeof v === 'string' && /^[^\s@]+@[^\s@]+$/
 const cleanText = (v: unknown, max: number) => String(v ?? '').replace(/\r\n?/g, '\n').replace(/[^\S\n]+$/gm, '').trim().slice(0, max);
 const cleanName = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
 const uniqueSorted = (ns: number[]) => [...new Set(ns)].sort((a, b) => a - b);
+const MAX_EDITORS = 12;
+const NO_RIGHTS = 'Only TAs and admins can mark.';
+const nameOf = (m: Marker) => cleanName(m.name) || (m.email ?? '');
 
 /** A stored or posted document, with anything malformed dropped. */
 export function cleanDoc(input: unknown): MarkingDoc {
@@ -70,6 +77,8 @@ export function cleanDoc(input: unknown): MarkingDoc {
         at: String(m.at ?? '').slice(0, 40),
         members: Array.isArray(m.members) ? m.members.map((x) => String(x).slice(0, 32)).slice(0, 12) : [],
       };
+      const editors = Array.isArray(m.editors) ? [...new Set(m.editors.map(cleanName).filter(Boolean))].slice(-MAX_EDITORS) : [];
+      if (editors.length) doc.marks[String(n)].editors = editors;
       const help = cleanAnswers(m.help);
       if (Object.keys(help).length) doc.marks[String(n)].help = help;
     }
@@ -91,24 +100,28 @@ export function cleanDoc(input: unknown): MarkingDoc {
 /** The load row linked to this account, if any. */
 export const myRow = (doc: MarkingDoc, email: string | null): TA | null => (email ? doc.tas.find((t) => t.email === email.trim().toLowerCase()) ?? null : null);
 
-export function canEdit(m: Marker, doc: MarkingDoc, group: number): boolean {
-  if (m.role === 'admin') return true;
-  if (m.role !== 'ta') return false;
-  return myRow(doc, m.email)?.groups.includes(group) ?? false;
+/** Every TA and admin may mark every group; the load row only decides "My groups". */
+export function canEdit(m: Marker, _doc: MarkingDoc, _group: number): boolean {
+  return m.role === 'admin' || m.role === 'ta';
 }
 
-/** Saves one group's marks (scores clamped, comment trimmed) with the members it was marked for. */
+/** Saves one group's marks (scores clamped, comment trimmed) with the members it was marked for; the saver joins its editors. */
 export function applyMarks(doc: MarkingDoc, m: Marker, group: number, input: { scores: unknown; comment?: unknown; help?: unknown }, members: string[], now = new Date()): { ok: true } | { ok: false; error: string } {
-  if (!canEdit(m, doc, group)) return { ok: false, error: `Group ${group} is not one of your groups in the marking load.` };
+  if (!canEdit(m, doc, group)) return { ok: false, error: NO_RIGHTS };
   const scores = cleanScores(input.scores);
   // the assistant's answers are kept only for criteria that still have a mark
   const help = Object.fromEntries(Object.entries(cleanAnswers(input.help)).filter(([id]) => id in scores));
+  const old = doc.marks[String(group)];
+  const who = nameOf(m);
+  // marks saved before editors were kept start from the one who saved them
+  const editors = [...new Set([...(old?.editors ?? (old?.by ? [old.by] : [])), who].filter(Boolean))].slice(-MAX_EDITORS);
   doc.marks[String(group)] = {
     scores,
     comment: cleanText(input.comment, MAX_COMMENT),
-    by: cleanName(m.name) || (m.email ?? ''),
+    by: who,
     at: now.toISOString(),
     members: [...members],
+    ...(editors.length ? { editors } : {}),
     ...(Object.keys(help).length ? { help } : {}),
   };
   return { ok: true };
@@ -116,8 +129,8 @@ export function applyMarks(doc: MarkingDoc, m: Marker, group: number, input: { s
 
 /** Calls a group to discuss its project with its TA (on), or lifts the call (off). Same rights as marking the group. */
 export function setCall(doc: MarkingDoc, m: Marker, group: number, on: boolean, now = new Date()): { ok: true } | { ok: false; error: string } {
-  if (!canEdit(m, doc, group)) return { ok: false, error: `Group ${group} is not one of your groups in the marking load.` };
-  if (on) doc.calls[String(group)] = { by: cleanName(m.name) || (m.email ?? ''), at: now.toISOString() };
+  if (!canEdit(m, doc, group)) return { ok: false, error: NO_RIGHTS };
+  if (on) doc.calls[String(group)] = { by: nameOf(m), at: now.toISOString() };
   else delete doc.calls[String(group)];
   return { ok: true };
 }
@@ -165,7 +178,7 @@ export function applyImport(doc: MarkingDoc, m: Marker, rows: readonly ImportRow
     const n = groupNumber(row.group);
     if (n === null) continue;
     if (!canEdit(m, doc, n)) {
-      skipped.push({ group: n, reason: `Group ${n} is not one of your groups in the marking load.` });
+      skipped.push({ group: n, reason: NO_RIGHTS });
       continue;
     }
     const scores = cleanScores(row.scores);

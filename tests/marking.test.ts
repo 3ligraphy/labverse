@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const { CRITERIA, SECTIONS, cleanScore, totals, gradeOf } = await import('../src/lib/marking/rubric.ts');
-const { emptyDoc, cleanDoc, canEdit, applyMarks, applyImport, memberChanges, renumbered, loadFromRows } = await import('../src/lib/marking/doc.ts');
+const { emptyDoc, cleanDoc, canEdit, myRow, applyMarks, applyImport, memberChanges, renumbered, loadFromRows } = await import('../src/lib/marking/doc.ts');
 
 const full = { uc_actors: 1, uc_logic: 1.5, uc_mapping: 5, ad_reqs: 5, ad_flow: 2.5, ui_screens: 9, ar_pattern: 2, ar_impl: 2, ar_reason: 2 };
 
@@ -54,31 +54,44 @@ const doc = () => {
   return d;
 };
 
-test('who may edit: admins every group, a TA only the groups of their own row', () => {
+test('who may edit: every TA and admin, every group (the load only decides “My groups”)', () => {
   const d = doc();
   assert.equal(canEdit({ role: 'admin', email: 'x@uni.test' }, d, 2), true);
   assert.equal(canEdit({ role: 'ta', email: 'one@uni.test' }, d, 3), true);
-  assert.equal(canEdit({ role: 'ta', email: 'ONE@uni.test' }, d, 3), true, 'emails are compared without case');
-  assert.equal(canEdit({ role: 'ta', email: 'one@uni.test' }, d, 2), false);
-  assert.equal(canEdit({ role: 'ta', email: 'nobody@uni.test' }, d, 1), false, 'a TA not linked to a row edits nothing');
+  assert.equal(canEdit({ role: 'ta', email: 'one@uni.test' }, d, 2), true, 'another TA’s group');
+  assert.equal(canEdit({ role: 'ta', email: 'nobody@uni.test' }, d, 1), true, 'a TA not linked to a row too');
   assert.equal(canEdit({ role: 'none', email: 'one@uni.test' }, d, 1), false);
+  assert.equal(myRow(d, 'ONE@uni.test')?.name, 'TA One', 'emails are compared without case');
 });
 
-test('saving marks keeps the members, cleans the values, and refuses groups you may not edit', () => {
+test('saving marks keeps the members, cleans the values, records everyone who saved, and refuses non-staff', () => {
   const d = doc();
-  const r = applyMarks(d, { role: 'ta', email: 'one@uni.test', name: 'TA One' }, 1, { scores: { ...full, uc_mapping: 9 }, comment: '  Good work.  ' }, ['S1', 'S2']);
+  const one = { role: 'ta' as const, email: 'one@uni.test', name: 'TA One' };
+  const two = { role: 'ta' as const, email: 'two@uni.test', name: 'TA Two' };
+  const r = applyMarks(d, one, 1, { scores: { ...full, uc_mapping: 9 }, comment: '  Good work.  ' }, ['S1', 'S2']);
   assert.equal(r.ok, true);
   const m = d.marks['1'];
   assert.equal(m.scores.uc_mapping, 5, 'clamped to the maximum');
   assert.equal(m.comment, 'Good work.');
   assert.deepEqual(m.members, ['S1', 'S2']);
   assert.equal(m.by, 'TA One');
-  const refused = applyMarks(d, { role: 'ta', email: 'one@uni.test', name: 'TA One' }, 2, { scores: full, comment: '' }, []);
+  assert.deepEqual(m.editors, ['TA One']);
+  // another TA updates the same group: both are part of its marking, the last one is `by`
+  assert.equal(applyMarks(d, two, 1, { scores: full, comment: 'Updated.' }, ['S1', 'S2']).ok, true);
+  assert.equal(d.marks['1'].by, 'TA Two');
+  assert.deepEqual(d.marks['1'].editors, ['TA One', 'TA Two']);
+  applyMarks(d, one, 1, { scores: full, comment: 'Again.' }, ['S1', 'S2']);
+  assert.deepEqual(d.marks['1'].editors, ['TA One', 'TA Two'], 'a name is listed once');
+  // marks saved before editors were kept start from the one who saved them
+  d.marks['3'] = { scores: full, comment: '', by: 'Old TA', at: '', members: [] };
+  applyMarks(d, two, 3, { scores: full }, []);
+  assert.deepEqual(d.marks['3'].editors, ['Old TA', 'TA Two']);
+  const refused = applyMarks(d, { role: 'none', email: 'one@uni.test', name: 'Student' }, 2, { scores: full, comment: '' }, []);
   assert.equal(refused.ok, false);
   assert.equal(d.marks['2'], undefined);
 });
 
-test('importing a workbook: a TA gets only their own groups, an admin gets all; rows with no marks are skipped', () => {
+test('importing a workbook: any TA imports every group; rows with no marks are skipped', () => {
   const rows = [
     { group: 1, ta: 'TA One', scores: full, comment: 'One' },
     { group: 2, ta: 'TA Two', scores: full, comment: 'Two' },
@@ -86,14 +99,14 @@ test('importing a workbook: a TA gets only their own groups, an admin gets all; 
   ];
   const d = doc();
   const asTa = applyImport(d, { role: 'ta', email: 'one@uni.test', name: 'TA One' }, rows, () => ['S1']);
-  assert.deepEqual(asTa.imported, [1]);
-  assert.deepEqual(asTa.skipped.map((s) => s.group), [2, 3]);
-  assert.match(asTa.skipped[0].reason, /not one of your groups/);
-  assert.match(asTa.skipped[1].reason, /no marks/);
-  assert.equal(d.marks['2'], undefined);
+  assert.deepEqual(asTa.imported, [1, 2]);
+  assert.deepEqual(asTa.skipped.map((s) => s.group), [3]);
+  assert.match(asTa.skipped[0].reason, /no marks/);
+  assert.equal(d.marks['2'].by, 'TA One', 'the import records who made it');
   const d2 = doc();
-  const asAdmin = applyImport(d2, { role: 'admin', email: 'a@uni.test', name: 'Admin' }, rows, () => []);
-  assert.deepEqual(asAdmin.imported, [1, 2]);
+  const none = applyImport(d2, { role: 'none', email: 'x@uni.test', name: 'X' }, rows, () => []);
+  assert.deepEqual(none.imported, []);
+  assert.match(none.skipped[0].reason, /Only TAs and admins/);
 });
 
 test('the load comes from the workbook’s Assigned TA column', () => {
