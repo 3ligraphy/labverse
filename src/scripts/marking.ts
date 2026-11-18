@@ -99,6 +99,8 @@ export function initMarking(root: HTMLElement) {
   };
   const taOf = (n: number) => data.doc.tas.find((t) => t.groups.includes(n))?.name ?? '';
   const marksOf = (n: number) => data.doc.marks[String(n)];
+  /** the AI button: the group is called in to discuss its project (its students see only the call) */
+  const callOf = (n: number) => data.doc.calls?.[String(n)];
   /** complete: all 9 marks; started: some marks */
   const isMarked = (n: number) => !!marksOf(n) && totals(marksOf(n)!.scores).missing.length === 0;
   const markCount = (n: number) => (marksOf(n) ? CRITERIA.length - totals(marksOf(n)!.scores).missing.length : 0);
@@ -114,9 +116,11 @@ export function initMarking(root: HTMLElement) {
     pub.hidden = !admin();
     pub.textContent = data.doc.published ? 'Hide marks from students' : 'Publish marks to students';
     pub.setAttribute('aria-pressed', String(data.doc.published));
-    $('[data-mk-pubnote]').innerHTML = data.doc.published
+    const calls = Object.keys(data.doc.calls ?? {}).length;
+    $('[data-mk-pubnote]').innerHTML = (data.doc.published
       ? `<b>Published</b>: a student who types their ID on the Project page sees their group’s marks, grade and comments${data.doc.publishedBy ? ` (published by ${esc(data.doc.publishedBy)}, ${esc(when(data.doc.publishedAt))})` : ''}.`
-      : 'Not published: students see nothing yet.';
+      : 'Not published: students see nothing yet.')
+      + (calls ? ` <b>${plural(calls, 'group')} called to discuss</b> (AI): ${calls === 1 ? 'it sees' : 'they see'} only the call, no marks and no feedback.` : '');
     const row = mine();
     $('[data-mk-role]').textContent = admin()
       ? `You are an admin: you can mark every group and change the marking load.${row ? ` Your own groups (${row.name}): ${row.groups.length}.` : ''}`
@@ -156,13 +160,17 @@ export function initMarking(root: HTMLElement) {
       const t = m ? totals(m.scores) : null;
       const done = isMarked(g.number);
       const draft = editable(g.number) && drafts.get(g.number)?.by === data.me.email;
-      const status = changed.has(g.number)
+      const status = (callOf(g.number) ? '<span class="mk-flag ai">Called to discuss</span> ' : '') + (changed.has(g.number)
         ? '<span class="mk-flag warn">Members changed since marked</span>'
         : done
           ? `<span class="mk-flag ok">Marked${m!.by ? ` by ${esc(m!.by)}` : ''}</span>`
           : markCount(g.number)
             ? `<span class="mk-flag">Started · ${markCount(g.number)} / ${CRITERIA.length}</span>`
-            : '<span class="mk-flag">Not marked</span>';
+            : '<span class="mk-flag">Not marked</span>');
+      const call = callOf(g.number);
+      const ai = editable(g.number)
+        ? `<button type="button" class="mk-ai" data-mk-ai="${g.number}" aria-pressed="${!!call}" aria-label="${call ? `Group ${g.number} is called to discuss. Lift the call` : `Call group ${g.number} to discuss their project`}" title="${call ? `Called to discuss${call.by ? ` by ${esc(call.by)}` : ''}: the students see only the call. Press to lift it.` : 'Call this group to discuss their project: the students see only the call, no marks and no feedback.'}">AI</button>`
+        : call ? '<span class="mk-flag ai">AI</span>' : '';
       return `<tr>
         <th scope="row" class="mono">${g.number}</th>
         <td>${esc(taOf(g.number)) || '<span class="faint">—</span>'}</td>
@@ -171,10 +179,11 @@ export function initMarking(root: HTMLElement) {
         <td class="mono">${done ? fmt(t!.total) : '–'}</td>
         <td>${done ? `<span class="mk-grade" data-g="${t!.grade}">${t!.grade}</span>` : ''}</td>
         <td>${status}${draft ? ' <span class="mk-flag draft">Unsaved draft</span>' : ''}</td>
+        <td>${ai}</td>
         <td><button type="button" class="btn btn-sm ${editable(g.number) ? 'btn-primary' : 'btn-ghost'}" data-mk-open="${g.number}">${editable(g.number) ? (m ? 'Edit' : 'Mark') : 'View'}</button></td>
       </tr>`;
     });
-    $('[data-mk-rows]').innerHTML = rows.join('') || `<tr><td colspan="8" class="faint">No groups here.</td></tr>`;
+    $('[data-mk-rows]').innerHTML = rows.join('') || `<tr><td colspan="9" class="faint">No groups here.</td></tr>`;
   }
 
   /* ------------------------------------------------------------------ the marking form */
@@ -221,7 +230,8 @@ export function initMarking(root: HTMLElement) {
     help = JSON.parse(JSON.stringify(use?.help ?? m?.help ?? {})) as Help;
     const change = data.changes.find((c) => c.group === n);
     $('[data-mk-d-title]').textContent = `Group ${n}${g.idea ? ` · ${g.idea}` : ''}`;
-    $('[data-mk-d-meta]').innerHTML = `${esc(taOf(n)) ? `TA: <b>${esc(taOf(n))}</b> · ` : ''}${g.members.map((x) => `${esc(x.name)} <span class="mono faint">${esc(x.id)}</span>`).join(' · ')}${change ? `<br><span class="mk-flag warn">Members changed since it was marked: +${change.added.length} / −${change.removed.length}. Check the group before you save.</span>` : ''}${m?.at ? `<br><span class="faint">Last saved ${esc(when(m.at))}${m.by ? ` by ${esc(m.by)}` : ''}</span>` : ''}`;
+    $('[data-mk-d-meta]').innerHTML = `${esc(taOf(n)) ? `TA: <b>${esc(taOf(n))}</b> · ` : ''}${g.members.map((x) => `${esc(x.name)} <span class="mono faint">${esc(x.id)}</span>`).join(' · ')}${change ? `<br><span class="mk-flag warn">Members changed since it was marked: +${change.added.length} / −${change.removed.length}. Check the group before you save.</span>` : ''}${m?.at ? `<br><span class="faint">Last saved ${esc(when(m.at))}${m.by ? ` by ${esc(m.by)}` : ''}</span>` : ''}<span data-mk-d-call></span>`;
+    showCall(n);
     aside.append(panel);
     $('[data-mk-form]').innerHTML = SECTIONS.map((s) => `
       <fieldset class="mk-sec">
@@ -270,6 +280,19 @@ export function initMarking(root: HTMLElement) {
     dlg.style.setProperty('--mk-head', `${$('.mk-d-head').offsetHeight}px`);
     if (projOn()) void project.show(n);
     (root.querySelector<HTMLInputElement>('[data-mk-in]:not([disabled])') ?? $('[data-mk-close]')).focus({ preventScroll: true });
+  }
+  /** The dialog's AI button and its line under the members, for group n. */
+  function showCall(n: number) {
+    const call = callOf(n);
+    const btn = $<HTMLButtonElement>('[data-mk-ai-d]');
+    btn.hidden = !editable(n);
+    btn.setAttribute('aria-pressed', String(!!call));
+    btn.textContent = call ? 'AI: called to discuss' : 'AI: call to discuss';
+    btn.title = call
+      ? 'Press to lift the call: the students see their marks and feedback again once marks are published.'
+      : 'Call this group to discuss their project: the students see only the call, no marks and no feedback.';
+    const line = root.querySelector('[data-mk-d-call]');
+    if (line) line.innerHTML = call ? `<br><span class="mk-flag ai">Called to discuss${call.by ? ` by ${esc(call.by)}` : ''}${call.at ? `, ${esc(when(call.at))}` : ''}: the students see only the call, no marks and no feedback.</span>` : '';
   }
   function formScores(): Scores {
     const s: Scores = {};
@@ -655,6 +678,27 @@ export function initMarking(root: HTMLElement) {
       drafts.del(current);
       renderMarks();
       return openGroup(current);
+    }
+    const aiBtn = t.closest<HTMLElement>('[data-mk-ai], [data-mk-ai-d]');
+    if (aiBtn) {
+      const n = aiBtn.dataset.mkAi ? Number(aiBtn.dataset.mkAi) : current;
+      const on = !callOf(n);
+      if (on && !confirm(`Call group ${n} to discuss their project?\n\nOn the Project page these students will see only a request to come and discuss their project with their TA: no marks and no feedback, until you lift the call.`)) return;
+      const tell = (text: string, tone: 'ok' | 'err') => {
+        say(text, tone);
+        if (dlg.open) $('[data-mk-d-msg]').textContent = text;
+      };
+      try {
+        const j = await api({ action: 'call', group: n, on });
+        data.doc = j.doc;
+        renderHead();
+        renderMarks();
+        if (dlg.open && current === n) showCall(n);
+        tell(on ? `Group ${n} is called to discuss: its students see only the call.` : `Call lifted for group ${n}: its students see their marks and feedback again once marks are published.`, 'ok');
+      } catch (error) {
+        tell((error as Error).message, 'err');
+      }
+      return;
     }
     if (t.closest('[data-mk-proj-toggle]')) {
       setProj(!projOn());

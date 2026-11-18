@@ -1,7 +1,8 @@
 /**
  * A student's proposal result (public, for /project). Only items whose results staff have published are shown.
  *   GET                      { items: [{ id, title }] }  the published items (so the page knows to show the box)
- *   GET ?studentId=…         { results: [{ item, group, members, idea, feedback }] }  the student's own group only
+ *   GET ?studentId=…         { results: [{ item, group, members, idea, feedback, phase1 }] }  the student's own group only
+ *                            (phase1: the marks, or { call: true } when the group is called in to discuss its project)
  * Lookups are limited per network address, so nobody can try every ID; members come with their IDs so teammates can find each other.
  * Each lookup that finds a group is recorded, so staff can see who has checked (admin feedback page).
  */
@@ -16,7 +17,7 @@ import { cleanRelease, resultFor } from '@/lib/project-files/results';
 import { getFilesStore } from '@/lib/project-files/server';
 import { normId } from '@/lib/project-files/groups';
 import { loadMarking } from '@/lib/marking/server';
-import { CRITERIA, SECTIONS, totals } from '@/lib/marking/rubric';
+import { studentPhase1 } from '@/lib/marking/doc';
 
 export const prerender = false;
 
@@ -57,20 +58,17 @@ export const GET: APIRoute = async ({ url, request, clientAddress }) => {
       const { notes } = placeNotes(groups, cleanFeedback(feedback));
       const r = resultFor(groups, canon ? { choices: ideasAsChoices(canon) } : p, notes, studentId);
       if (!r) continue;
+      // the marking's item: a group called in to discuss its project (the AI button) sees only the call, no marks and
+      // no feedback; any other group sees its marks once they are published
       let phase1 = null;
-      if (marking && file.id === marksOn) {
+      let shownFeedback = r.feedback;
+      if (marking && file.id === marking.source) {
         const g = groups.find((x) => x.numbered && x.members.some((m) => m.id === normId(studentId)));
-        const m = g ? marking.marks[/^G(\d+)$/.exec(g.key)?.[1] ?? ''] : undefined;
-        const t = m ? totals(m.scores) : null;
-        if (m && t && t.grade && !t.missing.length) {
-          phase1 = {
-            sections: SECTIONS.map((s) => ({ title: s.title, max: s.max, score: t.sections[s.id] })),
-            criteria: CRITERIA.map((c) => ({ label: c.label, max: c.max, score: m.scores[c.id] ?? null })),
-            total: t.total, percent: t.percent, grade: t.grade, comment: m.comment || null,
-          };
-        }
+        const n = g ? Number(/^G(\d+)$/.exec(g.key)?.[1] ?? NaN) : NaN;
+        phase1 = studentPhase1(marking, Number.isInteger(n) ? n : null, file.id === marksOn);
+        if (phase1?.call) shownFeedback = null;
       }
-      results.push({ item: file.title, ...r, phase1 });
+      results.push({ item: file.title, ...r, feedback: shownFeedback, phase1 });
       // never fail the student's lookup over the record
       await store.recordView(file.id, studentId).catch((error) => console.error('[project-result] could not record the view', error));
     }

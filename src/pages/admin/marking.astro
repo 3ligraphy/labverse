@@ -78,8 +78,8 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
       </div>
       <div class="mk-tablewrap">
         <table class="mk-table mk-groups">
-          <thead><tr><th scope="col">Group</th><th scope="col">TA</th><th scope="col">Members</th><th scope="col">Idea</th><th scope="col">/30</th><th scope="col">Grade</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Open</span></th></tr></thead>
-          <tbody data-mk-rows><tr><td colspan="8" class="faint">Loading groups…</td></tr></tbody>
+          <thead><tr><th scope="col">Group</th><th scope="col">TA</th><th scope="col">Members</th><th scope="col">Idea</th><th scope="col">/30</th><th scope="col">Grade</th><th scope="col">Status</th><th scope="col" title="Call the group to discuss their project: the students see only the call, no marks and no feedback">AI</th><th scope="col"><span class="sr-only">Open</span></th></tr></thead>
+          <tbody data-mk-rows><tr><td colspan="9" class="faint">Loading groups…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -99,6 +99,7 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
           <p class="small muted" data-mk-d-meta></p>
         </div>
         <div class="mk-d-tools">
+          <button type="button" class="btn btn-ghost btn-sm mk-ai-d" data-mk-ai-d aria-pressed="false" hidden>AI: call to discuss</button>
           <button type="button" class="btn btn-ghost btn-sm" data-mk-proj-toggle aria-pressed="true" title="Show or hide the group's app and report">Project</button>
           <button type="button" class="mk-x" data-mk-close aria-label="Close">✕</button>
         </div>
@@ -201,6 +202,12 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
   .mk-flag.ok { color: var(--ok); background: color-mix(in oklab, var(--ok) 12%, transparent); }
   .mk-flag.warn { color: var(--text); background: color-mix(in oklab, var(--warn) 18%, transparent); }
   .mk-flag.draft { color: var(--text); background: color-mix(in oklab, var(--info) 16%, transparent); }
+  .mk-flag.ai { color: var(--text); background: color-mix(in oklab, var(--danger) 16%, transparent); font-weight: 600; }
+  /* the AI button: calls the group in to discuss their project (students then see only the call) */
+  .mk-ai { min-width: 44px; min-height: 32px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text-2); font: 600 12.5px/1 var(--font-mono, ui-monospace, monospace); letter-spacing: .04em; cursor: pointer; }
+  .mk-ai:hover { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); color: var(--text); }
+  .mk-ai:focus-visible, .mk-ai-d:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
+  .mk-ai[aria-pressed="true"], .mk-ai-d[aria-pressed="true"] { border-color: var(--danger); background: color-mix(in oklab, var(--danger) 16%, transparent); color: var(--text); }
   .mk-note { margin: 0; font-size: 14px; color: var(--text-2); max-width: 80ch; }
   .mk-dl { white-space: nowrap; font-size: 13px; }
   .mk-loadt { min-width: 860px; }

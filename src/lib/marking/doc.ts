@@ -1,11 +1,12 @@
 /**
  * MARKING DOCUMENT — everything Admin → Marking saves, as one JSON document in the project-files store
  * (key `marking:phase1`): the item whose group numbers are used, the marking load (TA name → linked account
- * email → group numbers), each group's marks and comment, and whether students may see them.
+ * email → group numbers), each group's marks and comment, the groups called in to discuss their project
+ * (the AI button: those students see only the call), and whether students may see the marks.
  * Rules: admins edit every group and the load; a TA edits only the groups of the load row linked to their email.
  * Pure functions, unit-tested (tests/marking.test.ts).
  */
-import { MAX_COMMENT, cleanScores, type CriterionId, type Scores } from './rubric.ts';
+import { CRITERIA, MAX_COMMENT, SECTIONS, cleanScores, totals, type CriterionId, type Scores } from './rubric.ts';
 import { cleanAnswers, type Answers } from './assistant.ts';
 
 export const MARKING_KEY = 'marking:phase1';
@@ -13,12 +14,16 @@ export const MARKING_KEY = 'marking:phase1';
 export type TA = { name: string; email: string | null; groups: number[] };
 /** `help`: the grading assistant's answers behind the marks (how they were reached), when the TA used it. */
 export type GroupMarks = { scores: Scores; comment: string; by: string; at: string; members: string[]; help?: Partial<Record<CriterionId, Answers>> };
+/** A group called in to discuss its project with its TA (the AI button: for example, when the work looks AI-made). */
+export type Call = { by: string; at: string };
 export type MarkingDoc = {
   v: 1;
   /** the submission item (usually the proposal) whose group numbers are used */
   source: string | null;
   tas: TA[];
   marks: Record<string, GroupMarks>;
+  /** groups called to discuss their project: their students see only the call, never marks or feedback */
+  calls: Record<string, Call>;
   published: boolean;
   publishedAt: string;
   publishedBy: string;
@@ -28,7 +33,7 @@ export type MarkingDoc = {
 export type Marker = { role: 'admin' | 'ta' | 'none'; email: string | null; name?: string };
 export type ImportRow = { group: number; ta?: string; scores: Record<string, unknown>; comment?: string };
 
-export const emptyDoc = (): MarkingDoc => ({ v: 1, source: null, tas: [], marks: {}, published: false, publishedAt: '', publishedBy: '', unlocked: false });
+export const emptyDoc = (): MarkingDoc => ({ v: 1, source: null, tas: [], marks: {}, calls: {}, published: false, publishedAt: '', publishedBy: '', unlocked: false });
 
 /** A group number from a cell or a form: 12, "12", "G12" or "Group 12". */
 export const groupNumber = (v: unknown): number | null => {
@@ -69,6 +74,13 @@ export function cleanDoc(input: unknown): MarkingDoc {
       if (Object.keys(help).length) doc.marks[String(n)].help = help;
     }
   }
+  if (i.calls && typeof i.calls === 'object' && !Array.isArray(i.calls)) {
+    for (const [k, c] of Object.entries(i.calls as Record<string, Call>).slice(0, 500)) {
+      const n = groupNumber(k);
+      if (n === null || !c || typeof c !== 'object') continue;
+      doc.calls[String(n)] = { by: cleanName(c.by), at: String(c.at ?? '').slice(0, 40) };
+    }
+  }
   doc.published = i.published === true;
   doc.publishedAt = String(i.publishedAt ?? '').slice(0, 40);
   doc.publishedBy = cleanName(i.publishedBy);
@@ -100,6 +112,46 @@ export function applyMarks(doc: MarkingDoc, m: Marker, group: number, input: { s
     ...(Object.keys(help).length ? { help } : {}),
   };
   return { ok: true };
+}
+
+/** Calls a group to discuss its project with its TA (on), or lifts the call (off). Same rights as marking the group. */
+export function setCall(doc: MarkingDoc, m: Marker, group: number, on: boolean, now = new Date()): { ok: true } | { ok: false; error: string } {
+  if (!canEdit(m, doc, group)) return { ok: false, error: `Group ${group} is not one of your groups in the marking load.` };
+  if (on) doc.calls[String(group)] = { by: cleanName(m.name) || (m.email ?? ''), at: now.toISOString() };
+  else delete doc.calls[String(group)];
+  return { ok: true };
+}
+
+export type StudentMarks = {
+  sections: { title: string; max: number; score: number }[];
+  criteria: { label: string; max: number; score: number | null }[];
+  total: number;
+  percent: number;
+  grade: string;
+  comment: string | null;
+};
+export type StudentPhase1 = { call: true } | ({ call: false } & StudentMarks);
+
+/**
+ * What a student of `group` sees for Phase 1 on the Project page: while the group is called, only the call
+ * (no marks, no feedback); otherwise their marks once all 9 are in and the marks are published; else nothing.
+ */
+export function studentPhase1(doc: MarkingDoc, group: number | null, marksPublished: boolean): StudentPhase1 | null {
+  if (group === null) return null;
+  if (doc.calls[String(group)]) return { call: true };
+  const m = marksPublished ? doc.marks[String(group)] : undefined;
+  if (!m) return null;
+  const t = totals(m.scores);
+  if (!t.grade || t.missing.length) return null;
+  return {
+    call: false,
+    sections: SECTIONS.map((s) => ({ title: s.title, max: s.max, score: t.sections[s.id] })),
+    criteria: CRITERIA.map((c) => ({ label: c.label, max: c.max, score: m.scores[c.id] ?? null })),
+    total: t.total,
+    percent: t.percent,
+    grade: t.grade,
+    comment: m.comment || null,
+  };
 }
 
 /**

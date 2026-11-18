@@ -2,6 +2,7 @@
  * Admin → Marking (Phase 1).
  *   GET   { doc, me, files, groups, staff, changes, loadSaved }   everyone with submissions access (TAs see every group)
  *   PUT   { action: 'marks', group, scores, comment, help }   a TA for the groups of their load row; admins any group
+ *         { action: 'call', group, on }   the AI button: call the group to discuss its project (students see only the call)
  *         { action: 'import', rows: [{ group, ta, scores, comment }] }   rows read from a marking workbook
  *         { action: 'source', fileId }                  admin: the item whose group numbers are used
  *         { action: 'load', tas } | { action: 'load-rows', rows }   admin: the marking load
@@ -15,7 +16,7 @@ import { access } from '@/lib/accounts/access';
 import { canManageSubmissions } from '@/lib/accounts/labscope';
 import { json } from '@/lib/progress/server';
 import { getFilesStore } from '@/lib/project-files/server';
-import { MARKING_KEY, applyImport, applyMarks, cleanDoc, groupNumber, loadFromRows, memberChanges, myRow, type ImportRow } from '@/lib/marking/doc';
+import { MARKING_KEY, applyImport, applyMarks, cleanDoc, groupNumber, loadFromRows, memberChanges, myRow, setCall, type ImportRow } from '@/lib/marking/doc';
 import { defaultSource, loadMarking, markGroups, markerOf, prepared, staffList } from '@/lib/marking/server';
 
 export const prerender = false;
@@ -82,6 +83,13 @@ export const PUT: APIRoute = async ({ cookies, request }) => {
         if (n === null || !known.has(n)) extra.error = 'There is no such group.';
         else {
           const r = applyMarks(d, me, n, { scores: body.scores, comment: body.comment, help: body.help }, membersOf(n));
+          if (!r.ok) extra.error = r.error;
+        }
+      } else if (action === 'call') {
+        const n = groupNumber(body.group);
+        if (n === null || !known.has(n)) extra.error = 'There is no such group.';
+        else {
+          const r = setCall(d, me, n, body.on === true);
           if (!r.ok) extra.error = r.error;
         }
       } else if (action === 'import') {

@@ -269,6 +269,7 @@ const nav = d ? [
   :global(.pjr-label) { font: 600 12px var(--font-mono); color: var(--text-3); }
   :global(.pjr-idea) { margin: 0 !important; font-size: 1.15rem; font-weight: 600; color: var(--text); }
   :global(.pjr-fb) { margin: 0 !important; white-space: pre-wrap; color: var(--text); line-height: 1.6; }
+  :global(.pjr-call .pjr-fb) { padding: 10px 12px; border-left: 3px solid var(--warn); border-radius: 6px; background: color-mix(in oklab, var(--warn) 12%, transparent); }
   :global(.pjr-none) { margin: 0 !important; color: var(--text-3); }
   :global(.pjr-score) { margin: 0 !important; font-size: 1.05rem; color: var(--text); }
   :global(.pjr-marks) { width: 100%; min-width: 0 !important; border-collapse: collapse; font-size: 14px; }
@@ -336,9 +337,16 @@ const nav = d ? [
     const input = form.querySelector<HTMLInputElement>('input')!;
     const msg = sec.querySelector<HTMLElement>('[data-pjr-msg]')!;
     const out = sec.querySelector<HTMLElement>('[data-pjr-out]')!;
-    type Phase1 = { sections: { title: string; max: number; score: number }[]; criteria: { label: string; max: number; score: number | null }[]; total: number; percent: number; grade: string; comment: string | null };
+    type Marks = { call?: false; sections: { title: string; max: number; score: number }[]; criteria: { label: string; max: number; score: number | null }[]; total: number; percent: number; grade: string; comment: string | null };
+    type Phase1 = Marks | { call: true };
     type Result = { item: string; group: string; members: { name: string; id: string }[]; idea: string; feedback: string | null; phase1?: Phase1 | null };
-    const marks = (p: Phase1) => `
+    // the group is called in to discuss its project with its TA: no marks and no feedback until then
+    const called = (r: Result) => !!r.phase1 && r.phase1.call === true;
+    const callNote = `
+        <div class="pjr-block pjr-call" role="note"><span class="pjr-label">Phase 1</span>
+          <p class="pjr-fb"><b>Come to a discussion about your project.</b> Your TA needs to discuss your project with your group before your Phase 1 marks and feedback are released. Ask your TA for a time, and bring your project ready to run.</p>
+        </div>`;
+    const marks = (p: Marks) => `
         <div class="pjr-block"><span class="pjr-label">Phase 1 marks</span>
           <p class="pjr-score"><b>${p.total}</b> / 30 · ${p.percent} / 100 · grade <b>${esc(p.grade)}</b></p>
           <table class="pjr-marks"><tbody>${p.criteria.map((c) => `<tr><td>${esc(c.label)}</td><td class="mono">${c.score ?? '–'} / ${c.max}</td></tr>`).join('')}</tbody></table>
@@ -350,8 +358,8 @@ const nav = d ? [
         <h3 class="pjr-group">${esc(r.group)}</h3>
         <div class="pjr-block pjr-team"><span class="pjr-label">Members</span><ul class="pjr-members">${r.members.map((m) => `<li><span>${esc(m.name)}</span><span class="mono">${esc(m.id)}</span></li>`).join('')}</ul></div>
         <div class="pjr-block"><span class="pjr-label">Approved idea</span>${r.idea ? `<p class="pjr-idea">${esc(r.idea)}</p>` : '<p class="pjr-none">No idea approved yet. Check again later or ask your TA.</p>'}</div>
-        <div class="pjr-block"><span class="pjr-label">Feedback</span>${r.feedback ? `<p class="pjr-fb">${esc(r.feedback)}</p>` : '<p class="pjr-none">No feedback.</p>'}</div>
-        ${r.phase1 ? marks(r.phase1) : ''}
+        ${called(r) ? callNote : `<div class="pjr-block"><span class="pjr-label">Feedback</span>${r.feedback ? `<p class="pjr-fb">${esc(r.feedback)}</p>` : '<p class="pjr-none">No feedback.</p>'}</div>
+        ${r.phase1 && r.phase1.call !== true ? marks(r.phase1) : ''}`}
       </article>`;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
