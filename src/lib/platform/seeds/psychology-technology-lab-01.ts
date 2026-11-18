@@ -797,7 +797,7 @@ export function psychologyTechnologyLab02(): Flow {
   ]);
 }
 
-/** The module canvas: Technology for Psychology (Arts & Humanities): Week 1 → Lab 01 (Session 1), Week 2 → Lab 02 (Session 2). */
+/** The module canvas: Technology for Psychology (Arts & Humanities): Week 1 → Lab 01 (Session 1), Week 2 → Lab 02 (Session 2), Week 3 → Lab 03, Week 4 → Lab 04. */
 export function psychologyTechnologyModule(): Flow {
   const flow: Flow = {
     nodes: [
@@ -814,8 +814,10 @@ export function psychologyTechnologyModule(): Flow {
       { id: 'lab-02', type: 'lab', x: 100, y: 740, data: { slug: 'lab-02' } },
       { id: 'week-03', type: 'divider', x: 100, y: 900, data: { title: 'Week 3' } },
       { id: 'lab-03', type: 'lab', x: 100, y: 1060, data: { slug: 'lab-03' } },
+      { id: 'week-04', type: 'divider', x: 100, y: 1220, data: { title: 'Week 4' } },
+      { id: 'lab-04', type: 'lab', x: 100, y: 1380, data: { slug: 'lab-04' } },
     ],
-    edges: [{ from: 'module', to: 'week-01' }, { from: 'week-01', to: 'lab-01' }, { from: 'lab-01', to: 'week-02' }, { from: 'week-02', to: 'lab-02' }, { from: 'lab-02', to: 'week-03' }, { from: 'week-03', to: 'lab-03' }],
+    edges: [{ from: 'module', to: 'week-01' }, { from: 'week-01', to: 'lab-01' }, { from: 'lab-01', to: 'week-02' }, { from: 'week-02', to: 'lab-02' }, { from: 'lab-02', to: 'week-03' }, { from: 'week-03', to: 'lab-03' }, { from: 'lab-03', to: 'week-04' }, { from: 'week-04', to: 'lab-04' }],
   };
   const clean = sanitizeFlow(flow, 'module');
   if (!clean.ok) throw new Error(clean.error);

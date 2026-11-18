@@ -10,6 +10,8 @@ import { introComputingModule, introComputingRevisionLab } from './intro-computi
 import { introComputingPracticeLab } from './intro-computing-practice.ts';
 import { introComputingTypeDrawLab } from './intro-computing-type-draw.ts';
 import { aiForCodingLab01, aiForCodingModule } from './ai-for-coding.ts';
+import { psychologyTechnologyModule } from './psychology-technology-lab-01.ts';
+import { psychologyTechnologyLab04 } from './psychology-technology-lab-04.ts';
 
 export type Seed = {
   id: string;
@@ -36,6 +38,19 @@ function seed(id: string, slug: string, moduleFlow: Flow, labNodes: LabNodeType[
       if (!r.ok) throw new Error(`seed ${id}, lab ${l.slug}: ${r.error}`);
       return { slug: l.slug, title: compileLab(r.value, `${slug}--${l.slug}`).meta.title, flow: r.value };
     }),
+  };
+}
+
+/**
+ * Only the module node and the new Week 4 → Lab 04 nodes of the psychology canvas: that module was created by
+ * scripts/seed-psychology-technology.mjs, and an extend seed appends every node whose id is not on the live canvas,
+ * so a minimal flow never brings back a node staff deleted.
+ */
+function psychologyTechnologyWeek04(): Flow {
+  const keep = new Set(['module', 'week-04', 'lab-04']);
+  return {
+    nodes: psychologyTechnologyModule().nodes.filter((n) => keep.has(n.id)),
+    edges: [{ from: 'module', to: 'week-04' }, { from: 'week-04', to: 'lab-04' }],
   };
 }
 
@@ -82,5 +97,9 @@ export function shippedSeeds(): Seed[] {
     // Lab 01 gains a part on preparing a PRD for the coding agent (rewrites the lab once if @1 already created it)
     { ...seed('ai-for-coding@2', 'ai-for-coding', aiForCodingModule(), nodesOfKits(['ai']),
       [{ slug: 'lab-01', flow: aiForCodingLab01() }]), update: true },
+    // TECHNOLOGY FOR PSYCHOLOGY (created by its seed script, not here): Week 4 → Lab 04 is added to the live module
+    // (does nothing on a database where the script never created it)
+    { ...seed('technology-for-psychology@1', 'technology-for-psychology', psychologyTechnologyWeek04(), nodesOfKits(['web']),
+      [{ slug: 'lab-04', flow: psychologyTechnologyLab04() }]), extend: true },
   ];
 }

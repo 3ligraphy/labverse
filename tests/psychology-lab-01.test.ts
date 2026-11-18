@@ -91,5 +91,6 @@ test('Technology for Psychology module: Week 1 → Lab 01, Week 2 → Lab 02, fo
     { kind: 'week', title: 'Week 1' }, { kind: 'lab', slug: 'lab-01' },
     { kind: 'week', title: 'Week 2' }, { kind: 'lab', slug: 'lab-02' },
     { kind: 'week', title: 'Week 3' }, { kind: 'lab', slug: 'lab-03' },
+    { kind: 'week', title: 'Week 4' }, { kind: 'lab', slug: 'lab-04' },
   ]);
 });

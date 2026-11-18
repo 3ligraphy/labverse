@@ -7,6 +7,7 @@ import { compileLab, compileModule, nodesOfKits, sanitizeFlow } from '../src/lib
 import { DEFAULT_FACULTIES, upgradeFaculties } from '../src/lib/accounts/core.ts';
 import { BONUS, psychologyTechnologyLab01, psychologyTechnologyLab02, psychologyTechnologyModule } from '../src/lib/platform/seeds/psychology-technology-lab-01.ts';
 import { psychologyTechnologyLab03 } from '../src/lib/platform/seeds/psychology-technology-lab-03.ts';
+import { psychologyTechnologyLab04 } from '../src/lib/platform/seeds/psychology-technology-lab-04.ts';
 
 const dev = process.argv.includes('--dev');
 const production = process.argv.includes('--confirm-production');
@@ -21,7 +22,7 @@ const cleanModule = sanitizeFlow(psychologyTechnologyModule(), 'module');
 if (!cleanModule.ok) throw new Error(cleanModule.error);
 const compiledModule = compileModule(cleanModule.value);
 
-const labs = [['lab-01', psychologyTechnologyLab01()], ['lab-02', psychologyTechnologyLab02()], ['lab-03', psychologyTechnologyLab03()]].map(([slug, flow]) => {
+const labs = [['lab-01', psychologyTechnologyLab01()], ['lab-02', psychologyTechnologyLab02()], ['lab-03', psychologyTechnologyLab03()], ['lab-04', psychologyTechnologyLab04()]].map(([slug, flow]) => {
   const compiled = compileLab(flow, `${moduleSlug}--${slug}`);
   if (compiled.warnings.length) throw new Error(`${slug}: ${compiled.warnings.join('\n')}`);
   if (!compiledModule.items.some((item) => item.kind === 'lab' && item.slug === slug)) throw new Error(`${slug} is not connected to the module canvas.`);
