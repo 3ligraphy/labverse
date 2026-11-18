@@ -66,6 +66,8 @@ export type Build = {
   by: string;
   size: number;
 };
+/** The last automatic build that failed: for which hand-in version, when, and why (shown to staff, retried a day later). */
+export type Failure = { handIn: string; at: string; note: string };
 export type Preview = {
   /** the student's GitHub repo, found in the hand-in or typed by staff */
   repo: string | null;
@@ -73,6 +75,7 @@ export type Preview = {
   /** the hand-in version that was searched for a repo (updated_at), so a new hand-in is searched again */
   checked: string;
   build: Build | null;
+  fail?: Failure | null;
 };
 /** Hand-in id → its app preview. */
 export type Previews = Record<string, Preview>;
@@ -100,8 +103,33 @@ export function cleanPreviews(input: unknown): Previews {
     if (!/^[A-Za-z0-9-]{1,64}$/.test(id) || !v || typeof v !== 'object') continue;
     const p = v as Record<string, unknown>;
     out[id] = { repo: cleanRepo(p.repo), repoBy: p.repoBy === 'staff' ? 'staff' : p.repoBy === 'found' ? 'found' : null, checked: text(p.checked, 40), build: cleanBuild(p.build) };
+    const f = p.fail as Record<string, unknown> | null | undefined;
+    if (f && typeof f === 'object' && f.handIn) out[id].fail = { handIn: text(f.handIn, 40), at: text(f.at, 40), note: text(f.note, 300) };
   }
   return out;
+}
+
+/** How long a hand-in whose automatic build failed waits before the builder tries it again. */
+export const RETRY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Whether the builder builds this hand-in now: 'current' when its build is still right, 'wait' when it failed for
+ * this same hand-in less than a day ago, else 'build'. `pin` (the automatic builder): a build stays until the
+ * hand-in itself changes, so staff see the app as it was handed in, not later pushes to the repo. Without `pin` a
+ * repo build is current while the repo's commit (`head`) is the one it was built from.
+ */
+export function needsBuild(
+  e: { updatedAt: string; repo?: string | null; built: { sha?: string | null; source?: string; handIn?: string | null } | null; failed?: { handIn: string; at: string } | null },
+  opts: { now: number; pin: boolean; force?: boolean; head?: string | null },
+): 'current' | 'wait' | 'build' {
+  if (opts.force) return 'build';
+  const b = e.built;
+  if (b) {
+    if (opts.pin ? b.handIn === e.updatedAt : e.repo ? !!b.sha && b.sha === opts.head : b.source === 'zip' && b.handIn === e.updatedAt) return 'current';
+  }
+  const f = e.failed;
+  if (f && f.handIn === e.updatedAt && opts.now - Date.parse(f.at) < RETRY_MS) return 'wait';
+  return 'build';
 }
 
 /** The hand-in a build belongs to: by its id, else by the student ID among the item's hand-ins. */
@@ -122,7 +150,10 @@ export function buildList(item: string, entries: readonly { id: string; student_
       return {
         entry: e.id, group: e.group ? Number(e.group.replace(/^G/, '')) || null : null, studentId: e.student_id, url: e.url, updatedAt: e.updated_at,
         repo: p?.repo ?? null,
+        /** the hand-in version already searched for a repo */
+        checked: p?.checked ?? '',
         built: p?.build ? { key: p.build.key, sha: p.build.sha, source: p.build.source, handIn: p.build.handIn } : null,
+        failed: p?.fail ? { handIn: p.fail.handIn, at: p.fail.at } : null,
       };
     }),
   };

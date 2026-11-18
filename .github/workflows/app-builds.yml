@@ -1,0 +1,37 @@
+# App builds: every hour GitHub makes a real web build of each new hand-in's Expo app (in a Docker box) and uploads it
+# to the site, so Admin → Marking shows the app running beside the marking form. Nothing secret is stored: the site
+# accepts only this workflow on main, through the OIDC token GitHub signs for the run (src/lib/previews/builder-auth.ts).
+# Student code runs only inside the Docker boxes. This repo is public, so the log shows counts only.
+name: App builds
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: app-builds
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == '3ligraphy/labverse'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build and upload the apps
+        run: node --import ./tests/support/register-tsx.mjs scripts/previews/ci.mjs
+        env:
+          SITE: https://labverse-indol.vercel.app

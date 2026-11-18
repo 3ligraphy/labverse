@@ -74,10 +74,18 @@ export async function registerBuild(store: Store, stored: { url: string; pathnam
   await updatePreviews(store, (p) => {
     const cur = p[entry] ?? { repo: build.repo, repoBy: build.repo ? 'found' : null, checked: '', build: null };
     old = cur.build && cur.build.key !== build.key ? cur.build : null;
-    p[entry] = { ...cur, repo: cur.repo ?? build.repo, repoBy: cur.repoBy ?? (build.repo ? 'found' : null), build };
+    p[entry] = { ...cur, repo: cur.repo ?? build.repo, repoBy: cur.repoBy ?? (build.repo ? 'found' : null), build, fail: null };
   });
   if (old) await deleteStored(old);
   return { ok: true, entry, build };
+}
+
+/** The automatic builder could not build this hand-in version: kept so staff see why, and retried a day later. */
+export async function recordFailure(store: Store, entry: { id: string; updated_at: string }, note: string) {
+  await updatePreviews(store, (p) => {
+    const cur = p[entry.id] ?? { repo: null, repoBy: null, checked: '', build: null };
+    p[entry.id] = { ...cur, fail: { handIn: entry.updated_at, at: new Date().toISOString(), note: note.replace(/\s+/g, ' ').trim().slice(0, 300) || 'The build failed.' } };
+  });
 }
 
 /* ------------------------------------------------------------------ serving */

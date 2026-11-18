@@ -58,7 +58,8 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
 
       <details class="mk-builds" data-mk-builds>
         <summary data-builds-sum>App builds</summary>
-        <p class="small muted">Each group's app runs beside the marking form: a real web build made from the GitHub repo in its hand-in (or the app files in its ZIP), on a computer with Docker. Student code runs only inside the Docker box.</p>
+        <p class="small muted">Each group's app runs beside the marking form: a real web build made from the GitHub repo in its hand-in (or the app files in its ZIP). <b>Every hand-in is built automatically every hour</b> (on GitHub, in a Docker box), now and for anything handed in later, so a new app shows within about an hour. Student code runs only inside the Docker box.</p>
+        <p class="small muted">To build one right away, or again, on your own computer with Docker:</p>
         <ol class="mk-builds-steps small">
           <li><button type="button" class="btn btn-ghost btn-sm" data-builds-list>Download the build list</button></li>
           <li>On a computer with Docker, in the labverse folder: <code class="mk-code">npm run previews -- build-list.json</code> It builds only new or changed apps (about 3–6 minutes each).</li>

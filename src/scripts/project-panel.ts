@@ -12,7 +12,7 @@ import { findRepo } from '@/lib/previews/core';
 import { loadPdfjs, renderPdf, unzip } from '@/scripts/doc-text';
 
 type BuildInfo = { key: string; source: 'repo' | 'zip'; repo: string | null; sha: string | null; sdk: string | null; builtAt: string; by: string; size: number };
-type Info = { repo: string | null; repoBy: 'found' | 'staff' | null; checked: string; build: BuildInfo | null };
+type Info = { repo: string | null; repoBy: 'found' | 'staff' | null; checked: string; build: BuildInfo | null; fail?: { handIn: string; at: string; note: string } | null };
 type HandIn = { entry: string; group: number | null; studentId: string; url: string; updatedAt: string; repo: string | null; built: { key: string } | null };
 type Data = { list: { item: string; generatedAt: string; entries: HandIn[] }; info: Record<string, Info>; upload: 'blob' | 'local' | null; folder: string };
 type Tab = 'app' | 'report' | 'files';
@@ -176,7 +176,9 @@ export function createProjectPanel(host: HTMLElement, opts: { item: () => string
       ${b ? `<div class="mk-phone-wrap"><div class="mk-phone"><iframe src="/preview/${esc(b.key)}/" title="App of group ${group}" sandbox="allow-scripts allow-forms allow-modals" loading="lazy" referrerpolicy="no-referrer" data-proj-frame></iframe></div></div>
         <p class="mk-proj-cap small">A real web build of the app (${b.source === 'repo' ? `GitHub${b.sha ? `, commit ${esc(b.sha.slice(0, 7))}` : ''}` : 'the files in the hand-in ZIP'}${b.sdk ? ` · Expo ${esc(b.sdk)}` : ''}) · built ${esc(when(b.builtAt))}. Native-only parts (camera, notifications…) can differ from a phone.</p>
         <div class="mk-proj-row"><button type="button" class="btn btn-ghost btn-sm" data-proj-reload>Restart the app</button><a class="btn btn-ghost btn-sm" href="/preview/${esc(b.key)}/" target="_blank" rel="noopener">Open full screen ↗</a></div>`
-        : `<div class="mk-proj-empty"><b>Not built yet.</b><p class="small">Open <b>App builds</b> on the Marks tab: download the build list, run the builder on a computer with Docker, and upload the ZIPs it makes. The app then runs here for every TA.</p></div>`}`;
+        : info?.fail && info.fail.handIn === h.updatedAt
+          ? `<div class="mk-proj-empty"><b>The automatic build did not work.</b><p class="small">${esc(info.fail.note)} (${esc(when(info.fail.at))}). It is tried again a day later. If the link is wrong, change it above and the next build uses it.</p></div>`
+          : `<div class="mk-proj-empty"><b>Not built yet.</b><p class="small">New hand-ins are built automatically every hour, so the app shows here within about an hour. ${repo || /\.zip$/i.test(h.url) ? '' : 'No GitHub link or app files were found in this hand-in yet: add the link above if you have it.'}</p></div>`}`;
     if (!lookedAt && !repo && !finding.has(h.entry)) void find(h);
   }
 
