@@ -122,6 +122,9 @@ test('the app folder of a ZIP or repo, and the files worth opening', () => {
   assert.equal(keepFile('app/index.tsx', 10), true);
   const names = [{ name: 'r/mobile/app/index.tsx', size: 10 }, { name: 'r/mobile/assets/icon.png', size: 10 }, { name: 'r/mobile/.git/config', size: 10 }, { name: 'r/server/index.js', size: 10 }, { name: 'r/mobile/app/', size: 0 }];
   assert.deepEqual(appFiles(names, 'r/mobile/'), ['r/mobile/app/index.tsx', 'r/mobile/assets/icon.png']);
+  // the app is the whole repo: the repo folder's own entry is not a file (it made "Open in BUENOVA Code" fail: EISDIR)
+  assert.equal(keepFile('', 0), false);
+  assert.deepEqual(appFiles([{ name: 'estateshare-HEAD/', size: 0 }, { name: 'estateshare-HEAD/App.js', size: 10 }], 'estateshare-HEAD/'), ['estateshare-HEAD/App.js']);
 });
 
 test('a build that failed on the build computer (EACCES) is built again at once, not a day later', () => {

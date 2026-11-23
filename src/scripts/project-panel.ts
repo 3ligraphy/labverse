@@ -198,7 +198,7 @@ export function createProjectPanel(host: HTMLElement, opts: { item: () => string
       tell(`Opened in a new tab (${src.files.size} files from ${src.from === 'repo' ? 'GitHub' : 'the hand-in ZIP'}).`);
     } catch (error) {
       tab.fail();
-      tell(error instanceof Error ? error.message : 'Could not open the code.', true);
+      tell(`Could not open the code: ${error instanceof Error ? error.message : 'unknown error'}.`, true);
     } finally {
       btn.disabled = false;
     }

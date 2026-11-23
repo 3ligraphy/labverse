@@ -27,7 +27,8 @@ export async function ideProjectFor(key: string, name: string, src: AppSource, o
   const fs = new WorkspaceFS(ws.id);
   try {
     let i = 0;
-    const all = [...src.files];
+    // files only: never a folder entry or an empty name (writing those over a folder fails with EISDIR)
+    const all = [...src.files].filter(([path]) => path && !path.endsWith('/'));
     for (const [path, bytes] of all) {
       await fs.write(`/${path}`, bytes);
       if (++i % 40 === 0) onStep?.(`Copying ${i} of ${all.length} files…`);

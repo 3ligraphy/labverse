@@ -14,7 +14,8 @@ export const MAX_FILES = 3000;
 
 /** Whether a file of the archive is worth copying (not a folder, not skipped, not too big). */
 export function keepFile(name: string, size: number): boolean {
-  return !name.endsWith('/') && !name.includes('..') && !SKIP_DIR.test(name) && !SKIP_FILE.test(name) && size <= MAX_FILE_BYTES;
+  // '' is the app folder's own entry (repo-main/ when the app is the whole repo): a folder, not a file
+  return name !== '' && !name.endsWith('/') && !name.includes('..') && !SKIP_DIR.test(name) && !SKIP_FILE.test(name) && size <= MAX_FILE_BYTES;
 }
 
 /**

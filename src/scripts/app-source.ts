@@ -21,7 +21,7 @@ async function appInZip(bytes: Uint8Array, depth = 0): Promise<Map<string, Uint8
   if (root !== null) {
     const want = new Set(appFiles(sizes, root));
     const files = await unzip(bytes, (n) => want.has(n));
-    return new Map(Object.entries(files).map(([n, b]) => [n.slice(root.length), b]));
+    return new Map(Object.entries(files).map(([n, b]) => [n.slice(root.length), b] as const).filter(([n]) => n && !n.endsWith('/')));
   }
   // some groups zip their repo and hand in that ZIP inside another one
   if (depth > 0) return null;
@@ -53,7 +53,7 @@ export function appSource(h: { entry: string; updatedAt: string; url: string }, 
       if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? `Could not get github.com/${repo} (${r.status}).`);
       const zip = new Uint8Array(await r.arrayBuffer());
       const files = await unzip(zip, () => true);
-      return { files: new Map(Object.entries(files).filter(([n]) => !n.endsWith('/'))), from: 'repo', repo };
+      return { files: new Map(Object.entries(files).filter(([n]) => n && !n.endsWith('/'))), from: 'repo', repo };
     })();
     cache.set(key, hit);
     hit.catch(() => cache.delete(key));
