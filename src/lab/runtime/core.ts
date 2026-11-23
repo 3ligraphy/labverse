@@ -171,8 +171,8 @@ export function createRuntime(opts: { container: HTMLElement; post: Post; onFram
     modules = createModuleSystem(builtins, request.files);
 
     try {
-      // an expo-router project: app/_layout.tsx → the screen for the current address, with real navigation
-      if (request.entry.startsWith('app/')) {
+      // an expo-router project: app/_layout.tsx (or src/app/) → the screen for the current address, with real navigation
+      if (request.entry.startsWith('app/') || request.entry.startsWith('src/app/')) {
         const system = modules;
         const RouterApp = createRouterApp(Object.keys(request.files), (file) => system.load(file), () => {});
         mount(createElement(RouterApp));

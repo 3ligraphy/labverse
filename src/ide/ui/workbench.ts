@@ -102,7 +102,11 @@ export class Workbench {
     this.sideViews.sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
     v.el.hidden = true;
     this.sideBody.append(v.el);
-    if (v.id === this.activeSide && this.sideVisible) this.showSide(v.id, false);
+    const wanted = memo.get('side.view', 'explorer');
+    if (this.sideVisible && v.id === wanted) this.showSide(v.id, false);
+    // the view last used (the Guide of a lab project) is not in this project: show this one meanwhile, without
+    // forgetting the choice, so the side bar is never empty (a group's app opened from Marking has no Guide)
+    else if (this.sideVisible && !this.sideViews.some((x) => x.id === this.activeSide && !x.el.hidden)) this.showSide(v.id, false, false);
     else this.paintActivity();
   }
   removeSideView(id: string) {
@@ -113,13 +117,13 @@ export class Workbench {
     if (this.activeSide === id) this.showSide('explorer', false); else this.paintActivity();
   }
   setBadge(id: string, text: string) { if (text) this.badges.set(id, text); else this.badges.delete(id); this.paintActivity(); }
-  showSide(id: string, toggle = true) {
+  showSide(id: string, toggle = true, remember = true) {
     if (toggle && this.sideVisible && this.activeSide === id) { this.sideVisible = false; this.apply(); return; }
     const v = this.sideViews.find((x) => x.id === id);
     if (!v) return;
     this.activeSide = id;
     this.sideVisible = true;
-    memo.set('side.view', id);
+    if (remember) memo.set('side.view', id);
     for (const x of this.sideViews) x.el.hidden = x !== v;
     this.sideTitle.textContent = v.title.toUpperCase();
     this.refreshSideActions();
