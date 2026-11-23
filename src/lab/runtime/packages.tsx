@@ -14,6 +14,7 @@ import aesjs from 'aes-js';
 import * as SQLite from './sqlite.ts';
 import { AsyncStorage, decode, encode, ExpoCrypto, ImagePicker, KvStore, MMKVModule, NetInfoModule, SecureStore } from './storage.ts';
 import { createClient as createSupabaseClient } from './supabase.ts';
+import { SvgModule } from './svg.tsx';
 
 type AnyProps = Record<string, any>;
 
@@ -116,6 +117,7 @@ export function createPackages(rn: { SafeAreaView: unknown; insets: Record<strin
     'expo-font': { useFonts: () => [true, null], loadAsync: resolved, isLoaded: () => true },
     'expo-splash-screen': { preventAutoHideAsync: resolved, hideAsync: resolved, hide: noop, setOptions: noop },
     'expo-image': { Image },
+    'react-native-svg': SvgModule,
     'expo-status-bar': { StatusBar: () => null, setStatusBarStyle: noop },
     'react-native-gesture-handler': { GestureHandlerRootView: ViewPassthrough, gestureHandlerRootHOC: (c: unknown) => c },
     'react-native-screens': { enableScreens: noop, enableFreeze: noop },
@@ -153,6 +155,17 @@ export const PACKAGE_NAMES = [
   'expo-haptics', 'expo-image', 'react-native-safe-area-context', 'nativewind', 'axios',
   'react-native-mmkv', 'expo-secure-store', '@react-native-community/netinfo', 'expo-sqlite', 'expo-sqlite/kv-store',
   'expo-sqlite/localStorage/install', 'expo-image-picker', 'expo-crypto', 'base64-arraybuffer', 'react-native-url-polyfill/auto',
-  'react-native-get-random-values', 'aes-js', '@supabase/supabase-js',
+  'react-native-get-random-values', 'aes-js', '@supabase/supabase-js', 'react-native-svg', '@expo-google-fonts/…',
 ];
+
+/**
+ * @expo-google-fonts/<family>: useFonts says the fonts are loaded, and each font name (Inter_400Regular…) is its
+ * own name, used as the fontFamily. The browser falls back to its own font when it does not have that one.
+ */
+export function googleFontsModule(): Record<string, unknown> {
+  return new Proxy({ useFonts: () => [true, null], __esModule: true } as Record<string | symbol, unknown>, {
+    get: (target, key) => (key in target ? target[key] : typeof key === 'string' ? key : undefined),
+    has: () => true,
+  });
+}
 

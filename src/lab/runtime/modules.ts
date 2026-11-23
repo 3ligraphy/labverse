@@ -12,7 +12,7 @@ export class LabError extends Error {
 }
 
 import { createLoopGuard, PREVIEW_ENV } from '../engine/guard.ts';
-import { PACKAGE_NAMES } from './packages.tsx';
+import { PACKAGE_NAMES, googleFontsModule } from './packages.tsx';
 import { localStoragePolyfill } from './storage.ts';
 
 /**
@@ -104,6 +104,7 @@ export function createModuleSystem(builtins: Builtins, files: Record<string, str
     return (spec: string): unknown => {
       if (own(builtins, spec)) return builtins[spec];
       if (/\.(css|scss|sass)$/.test(spec)) return {};
+      if (spec.startsWith('@expo-google-fonts/')) return googleFontsModule();
       if (/^(\.|\/|@\/)/.test(spec)) {
         const file = resolveFile(from, spec);
         if (file) return load(file);
@@ -120,10 +121,21 @@ export function createModuleSystem(builtins: Builtins, files: Record<string, str
     if (code === undefined) throw new LabError(`The file '${path}' doesn't exist.`);
     const module = { exports: {} as Record<string, unknown> };
     cache.set(path, module);
+    try {
+      run(path, code, module);
+    } catch (error) {
+      // a file that failed is not kept half-loaded: loading it again (React renders twice after an error) must show
+      // the same error, not an empty module ("… must export default a component")
+      cache.delete(path);
+      throw error;
+    }
+    return module.exports;
+  }
+
+  function run(path: string, code: string, module: { exports: Record<string, unknown> }) {
     // `localStorage`: the sandboxed preview has none; this is the one `import 'expo-sqlite/localStorage/install'` adds on a phone
     const factory = new Function('require', 'module', 'exports', '__labLoop', 'process', 'localStorage', ...SHADOWED, `${code}\n//# sourceURL=lab:///${path}`);
     factory(requireFrom(path), module, module.exports, loopGuard, process, localStoragePolyfill, ...shadows);
-    return module.exports;
   }
 
   return {
