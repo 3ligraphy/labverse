@@ -77,7 +77,7 @@ async function mount(files: Files) {
     const sys = createModuleSystem(files, builtins, PACKAGE_NAMES);
     const names = Object.keys(files);
     let App: React.ComponentType;
-    if (names.some((f) => f.startsWith('app/'))) {
+    if (ExpoRouter.hasRoutes(names)) {
       App = ExpoRouter.createRouterApp(names, (f) => sys.require(f), (href) => post({ type: 'route', href }));
     } else {
       const entry = names.includes('App.tsx') ? 'App.tsx' : names[0];

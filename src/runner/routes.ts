@@ -1,6 +1,7 @@
 /**
  * expo-router's file-based routing, reduced to what the labs use:
- * app/_layout.tsx, groups like (tabs), index routes and [param] segments.
+ * app/_layout.tsx, groups like (tabs), index routes and [param] segments. The routes folder is app/, or src/app/
+ * when there is no app/ (as expo-router does: newer Expo templates put it there).
  */
 export type Route = { file: string; name: string; segments: string[]; layouts: string[] };
 export type Match = { route: Route; params: Record<string, string> };
@@ -19,15 +20,23 @@ export function childName(route: Route, level: number): string {
   return next ? dirOf(next).slice(dir.length + 1) : strip(route.file).slice(dir.length + 1);
 }
 
+/** The folder of the routes: app/, else src/app/; null when the project has neither (no expo-router). */
+export function routesDir(fileNames: readonly string[]): 'app' | 'src/app' | null {
+  if (fileNames.some((f) => f.startsWith('app/') && CODE.test(f))) return 'app';
+  if (fileNames.some((f) => f.startsWith('src/app/') && CODE.test(f))) return 'src/app';
+  return null;
+}
+
 export function buildRoutes(fileNames: string[]): Route[] {
+  const root = routesDir(fileNames) ?? 'app';
   const layoutIn = new Map<string, string>();
-  for (const f of fileNames) if (/^app\/(.*\/)?_layout\.(tsx|ts|jsx|js)$/.test(f)) layoutIn.set(dirOf(f), f);
+  for (const f of fileNames) if (f.startsWith(`${root}/`) && /(^|\/)_layout\.(tsx|ts|jsx|js)$/.test(f)) layoutIn.set(dirOf(f), f);
   const routes: Route[] = [];
   for (const file of fileNames) {
-    if (!file.startsWith('app/') || !CODE.test(file) || /(^|\/)_layout\.\w+$/.test(file)) continue;
-    const parts = strip(file).split('/').slice(1);
+    if (!file.startsWith(`${root}/`) || !CODE.test(file) || /(^|\/)_layout\.\w+$/.test(file)) continue;
+    const parts = strip(file).slice(root.length + 1).split('/');
     const layouts: string[] = [];
-    let dir = 'app';
+    let dir = root;
     if (layoutIn.has(dir)) layouts.push(layoutIn.get(dir)!);
     for (const p of parts.slice(0, -1)) {
       dir += `/${p}`;
@@ -35,7 +44,7 @@ export function buildRoutes(fileNames: string[]): Route[] {
     }
     const segments = parts.filter((p) => !isGroup(p));
     if (segments[segments.length - 1] === 'index') segments.pop();
-    const base = layouts.length ? dirOf(layouts[layouts.length - 1]) : 'app';
+    const base = layouts.length ? dirOf(layouts[layouts.length - 1]) : root;
     routes.push({ file, name: strip(file).slice(base.length + 1), segments, layouts });
   }
   const dyn = (r: Route) => r.segments.filter(isDynamic).length;

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { compile, resolve, createModuleSystem } from '../src/runner/modules.ts';
-import { buildRoutes, matchRoute, childName, hrefOf, buildHref } from '../src/runner/routes.ts';
+import { buildRoutes, matchRoute, childName, hrefOf, buildHref, routesDir } from '../src/runner/routes.ts';
 
 /* ---------------- modules ---------------- */
 
@@ -61,6 +61,21 @@ test('buildRoutes maps files to URL segments, names and layout chains', () => {
   assert.deepEqual(byFile['app/recipe/[id].tsx'].layouts, ['app/_layout.tsx']);
   assert.equal(byFile['app/(tabs)/favorites.tsx'].name, 'favorites');
   assert.equal(byFile['app/recipe/[id].tsx'].name, 'recipe/[id]');
+});
+
+test('routes in src/app/ (newer Expo templates) work like app/', () => {
+  const files = ['src/app/_layout.tsx', 'src/app/index.tsx', 'src/app/estate/new.tsx', 'src/app/estate/[id]/index.tsx', 'src/app/estate/[id]/shares.tsx', 'src/components/ui/Card.tsx', 'src/data/types.ts'];
+  assert.equal(routesDir(files), 'src/app');
+  assert.equal(routesDir(['app/index.tsx', 'src/app/index.tsx']), 'app', 'app/ wins, as in expo-router');
+  assert.equal(routesDir(['App.tsx', 'src/App.tsx']), null);
+  const routes = buildRoutes(files);
+  const byFile = Object.fromEntries(routes.map((r) => [r.file, r]));
+  assert.equal(routes.length, 4, 'components and data are not routes');
+  assert.deepEqual(byFile['src/app/index.tsx'].segments, []);
+  assert.deepEqual(byFile['src/app/estate/[id]/shares.tsx'].segments, ['estate', '[id]', 'shares']);
+  assert.deepEqual(byFile['src/app/estate/[id]/index.tsx'].layouts, ['src/app/_layout.tsx']);
+  assert.equal(byFile['src/app/estate/new.tsx'].name, 'estate/new');
+  assert.deepEqual(matchRoute(routes, '/estate/7/shares')?.params, { id: '7' });
 });
 
 test('matchRoute matches static before dynamic and reads params + query', () => {

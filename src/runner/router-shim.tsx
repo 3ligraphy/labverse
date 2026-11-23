@@ -5,7 +5,7 @@
 import React, { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useLayoutEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native-web';
 import { safeArea } from '../lab/runtime/safe-area.ts';
-import { buildHref, buildRoutes, childName, hrefOf, isDynamicRoute, matchRoute, type Href, type Match, type Route } from './routes.ts';
+import { buildHref, buildRoutes, childName, hrefOf, isDynamicRoute, matchRoute, routesDir, type Href, type Match, type Route } from './routes.ts';
 
 type Options = {
   title?: string;
@@ -36,7 +36,7 @@ export const useRouter = () => router;
 
 function useRouterCtx() {
   const c = useContext(RouterCtx);
-  if (!c) throw new Error('expo-router hooks only work in files inside the app/ folder.');
+  if (!c) throw new Error('expo-router hooks only work in files inside the app/ (or src/app/) folder.');
   return c;
 }
 export const useLocalSearchParams = () => useRouterCtx().match.params;
@@ -194,7 +194,10 @@ export function Link({ href, replace, asChild, children, style, ...rest }: LinkP
   return <Text accessibilityRole="link" style={[{ color: '#2563eb' }, style]} onPress={go} {...rest}>{children}</Text>;
 }
 
-/** Builds the root component for a project that has an app/ folder. */
+/** Whether the project routes with expo-router: it has an app/ (or src/app/) folder. */
+export const hasRoutes = (fileNames: readonly string[]) => routesDir(fileNames) !== null;
+
+/** Builds the root component for a project that has an app/ (or src/app/) folder. */
 export function createRouterApp(fileNames: string[], load: (file: string) => any, onRoute: (href: string) => void) {
   const routes = buildRoutes(fileNames);
   return function RouterApp() {
