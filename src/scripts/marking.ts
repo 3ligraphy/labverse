@@ -9,6 +9,7 @@ import { HELPERS, LEVELS, RULES, explain, suggest, type Answers, type Question }
 import { canEdit, myRow, type MarkingDoc, type Marker } from '@/lib/marking/doc';
 import { parseMarkingFile, type ParsedRow } from '@/lib/marking/xlsx-read';
 import { createProjectPanel, wireAppBuilds } from '@/scripts/project-panel';
+import { autoMark, groupsMarkedBy, readEvidence, taPattern, type AutoMark } from '@/lib/marking/automark';
 
 type Group = { number: number; members: { id: string; name: string }[]; idea: string };
 type Data = {
@@ -241,7 +242,7 @@ export function initMarking(root: HTMLElement) {
           const value = use ? use.scores[c.id] ?? '' : m?.scores[c.id] ?? '';
           return `
           <div class="mk-crit" data-mk-row="${c.id}">
-            <label class="mk-crit-l" for="mk-in-${c.id}">${esc(c.label)}<small class="faint">${avg ? `class avg ${fmt(avg.avg)}` : ''}</small></label>
+            <label class="mk-crit-l" for="mk-in-${c.id}">${esc(c.label)}<small class="faint">${avg ? `class avg ${fmt(avg.avg)}` : ''}</small><small class="mk-auto-tag" data-mk-tag="${c.id}" hidden></small></label>
             <span class="mk-crit-in">
               <input id="mk-in-${c.id}" class="input mono" type="text" inputmode="decimal" autocomplete="off" data-mk-in="${c.id}" value="${esc(value)}" ${can ? '' : 'disabled'} aria-label="${esc(c.label)}, out of ${c.max}" />
               <span class="mono faint">/ ${c.max}</span>
@@ -267,6 +268,7 @@ export function initMarking(root: HTMLElement) {
     auto = new Map(CRITERIA.filter((c) => help[c.id]).map((c) => [c.id, explain(c.id, help[c.id]!).filter((x) => lines.has(`• ${x}`))]));
     dismissed = new Set();
     root.querySelectorAll<HTMLButtonElement>('[data-mk-save], [data-mk-save-next], [data-mk-full]').forEach((b) => (b.hidden = !can));
+    renderAutoBox(n, can);
     $('[data-mk-ro]').hidden = can;
     $('[data-mk-hint]').hidden = !can;
     const bar = $('[data-mk-draft]');
@@ -281,6 +283,86 @@ export function initMarking(root: HTMLElement) {
     if (projOn()) void project.show(n);
     (root.querySelector<HTMLInputElement>('[data-mk-in]:not([disabled])') ?? $('[data-mk-close]')).focus({ preventScroll: true });
   }
+  /* ------------------------------------------------------------------ auto-mark */
+  /**
+   * The Auto-mark box: whose way of marking to follow (the group's TA by default, when they have marked groups;
+   * else yours; else the TA with the most), or the whole class.
+   */
+  function renderAutoBox(n: number, can: boolean) {
+    $('[data-mk-autobox]').hidden = !can;
+    const msgEl = $('[data-mk-auto-msg]');
+    msgEl.hidden = true;
+    msgEl.textContent = '';
+    if (!can) return;
+    const counts = data.doc.tas.map((t) => ({ name: t.name, n: groupsMarkedBy(data.doc, t).filter((g) => g !== n).length }));
+    const pick = [taOf(n), mine()?.name ?? ''].find((name) => counts.some((c) => c.name === name && c.n > 0)) ?? [...counts].sort((a, b) => b.n - a.n).find((c) => c.n > 0)?.name ?? '';
+    $('[data-mk-auto-ta]').innerHTML = `${counts.map((c) => `<option value="${esc(c.name)}" ${c.name === pick ? 'selected' : ''}>${esc(c.name)} (${plural(c.n, 'group')} marked)</option>`).join('')}<option value="" ${pick ? '' : 'selected'}>the whole class</option>`;
+  }
+  const SOURCE_TAG: Record<AutoMark['source'], string> = { answers: 'auto · your answers', evidence: 'auto · from the hand-in', pattern: 'auto · TA pattern', class: 'auto · class pattern' };
+  function tag(id: CriterionId, a: AutoMark | null) {
+    const el = root.querySelector<HTMLElement>(`[data-mk-tag="${id}"]`);
+    if (!el) return;
+    el.hidden = !a;
+    el.textContent = a ? SOURCE_TAG[a.source] : '';
+    el.title = a ? `Why ${fmt(a.value)}: ${a.note}` : '';
+    el.dataset.source = a?.source ?? '';
+  }
+  /**
+   * Auto-mark: reads the hand-in (report text and app code), turns what it shows into assistant answers, and fills
+   * every EMPTY mark the way the chosen TA marks (src/lib/marking/automark.ts). Typed marks stay; nothing is saved.
+   */
+  async function autoFill() {
+    const n = current;
+    if (!n || !editable(n)) return;
+    const btn = $<HTMLButtonElement>('[data-mk-auto]');
+    const msgEl = $('[data-mk-auto-msg]');
+    btn.disabled = true;
+    msgEl.hidden = false;
+    msgEl.dataset.tone = '';
+    msgEl.textContent = 'Reading the hand-in: the report and the app’s code…';
+    try {
+      const ev = await project.evidence(n).catch(() => null);
+      if (current !== n || !dlg.open) return;
+      const evidence = ev ? readEvidence(ev.report, ev.files) : { answers: {}, found: {} };
+      const who = $<HTMLSelectElement>('[data-mk-auto-ta]').value;
+      const ta = data.doc.tas.find((t) => t.name === who) ?? null;
+      const name = ta?.name ?? 'the class';
+      const own = taPattern(data.doc, ta, n);
+      const r = autoMark(evidence, help, own, taPattern(data.doc, null, n), name);
+      const filled: AutoMark[] = [];
+      let kept = 0;
+      for (const c of CRITERIA) {
+        if (r.help[c.id]) help[c.id] = r.help[c.id];
+        const a = r.marks[c.id];
+        if (!a) continue;
+        if (inputOf(c.id).value.trim()) { kept++; continue; }
+        setMark(c.id, a.value);
+        manual.delete(c.id);
+        filled.push(a);
+        tag(c.id, a);
+      }
+      for (const c of CRITERIA) if (r.help[c.id]) syncComment(c.id);
+      updateTotals();
+      renderAssist();
+      saveDraft();
+      const fromHandIn = filled.filter((a) => a.source === 'evidence' || a.source === 'answers').length;
+      const fromPattern = filled.length - fromHandIn;
+      const missing = CRITERIA.filter((c) => !inputOf(c.id).value.trim()).map((c) => c.label);
+      const notRead = ev?.notes.length ? ` Not read: ${ev.notes.join('; ')}.` : ev ? '' : ' The hand-in could not be loaded.';
+      msgEl.dataset.tone = filled.length ? 'ok' : '';
+      msgEl.textContent = filled.length
+        ? `Filled ${plural(filled.length, 'mark')} like ${name}${ta ? ` (learned from ${plural(own.groups.length, 'marked group')})` : ''}: ${fromHandIn} from what the hand-in shows, ${fromPattern} from ${ta ? `${name}’s` : 'the'} usual marks.${kept ? ` ${plural(kept, 'mark')} already in the form ${kept === 1 ? 'was' : 'were'} kept.` : ''}${missing.length ? ` Still empty: ${missing.join(', ')}.` : ''}${notRead} Hover an “auto” tag to see why, check every mark, then save.`
+        : kept === CRITERIA.length
+          ? 'Every mark is already filled in: empty a mark to let Auto-mark fill it.'
+          : `Nothing to fill yet: ${ta ? `${name} has` : 'the class has'} too few marked groups and the hand-in showed nothing that decides a mark.${notRead} Mark a few groups first: Auto-mark learns from them.`;
+    } catch (error) {
+      msgEl.dataset.tone = 'err';
+      msgEl.textContent = `Auto-mark did not work: ${(error as Error).message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   /** The dialog's AI button and its line under the members, for group n. */
   function showCall(n: number) {
     const call = callOf(n);
@@ -668,6 +750,7 @@ export function initMarking(root: HTMLElement) {
       }
       return;
     }
+    if (t.closest('[data-mk-auto]')) return void autoFill();
     if (t.closest('[data-mk-full]')) {
       for (const c of CRITERIA) if (!inputOf(c.id).value.trim()) setMark(c.id, c.max);
       updateTotals();
@@ -791,6 +874,7 @@ export function initMarking(root: HTMLElement) {
     if (t.matches('[data-mk-in]')) {
       const id = t.dataset.mkIn as CriterionId;
       manual.add(id);
+      tag(id, null);
       if (id !== active) select(id);
       else renderOut();
     }

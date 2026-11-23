@@ -113,13 +113,19 @@ export function cleanPreviews(input: unknown): Previews {
 export const RETRY_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * A failure of the build computer, not of the student's app (files it could not write or delete, a full disk…):
+ * such a hand-in is built again at the next run instead of a day later, and staff are told it is not the app.
+ */
+export const builderFault = (note: string | null | undefined) => /(EACCES|EPERM|ENOSPC|EBUSY|EMFILE)|permission denied|no space left/i.test(String(note ?? ''));
+
+/**
  * Whether the builder builds this hand-in now: 'current' when its build is still right, 'wait' when it failed for
  * this same hand-in less than a day ago, else 'build'. `pin` (the automatic builder): a build stays until the
  * hand-in itself changes, so staff see the app as it was handed in, not later pushes to the repo. Without `pin` a
  * repo build is current while the repo's commit (`head`) is the one it was built from.
  */
 export function needsBuild(
-  e: { updatedAt: string; repo?: string | null; built: { sha?: string | null; source?: string; handIn?: string | null } | null; failed?: { handIn: string; at: string } | null },
+  e: { updatedAt: string; repo?: string | null; built: { sha?: string | null; source?: string; handIn?: string | null } | null; failed?: { handIn: string; at: string; note?: string } | null },
   opts: { now: number; pin: boolean; force?: boolean; head?: string | null },
 ): 'current' | 'wait' | 'build' {
   if (opts.force) return 'build';
@@ -128,7 +134,7 @@ export function needsBuild(
     if (opts.pin ? b.handIn === e.updatedAt : e.repo ? !!b.sha && b.sha === opts.head : b.source === 'zip' && b.handIn === e.updatedAt) return 'current';
   }
   const f = e.failed;
-  if (f && f.handIn === e.updatedAt && opts.now - Date.parse(f.at) < RETRY_MS) return 'wait';
+  if (f && f.handIn === e.updatedAt && !builderFault(f.note) && opts.now - Date.parse(f.at) < RETRY_MS) return 'wait';
   return 'build';
 }
 
@@ -153,7 +159,7 @@ export function buildList(item: string, entries: readonly { id: string; student_
         /** the hand-in version already searched for a repo */
         checked: p?.checked ?? '',
         built: p?.build ? { key: p.build.key, sha: p.build.sha, source: p.build.source, handIn: p.build.handIn } : null,
-        failed: p?.fail ? { handIn: p.fail.handIn, at: p.fail.at } : null,
+        failed: p?.fail ? { handIn: p.fail.handIn, at: p.fail.at, note: p.fail.note } : null,
       };
     }),
   };

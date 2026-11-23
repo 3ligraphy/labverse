@@ -105,8 +105,34 @@ function docker(argv, logFile) {
     let log = '';
     p.stdout.on('data', (d) => (log += d));
     p.stderr.on('data', (d) => (log += d));
-    p.on('close', (code) => { writeFileSync(logFile, log); done(code); });
+    p.on('error', () => done(-1));
+    p.on('close', (code) => {
+      if (logFile) try { writeFileSync(logFile, log); } catch { /* the log only */ }
+      done(code);
+    });
   });
+}
+
+/** The user the build runs as, so the box gives its files back to it (Linux / macOS; Docker Desktop on Windows maps them). */
+const owner = typeof process.getuid === 'function' ? { uid: process.getuid(), gid: process.getgid() } : null;
+
+/**
+ * Removes a build's work folder. Never fails a build: a folder that cannot be removed (files the box made as root,
+ * from an older box script) is removed from inside a box, and if even that fails it is left for the next run.
+ */
+async function cleanup(box) {
+  try {
+    rmSync(box, { recursive: true, force: true });
+    return;
+  } catch {
+    /* root's files: below */
+  }
+  await docker(['run', '--rm', '-v', `${fwd(box)}:/w`, image, 'sh', '-c', 'rm -rf /w/* /w/.[!.]* 2>/dev/null; true'], null);
+  try {
+    rmSync(box, { recursive: true, force: true });
+  } catch {
+    /* left behind: the runner's disk is thrown away after the run anyway */
+  }
 }
 
 const zipDir = (dir, extra) => {
@@ -145,6 +171,7 @@ async function build(entry) {
   const outDir = join(box, 'out');
   mkdirSync(outDir, { recursive: true });
   const argv = ['run', '--rm', '-e', `BASE=/preview/${key}`, '-v', `${fwd(script)}:/run.sh:ro`, '-v', `${fwd(outDir)}:/out`, '--workdir', '/work', '--memory', '4g'];
+  if (owner) argv.push('-e', `HOST_UID=${owner.uid}`, '-e', `HOST_GID=${owner.gid}`);
   // a shared npm cache is faster on your own computer; the automatic run keeps every build apart
   if (!ci) argv.push('-v', 'buenova-npm-cache:/root/.npm');
   let source = 'repo';
@@ -154,6 +181,7 @@ async function build(entry) {
     try {
       zipSource(bytes ?? (await download(entry.url)), join(box, 'src'));
     } catch (error) {
+      await cleanup(box);
       return { ...base, found, status: 'failed', note: error.message };
     }
     argv.push('-v', `${fwd(join(box, 'src'))}:/src:ro`);
@@ -165,13 +193,18 @@ async function build(entry) {
   await docker(argv, join(box, 'docker.log'));
   const result = existsSync(join(outDir, 'build.json')) ? JSON.parse(readFileSync(join(outDir, 'build.json'), 'utf8')) : { ok: false, error: 'The build box stopped early (see docker.log)' };
   const secs = Math.round((Date.now() - started) / 1000);
-  if (!result.ok) return { ...base, found, status: 'failed', note: ci ? String(result.error).replace(/\s*\(see [^)]*\)/g, '') : `${result.error} · logs in ${box}`, secs };
+  if (!result.ok) {
+    // the automatic run keeps nothing (its log is public anyway); by hand the logs stay for you to read
+    if (ci) await cleanup(box);
+    return { ...base, found, status: 'failed', note: ci ? String(result.error).replace(/\s*\(see [^)]*\)/g, '') : `${result.error} · logs in ${box}`, secs };
+  }
   const manifest = { v: 1, key, entry: entry.entry, group: entry.group ?? null, studentId: entry.studentId, repo, sha: result.sha ?? head, source, handIn: entry.updatedAt, sdk: result.sdk, root: result.root, builtAt: new Date().toISOString() };
   const zip = zipDir(join(outDir, 'dist'), { 'preview.json': new TextEncoder().encode(JSON.stringify(manifest, null, 2)) });
   // the build's key is its file name too: the upload keeps it (Admin → App builds, or ci.mjs)
   const file = join(out, ci ? `${key}.zip` : `group-${entry.group ?? 'x'}-${entry.studentId}.zip`);
   writeFileSync(file, zip);
-  rmSync(box, { recursive: true, force: true });
+  // the build is done and saved: tidying up can no longer turn it into a failure
+  await cleanup(box);
   return { ...base, found, status: 'built', file, key, note: `${(zip.length / 1024 / 1024).toFixed(1)} MB · expo ${result.sdk || '?'}`, secs };
 }
 

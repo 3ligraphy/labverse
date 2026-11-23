@@ -9,6 +9,10 @@
 set -uo pipefail
 export CI=1 EXPO_NO_TELEMETRY=1 EXPO_NO_GIT_STATUS=1 NPM_CONFIG_UPDATE_NOTIFIER=false npm_config_fund=false npm_config_audit=false
 mkdir -p /out
+# the box runs as root, so everything it writes in /out is root's: hand it back to the user who started the build
+# (HOST_UID / HOST_GID), on every exit, or the builder cannot delete its own work folder afterwards (EACCES)
+give_back() { [ -n "${HOST_UID:-}" ] && chown -R "${HOST_UID}:${HOST_GID:-$HOST_UID}" /out 2>/dev/null; chmod -R u+rwX,go+rX /out 2>/dev/null; true; }
+trap give_back EXIT
 fail() { node -e 'const fs=require("fs");fs.writeFileSync("/out/build.json",JSON.stringify({ok:false,error:process.argv[1],sha:process.env.SHA||null,root:process.env.ROOT||null,sdk:process.env.SDK||null}))' "$1"; echo "BUILD FAILED: $1"; exit 1; }
 
 cd /work || exit 1

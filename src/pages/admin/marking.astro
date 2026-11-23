@@ -108,7 +108,14 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
       <div class="mk-d-body">
         <div class="mk-d-form">
           <p class="mk-draft small" data-mk-draft hidden></p>
-          <div class="mk-formtools"><button type="button" class="mk-link" data-mk-full>Fill the empty marks with full marks</button></div>
+          <div class="mk-formtools">
+            <span class="mk-autobox" data-mk-autobox>
+              <button type="button" class="btn btn-primary btn-sm" data-mk-auto title="Reads the report and the app's code, then fills the empty marks the way the chosen TA marks. Nothing is saved until you save.">Auto-mark</button>
+              <label class="small muted">like <select class="input mk-select" data-mk-auto-ta aria-label="Mark the way this TA marks"></select></label>
+            </span>
+            <button type="button" class="mk-link" data-mk-full>Fill the empty marks with full marks</button>
+          </div>
+          <p class="mk-auto-msg small" role="status" data-mk-auto-msg hidden></p>
           <div data-mk-form></div>
           <p class="mk-total" data-mk-total></p>
           <label class="mk-comment"><span>Comments <span class="mono faint" data-mk-count></span></span><textarea class="input" rows="7" data-mk-comment placeholder="What to fix next phase. The assistant adds a ready sentence here for each finding that costs marks."></textarea></label>
@@ -307,7 +314,17 @@ if (!(await canManageSubmissions(Astro.cookies))) return Astro.redirect('/admin'
   .mk-pick { width: 28px; height: 28px; flex: none; border: 1px solid var(--line-2); border-radius: 50%; background: var(--surface); color: var(--text-2); font: 700 13px var(--font-body); cursor: pointer; }
   .mk-pick:hover, .mk-crit[data-active] .mk-pick { border-color: var(--accent-text); color: var(--accent-text); }
   .mk-pick:focus-visible, .mk-step:focus-visible, .mk-link:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
-  .mk-formtools { display: flex; justify-content: flex-end; }
+  .mk-formtools { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
+  .mk-autobox { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mk-autobox[hidden] { display: none; }
+  .mk-autobox label { display: inline-flex; align-items: center; gap: 6px; }
+  .mk-autobox .mk-select { height: 34px; max-width: 240px; }
+  .mk-auto-msg { margin: 0; padding: 8px 12px; border-radius: var(--r-md); background: var(--surface-2); color: var(--text-2); }
+  .mk-auto-msg[data-tone='ok'] { background: color-mix(in oklab, var(--ok) 10%, transparent); color: var(--text); }
+  .mk-auto-msg[data-tone='err'] { color: var(--danger); }
+  .mk-auto-tag { width: max-content; margin-top: 2px; padding: 0 6px; border-radius: 999px; font: 600 10.5px var(--font-mono); color: var(--accent-text); background: var(--accent-soft); cursor: help; }
+  .mk-auto-tag[hidden] { display: none; }
+  .mk-auto-tag[data-source='pattern'], .mk-auto-tag[data-source='class'] { color: var(--text); background: color-mix(in oklab, var(--info) 16%, transparent); }
   .mk-link { padding: 0; border: 0; background: none; color: var(--accent-text); font: 600 13px var(--font-body); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
   .mk-draft { margin: 0; padding: 8px 12px; border-radius: var(--r-md); background: color-mix(in oklab, var(--info) 14%, transparent); }
   .mk-crit-in .input[aria-invalid='true'] { border-color: var(--warn); }

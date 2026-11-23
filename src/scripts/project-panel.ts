@@ -8,8 +8,9 @@
  * The repo is looked for in the hand-in here, once per hand-in version, and saved for every TA.
  */
 import { upload } from '@vercel/blob/client';
-import { findRepo } from '@/lib/previews/core';
+import { builderFault, findRepo } from '@/lib/previews/core';
 import { loadPdfjs, renderPdf, unzip } from '@/scripts/doc-text';
+import { appSource, type AppSource } from '@/scripts/app-source';
 
 type BuildInfo = { key: string; source: 'repo' | 'zip'; repo: string | null; sha: string | null; sdk: string | null; builtAt: string; by: string; size: number };
 type Info = { repo: string | null; repoBy: 'found' | 'staff' | null; checked: string; build: BuildInfo | null; fail?: { handIn: string; at: string; note: string } | null };
@@ -103,6 +104,30 @@ async function reportOf(url: string): Promise<{ kind: 'pdf' | 'docx'; name: stri
   return name ? { kind: /\.pdf$/i.test(name) ? 'pdf' : 'docx', name: name.split('/').pop()!, bytes: b } : null;
 }
 
+/**
+ * Opens a tab at once (a browser only allows a new tab straight after a click) with "Preparing…" in it; `go` then
+ * sends it to the project, `fail` closes it.
+ */
+function reserveTab(): { go: (url: string) => void; fail: () => void } {
+  const win = window.open('', '_blank');
+  try {
+    win?.document.write('<!doctype html><meta charset="utf-8"><title>Opening BUENOVA Code…</title><body style="margin:0;display:grid;place-items:center;height:100vh;background:#0b0d10;color:#cfd6df;font:15px system-ui">Preparing the group’s code for BUENOVA Code…</body>');
+  } catch {
+    /* the tab still opens the project */
+  }
+  return {
+    go: (url) => { if (win && !win.closed) win.location.href = url; else location.href = url; },
+    fail: () => { try { win?.close(); } catch { /* already closed */ } },
+  };
+}
+
+/** The report's text (PDF or Word) of a hand-in, for the auto-marker; '' when there is none. */
+async function reportText(url: string): Promise<string> {
+  const doc = await reportOf(url);
+  if (!doc) return '';
+  return doc.kind === 'pdf' ? pdfText(doc.bytes) : docxText(doc.bytes);
+}
+
 /* ------------------------------------------------------------------- panel */
 
 export function createProjectPanel(host: HTMLElement, opts: { item: () => string | null; onData?: (d: Data) => void }) {
@@ -129,6 +154,55 @@ export function createProjectPanel(host: HTMLElement, opts: { item: () => string
   }
 
   const handIns = (n: number) => (data?.list.entries ?? []).filter((e) => e.group === n).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  /** the hand-in chosen here, else the newest one whose app is built, else the newest with a repo, else the newest */
+  const chosen = (n: number): HandIn | null => {
+    const list = handIns(n);
+    const info = data?.info ?? {};
+    return list.find((x) => x.entry === picked && n === group) ?? list.find((x) => info[x.entry]?.build) ?? list.find((x) => info[x.entry]?.repo) ?? list[0] ?? null;
+  };
+  const repoOf = (h: HandIn) => data?.info[h.entry]?.repo ?? h.repo ?? null;
+  const sourceOf = (h: HandIn): Promise<AppSource> => appSource(h, repoOf(h), () => bytesOf(h.url));
+
+  /**
+   * What the auto-marker reads from a group's hand-in: the report's text and the app's file paths (from the ZIP or
+   * the repo). Parts that cannot be read are left empty; `notes` says which.
+   */
+  async function evidence(n: number): Promise<{ report: string; files: string[]; notes: string[] } | null> {
+    await load();
+    const h = chosen(n);
+    if (!h) return null;
+    const notes: string[] = [];
+    const [report, files] = await Promise.all([
+      reportText(h.url).catch(() => { notes.push('the report could not be read'); return ''; }),
+      sourceOf(h).then((s) => [...s.files.keys()]).catch((e: Error) => { notes.push(e.message.replace(/\.$/, '')); return [] as string[]; }),
+    ]);
+    if (!report) notes.push('no report text was found');
+    return { report, files, notes };
+  }
+
+  /** "Open in BUENOVA Code": the app's code as a project of the browser IDE, with its phone emulator, in a new tab. */
+  async function openIde(btn: HTMLButtonElement) {
+    const h = handIns(group).find((x) => x.entry === shown) ?? chosen(group);
+    if (!h) return;
+    const say = host.querySelector<HTMLElement>('[data-proj-ide-msg]');
+    const tell = (t: string, err = false) => { if (say) { say.textContent = t; say.classList.toggle('mk-proj-err', err); } };
+    const tab = reserveTab();
+    btn.disabled = true;
+    try {
+      tell(repoOf(h) ? 'Getting the code…' : 'Reading the hand-in…');
+      const src = await sourceOf(h);
+      tell(`Copying ${src.files.size} files…`);
+      const { ideProjectFor } = await import('@/scripts/open-in-ide');
+      const url = await ideProjectFor(`${h.entry}:${h.updatedAt}:${src.repo ?? ''}`, `Group ${group} · ${h.studentId}${src.from === 'repo' ? ` · ${src.repo}` : ''}`, src, tell);
+      tab.go(url);
+      tell(`Opened in a new tab (${src.files.size} files from ${src.from === 'repo' ? 'GitHub' : 'the hand-in ZIP'}).`);
+    } catch (error) {
+      tab.fail();
+      tell(error instanceof Error ? error.message : 'Could not open the code.', true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
 
   async function show(n: number) {
     if (n !== group) picked = '';
@@ -152,7 +226,7 @@ export function createProjectPanel(host: HTMLElement, opts: { item: () => string
     if (!list.length) { body.innerHTML = `<p class="mk-proj-note">No hand-in from group ${group} for this item.</p>`; return; }
     // the hand-in chosen here, else the newest one whose app is built, else the newest with a repo, else the newest
     const info = data.info;
-    const h = list.find((x) => x.entry === picked) ?? list.find((x) => info[x.entry]?.build) ?? list.find((x) => info[x.entry]?.repo) ?? list[0];
+    const h = chosen(group)!;
     shown = h.entry;
     const more = list.length > 1
       ? `<label class="mk-proj-pick small">${list.length} hand-ins from this group <select class="input" data-proj-pick>${list.map((x) => `<option value="${esc(x.entry)}" ${x.entry === h.entry ? 'selected' : ''}>${esc(x.studentId)} · ${esc(when(x.updatedAt))}${info[x.entry]?.build ? ' · app built' : ''}</option>`).join('')}</select></label>`
@@ -172,12 +246,15 @@ export function createProjectPanel(host: HTMLElement, opts: { item: () => string
       : lookedAt ? '<span class="faint">No GitHub link found in the hand-in.</span>' : '<span class="faint">Looking for the GitHub link in the hand-in…</span>';
     body.innerHTML = `${more}
       <div class="mk-proj-row">${repoLine} <button type="button" class="mk-link" data-proj-repo-edit>${repo ? 'Change' : 'Add the link'}</button></div>
+      <div class="mk-proj-row"><button type="button" class="btn btn-primary btn-sm" data-proj-ide ${repo || /\.zip$/i.test(h.url) ? '' : 'disabled'} title="The app's code in BUENOVA Code (the course's VS Code-like editor) with its phone emulator, in a new tab">Open in BUENOVA Code ↗</button><span class="small faint" data-proj-ide-msg>Code + phone emulator, in this browser</span></div>
       <form class="mk-proj-repo-form" data-proj-repo-form hidden><input class="input" name="repo" placeholder="https://github.com/owner/repo" value="${esc(repo ?? '')}" aria-label="GitHub link of the app" /><button class="btn btn-ghost btn-sm">Save</button></form>
       ${b ? `<div class="mk-phone-wrap"><div class="mk-phone"><iframe src="/preview/${esc(b.key)}/" title="App of group ${group}" sandbox="allow-scripts allow-forms allow-modals" loading="lazy" referrerpolicy="no-referrer" data-proj-frame></iframe></div></div>
         <p class="mk-proj-cap small">A real web build of the app (${b.source === 'repo' ? `GitHub${b.sha ? `, commit ${esc(b.sha.slice(0, 7))}` : ''}` : 'the files in the hand-in ZIP'}${b.sdk ? ` · Expo ${esc(b.sdk)}` : ''}) · built ${esc(when(b.builtAt))}. Native-only parts (camera, notifications…) can differ from a phone.</p>
         <div class="mk-proj-row"><button type="button" class="btn btn-ghost btn-sm" data-proj-reload>Restart the app</button><a class="btn btn-ghost btn-sm" href="/preview/${esc(b.key)}/" target="_blank" rel="noopener">Open full screen ↗</a></div>`
         : info?.fail && info.fail.handIn === h.updatedAt
-          ? `<div class="mk-proj-empty"><b>The automatic build did not work.</b><p class="small">${esc(info.fail.note)} (${esc(when(info.fail.at))}). It is tried again a day later. If the link is wrong, change it above and the next build uses it.</p></div>`
+          ? builderFault(info.fail.note)
+            ? `<div class="mk-proj-empty"><b>Waiting for the next automatic build.</b><p class="small">The last try stopped on the build computer, not in the app (${esc(when(info.fail.at))}). It is built again at the next hourly run. Meanwhile, open the code in BUENOVA Code below.</p></div>`
+            : `<div class="mk-proj-empty"><b>The automatic build did not work.</b><p class="small">${esc(info.fail.note)} (${esc(when(info.fail.at))}). It is tried again a day later. If the link is wrong, change it above and the next build uses it.</p></div>`
           : `<div class="mk-proj-empty"><b>Not built yet.</b><p class="small">New hand-ins are built automatically every hour, so the app shows here within about an hour. ${repo || /\.zip$/i.test(h.url) ? '' : 'No GitHub link or app files were found in this hand-in yet: add the link above if you have it.'}</p></div>`}`;
     if (!lookedAt && !repo && !finding.has(h.entry)) void find(h);
   }
@@ -255,6 +332,8 @@ export function createProjectPanel(host: HTMLElement, opts: { item: () => string
     const t = e.target as HTMLElement;
     const tb = t.closest<HTMLElement>('[data-proj-tab]');
     if (tb) { tab = tb.dataset.projTab as Tab; store.set('mk-proj-tab', tab); return render(); }
+    const ide = t.closest<HTMLButtonElement>('[data-proj-ide]');
+    if (ide) return void openIde(ide);
     if (t.closest('[data-proj-reload]')) { const f = host.querySelector<HTMLIFrameElement>('[data-proj-frame]'); if (f) f.src = f.src; return; }
     if (t.closest('[data-proj-repo-edit]')) { const f = host.querySelector<HTMLFormElement>('[data-proj-repo-form]'); if (f) { f.hidden = !f.hidden; f.querySelector('input')?.focus(); } }
   });
@@ -276,7 +355,7 @@ export function createProjectPanel(host: HTMLElement, opts: { item: () => string
     render();
   });
 
-  return { show, load, data: () => data };
+  return { show, load, evidence, data: () => data };
 }
 
 /* --------------------------------------------------------------- app builds */

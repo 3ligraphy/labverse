@@ -71,7 +71,8 @@ test('failures are kept per hand-in version, and the build list carries them wit
   assert.equal(p.e2.fail, undefined, 'a failure with no hand-in version is dropped');
   const list = buildList('item1', [{ id: 'e1', student_id: '240001', url: 'https://x/h.pdf', updated_at: 'h1', group: 'G3' }, { id: 'e3', student_id: '240003', url: 'https://x/z.zip', updated_at: 'h9' }], p);
   assert.equal(list.entries[0].checked, 'h1');
-  assert.deepEqual(list.entries[0].failed, { handIn: 'h1', at: '2026-11-18T10:00:00Z' });
+  // with its note: the builder retries at once when the build computer, not the app, failed (builderFault)
+  assert.deepEqual(list.entries[0].failed, { handIn: 'h1', at: '2026-11-18T10:00:00Z', note: 'npm install failed' });
   assert.equal(list.entries[1].checked, '', 'a hand-in nobody searched yet');
   assert.equal(list.entries[1].failed, null);
 });
