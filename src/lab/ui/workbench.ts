@@ -78,7 +78,8 @@ export class Workbench {
         { class: 'wb-run' },
         device,
         this.errorBar,
-        h('details', { class: 'wb-console', open: opts.mode === 'demo' && /useEffect|console\./.test(Object.values(this.starter).join('')) }, h('summary', {}, 'Console ', this.consoleCount), this.consoleList),
+        // Lab 07: haptics are only "felt" in the preview as lines in the console, so it starts open there
+        h('details', { class: 'wb-console', open: (opts.mode === 'demo' && /useEffect|console\./.test(Object.values(this.starter).join(''))) || /expo-haptics|scan\/feedback/.test(Object.values(this.starter).join('')) }, h('summary', {}, 'Console ', this.consoleCount), this.consoleList),
       ),
     );
     const starterCode = Object.values(this.starter).join('\n');

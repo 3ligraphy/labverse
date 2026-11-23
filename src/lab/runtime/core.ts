@@ -11,7 +11,7 @@ import { createDomDriver } from './driver-dom.ts';
 import { createRouterApp } from '../../runner/router-shim.tsx';
 import { setPlatform } from './tw.ts';
 import { setSafeArea } from './safe-area.ts';
-import { appStarted, onDeviceChange, resetDevice, setOnline, snapshot } from './device.ts';
+import { appStarted, onDeviceChange, resetDevice, setOnline, setScreenHost, snapshot } from './device.ts';
 import { practiceRemote } from './supabase-practice.ts';
 import type { RemoteOp } from './protocol.ts';
 import { loadSqlite, setAssetLoader } from './sqlite.ts';
@@ -81,6 +81,8 @@ function ErrorScreen({ info }: { info: LabErrorInfo }) {
 
 export function createRuntime(opts: { container: HTMLElement; post: Post; onFrame?: (frame: RunRequest['frame']) => void; loadAsset?: (name: string) => Promise<ArrayBuffer> }) {
   const { container, post } = opts;
+  // phone pop-ups (the camera permission dialog) are drawn in the app's own screen
+  setScreenHost(container);
   if (opts.loadAsset) setAssetLoader(opts.loadAsset);
   // the Device storage panel follows every change of the phone's storage
   onDeviceChange(() => post({ type: 'device', snapshot: snapshot() }));

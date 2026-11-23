@@ -134,8 +134,9 @@ export function createModuleSystem(builtins: Builtins, files: Record<string, str
 
   function run(path: string, code: string, module: { exports: Record<string, unknown> }) {
     // `localStorage`: the sandboxed preview has none; this is the one `import 'expo-sqlite/localStorage/install'` adds on a phone
-    const factory = new Function('require', 'module', 'exports', '__labLoop', 'process', 'localStorage', ...SHADOWED, `${code}\n//# sourceURL=lab:///${path}`);
-    factory(requireFrom(path), module, module.exports, loopGuard, process, localStoragePolyfill, ...shadows);
+    // `__DEV__`: true, like an app started with `npx expo start` (in Expo Go or a development build)
+    const factory = new Function('require', 'module', 'exports', '__labLoop', 'process', 'localStorage', '__DEV__', ...SHADOWED, `${code}\n//# sourceURL=lab:///${path}`);
+    factory(requireFrom(path), module, module.exports, loopGuard, process, localStoragePolyfill, true, ...shadows);
   }
 
   return {

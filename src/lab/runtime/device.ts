@@ -94,6 +94,15 @@ export function snapshot(): DeviceSnapshot {
   return { online: net.online, sections };
 }
 
+/* ------------------------------------------------------------------- screen */
+
+/** The element the app is drawn in. Phone pop-ups (the camera permission dialog) go in here, so checks can press them. */
+let screenHost: Element | null = null;
+export function setScreenHost(el: Element) {
+  screenHost = el;
+}
+export const getScreenHost = (): Element | null => screenHost ?? (typeof document === 'undefined' ? null : document.body);
+
 /** "Erase this phone": every store goes back to empty (the practice cloud keeps its starting rows). */
 export function resetDevice() {
   for (const p of providers.values()) p.reset();

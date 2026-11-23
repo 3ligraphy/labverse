@@ -9,6 +9,7 @@
 import { Children, createElement, forwardRef, type ComponentType } from 'react';
 import * as RNW from 'react-native-web';
 import { classToStyle } from './tw.ts';
+import { openAppSettings } from './camera.tsx';
 
 export * from 'react-native-web';
 
@@ -118,6 +119,15 @@ export const Switch = lab('Switch', RNW.Switch);
 export const ActivityIndicator = lab('ActivityIndicator', RNW.ActivityIndicator);
 export const KeyboardAvoidingView = lab('KeyboardAvoidingView', RNW.KeyboardAvoidingView, true);
 export const SafeAreaView = lab('SafeAreaView', SafeAreaBase, true);
+
+/** Linking as react-native-web has it, plus openSettings: this app's page in the phone's Settings (Lab 07: the camera permission). */
+export const Linking = {
+  ...RNW.Linking,
+  openSettings: async () => {
+    console.log("Linking: openSettings (the phone opens this app's settings page)");
+    openAppSettings();
+  },
+};
 
 /** Alert.alert shows a small banner on the phone screen and logs to the console panel. */
 export const Alert = {

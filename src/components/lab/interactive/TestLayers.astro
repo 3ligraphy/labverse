@@ -1,0 +1,103 @@
+---
+/**
+ * Lab 07 · Part 5 — the three layers of tests of Smart QR, as a pyramid: many fast unit tests at the bottom, a few
+ * component tests in the middle, one end-to-end flow on top. Click a layer to see its tool, what really runs, its file
+ * in the project and the command. <TestLayers />
+ */
+const LAYERS = [
+  {
+    id: 'e2e', name: 'End-to-end test', tool: 'Maestro', count: '1 flow',
+    runs: 'The real app in Expo Go on the emulator (or a phone). Real taps, the real permission dialog, the real screens.',
+    fake: 'Nothing is fake. Only the QR code: the flow presses “Use sample QR” (a development-only button).',
+    file: '.maestro/scan-sample.yaml',
+    cmd: 'maestro test .maestro/scan-sample.yaml -e APP_URL=exp://127.0.0.1:8081',
+    speed: 'Slowest: about a minute (Expo Go opens the project first).',
+    catches: 'The parts do not work together: the app does not start, a screen never appears, a button leads nowhere.',
+  },
+  {
+    id: 'component', name: 'Component test', tool: 'Jest + React Native Testing Library', count: '5 tests',
+    runs: 'One screen (ScannerScreen), drawn in Node on your computer. The test presses its buttons and reads its text.',
+    fake: 'The camera (a fake CameraView with “scan” buttons) and the vibration motor (jest.mock).',
+    file: '__tests__/ScannerScreen-test.tsx',
+    cmd: 'npm test',
+    speed: 'Fast: a second or two.',
+    catches: 'The wrong screen for a state, a button that calls the wrong function, a missing vibration call.',
+  },
+  {
+    id: 'unit', name: 'Unit test', tool: 'Jest', count: '7 tests',
+    runs: 'One function (parseScan) with one input. No screen, no phone.',
+    fake: 'Nothing to fake: parseScan only turns text into a result.',
+    file: '__tests__/parseScan-test.ts',
+    cmd: 'npm test',
+    speed: 'Fastest: milliseconds per test.',
+    catches: 'Wrong logic in one function: a kind, a label, an error message.',
+  },
+];
+---
+<figure class="tl" data-tl data-reveal data-free>
+  <div class="tl-grid">
+    <div class="tl-pyramid" role="tablist" aria-label="Test layers">
+      {LAYERS.map((l, i) => (
+        <button type="button" role="tab" class="tl-tier" data-tl-tab={l.id} aria-selected={l.id === 'unit' ? 'true' : 'false'} style={`--w:${46 + i * 27}%`}>
+          <b>{l.name}</b><span>{l.tool} · {l.count}</span>
+        </button>
+      ))}
+      <p class="tl-axis"><span>↑ more real, slower, fewer</span><span>↓ faster, more of them</span></p>
+    </div>
+    {LAYERS.map((l) => (
+      <dl class="tl-card" role="tabpanel" data-tl-panel={l.id} hidden={l.id !== 'unit'}>
+        <div><dt>What really runs</dt><dd>{l.runs}</dd></div>
+        <div><dt>What is fake</dt><dd>{l.fake}</dd></div>
+        <div><dt>Speed</dt><dd>{l.speed}</dd></div>
+        <div><dt>Catches</dt><dd>{l.catches}</dd></div>
+        <div><dt>In Smart QR</dt><dd><code>{l.file}</code></dd></div>
+        <div><dt>Run it</dt><dd><code>{l.cmd}</code></dd></div>
+      </dl>
+    ))}
+  </div>
+</figure>
+
+<script>
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-tl]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const tabs = [...root.querySelectorAll<HTMLButtonElement>('[data-tl-tab]')];
+      const pick = (id: string) => {
+        tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tlTab === id)));
+        root.querySelectorAll<HTMLElement>('[data-tl-panel]').forEach((p) => (p.hidden = p.dataset.tlPanel !== id));
+      };
+      tabs.forEach((t, i) => {
+        t.addEventListener('click', () => pick(t.dataset.tlTab!));
+        t.addEventListener('keydown', (e) => {
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+          e.preventDefault();
+          const next = tabs[(i + (e.key === 'ArrowDown' ? 1 : tabs.length - 1)) % tabs.length];
+          next.focus();
+          pick(next.dataset.tlTab!);
+        });
+      });
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .tl { margin: 22px 0 30px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .tl-grid { display: grid; gap: 16px; }
+  @media (min-width: 820px) { .tl-grid { grid-template-columns: 1fr 1.15fr; align-items: center; } }
+  .tl-pyramid { display: grid; justify-items: center; gap: 6px; }
+  .tl-tier { width: var(--w); min-width: 210px; display: grid; gap: 2px; padding: 12px 10px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 13px var(--font-body); text-align: center; cursor: pointer; transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out); }
+  .tl-tier b { font-size: 14.5px; }
+  .tl-tier span { color: var(--text-2); font-size: 12.5px; }
+  .tl-tier:hover { border-color: var(--text-3); }
+  .tl-tier[aria-selected='true'] { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent); }
+  .tl-tier:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .tl-axis { width: 100%; display: flex; justify-content: space-between; gap: 10px; margin: 4px 0 0 !important; font-size: 12px; color: var(--text-3); }
+  .tl-card { display: grid; gap: 8px; margin: 0; }
+  .tl-card[hidden] { display: none; }
+  .tl-card div { display: grid; gap: 2px; padding: 8px 12px; border-radius: 10px; background: var(--bg-2); }
+  .tl-card dt { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+  .tl-card dd { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text); overflow-wrap: anywhere; }
+  .tl :global(code) { font-size: 0.88em; }
+  @media (prefers-reduced-motion: reduce) { .tl-tier { transition: none; } }
+</style>

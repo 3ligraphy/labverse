@@ -4,9 +4,10 @@ import { demos as lab02 } from '@/lab/exercises/lab-02/demos';
 import { demos as lab03 } from '@/lab/exercises/lab-03/demos';
 import { demos as lab05 } from '@/lab/exercises/lab-05/demos';
 import { demos as lab06 } from '@/lab/exercises/lab-06/demos';
+import { demos as lab07 } from '@/lab/exercises/lab-07/demos';
 interface Props { id: string }
 const { id } = Astro.props;
-const demo = lab02[id] ?? lab03[id] ?? lab05[id] ?? lab06[id];
+const demo = lab02[id] ?? lab03[id] ?? lab05[id] ?? lab06[id] ?? lab07[id];
 if (!demo) throw new Error(`<Demo id="${id}">: no such demo in demos.ts`);
 ---
 <div class="demo-mount" data-demo={id}>

@@ -39,6 +39,17 @@ body[data-frame="web"] .lab-redbox{padding-top:18px}
 .lab-redbox p{margin:0 0 10px;white-space:pre-wrap;word-break:break-word}
 .lab-redbox .lab-redbox-hint{background:rgba(0,0,0,.22);border-radius:8px;padding:8px 10px}
 .lab-redbox small{opacity:.85;font-family:ui-monospace,monospace}
+.lab-perm{position:absolute;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;padding:0 12px 28px;background:rgba(0,0,0,.45);font:15px/1.4 system-ui,sans-serif}
+.lab-perm-card{width:100%;max-width:340px;border-radius:26px;background:#f2f4f7;color:#11181c;padding:22px 18px 12px;box-shadow:0 12px 36px rgba(0,0,0,.35);text-align:center}
+.lab-perm-icon{font-size:26px;margin-bottom:6px}
+.lab-perm-card p{margin:0 0 14px;font-size:17px;font-weight:600;line-height:1.35}
+.lab-perm-card button{display:block;width:100%;margin:0 0 8px;padding:12px;border:0;border-radius:20px;background:#dbe3ef;color:#0b4f8a;font:600 15px system-ui,sans-serif;cursor:pointer}
+.lab-settings-path{font-size:12px!important;font-weight:500!important;color:#475569;margin-bottom:6px!important}
+.lab-settings .lab-perm-card button{text-align:left;background:#e6ebf2}
+.lab-settings .lab-perm-card button[aria-pressed=true]{background:#cfe0f7;color:#0b3d6e}
+@keyframes lab-buzz{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.lab-buzz{animation:lab-buzz .32s linear}
+@media (prefers-reduced-motion:reduce){.lab-buzz{animation:none;outline:3px solid #38bdf8;outline-offset:-3px}}
 .lab-alert{position:fixed;z-index:60;left:16px;right:16px;top:52px;padding:12px 14px;border-radius:14px;background:rgba(30,30,32,.92);color:#fff;font:14px/1.4 system-ui,sans-serif;white-space:pre-line;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 `;
 

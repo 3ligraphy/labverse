@@ -1,0 +1,103 @@
+---
+/**
+ * Lab 07 · Part 8 — what `eas build` does, from your project to a phone or a store, for each profile of Smart QR's
+ * eas.json (development, preview, production) and each platform. A second lane shows `eas update`: new JavaScript
+ * for apps that are already installed. <EasPipeline />
+ */
+---
+<figure class="ep" data-ep data-reveal data-free>
+  <div class="ep-acts">
+    <span class="ep-seg" role="group" aria-label="Build profile">
+      <button type="button" data-ep-profile="development" aria-pressed="false">development</button>
+      <button type="button" data-ep-profile="preview" aria-pressed="true">preview</button>
+      <button type="button" data-ep-profile="production" aria-pressed="false">production</button>
+    </span>
+    <span class="ep-seg" role="group" aria-label="Platform">
+      <button type="button" data-ep-platform="android" aria-pressed="true">Android</button>
+      <button type="button" data-ep-platform="ios" aria-pressed="false">iPhone</button>
+    </span>
+  </div>
+
+  <pre class="ep-cmd" data-ep-cmd></pre>
+
+  <ol class="ep-flow" aria-live="polite">
+    <li class="ep-node"><b>1 · Your project</b><span data-ep-n1></span></li>
+    <li class="ep-node ep-cloud"><b>2 · Expo’s build server</b><span data-ep-n2></span></li>
+    <li class="ep-node"><b>3 · The file you get</b><span data-ep-n3></span></li>
+    <li class="ep-node"><b>4 · Where it goes</b><span data-ep-n4></span></li>
+  </ol>
+
+  <div class="ep-lane">
+    <p class="ep-k">The other road: <code>eas update</code></p>
+    <p class="ep-u">Only JavaScript or images changed? <code>eas update --channel preview --message "Fix typo" --environment preview</code> uploads the new JavaScript. Every installed build on the <b>preview</b> channel with the same runtime version downloads it the next time it opens. No new build, no store review. (Needs <code>expo-updates</code> in the build.)</p>
+  </div>
+</figure>
+
+<script>
+  type Profile = 'development' | 'preview' | 'production';
+  type Platform = 'android' | 'ios';
+  const PROFILE_JSON: Record<Profile, string> = {
+    development: '"development": { "developmentClient": true, "distribution": "internal" }',
+    preview: '"preview": { "distribution": "internal", "android": { "buildType": "apk" } }',
+    production: '"production": { "autoIncrement": true }',
+  };
+  const FILE: Record<Profile, Record<Platform, string>> = {
+    development: { android: '<b>.apk</b>: a development build, your own Expo Go with Smart QR’s native packages inside.', ios: 'A development build for registered iPhones (an Apple Developer account is needed; a simulator build is not).' },
+    preview: { android: '<b>.apk</b>: the real app, installs with a tap. Not for Google Play.', ios: 'An internal iPhone build (.ipa) for the iPhones you registered with your Apple Developer account.' },
+    production: { android: '<b>.aab</b> (Android App Bundle): the format Google Play wants. It cannot be installed straight on a phone. Build number +1 (autoIncrement).', ios: '<b>.ipa</b> for the App Store, signed with your Apple Distribution certificate. Build number +1.' },
+  };
+  const WHERE: Record<Profile, Record<Platform, string>> = {
+    development: { android: 'Install it once, then run <code>npx expo start</code>: it loads your JavaScript like Expo Go, with Fast Refresh.', ios: 'Install it on a registered iPhone, then <code>npx expo start</code>.' },
+    preview: { android: 'expo.dev shows an <b>Install</b> button, a link and a QR code. Send the link to your testers: they open it on Android and install.', ios: 'expo.dev shows a link and QR code; only registered iPhones can install it.' },
+    production: { android: '<code>eas submit --platform android</code> uploads it to Google Play (internal testing first). Then you complete the store listing and release it.', ios: '<code>eas submit --platform ios</code> uploads it to App Store Connect. After processing it is in <b>TestFlight</b>, then App Review.' },
+  };
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-ep]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      let profile: Profile = 'preview', platform: Platform = 'android';
+      const set = (sel: string, html: string) => (root.querySelector<HTMLElement>(sel)!.innerHTML = html);
+      const render = () => {
+        root.querySelectorAll<HTMLButtonElement>('[data-ep-profile]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.epProfile === profile)));
+        root.querySelectorAll<HTMLButtonElement>('[data-ep-platform]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.epPlatform === platform)));
+        root.querySelector<HTMLElement>('[data-ep-cmd]')!.textContent = `eas build --platform ${platform} --profile ${profile}`;
+        set('[data-ep-n1]', `The code, <code>app.json</code> and the <b>${profile}</b> profile of <code>eas.json</code>:<br /><code>${PROFILE_JSON[profile]}</code><br />EAS packs it and uploads it (Smart QR: 1.2 MB).`);
+        set('[data-ep-n2]', `Installs the packages, makes the native ${platform === 'android' ? 'Android' : 'iOS'} project (prebuild), compiles it with ${platform === 'android' ? 'Gradle' : 'Xcode'}, and <b>signs</b> it ${platform === 'android' ? 'with your keystore (EAS creates one on the first build and keeps it).' : 'with your Apple certificates (EAS can create them with your Apple Developer account).'}`);
+        set('[data-ep-n3]', FILE[profile][platform]);
+        set('[data-ep-n4]', WHERE[profile][platform]);
+        root.querySelectorAll('.ep-node').forEach((n) => {
+          n.classList.remove('flash');
+          void (n as HTMLElement).offsetWidth;
+          n.classList.add('flash');
+        });
+      };
+      root.querySelectorAll<HTMLButtonElement>('[data-ep-profile]').forEach((b) => b.addEventListener('click', () => { profile = b.dataset.epProfile as Profile; render(); }));
+      root.querySelectorAll<HTMLButtonElement>('[data-ep-platform]').forEach((b) => b.addEventListener('click', () => { platform = b.dataset.epPlatform as Platform; render(); }));
+      render();
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .ep { margin: 22px 0 30px; display: grid; gap: 12px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .ep-acts { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+  .ep-seg { display: inline-flex; flex-wrap: wrap; padding: 3px; border-radius: var(--r-full); background: var(--bg-2); border: 1px solid var(--line); }
+  .ep-seg button { padding: 5px 12px; border: 0; border-radius: var(--r-full); background: none; color: var(--text-2); font: 600 13px var(--font-mono); cursor: pointer; }
+  .ep-seg button[aria-pressed='true'] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15); }
+  .ep-seg button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .ep-cmd { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); color: var(--text); font: 13px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ep-cmd::before { content: '$ '; color: var(--text-3); }
+  .ep-flow { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 8px; counter-reset: none; }
+  @media (min-width: 900px) { .ep-flow { grid-template-columns: repeat(4, 1fr); } }
+  .ep-node { position: relative; margin: 0 !important; display: grid; gap: 6px; align-content: start; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: 13.5px; line-height: 1.55; color: var(--text); }
+  .ep-node b { font-size: 13.5px; }
+  .ep-node span { color: var(--text); overflow-wrap: anywhere; }
+  .ep-cloud { border-color: color-mix(in oklab, var(--info) 45%, var(--line)); }
+  .ep-node.flash { animation: ep-flash 0.6s var(--ease-out); }
+  @keyframes ep-flash { from { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent); } }
+  .ep-lane { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--line-2); }
+  .ep-k { margin: 0 !important; font-size: 13px; font-weight: 700; color: var(--text); }
+  .ep-u { margin: 0 !important; font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
+  .ep :global(code) { font-size: 0.88em; }
+  @media (prefers-reduced-motion: reduce) { .ep-node.flash { animation: none; } }
+</style>

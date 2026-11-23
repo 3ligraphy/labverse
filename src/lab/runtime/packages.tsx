@@ -2,7 +2,7 @@
  * Expo / community packages the lab previews provide besides react-native and the navigators, so
  * the code students copy from the docs runs in the browser too:
  * @expo/vector-icons, expo-linear-gradient, @react-native-async-storage/async-storage, expo-constants,
- * expo-haptics, expo-font, expo-splash-screen, expo-image, react-native-gesture-handler, the storage packages of Lab 06,
+ * expo-haptics and expo-camera (Lab 07, src/lab/runtime/camera.tsx), expo-font, expo-splash-screen, expo-image, react-native-gesture-handler, the storage packages of Lab 06,
  * react-native-screens and react-native-safe-area-context.
  */
 import { createElement } from 'react';
@@ -15,6 +15,7 @@ import * as SQLite from './sqlite.ts';
 import { AsyncStorage, decode, encode, ExpoCrypto, ImagePicker, KvStore, MMKVModule, NetInfoModule, SecureStore } from './storage.ts';
 import { createClient as createSupabaseClient } from './supabase.ts';
 import { SvgModule } from './svg.tsx';
+import { CameraModule, HapticsModule } from './camera.tsx';
 
 type AnyProps = Record<string, any>;
 
@@ -110,10 +111,8 @@ export function createPackages(rn: { SafeAreaView: unknown; insets: Record<strin
     'expo-linear-gradient': { LinearGradient },
     '@react-native-async-storage/async-storage': { default: AsyncStorage, ...AsyncStorage },
     'expo-constants': { default: Constants, ...Constants },
-    'expo-haptics': {
-      impactAsync: resolved, notificationAsync: resolved, selectionAsync: resolved,
-      ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' }, NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
-    },
+    'expo-haptics': HapticsModule,
+    'expo-camera': CameraModule,
     'expo-font': { useFonts: () => [true, null], loadAsync: resolved, isLoaded: () => true },
     'expo-splash-screen': { preventAutoHideAsync: resolved, hideAsync: resolved, hide: noop, setOptions: noop },
     'expo-image': { Image },
@@ -152,7 +151,7 @@ export function createPackages(rn: { SafeAreaView: unknown; insets: Record<strin
 export const PACKAGE_NAMES = [
   'react', 'react-native', 'expo-router', '@react-navigation/native', '@react-navigation/native-stack', '@react-navigation/bottom-tabs',
   '@react-navigation/drawer', '@expo/vector-icons', 'expo-linear-gradient', '@react-native-async-storage/async-storage', 'expo-constants',
-  'expo-haptics', 'expo-image', 'react-native-safe-area-context', 'nativewind', 'axios',
+  'expo-haptics', 'expo-camera', 'expo-image', 'react-native-safe-area-context', 'nativewind', 'axios',
   'react-native-mmkv', 'expo-secure-store', '@react-native-community/netinfo', 'expo-sqlite', 'expo-sqlite/kv-store',
   'expo-sqlite/localStorage/install', 'expo-image-picker', 'expo-crypto', 'base64-arraybuffer', 'react-native-url-polyfill/auto',
   'react-native-get-random-values', 'aes-js', '@supabase/supabase-js', 'react-native-svg', '@expo-google-fonts/…',

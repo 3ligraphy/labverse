@@ -1,0 +1,168 @@
+---
+/**
+ * Lab 07 · Part 3 — the camera permission as states. The student plays the user (open the scanner, allow, refuse,
+ * Settings); the phone shows what the screen draws, the panel shows what `useCameraPermissions()` gives, and the
+ * branch of ScannerScreen that runs lights up. Android rules: two refusals and the dialog never comes back. <PermissionFlow />
+ */
+const BRANCHES = [
+  { id: 'null', code: 'if (!permission) return <Text>Checking camera permission…</Text>;' },
+  { id: 'ask', code: 'if (!permission.granted) return permission.canAskAgain\n  ? <AppButton title="Allow camera" onPress={requestPermission} />' },
+  { id: 'settings', code: '  : <AppButton title="Open settings" onPress={() => Linking.openSettings()} />;' },
+  { id: 'camera', code: 'return <CameraView … />;' },
+];
+---
+<figure class="pf" data-pf data-reveal data-free>
+  <div class="pf-acts" role="toolbar" aria-label="What the user does">
+    <button type="button" class="pf-act" data-pf-do="open">Open the scanner</button>
+    <button type="button" class="pf-act" data-pf-do="allow">Allow camera → While using the app</button>
+    <button type="button" class="pf-act" data-pf-do="deny">Allow camera → Don’t allow</button>
+    <button type="button" class="pf-act" data-pf-do="settings">Open settings → allow</button>
+    <button type="button" class="pf-act pf-reset" data-pf-do="reset">Start over</button>
+  </div>
+
+  <div class="pf-grid">
+    <div class="pf-phone" aria-live="polite">
+      <div class="pf-screen" data-pf-screen></div>
+    </div>
+    <div class="pf-side">
+      <p class="pf-k">What <code>useCameraPermissions()</code> gives</p>
+      <pre class="pf-json" data-pf-json></pre>
+      <p class="pf-k">Which part of <code>ScannerScreen</code> draws the screen</p>
+      <ol class="pf-code">
+        {BRANCHES.map((b) => <li data-branch={b.id}><pre>{b.code}</pre></li>)}
+      </ol>
+    </div>
+  </div>
+  <p class="pf-note" data-pf-note></p>
+</figure>
+
+<script>
+  type State = 'home' | 'null' | 'ask' | 'denied1' | 'denied2' | 'granted';
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-pf]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const screen = root.querySelector<HTMLElement>('[data-pf-screen]')!;
+      const json = root.querySelector<HTMLElement>('[data-pf-json]')!;
+      const note = root.querySelector<HTMLElement>('[data-pf-note]')!;
+      const btn = (k: string) => root.querySelector<HTMLButtonElement>(`[data-pf-do="${k}"]`)!;
+      let state: State = 'home';
+      let timer = 0;
+
+      const perm: Record<State, string> = {
+        home: '— (the scanner is not open yet)',
+        null: 'null',
+        ask: '{ status: "undetermined", granted: false, canAskAgain: true }',
+        denied1: '{ status: "denied", granted: false, canAskAgain: true }',
+        denied2: '{ status: "denied", granted: false, canAskAgain: false }',
+        granted: '{ status: "granted", granted: true, canAskAgain: true }',
+      };
+      const branch: Record<State, string | null> = { home: null, null: 'null', ask: 'ask', denied1: 'ask', denied2: 'settings', granted: 'camera' };
+      const say: Record<State, [string, string]> = {
+        home: ['Press <b>Open the scanner</b>: the screen needs the camera.', ''],
+        null: ['For a moment the hook gives <code>null</code>: it is still asking the phone. The screen shows a loading text.', ''],
+        ask: ['The phone answered: not allowed yet, but the app may ask. The screen explains why it needs the camera, with <b>Allow camera</b>.', ''],
+        denied1: ['“Don’t allow” once: still not granted, but <code>canAskAgain</code> is true. Android lets the app ask one more time.', 'warn'],
+        denied2: ['Second “Don’t allow”: <code>canAskAgain</code> is false. <code>requestPermission()</code> shows no dialog any more: only the user can change it, in the phone’s Settings. So the screen offers <b>Open settings</b>.', 'bad'],
+        granted: ['Granted: the last branch runs and the camera opens.', 'good'],
+      };
+
+      const phone: Record<State, string> = {
+        home: '<div class="pf-s pf-home"><b>Smart QR</b><span>Scan a QR code and feel the result.</span><i>Start scanning</i></div>',
+        null: '<div class="pf-s"><span>Checking camera permission…</span></div>',
+        ask: '<div class="pf-s"><b>Camera permission needed</b><span>Smart QR uses the camera only to read QR codes.</span><i>Allow camera</i></div>',
+        denied1: '<div class="pf-s"><b>Camera permission needed</b><span>Smart QR uses the camera only to read QR codes.</span><i>Allow camera</i></div>',
+        denied2: '<div class="pf-s"><b>Camera permission needed</b><span>Smart QR uses the camera only to read QR codes.</span><i>Open settings</i></div>',
+        granted: '<div class="pf-s pf-cam"><span class="pf-frame"></span><span>Point the camera at a QR code</span></div>',
+      };
+      const dialog = '<div class="pf-dialog" role="presentation"><p>Allow Expo Go to take pictures and record video?</p><i>While using the app</i><i>Only this time</i><i>Don’t allow</i></div>';
+
+      const show = (next: State, withDialog = false) => {
+        state = next;
+        screen.innerHTML = phone[next] + (withDialog ? dialog : '');
+        json.textContent = perm[next];
+        root.querySelectorAll('[data-branch]').forEach((li) => li.classList.toggle('on', (li as HTMLElement).dataset.branch === branch[next]));
+        note.innerHTML = say[next][0];
+        note.dataset.tone = say[next][1];
+        btn('open').disabled = next !== 'home';
+        btn('allow').disabled = !(next === 'ask' || next === 'denied1');
+        btn('deny').disabled = !(next === 'ask' || next === 'denied1');
+        btn('settings').disabled = next !== 'denied2';
+      };
+      const ask = (then: State) => {
+        // the phone's dialog first, then the answer (the user can only answer once)
+        ['allow', 'deny', 'settings'].forEach((k) => (btn(k).disabled = true));
+        screen.innerHTML = phone[state] + dialog;
+        note.innerHTML = '<code>requestPermission()</code> shows the phone’s own dialog. The app waits for the answer.';
+        note.dataset.tone = '';
+        clearTimeout(timer);
+        timer = window.setTimeout(() => show(then), matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 900);
+      };
+
+      btn('open').addEventListener('click', () => {
+        show('null');
+        clearTimeout(timer);
+        timer = window.setTimeout(() => show('ask'), matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 900);
+      });
+      btn('allow').addEventListener('click', () => ask('granted'));
+      btn('deny').addEventListener('click', () => ask(state === 'ask' ? 'denied1' : 'denied2'));
+      btn('settings').addEventListener('click', () => {
+        btn('settings').disabled = true;
+        screen.innerHTML = '<div class="pf-s pf-settings"><small>Settings › Apps › Expo Go › Permissions</small><b>Camera</b><i>● Allow only while using the app</i><i>○ Ask every time</i><i>○ Don’t allow</i></div>';
+        note.innerHTML = '<code>Linking.openSettings()</code> opened this app’s page in Settings. The user allows the camera there and comes back.';
+        note.dataset.tone = '';
+        clearTimeout(timer);
+        timer = window.setTimeout(() => show('granted'), matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1100);
+      });
+      btn('reset').addEventListener('click', () => {
+        clearTimeout(timer);
+        show('home');
+      });
+      show('home');
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .pf { margin: 22px 0 30px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .pf-acts { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+  .pf-act { padding: 7px 13px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 13px var(--font-body); cursor: pointer; }
+  .pf-act:hover:not(:disabled) { border-color: var(--text-3); }
+  .pf-act:disabled { opacity: 0.45; cursor: default; }
+  .pf-act:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .pf-reset { margin-left: auto; }
+
+  .pf-grid { display: grid; gap: 14px; }
+  @media (min-width: 760px) { .pf-grid { grid-template-columns: 230px 1fr; align-items: start; } }
+  .pf-phone { justify-self: center; width: 230px; height: 400px; padding: 9px; border-radius: 34px; background: #0b0f17; box-shadow: inset 0 0 0 2px #1e293b; }
+  .pf-screen { position: relative; height: 100%; overflow: hidden; border-radius: 26px; background: #0f172a; color: #e2e8f0; font: 13px/1.4 var(--font-body); }
+  .pf-screen :global(.pf-s) { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px; text-align: center; }
+  .pf-screen :global(.pf-s b) { font-size: 16px; color: #fff; }
+  .pf-screen :global(.pf-s span) { color: #cbd5e1; }
+  .pf-screen :global(.pf-s i) { font-style: normal; font-weight: 700; padding: 9px 16px; border-radius: 12px; background: #0ea5e9; color: #fff; }
+  .pf-screen :global(.pf-home b) { font-size: 22px; }
+  .pf-screen :global(.pf-cam) { background: radial-gradient(circle at 50% 42%, #334155, #0b0f17 70%); justify-content: flex-start; padding-top: 40px; }
+  .pf-screen :global(.pf-frame) { width: 130px; height: 130px; margin-top: 40px; border-radius: 16px; box-shadow: 0 0 0 3px #38bdf8; order: 2; }
+  .pf-screen :global(.pf-settings) { background: #f1f5f9; color: #0f172a; align-items: stretch; text-align: left; }
+  .pf-screen :global(.pf-settings b) { color: #0f172a; }
+  .pf-screen :global(.pf-settings small) { color: #475569; }
+  .pf-screen :global(.pf-settings i) { background: #e2e8f0; color: #0f172a; font-weight: 600; }
+  .pf-screen :global(.pf-dialog) { position: absolute; left: 10px; right: 10px; bottom: 14px; display: grid; gap: 6px; padding: 14px 12px 10px; border-radius: 22px; background: #f2f4f7; color: #11181c; text-align: center; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); animation: pf-up 0.25s var(--ease-out); }
+  .pf-screen :global(.pf-dialog p) { margin: 0 0 4px !important; font-weight: 600; font-size: 13.5px; }
+  .pf-screen :global(.pf-dialog i) { font-style: normal; font-weight: 600; padding: 7px; border-radius: 16px; background: #dbe3ef; color: #0b4f8a; }
+  @keyframes pf-up { from { transform: translateY(16px); opacity: 0; } }
+
+  .pf-side { display: grid; gap: 8px; min-width: 0; }
+  .pf-k { margin: 0 !important; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .pf-json { margin: 0 0 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); color: var(--text); font: 12.5px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pf-code { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 6px; }
+  .pf-code li { margin: 0 !important; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); transition: border-color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out); }
+  .pf-code li.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 20%, transparent); }
+  .pf-code pre { margin: 0; padding: 8px 12px; background: none; border: 0; color: var(--text); font: 12px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pf-note { margin: 0 !important; padding: 10px 12px; border-radius: 10px; font-size: 14.5px; line-height: 1.6; color: var(--text); background: var(--bg-2); }
+  .pf-note[data-tone='good'] { background: color-mix(in oklab, var(--ok) 12%, transparent); }
+  .pf-note[data-tone='warn'] { background: color-mix(in oklab, var(--warn) 14%, transparent); }
+  .pf-note[data-tone='bad'] { background: color-mix(in oklab, var(--danger) 14%, transparent); }
+  .pf :global(code) { font-size: 0.9em; }
+  @media (prefers-reduced-motion: reduce) { .pf-code li { transition: none; } .pf-screen :global(.pf-dialog) { animation: none; } }
+</style>

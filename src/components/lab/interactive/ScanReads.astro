@@ -1,0 +1,132 @@
+---
+/**
+ * Lab 07 · Parts 3–4 — one QR code, many reads. The camera calls onBarcodeScanned for every frame that shows the
+ * code; this plays three reads and lists what the app does with each one. Switches: the lock (useRef), where the
+ * vibration is played (in handleScan, while the camera is on, or in ResultCard after it closed), and the phone
+ * (Android, or an iPhone, where haptics are off while the camera is active). <ScanReads />
+ */
+---
+<figure class="sr" data-sr data-reveal data-free>
+  <div class="sr-acts" role="toolbar" aria-label="Scan settings">
+    <button type="button" class="sr-go" data-sr-go>Hold a QR code in front of the camera</button>
+    <label class="sr-switch"><input type="checkbox" data-sr-lock checked /><span>Lock (useRef) in handleScan</span></label>
+    <label class="sr-switch"><input type="checkbox" data-sr-card checked /><span>Vibrate in ResultCard (after the camera closed)</span></label>
+    <span class="sr-seg" role="group" aria-label="Phone">
+      <button type="button" data-sr-os="android" aria-pressed="true">Android</button>
+      <button type="button" data-sr-os="ios" aria-pressed="false">iPhone</button>
+    </span>
+  </div>
+
+  <div class="sr-grid">
+    <ol class="sr-reads" data-sr-reads aria-live="polite"></ol>
+    <div class="sr-sum">
+      <p class="sr-k">handleScan worked</p>
+      <p class="sr-big" data-sr-calls>—</p>
+      <p class="sr-k">Vibrations the user feels</p>
+      <p class="sr-big" data-sr-felt>—</p>
+    </div>
+  </div>
+  <p class="sr-note" data-sr-note>Press <b>Hold a QR code in front of the camera</b>.</p>
+</figure>
+
+<script>
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-sr]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+      const lock = q<HTMLInputElement>('[data-sr-lock]'), card = q<HTMLInputElement>('[data-sr-card]');
+      const reads = q('[data-sr-reads]'), calls = q('[data-sr-calls]'), felt = q('[data-sr-felt]'), note = q('[data-sr-note]'), go = q<HTMLButtonElement>('[data-sr-go]');
+      const osButtons = root.querySelectorAll<HTMLButtonElement>('[data-sr-os]');
+      let os: 'android' | 'ios' = 'android';
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, reduce ? 0 : ms));
+      const row = (html: string, tone = '') => {
+        const li = document.createElement('li');
+        li.innerHTML = html;
+        if (tone) li.dataset.tone = tone;
+        reads.append(li);
+      };
+
+      osButtons.forEach((b) =>
+        b.addEventListener('click', () => {
+          os = b.dataset.srOs as 'android' | 'ios';
+          osButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        }),
+      );
+
+      go.addEventListener('click', async () => {
+        go.disabled = true;
+        reads.replaceChildren();
+        calls.textContent = '…';
+        felt.textContent = '…';
+        let locked = false, worked = 0, buzzes = 0;
+        for (let i = 1; i <= 3; i++) {
+          await wait(420);
+          const t = `${(i - 1) * 33} ms`;
+          if (lock.checked && locked) {
+            row(`<b>Read ${i}</b> · ${t} · <code>onBarcodeScanned</code> → <code>handleScan</code> → <code>locked.current</code> is true → <b>return</b> (nothing happens)`, 'stop');
+            continue;
+          }
+          if (lock.checked) locked = true;
+          worked++;
+          let line = `<b>Read ${i}</b> · ${t} · <code>onBarcodeScanned</code> → <code>handleScan</code> → <code>setResult(…)</code>`;
+          if (!card.checked) {
+            const ok = os === 'android';
+            if (ok) buzzes++;
+            line += ` → vibrate ${ok ? '(felt)' : '(<b>not felt</b>: the camera is still on)'}`;
+          }
+          row(line, 'go');
+        }
+        await wait(420);
+        row('React draws the next screen: <b>ResultCard</b>. The camera closes.');
+        if (card.checked) {
+          await wait(380);
+          buzzes++;
+          row('ResultCard’s <code>useEffect</code> runs once → <code>successFeedback()</code> → vibrate (felt: the camera is off now)', 'go');
+        }
+        calls.textContent = `${worked} ${worked === 1 ? 'time' : 'times'}`;
+        felt.textContent = String(buzzes);
+        const parts: string[] = [];
+        if (worked > 1) parts.push(`Without the lock, <b>handleScan worked ${worked} times</b> for one code. Here it only sets the same result, but if it opened a link or saved to a server, that would happen ${worked} times.`);
+        else parts.push('The lock closed on the first read, so the next reads stopped at once: <b>one code, one result</b>.');
+        if (!card.checked && os === 'ios') parts.push('On an iPhone, haptics are <b>off while the camera is active</b>: these vibrations were never felt. Play it in ResultCard, after the camera closed.');
+        else if (!card.checked && worked > 1) parts.push(`The phone buzzed ${buzzes} times for one code.`);
+        else if (!card.checked) parts.push('Android felt the vibration in handleScan, but an iPhone would not: the camera is still on. ResultCard is the place that works on every phone.');
+        else parts.push('The vibration plays once, on the result card, on every phone.');
+        note.innerHTML = parts.join(' ');
+        note.dataset.tone = worked === 1 && (card.checked || os === 'android') ? 'good' : 'warn';
+        go.disabled = false;
+      });
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .sr { margin: 22px 0 30px; display: grid; gap: 14px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+  .sr-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .sr-go { padding: 8px 15px; border-radius: var(--r-full); border: 0; background: var(--accent); color: var(--accent-ink); font: 700 13.5px var(--font-body); cursor: pointer; }
+  .sr-go:disabled { opacity: 0.6; cursor: default; }
+  .sr-go:focus-visible, .sr-seg button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .sr-switch { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
+  .sr-switch input { width: 17px; height: 17px; accent-color: var(--accent); }
+  .sr-seg { display: inline-flex; padding: 3px; border-radius: var(--r-full); background: var(--bg-2); border: 1px solid var(--line); }
+  .sr-seg button { padding: 5px 12px; border: 0; border-radius: var(--r-full); background: none; color: var(--text-2); font: 600 13px var(--font-body); cursor: pointer; }
+  .sr-seg button[aria-pressed='true'] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15); }
+
+  .sr-grid { display: grid; gap: 12px; }
+  @media (min-width: 760px) { .sr-grid { grid-template-columns: 1fr 190px; align-items: start; } }
+  .sr-reads { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 6px; min-height: 120px; }
+  .sr-reads :global(li) { margin: 0 !important; padding: 8px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-2); font-size: 13.5px; line-height: 1.55; color: var(--text); animation: sr-in 0.3s var(--ease-out); }
+  .sr-reads :global(li[data-tone='go']) { border-color: color-mix(in oklab, var(--accent) 45%, var(--line)); }
+  .sr-reads :global(li[data-tone='stop']) { color: var(--text-2); border-style: dashed; }
+  @keyframes sr-in { from { opacity: 0; transform: translateY(-4px); } }
+  .sr-sum { display: grid; gap: 2px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); }
+  .sr-k { margin: 0 !important; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+  .sr-big { margin: 0 0 8px !important; font: 800 26px/1.2 var(--font-body); color: var(--text); }
+  .sr-note { margin: 0 !important; padding: 10px 12px; border-radius: 10px; font-size: 14.5px; line-height: 1.6; color: var(--text); background: var(--bg-2); }
+  .sr-note[data-tone='good'] { background: color-mix(in oklab, var(--ok) 12%, transparent); }
+  .sr-note[data-tone='warn'] { background: color-mix(in oklab, var(--warn) 14%, transparent); }
+  .sr :global(code) { font-size: 0.9em; }
+  @media (prefers-reduced-motion: reduce) { .sr-reads :global(li) { animation: none; } }
+</style>
