@@ -334,12 +334,28 @@ const nav = d ? [
     // once the Phase 1 marks are published, the box is about Phase 1 (the proposal feedback, if published, comes after)
     if (data.items.some((i: { marks?: boolean }) => i.marks)) {
       sec.querySelector('[data-pjr-title]')!.textContent = 'Your Phase 1 result';
-      sec.querySelector('[data-pjr-intro]')!.textContent = 'Type your student ID to see your group’s Phase 1 marks and your TA’s comment. Only your own group is shown.';
+      sec.querySelector('[data-pjr-intro]')!.textContent = 'Type your student ID to see your group’s Phase 1 marks and feedback. Only your own group is shown.';
     }
     sec.hidden = false;
     if (link) link.hidden = false;
     const form = sec.querySelector<HTMLFormElement>('[data-pjr-form]')!;
     const input = form.querySelector<HTMLInputElement>('input')!;
+    // the banner's "See my result" and the "Your result" link open #results: put the ID box in front of the student,
+    // ready to type (the box appears only after the page loads, so the browser could not scroll to it by itself)
+    const toBox = () => {
+      form.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      input.focus({ preventScroll: true });
+    };
+    if (location.hash === '#results') toBox();
+    const onHash = () => location.hash === '#results' && toBox();
+    window.addEventListener('hashchange', onHash);
+    document.addEventListener('astro:before-swap', () => window.removeEventListener('hashchange', onHash), { once: true });
+    document.querySelectorAll<HTMLAnchorElement>('a[href$="#results"]').forEach((a) => a.addEventListener('click', (e) => {
+      if (new URL(a.href, location.href).pathname !== location.pathname) return;
+      e.preventDefault();
+      history.replaceState(null, '', '#results');
+      toBox();
+    }));
     const msg = sec.querySelector<HTMLElement>('[data-pjr-msg]')!;
     const out = sec.querySelector<HTMLElement>('[data-pjr-out]')!;
     type Marks = { call?: false; sections: { title: string; max: number; score: number }[]; criteria: { label: string; max: number; score: number | null }[]; total: number; percent: number; grade: string; comment: string | null };
@@ -355,8 +371,8 @@ const nav = d ? [
         <div class="pjr-block"><span class="pjr-label">Phase 1 marks</span>
           <p class="pjr-score"><b>${p.total}</b> / 30 · ${p.percent} / 100 · grade <b>${esc(p.grade)}</b></p>
           <table class="pjr-marks"><tbody>${p.criteria.map((c) => `<tr><td>${esc(c.label)}</td><td class="mono">${c.score ?? '–'} / ${c.max}</td></tr>`).join('')}</tbody></table>
-          ${p.comment ? `<p class="pjr-fb">${esc(p.comment)}</p>` : ''}
-        </div>`;
+        </div>
+        ${p.comment ? `<div class="pjr-block"><span class="pjr-label">Phase 1 feedback</span><p class="pjr-fb">${esc(p.comment)}</p></div>` : ''}`;
     // the item's own feedback; with Phase 1 marks the TA's comment is under the marks, so an empty feedback block is left out
     const feedback = (r: Result) =>
       r.feedback ? `<div class="pjr-block"><span class="pjr-label">Feedback</span><p class="pjr-fb">${esc(r.feedback)}</p></div>`
