@@ -1,0 +1,84 @@
+---
+/**
+ * Lab 07 · Part 6 — fakes for a component test: a test runs on a computer (no camera, no vibration motor), so
+ * jest.mock swaps expo-camera for test-utils/fakeCamera.tsx and expo-haptics for mock functions that only remember
+ * their calls; jest.fn() lets each test decide what the permission hook returns. <MockSwap />
+ */
+import Stepper from './Stepper.astro';
+import { highlightLines } from '@/lab/ui/highlight-static';
+
+const IMPORT = "import { CameraView, useCameraPermissions } from 'expo-camera';";
+const MOCK_CAMERA = "jest.mock('expo-camera', () => require('../test-utils/fakeCamera'));";
+const MOCK_HAPTICS = "jest.mock('expo-haptics');";
+const GIVE = 'jest.mocked(useCameraPermissions).mockReturnValue([{ granted: true, … }, askForCamera]);';
+const CHECK = 'expect(Haptics.notificationAsync).toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Success);';
+const [imp, mockCam, mockHap, give, check] = [IMPORT, MOCK_CAMERA, MOCK_HAPTICS, GIVE, CHECK].map((c) => highlightLines(c)[0]);
+
+const STEPS = [
+  { title: 'A test runs on a computer', text: '`ScannerScreen` imports `expo-camera`. In a test there is **no phone**: no camera, no vibration motor. The real package cannot start, so the test needs a stand-in — a **fake** (a **mock**).', ms: 5200 },
+  { title: '`jest.mock`: swap a package for a fake', text: '`jest.mock(\'expo-camera\', () => require(\'../test-utils/fakeCamera\'))` — in **this test file**, every `import … from \'expo-camera\'` gets the fake file instead. The screen’s code does not change at all.', ms: 6000 },
+  { title: 'The fake camera: buttons that “scan”', text: 'The fake `CameraView` draws two buttons. Pressing **Fake scan: website** calls `onBarcodeScanned` with `{ type: \'qr\', data: \'https://expo.dev\' }` — the same shape a real camera gives. The test decides what is scanned.', ms: 6000 },
+  { title: '`jest.fn()`: the test decides the answer', text: 'In the fake file `useCameraPermissions = jest.fn()`: a **mock function**. Each test sets what it returns with `mockReturnValue(…)` — granted, not granted, or refused for good — so one screen can be tested in every state.', ms: 6000 },
+  { title: '`jest.mock(\'expo-haptics\')`: calls are remembered', text: 'With no second argument, **every** function of the package becomes a mock: nothing vibrates, but each call is remembered. `toHaveBeenCalledWith(…Success)` checks that the screen asked for the success vibration.', ms: 6400 },
+];
+---
+<Stepper label="jest.mock: fakes for a component test" steps={STEPS} class="ms">
+  <code class="ms-code" data-at="1:on" set:html={imp} />
+  <div class="ms-route">
+    <div class="ms-pkg ms-real" data-at="1:on 2-5:off">
+      <b>expo-camera</b><small>the real package · needs a phone’s camera</small>
+      <span class="ms-x stp-only" data-at="1:show">✕ no camera on a computer</span>
+    </div>
+    <span class="ms-arrow stp-only" data-at="2-5:show" aria-hidden="true">↳ swapped by</span>
+    <div class="ms-pkg ms-fake stp-only" data-at="2-5:show">
+      <b>test-utils/fakeCamera.tsx</b><small>the fake · used only in this test file</small>
+      <code class="ms-mini stp-only" data-at="2:show 3-5:show" set:html={mockCam} />
+    </div>
+  </div>
+
+  <div class="ms-row">
+    <div class="ms-screen stp-only" data-at="3-5:show" aria-hidden="true">
+      <span class="ms-k">what the test draws</span>
+      <i class="ms-btn" data-at="3:press">Fake scan: website</i>
+      <i class="ms-btn">Fake scan: empty code</i>
+      <small class="mono stp-only" data-at="3:show">→ onBarcodeScanned({'{'} type: 'qr', data: 'https://expo.dev' {'}'})</small>
+    </div>
+    <div class="ms-side">
+      <code class="ms-mini stp-only" data-at="4:show" set:html={give} />
+      <code class="ms-mini stp-only" data-at="5:show" set:html={mockHap} />
+      <code class="ms-mini stp-only" data-at="5:show" set:html={check} />
+      <div class="ms-calls stp-only" data-at="5:show">
+        <span class="ms-k">Haptics.notificationAsync — calls remembered</span>
+        <span class="mono">1 · NotificationFeedbackType.Success ✓</span>
+      </div>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .ms-code { display: block; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); font-size: 12.5px; color: var(--cm-var); overflow-wrap: anywhere; }
+  .ms-code[data-now='on'] { border-color: var(--accent); }
+  .ms-route { display: grid; gap: 8px; margin: 12px 0; }
+  @media (min-width: 820px) { .ms-route { grid-template-columns: 1fr auto 1.4fr; align-items: center; } }
+  .ms-pkg { display: grid; gap: 4px; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-2); transition: opacity 0.3s, border-color 0.3s; }
+  .ms-pkg b { font: 700 13.5px var(--font-mono); color: var(--text); }
+  .ms-pkg small { font-size: 12.5px; color: var(--text-2); }
+  .ms-real[data-now='on'] { border-color: var(--danger); }
+  .ms-real[data-now='off'] { opacity: 0.4; text-decoration: line-through; }
+  .ms-fake { border-color: var(--ok); }
+  .ms-x { color: var(--danger); font-weight: 700; font-size: 13px; }
+  .ms-arrow { font: 700 13px var(--font-mono); color: var(--accent-text); white-space: nowrap; }
+  .ms-mini { display: block; padding: 6px 10px; border-radius: 8px; background: var(--code-bg); font-size: 12px; color: var(--cm-var); overflow-wrap: anywhere; }
+  .ms-row { display: grid; gap: 12px; }
+  @media (min-width: 820px) { .ms-row { grid-template-columns: 230px minmax(0, 1fr); align-items: start; } }
+  .ms-screen { display: grid; gap: 8px; padding: 16px 12px; border-radius: 22px; background: #0f172a; box-shadow: inset 0 0 0 6px #0b0f17; color: #e2e8f0; }
+  .ms-k { font-size: 11.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .ms-screen .ms-k { color: #64748b; }
+  .ms-btn { font-style: normal; padding: 8px 10px; border-radius: 10px; background: #1e293b; color: #fff; font-size: 12.5px; font-weight: 600; }
+  .ms-btn[data-now='press'] { box-shadow: 0 0 0 3px #38bdf8; animation: ms-press 0.6s var(--ease-out); }
+  @keyframes ms-press { 40% { transform: scale(0.95); } }
+  .ms-screen small { color: #94a3b8; font-size: 11px; overflow-wrap: anywhere; }
+  .ms-side { display: grid; gap: 8px; align-content: start; min-width: 0; }
+  .ms-calls { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--ok); background: color-mix(in oklab, var(--ok) 10%, transparent); font-size: 12.5px; color: var(--text); }
+  @media (prefers-reduced-motion: reduce) { .ms-btn[data-now='press'] { animation: none; } }
+</style>

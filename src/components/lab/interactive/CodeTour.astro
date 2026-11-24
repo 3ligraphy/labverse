@@ -9,10 +9,10 @@
  *   { lines: 16, title: 'Read the permission', tool: 'expo-camera', text: '…', shot: '/labs/lab-07/part4/a-needed.webp',
  *     alt: '…', console: ['Camera permission: not asked yet'], phone: 'What the user sees now' },
  * ]} />
- * A step without `shot` / `console` / `phone` keeps the previous step's ones.
+ * A step without `shot` / `console` keeps the previous step's ones; `phone` (a caption) is shown on its own step only.
  */
 import { inline } from '@/lib/content';
-import { highlightLines } from '@/lab/ui/highlight-static';
+import { highlightLines, type CodeLang } from '@/lab/ui/highlight-static';
 
 type Step = { lines: number | number[]; title: string; text: string; tool?: string; shot?: string; alt?: string; console?: string[]; phone?: string };
 interface Props {
@@ -24,8 +24,13 @@ interface Props {
   logo?: string;
   /** lines the student writes in the exercise: marked with + */
   added?: number[];
+  /** tsx (default), json or yaml */
+  lang?: CodeLang;
+  /** the title of the box with the `console` lines: "Console" under a phone; with no pictures the box is a terminal
+   *  beside the code, e.g. "npm test" or "maestro test" */
+  consoleTitle?: string;
 }
-const { file, code, steps, title, logo, added = [] } = Astro.props;
+const { file, code, steps, title, logo, added = [], lang = 'tsx', consoleTitle } = Astro.props;
 if (!steps.length) throw new Error(`<CodeTour file="${file}">: steps are required`);
 
 const logoFiles = import.meta.glob<ImageMetadata>('/src/assets/tools/*.svg', { eager: true, import: 'default' });
@@ -37,9 +42,16 @@ const TOOLS: Record<string, { name: string; logo: string }> = {
   expo: { name: 'Expo', logo: 'expo' },
   react: { name: 'React', logo: 'react' },
   'react-native': { name: 'React Native', logo: 'react' },
+  jest: { name: 'Jest', logo: 'jest' },
+  'testing-library': { name: 'React Native Testing Library', logo: 'testing-library' },
+  maestro: { name: 'Maestro', logo: 'maestro' },
+  eas: { name: 'EAS', logo: 'expo' },
 };
+/** colour of a Console / terminal line: PASS, ✓, COMPLETED green · FAIL, ✕, FAILED red · WARNED amber */
+const tone = (line: string) =>
+  /^\s*(PASS\b|✓)|\.\.\. COMPLETED$/.test(line) ? 'ok' : /^\s*(FAIL\b|✕|!)|FAILED$/.test(line) ? 'bad' : /WARNED$|^\s*Warning/.test(line) ? 'warn' : /^(Tests|Test Suites|Time):/.test(line) ? 'sum' : '';
 
-const html = highlightLines(code.replace(/\n$/, ''));
+const html = highlightLines(code.replace(/\n$/, ''), lang);
 const range = (s: Step) => {
   const l = Array.isArray(s.lines) ? s.lines : [s.lines];
   return l.length === 2 && l[1] > l[0] ? Array.from({ length: l[1] - l[0] + 1 }, (_, i) => l[0] + i) : l;
@@ -67,13 +79,17 @@ const data = steps.map((s) => {
     shotAt = known >= 0 ? known : shots.push({ src: s.shot, alt: s.alt ?? '' }) - 1;
   }
   if (s.console) consoleNow = s.console;
-  if (s.phone !== undefined) phoneNow = s.phone;
+  // the caption belongs to its own step only (the picture and the Console carry on)
+  phoneNow = s.phone ?? '';
   return { lines: range(s), shot: shotAt, console: consoleNow, phone: phoneNow, tool: s.tool ? TOOLS[s.tool] : undefined };
 });
 for (const s of shots) if (!s.alt.trim()) throw new Error(`<CodeTour file="${file}">: the picture ${s.src} needs alt text`);
 const hasPhone = shots.length > 0;
+// no pictures but output lines: a terminal beside the code (test runs, Maestro flows)
+const hasTerminal = !hasPhone && steps.some((s) => s.console?.length);
+const boxTitle = consoleTitle ?? (hasTerminal ? 'Output' : 'Console');
 ---
-<figure class:list={['ct', { 'ct-nophone': !hasPhone }]} data-ct data-reveal data-free>
+<figure class:list={['ct', { 'ct-nophone': !hasPhone && !hasTerminal, 'ct-hasterm': hasTerminal }]} data-ct data-reveal data-free>
   <figcaption class="ct-head">
     {logoSrc(logo) && <span class="ct-logo"><img src={logoSrc(logo)} alt="" width="20" height="20" /></span>}
     <span class="ct-file mono">{file}</span>
@@ -94,9 +110,17 @@ const hasPhone = shots.length > 0;
         <div class="ct-device">
           {shots.map((s, i) => <img src={s.src} alt={s.alt} width="600" height="1242" loading="lazy" decoding="async" class:list={{ on: i === data[0].shot }} data-ct-shot={i} />)}
         </div>
-        <div class="ct-console" aria-label="Console" data-ct-console>
-          <span class="ct-console-k">Console</span>
-          {data[0].console.map((l) => <span>{l}</span>)}
+        <div class="ct-console" aria-label={boxTitle} data-ct-console data-title={boxTitle}>
+          <span class="ct-console-k">{boxTitle}</span>
+          {data[0].console.map((l) => <span class:list={[tone(l) && `t-${tone(l)}`]}>{l}</span>)}
+        </div>
+      </div>
+    )}
+    {hasTerminal && (
+      <div class="ct-termside">
+        <div class="ct-console ct-term" aria-label={boxTitle} data-ct-console data-title={boxTitle}>
+          <span class="ct-console-k">{boxTitle}</span>
+          {data[0].console.map((l) => <span class:list={[tone(l) && `t-${tone(l)}`]}>{l}</span>)}
         </div>
       </div>
     )}
@@ -111,7 +135,7 @@ const hasPhone = shots.length > 0;
         </p>
         <h4 class="ct-h" set:html={inline(s.title)} />
         <div class="ct-text" set:html={block(s.text)} />
-        {hasPhone && data[i].phone && <p class="ct-onphone"><span aria-hidden="true">📱</span> <span set:html={inline(data[i].phone)} /></p>}
+        {(hasPhone || hasTerminal) && data[i].phone && <p class="ct-onphone"><span aria-hidden="true">{hasPhone ? '📱' : '▸'}</span> <span set:html={inline(data[i].phone)} /></p>}
       </section>
     ))}
   </div>
@@ -130,6 +154,9 @@ const hasPhone = shots.length > 0;
 
 <script>
   type Step = { lines: number[]; shot: number; console: string[] };
+  // the same colours as on the server (see `tone` above)
+  const tone = (line: string) =>
+    /^\s*(PASS\b|✓)|\.\.\. COMPLETED$/.test(line) ? 'ok' : /^\s*(FAIL\b|✕|!)|FAILED$/.test(line) ? 'bad' : /WARNED$|^\s*Warning/.test(line) ? 'warn' : /^(Tests|Test Suites|Time):/.test(line) ? 'sum' : '';
   const wire = () =>
     document.querySelectorAll<HTMLElement>('[data-ct]:not([data-wired])').forEach((root) => {
       root.dataset.wired = '1';
@@ -154,8 +181,8 @@ const hasPhone = shots.length > 0;
         shots.forEach((img) => img.classList.toggle('on', Number(img.dataset.ctShot) === s.shot));
         dots.forEach((d, j) => (j === at ? d.setAttribute('aria-current', 'step') : d.removeAttribute('aria-current')));
         if (consoleBox) {
-          consoleBox.replaceChildren(Object.assign(document.createElement('span'), { className: 'ct-console-k', textContent: 'Console' }));
-          for (const line of s.console) consoleBox.append(Object.assign(document.createElement('span'), { textContent: line }));
+          consoleBox.replaceChildren(Object.assign(document.createElement('span'), { className: 'ct-console-k', textContent: consoleBox.dataset.title ?? 'Console' }));
+          for (const line of s.console) consoleBox.append(Object.assign(document.createElement('span'), { textContent: line, className: tone(line) ? `t-${tone(line)}` : '' }));
         }
         count.textContent = `Step ${at + 1} of ${steps.length}`;
         prev.disabled = at === 0;
@@ -194,6 +221,7 @@ const hasPhone = shots.length > 0;
 
   .ct-body { display: grid; min-width: 0; }
   @media (min-width: 900px) { .ct-body { grid-template-columns: minmax(0, 1fr) 272px; } }
+  @media (min-width: 900px) { .ct-nophone .ct-body { grid-template-columns: minmax(0, 1fr); } }
   /* the code box fills its row (as tall as the phone beside it) and scrolls inside */
   .ct-codewrap { position: relative; min-width: 0; height: 380px; background: var(--code-bg); }
   @media (min-width: 900px) { .ct-codewrap { height: auto; min-height: 470px; } }
@@ -217,6 +245,16 @@ const hasPhone = shots.length > 0;
   .ct-device img.on { opacity: 1; transform: none; }
   .ct-console { width: 100%; display: grid; gap: 2px; min-height: 64px; padding: 8px 10px; border-radius: 10px; background: #0b0f17; color: #cbd5e1; font: 11.5px/1.5 var(--font-mono); overflow-wrap: anywhere; }
   .ct-console :global(.ct-console-k) { color: #64748b; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .ct-console :global(.t-ok) { color: #4ade80; }
+  .ct-console :global(.t-bad) { color: #f87171; }
+  .ct-console :global(.t-warn) { color: #fbbf24; }
+  .ct-console :global(.t-sum) { color: #e2e8f0; font-weight: 700; }
+  /* no phone: a terminal beside the code (npm test, maestro test) */
+  @media (min-width: 900px) { .ct-hasterm .ct-body { grid-template-columns: minmax(0, 1fr) minmax(260px, 34%); } }
+  .ct-termside { display: grid; padding: 14px; border-left: 1px solid var(--line); background: color-mix(in oklab, var(--bg-2) 70%, var(--surface)); }
+  @media (max-width: 899px) { .ct-termside { border-left: 0; border-top: 1px solid var(--line); } }
+  .ct-term { align-content: start; min-height: 220px; padding: 12px 14px; font-size: 12px; white-space: pre-wrap; }
+  .ct-term :global(.ct-console-k) { margin-bottom: 4px; }
 
   .ct-explain { display: grid; padding: 18px clamp(16px, 2.6vw, 26px) 6px; border-top: 1px solid var(--line); }
   /* every step's text sits in the same cell: the panel keeps the height of the longest, so the page never jumps */

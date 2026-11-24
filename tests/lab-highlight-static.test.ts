@@ -24,6 +24,36 @@ test('one HTML string per line, blank lines kept, text escaped', () => {
   assert.match(lines[0], /&lt;/);
 });
 
+test('JSON (app.json, eas.json): keys, text, numbers and true/false', () => {
+  const [l] = highlightLines('    "buildType": "apk", "n": 1, "autoIncrement": true', 'json');
+  assert.match(l, /<span class="tk-prop">"buildType"<\/span>/);
+  assert.match(l, /<span class="tk-str">"apk"<\/span>/);
+  assert.match(l, /<span class="tk-num">1<\/span>/);
+  assert.match(l, /<span class="tk-num">true<\/span>/);
+  assert.match(l, /<span class="tk-punc">:<\/span>/);
+});
+
+test('YAML (a Maestro flow): keys, list dashes, text, numbers, comments', () => {
+  const lines = highlightLines('appId: host.exp.exponent\n---\n- tapOn: "Start scanning"  # tap it\n    timeout: 60000\n    optional: true\n- openLink: ${APP_URL}', 'yaml');
+  assert.match(lines[0], /<span class="tk-prop">appId<\/span>/);
+  assert.match(lines[1], /<span class="tk-punc">---<\/span>/);
+  assert.match(lines[2], /<span class="tk-punc">- <\/span>/);
+  assert.match(lines[2], /<span class="tk-fn">tapOn<\/span>/, 'a step’s command');
+  assert.match(lines[2], /<span class="tk-str">"Start scanning"<\/span>/);
+  assert.match(lines[2], /<span class="tk-com"># tap it<\/span>/);
+  assert.match(lines[3], /<span class="tk-num">60000<\/span>/);
+  assert.match(lines[4], /<span class="tk-num">true<\/span>/);
+  assert.match(lines[5], /<span class="tk-var">\$\{APP_URL\}<\/span>/);
+});
+
+test('the text of every line is unchanged in every language', () => {
+  const plain = (l: string) => l.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  const json = '{\n  "cli": { "version": ">= 27.11.0" },\n  "submit": { "production": {} }\n}';
+  const yaml = 'appId: host.exp.exponent\n---\n- tapOn:\n    text: "Allow camera" # the button\n    optional: true';
+  assert.deepEqual(highlightLines(json, 'json').map(plain), json.split('\n'));
+  assert.deepEqual(highlightLines(yaml, 'yaml').map(plain), yaml.split('\n'));
+});
+
 test('the text of every line is unchanged (only spans are added)', () => {
   const code = "export default function ScannerScreen({ onBack }: Props) {\n  const [permission, requestPermission] = useCameraPermissions();\n}";
   const plain = highlightLines(code).map((l) => l.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));

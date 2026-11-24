@@ -1,0 +1,79 @@
+---
+/**
+ * Lab 07 · Part 7 — a Maestro flow, played one command at a time: the YAML line lights up, the lab phone shows
+ * what Maestro sees (real pictures), and Maestro prints the step with COMPLETED. <FlowPlayer />
+ */
+import Stepper from './Stepper.astro';
+import { highlightLines } from '@/lab/ui/highlight-static';
+import { MAESTRO_FLOW } from '@/lab/exercises/lab-07/project';
+
+const HL = highlightLines(MAESTRO_FLOW.replace(/\n$/, ''), 'yaml');
+// which step lights which lines of the flow (1-based)
+const AT: Record<number, string> = { 1: '1:match', 2: '1:match', 3: '2:match', 4: '3:match', 5: '4:match', 6: '4:match', 7: '4:match', 8: '5:match', 9: '6:match', 10: '6:match', 11: '6:match', 12: '7:match', 13: '7:match', 14: '7:match', 15: '8:match', 16: '8:match', 17: '9:match', 18: '9:match', 19: '9:match', 20: '10:match' };
+const OUT = [
+  { text: 'Running on BUENOVA phone', from: 1 },
+  { text: ' > Flow scan-sample', from: 1 },
+  { text: 'Stop host.exp.exponent... COMPLETED', from: 2 },
+  { text: 'Open ${APP_URL}... COMPLETED', from: 3 },
+  { text: 'Assert that "Start scanning" is visible... COMPLETED', from: 4 },
+  { text: 'Tap on "Start scanning"... COMPLETED', from: 5 },
+  { text: 'Tap on (Optional) "Allow camera"... COMPLETED', from: 6 },
+  { text: 'Tap on (Optional) "While using the app"... COMPLETED', from: 7 },
+  { text: 'Tap on id: sample-scan... COMPLETED', from: 8 },
+  { text: 'Assert that "https://expo.dev" is visible... COMPLETED', from: 9 },
+  { text: 'Assert that id: scan-again is visible... COMPLETED', from: 9 },
+  { text: 'Take screenshot scan-result... COMPLETED', from: 10 },
+];
+const PICS = [
+  { src: '/labs/lab-07/part4/a-home.webp', alt: 'The Smart QR home screen', at: '3-4:show' },
+  { src: '/labs/lab-07/part4/a-needed.webp', alt: 'Camera permission needed', at: '5:show' },
+  { src: '/labs/lab-07/part4/a-dialog.webp', alt: 'The phone’s camera dialog', at: '6:show' },
+  { src: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen with the Use sample QR button', at: '7:show' },
+  { src: '/labs/lab-07/part4/b-result.webp', alt: 'The result card with https://expo.dev and Scan again', at: '8-11:show' },
+];
+
+const STEPS = [
+  { title: 'Which app, then the steps', text: '`appId` names the app the flow drives. In Expo Go that is Expo Go itself: `host.exp.exponent`. The line `---` ends the settings: every line below it is a **step**, a list item starting with `-`.', ms: 5200 },
+  { title: '`stopApp`: start from scratch', text: 'Close the app first, so every run starts the same way, whatever the last run left on the screen.', ms: 4200 },
+  { title: '`openLink`: open your project', text: 'Open the project in Expo Go. `${APP_URL}` is filled in when you start the flow (`maestro test … -e APP_URL=exp://…`). On the lab page it opens the app on the lab phone.', ms: 5000 },
+  { title: '`extendedWaitUntil`: wait for the first screen', text: 'The first load of the JavaScript can be slow. Maestro waits until **Start scanning** is `visible` — at most `timeout: 60000` milliseconds (60 seconds) — then goes on.', ms: 5200 },
+  { title: '`tapOn: "Start scanning"`: tap like a finger', text: 'Maestro finds the element whose **whole text** is “Start scanning” and taps it. The scanner opens and asks for the camera.', ms: 4600 },
+  { title: '`optional: true`: tap it if it is there', text: 'A new phone shows **Allow camera** and the phone’s dialog. If the camera was allowed in an earlier run, these screens never come. `optional: true` says: tap it if it is there — if not, go on without failing (**WARNED**, not FAILED).', ms: 6400 },
+  { title: 'The dialog: “While using the app”', text: 'The same for the phone’s own dialog. Maestro taps the system dialog just like the app’s buttons.', ms: 4400 },
+  { title: '`tapOn: id: "sample-scan"`: tap by id', text: '`id` finds the element by its `testID` — invisible to users, and it does not change when the button’s text changes. **Use sample QR** “scans” `https://expo.dev`.', ms: 5200 },
+  { title: '`assertVisible`: check what a user sees', text: 'An **assertion**: the step fails if `https://expo.dev` is not on the screen (Maestro waits a few seconds first). The second one checks the **Scan again** button by its id.', ms: 5600 },
+  { title: '`takeScreenshot`: a picture as proof', text: 'Saves a picture of the screen as `scan-result.png`. The flow passed: from a closed app to the result card, without a person touching the phone.', ms: 5000 },
+  { title: 'Every step COMPLETED', text: 'Maestro prints one line per step. **COMPLETED** — done; **WARNED** — an optional step was skipped; **FAILED** — Maestro stops there and says why.', ms: 5000 },
+];
+---
+<Stepper label="A Maestro flow, one command at a time" steps={STEPS} class="fp">
+  <div class="fp-grid">
+    <pre class="stp-code" aria-label=".maestro/scan-sample.yaml">{HL.map((l, i) => <span class="stp-ln" data-at={AT[i + 1] ?? ''} set:html={l || ' '} />)}</pre>
+    <div class="fp-phone" aria-hidden="true">
+      <div class="fp-device">
+        <span class="fp-blank stp-only" data-at="1-2:show">app closed</span>
+        {PICS.map((p) => <img class="stp-only" data-at={p.at} src={p.src} alt={p.alt} width="600" height="1242" loading="lazy" decoding="async" />)}
+        <span class="fp-flash stp-only" data-at="10:show"></span>
+      </div>
+    </div>
+  </div>
+  <div class="stp-console fp-out" aria-label="maestro test output">
+    <span>maestro test .maestro/scan-sample.yaml</span>
+    {OUT.map((o) => <span class:list={['stp-only', { 'fp-ok': /COMPLETED$/.test(o.text) }]} data-at={`${o.from}-11:show`}>{o.text}</span>)}
+  </div>
+</Stepper>
+
+<style>
+  .fp-grid { display: grid; gap: 14px; }
+  @media (min-width: 860px) { .fp-grid { grid-template-columns: minmax(0, 1fr) 226px; align-items: start; } }
+  .fp-phone { display: grid; justify-items: center; }
+  .fp-device { position: relative; display: grid; width: 200px; aspect-ratio: 600 / 1242; }
+  .fp-device > * { grid-area: 1 / 1; }
+  .fp-device img { width: 100%; height: auto; }
+  .fp-blank { display: grid; place-items: center; border-radius: 30px; background: #0b0f17; box-shadow: inset 0 0 0 7px #1f242c; color: #64748b; font-size: 12.5px; }
+  .fp-flash { border-radius: 30px; background: #fff; animation: fp-flash 0.7s ease-out forwards; pointer-events: none; }
+  @keyframes fp-flash { from { opacity: 0.85; } to { opacity: 0; } }
+  .fp-out { margin-top: 12px; min-height: 0; }
+  .fp-ok { color: #4ade80; }
+  @media (prefers-reduced-motion: reduce) { .fp-flash { animation: none; opacity: 0; } }
+</style>

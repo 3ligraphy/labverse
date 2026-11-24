@@ -12,15 +12,15 @@ const { EXERCISE_IDS, BLOCKS } = await import('../src/lab/exercises/lab-07/meta.
 const { demos } = await import('../src/lab/exercises/lab-07/demos.ts');
 const project = (await import('../src/lab/exercises/lab-07/project.ts')) as unknown as Record<string, string>;
 
-test('ten parts: 7 + 8 + 12 + 50 (explained step by step, with the break) + 12 + 25 + 15 + 12 + 13 + 11 = 165 minutes', () => {
+test('ten parts, each explained before it is solved: 10 + 13 + 16 + 50 (with the break) + 14 + 38 + 20 + 17 + 16 + 16 = 210 minutes', () => {
   const parts = parseLabOutline(mdx);
   assert.deepEqual(parts.map((p) => p.n), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
-  assert.deepEqual(parts.map((p) => minutes(p.time)), [7, 8, 12, 50, 12, 25, 15, 12, 13, 11]);
+  assert.deepEqual(parts.map((p) => minutes(p.time)), [10, 13, 16, 50, 14, 38, 20, 17, 16, 16]);
   const total = parts.reduce((a, p) => a + minutes(p.time), 0);
-  assert.equal(total, 165);
+  assert.equal(total, 210);
   assert.ok(total <= 210, 'never more than 3 h 30 min');
-  assert.equal(formatMinutes(total), '2 h 45 min');
-  assert.match(mdx, /estimatedTime: '2 h 45 min'/);
+  assert.equal(formatMinutes(total), '3 h 30 min');
+  assert.match(mdx, /estimatedTime: '3 h 30 min'/);
   assert.match(mdx, /Break · 5 minutes/, 'the break is on the page');
   // the parts on the page and the blocks of meta.ts have the same titles
   assert.deepEqual(parts.map((p) => p.title), BLOCKS.map((b) => b.title.replace(' (and a 5-minute break)', '')));
@@ -63,10 +63,11 @@ test('every code walk-through shows a real project file and points at lines that
   const walks = [...mdx.matchAll(/<Code(?:Walk|Tour)([\s\S]*?)\]\} \/>/g)].map((m) => m[1]);
   assert.ok(walks.length >= 15, `${walks.length} walk-throughs`);
   const wifiFix = /export const WIFI_FIX = `([\s\S]*?)`;/.exec(mdx)![1];
+  const wifiTest = /export const WIFI_TEST = `([\s\S]*?)`;/.exec(mdx)![1];
   for (const w of walks) {
     const file = /file="([^"]+)"/.exec(w)![1];
     const ref = /code=\{(?:P\.(\w+)|(\w+))\}/.exec(w)!;
-    const code = ref[1] ? project[ref[1]] : ref[2] === 'WIFI_FIX' ? wifiFix : undefined;
+    const code = ref[1] ? project[ref[1]] : ref[2] === 'WIFI_FIX' ? wifiFix : ref[2] === 'WIFI_TEST' ? wifiTest : undefined;
     assert.equal(typeof code, 'string', `${file}: the code exists (${ref[0]})`);
     const count = code!.replace(/\n$/, '').split('\n').length;
     for (const m of w.matchAll(/lines: (\[\s*(\d+)\s*,\s*(\d+)\s*\]|(\d+))/g)) {

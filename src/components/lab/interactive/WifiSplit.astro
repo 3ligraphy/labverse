@@ -1,0 +1,71 @@
+---
+/**
+ * Lab 07 · Part 10 — the Wi-Fi fix, one string method at a time: the code text → slice(5) → split(';') →
+ * find(startsWith('S:')) → slice(2) → the name (or 'Hidden network'). The password never comes out. <WifiSplit />
+ */
+import Stepper from './Stepper.astro';
+
+const CODE = 'WIFI:S:Lab-5G;T:WPA;P:secret123;;';
+const FIELDS = ['S:Lab-5G', 'T:WPA', 'P:secret123', '', ''];
+const STEPS = [
+  { title: 'What a Wi-Fi QR code holds', text: 'One text, in a fixed format: `WIFI:` then fields cut by `;`. `S:` is the network name, `T:` the security type, `P:` the **password**. Smart QR showed the whole text — with the password.', ms: 5200 },
+  { title: '`value.slice(5)`: drop “WIFI:”', text: '`slice(5)` gives the text **from position 5** on. Positions start at 0, so the 5 letters `W I F I :` (0–4) are left out.', ms: 5200 },
+  { title: '`.split(\';\')`: cut at every “;”', text: '`split(\';\')` cuts the text at each `;` and gives a **list** (an array). The two `;;` at the end make two empty items.', ms: 5200 },
+  { title: '`fields.find(…)`: the field that starts with “S:”', text: '`find` goes through the list and gives the **first** item for which the test is true: `field.startsWith(\'S:\')`. If no item matches, `find` gives `undefined`.', ms: 5600 },
+  { title: '`nameField.slice(2)`: drop “S:”', text: '`slice(2)` leaves out the two letters `S:` → `Lab-5G`. (`nameField ? … : \'\'` first checks a field was found.)', ms: 5000 },
+  { title: '`name || \'Hidden network\'`: never empty', text: '`||` gives the left side when it has a value, otherwise the right side. A code with no `S:` field (a hidden network) shows **Hidden network**. The password field is never used.', ms: 5600 },
+];
+---
+<Stepper label="The Wi-Fi fix, one method at a time" steps={STEPS} class="ws">
+  <div class="ws-stage">
+    <div class="ws-row">
+      <span class="ws-k mono">value</span>
+      <code class="ws-text">{[...CODE].map((ch, i) => <i class:list={['ws-ch', { 'ws-cut': i < 5, 'ws-pw': i >= 20 && i <= 30 }]} data-at={i < 5 ? '2:gone 3-6:gone' : ''}>{ch}</i>)}</code>
+    </div>
+    <div class="ws-row stp-only" data-at="3-6:show">
+      <span class="ws-k mono">fields</span>
+      <span class="ws-list">
+        {FIELDS.map((f, i) => (
+          <code class="ws-item" data-at={i === 0 ? '4-6:pick' : i === 2 ? '4-6:skip' : '4-6:skip'}>{f ? `'${f}'` : "''"}</code>
+        ))}
+      </span>
+    </div>
+    <div class="ws-row stp-only" data-at="4-6:show">
+      <span class="ws-k mono">nameField</span>
+      <code class="ws-item ws-pick">'S:Lab-5G'</code>
+    </div>
+    <div class="ws-row stp-only" data-at="5-6:show">
+      <span class="ws-k mono">name</span>
+      <code class="ws-item ws-name">'Lab-5G'</code>
+    </div>
+    <div class="ws-cards">
+      <div class="ws-card ws-before stp-only" data-at="1:show"><small>WI-FI NETWORK</small><span>WIFI:S:Lab-5G;T:WPA;<b>P:secret123</b>;;</span><em>✕ the password is on the screen</em></div>
+      <div class="ws-card stp-only" data-at="6:show"><small>WI-FI NETWORK</small><span>Lab-5G</span><em class="ws-good">✓ only the name</em></div>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .ws-stage { display: grid; gap: 12px; }
+  .ws-row { display: grid; gap: 6px; align-items: center; }
+  @media (min-width: 720px) { .ws-row { grid-template-columns: 110px minmax(0, 1fr); } }
+  .ws-k { font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+  .ws-text { display: flex; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; background: var(--code-bg); border: 1px solid var(--line); font-size: 15px; letter-spacing: 0.02em; }
+  .ws-ch { font-style: normal; color: var(--cm-str); transition: opacity 0.35s, transform 0.35s; }
+  .ws-ch.ws-pw { color: var(--danger); font-weight: 700; }
+  .ws-ch[data-now='gone'] { opacity: 0.18; text-decoration: line-through; }
+  .ws-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ws-item { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: 13px; color: var(--text); transition: all 0.3s; }
+  .ws-item[data-now='pick'], .ws-pick { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 16%, var(--bg-2)); font-weight: 700; }
+  .ws-item[data-now='skip'] { opacity: 0.4; }
+  .ws-name { border-color: var(--ok); background: color-mix(in oklab, var(--ok) 16%, var(--bg-2)); font-weight: 700; }
+  .ws-cards { display: grid; justify-items: start; }
+  .ws-cards > div { grid-area: 1 / 1; }
+  .ws-card { display: grid; gap: 4px; justify-items: center; min-width: 240px; padding: 14px 16px; border-radius: 16px; background: #fff; color: #0f172a; text-align: center; box-shadow: 0 12px 26px -18px rgb(0 0 0 / 0.5); }
+  .ws-card small { color: #64748b; font-weight: 700; letter-spacing: 0.08em; font-size: 11px; }
+  .ws-card span { font-size: 14px; overflow-wrap: anywhere; }
+  .ws-card b { color: #dc2626; }
+  .ws-card em { font-style: normal; font-size: 12.5px; font-weight: 700; color: #dc2626; }
+  .ws-card .ws-good { color: #16a34a; }
+  @media (prefers-reduced-motion: reduce) { .ws-ch { transition: none; } }
+</style>

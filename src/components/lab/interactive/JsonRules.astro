@@ -1,0 +1,71 @@
+---
+/**
+ * Lab 07 · Part 9 — the JSON rules app.json and eas.json must follow, shown as the four mistakes beginners make, one
+ * at a time, each with the real error message (JSON.parse) and the fix. <JsonRules />
+ */
+import Stepper from './Stepper.astro';
+import { highlightLines } from '@/lab/ui/highlight-static';
+
+// the same small part of eas.json, correct and with one mistake at a time
+const GOOD = ['"preview": {', '  "distribution": "internal",', '  "android": {', '    "buildType": "apk"', '  }', '}'];
+const CASES = [
+  { lines: GOOD, bad: -1 },
+  { lines: ['"preview": {', '  "distribution": "internal"', '  "android": {', '    "buildType": "apk"', '  }', '}'], bad: 1 },
+  { lines: ['"preview": {', '  "distribution": "internal",', '  "android": {', '    "buildType": "apk",', '  }', '}'], bad: 3 },
+  { lines: ['"preview": {', '  "distribution": "internal",', '  "android": {', "    \"buildType\": 'apk'", '  }', '}'], bad: 3 },
+  { lines: ['"preview": {', '  "distribution": "internal",', '  "android": {', '    buildType: "apk"', '  }', '}'], bad: 3 },
+  { lines: GOOD, bad: -1 },
+];
+const html = CASES.map((c) => highlightLines(c.lines.join('\n'), 'json'));
+
+const STEPS = [
+  { title: 'The JSON shape', text: 'JSON is text with strict rules: `{ }` holds **key: value** pairs; every key and every text is in **double quotes** `" "`; a `:` between a key and its value; a `,` **between** two items — and none after the last one.', ms: 5600 },
+  { title: 'Mistake 1: a missing comma', text: 'After `"internal"` the next item starts, so a `,` must come between them. The error names the place: line 3, the item after the missing comma.', ms: 5600 },
+  { title: 'Mistake 2: a comma after the last item', text: '`"apk",` is the **last** item of its object, so no comma after it. JavaScript allows it; JSON does not.', ms: 5200 },
+  { title: 'Mistake 3: single quotes', text: 'Texts need **double** quotes: `"apk"`, never `\'apk\'`.', ms: 4600 },
+  { title: 'Mistake 4: a key without quotes', text: 'In JavaScript `{ buildType: "apk" }` works. In JSON every key is a text too: `"buildType"`.', ms: 4800 },
+  { title: 'Fixed: valid JSON', text: 'All four rules kept. EAS can read the file now — and so can **Check**, which first tests that your `app.json` and `eas.json` are valid JSON.', ms: 4800 },
+];
+const ERRORS = [
+  '',
+  "Expected ',' or '}' after property value in JSON (line 3)",
+  'Expected double-quoted property name in JSON (line 5)',
+  "Unexpected token ''', …\"ildType\": 'apk' … is not valid JSON",
+  "Expected property name or '}' in JSON (line 4)",
+  '',
+];
+---
+<Stepper label="The JSON rules, mistake by mistake" steps={STEPS} class="jr">
+  <div class="jr-grid">
+    <div class="jr-files">
+      {html.map((lines, k) => (
+        <pre class="stp-code jr-file stp-only" data-at={`${k + 1}:show`} aria-label={`eas.json, case ${k + 1}`}>{lines.map((l, i) => <span class="stp-ln" data-at={CASES[k].bad === i ? `${k + 1}:stop` : ''} set:html={l || ' '} />)}</pre>
+      ))}
+    </div>
+    <div class="jr-side">
+      <span class="jr-ok stp-only" data-at="1:show 6:show">✓ valid JSON</span>
+      {ERRORS.map((e, k) => e && <span class="jr-err mono stp-only" data-at={`${k + 1}:show`}>✕ {e}</span>)}
+      <ul class="jr-rules">
+        <li data-at="2:on">a <b>,</b> between items</li>
+        <li data-at="3:on">no <b>,</b> after the last item</li>
+        <li data-at="4:on">texts in <b>" "</b></li>
+        <li data-at="5:on">keys in <b>" "</b></li>
+      </ul>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .jr-grid { display: grid; gap: 14px; }
+  @media (min-width: 820px) { .jr-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+  .jr-files { display: grid; }
+  .jr-files > pre { grid-area: 1 / 1; }
+  .jr-side { display: grid; gap: 10px; align-content: start; }
+  .jr-side > .jr-ok, .jr-side > .jr-err { grid-row: 1; grid-column: 1; }
+  .jr-ok { justify-self: start; padding: 6px 12px; border-radius: 999px; background: color-mix(in oklab, var(--ok) 18%, transparent); color: var(--text); font-weight: 700; font-size: 13.5px; }
+  .jr-err { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--danger); background: color-mix(in oklab, var(--danger) 10%, transparent); color: var(--text); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
+  .jr-rules { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 6px; }
+  .jr-rules li { margin: 0 !important; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-2); font-size: 13.5px; color: var(--text-2); transition: all 0.3s; }
+  .jr-rules li b { font-family: var(--font-mono); color: var(--text); }
+  .jr-rules li[data-now='on'] { border-color: var(--accent); color: var(--text); background: color-mix(in oklab, var(--accent) 12%, var(--bg-2)); }
+</style>

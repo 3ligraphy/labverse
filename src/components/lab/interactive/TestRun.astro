@@ -1,0 +1,83 @@
+---
+/**
+ * Lab 07 · Part 5 — what happens when you press Run tests (or type `npm test`): Jest finds the test files, runs each
+ * test, compares what the code gave with what the test expects, and prints ✓ or ✕ and a summary. <TestRun />
+ */
+import Stepper from './Stepper.astro';
+import { highlightLines } from '@/lab/ui/highlight-static';
+
+const FILES = [
+  { name: 'App.tsx', at: '' },
+  { name: 'src/scan/parseScan.ts', at: '2-4:used' },
+  { name: '__tests__/parseScan-test.ts', at: '1:found 2-5:test' },
+  { name: '__tests__/ScannerScreen-test.tsx', at: '1:found' },
+  { name: '.maestro/scan-sample.yaml', at: '1:skip' },
+];
+const LINES: [string, string][] = [
+  ["test('a website link is a website', () => {", '2:run 3-4:run'],
+  ["  const result = parseScan('https://expo.dev');", '2:match'],
+  ["  expect(result).toEqual({ ok: true, kind: 'website', label: 'Website', value: 'https://expo.dev' });", '3:match 4:stop'],
+  ['});', ''],
+];
+const HL = highlightLines(LINES.map(([t]) => t).join('\n'));
+
+const STEPS = [
+  { title: 'Find the test files', text: 'Jest looks through the project for **test files**: the files in a `__tests__` folder, or whose name ends in `-test.ts` / `.test.ts`. The app’s own files and the Maestro flow are not tests for Jest.', ms: 5200 },
+  { title: 'Run one test: call your code', text: 'Each `test(…)` is run on its own. Inside it, the test **calls your code** like any other file would: `parseScan(\'https://expo.dev\')` gives back an object.', ms: 5200 },
+  { title: 'Compare: received = expected? → ✓', text: '`expect(result).toEqual({ … })` compares two values: what your code gave (**received**) and what the test says it must be (**expected**). Every field is the same, so the test **passes**: ✓.', ms: 5600 },
+  { title: 'A different value → ✕', text: 'If your code gave something else — here a different `kind` — the values differ and the test **fails**: ✕. Jest shows both values, the line of the test, and goes on with the next test.', ms: 5600 },
+  { title: 'The summary', text: 'After the last test Jest prints a summary: how many test files and tests passed or failed, and the time. **One failed test** means something that worked before is broken — a **regression**.', ms: 5200 },
+];
+---
+<Stepper label="What happens when you press Run tests" steps={STEPS} class="tr">
+  <div class="tr-grid">
+    <div class="tr-files">
+      <p class="stp-k2">the project</p>
+      <ul>{FILES.map((f) => <li class="tr-file mono" data-at={f.at}>{f.name}</li>)}</ul>
+    </div>
+    <div class="tr-mid">
+      <pre class="stp-code" aria-label="One test">{LINES.map(([, at], i) => <span class="stp-ln" data-at={at} set:html={HL[i] || ' '} />)}</pre>
+      <div class="tr-compare">
+        <div class="tr-box stp-only" data-at="2-5:show"><small class="mono">received (your code gave)</small><code>{"{ ok: true, kind: "}<span class="tr-swap"><b class="tr-kind stp-only" data-at="2-3:show 5:show">'website'</b><b class="tr-kind tr-bad stp-only" data-at="4:show">'text'</b></span>{", … }"}</code></div>
+        <div class="tr-box stp-only" data-at="3-5:show"><small class="mono">expected (the test says)</small><code>{"{ ok: true, kind: 'website', … }"}</code></div>
+        <span class="tr-verdict tr-ok stp-only" data-at="3:show">equal → ✓ PASS</span>
+        <span class="tr-verdict tr-no stp-only" data-at="4:show">different → ✕ FAIL</span>
+      </div>
+    </div>
+    <div class="stp-console tr-out" aria-label="Output">
+      <span>npm test</span>
+      <span class="stp-only" data-at="1-5:show">Running 2 test files…</span>
+      <span class="stp-only tr-g" data-at="3:show 5:show">✓ a website link is a website</span>
+      <span class="stp-only tr-r" data-at="4:show">✕ a website link is a website</span>
+      <span class="stp-only" data-at="5:show">Tests: 12 passed, 12 total</span>
+      <span class="stp-only" data-at="5:show">Time:  0.4 s</span>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .tr-grid { display: grid; gap: 14px; }
+  @media (min-width: 900px) { .tr-grid { grid-template-columns: 220px minmax(0, 1fr) 230px; align-items: start; } }
+  .tr-files ul { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 5px; }
+  .tr-file { margin: 0 !important; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-2); font-size: 11.5px; color: var(--text-2); overflow-wrap: anywhere; transition: all 0.3s var(--ease-out); }
+  .tr-file[data-now='found'] { border-color: var(--accent); color: var(--text); background: color-mix(in oklab, var(--accent) 14%, var(--bg-2)); }
+  .tr-file[data-now='test'] { border-color: var(--accent); color: var(--text); font-weight: 700; }
+  .tr-file[data-now='used'] { border-color: var(--ok); color: var(--text); }
+  .tr-file[data-now='skip'] { opacity: 0.4; text-decoration: line-through; }
+  .tr-mid { display: grid; gap: 10px; min-width: 0; }
+  .tr-compare { display: grid; gap: 8px; }
+  .tr-box { display: grid; gap: 3px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-2); }
+  .tr-box small { font-size: 11px; color: var(--text-3); }
+  .tr-box code { font-size: 12.5px; background: none; padding: 0; overflow-wrap: anywhere; }
+  .tr-kind { font-weight: 700; color: var(--ok); }
+  .tr-bad { color: var(--danger); }
+  .tr-swap { display: inline-grid; }
+  .tr-swap > b { grid-area: 1 / 1; }
+  .tr-verdict { justify-self: start; padding: 4px 10px; border-radius: 999px; font: 700 12.5px var(--font-mono); }
+  .tr-ok { background: color-mix(in oklab, var(--ok) 18%, transparent); color: var(--text); }
+  .tr-no { background: color-mix(in oklab, var(--danger) 18%, transparent); color: var(--text); }
+  .tr-compare > .tr-verdict { grid-row: 3; grid-column: 1; }
+  .tr-out { min-height: 160px; }
+  .tr-g { color: #4ade80; }
+  .tr-r { color: #f87171; }
+</style>

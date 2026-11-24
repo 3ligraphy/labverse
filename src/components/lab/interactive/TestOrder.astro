@@ -1,0 +1,70 @@
+---
+/**
+ * Lab 07 · Part 6 — one component test, run line by line: arrange (the permission, then draw the screen), act (press
+ * like a user), assert (wait for the result, then check the label and the vibration). <TestOrder />
+ */
+import Stepper from './Stepper.astro';
+import { highlightLines } from '@/lab/ui/highlight-static';
+
+const LINES: [string, string][] = [
+  ["test('a scanned website shows its result and the success vibration', async () => {", '1-6:run'],
+  ['  givePermission({ granted: true, canAskAgain: true });', '1:match 2-6:done'],
+  ['  await render(<ScannerScreen onBack={jest.fn()} />);', '2:match 3-6:done'],
+  ['', ''],
+  ['  const user = userEvent.setup();', '3:match 4-6:done'],
+  ["  await user.press(screen.getByTestId('fake-scan-website'));", '3:match 4-6:done'],
+  ['', ''],
+  ["  expect(await screen.findByText('https://expo.dev')).toBeOnTheScreen();", '4:match 5-6:done'],
+  ["  expect(screen.getByText('Website')).toBeOnTheScreen();", '5:match 6:done'],
+  ['  expect(Haptics.notificationAsync).toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Success);', '5:match 6:done'],
+  ['});', ''],
+];
+const HL = highlightLines(LINES.map(([t]) => t).join('\n'));
+
+const STEPS = [
+  { title: 'Arrange ① — the answer of the permission', text: 'First, prepare the world of the test. `givePermission` makes the fake hook answer “granted”. It must come **before** `render`: the screen reads the permission while it is drawn.', ms: 5200 },
+  { title: 'Arrange ② — draw the screen', text: '`render(<ScannerScreen … />)` draws the screen inside the test, with the fake camera. Nothing is on a real phone: React Native Testing Library keeps the screen in memory.', ms: 5200 },
+  { title: 'Act — press like a user', text: '`userEvent.setup()` makes a pretend user. `user.press(…)` presses the element whose `testID` is `fake-scan-website`: the fake camera “reads” `https://expo.dev`.', ms: 5200 },
+  { title: 'Assert ① — wait for the result', text: 'The result card appears a moment **after** the press. `findByText` **waits** for it (up to a second); `getByText` would look only once, too early. `toBeOnTheScreen()` checks it is shown.', ms: 5600 },
+  { title: 'Assert ② — the label and the vibration', text: 'Now the card is there, so `getByText(\'Website\')` can look at once. `toHaveBeenCalledWith(…Success)` checks the mock of `expo-haptics` was asked for the success vibration. All three checks pass → ✓.', ms: 5600 },
+  { title: 'Why this order', text: '**Arrange → act → assert.** Prepare, then do what a user does, then check. Checking before pressing, or drawing before the permission is set, would test the wrong screen.', ms: 5200 },
+];
+---
+<Stepper label="One component test, line by line" steps={STEPS} class="to">
+  <div class="to-grid">
+    <pre class="stp-code" aria-label="A component test">{LINES.map(([, at], i) => <span class="stp-ln" data-at={at} set:html={HL[i] || ' '} />)}</pre>
+    <div class="to-side">
+      <div class="to-phases mono" aria-hidden="true">
+        <span data-at="1-2:on">arrange</span><span data-at="3:on">act</span><span data-at="4-5:on">assert</span>
+      </div>
+      <div class="stp-phone to-phone" aria-hidden="true">
+        <div class="stp-screen">
+          <div class="stp-scr stp-only" data-at="1:show"><small>nothing drawn yet</small></div>
+          <div class="stp-scr stp-only to-fake" data-at="2-3:show"><small class="to-k">the fake camera</small><i class="to-btn" data-at="3:press">Fake scan: website</i><i class="to-btn">Fake scan: empty code</i></div>
+          <div class="stp-scr stp-only" data-at="4-6:show"><div class="to-card"><span class="to-ok">✓</span><small class="to-lab">WEBSITE</small><span>https://expo.dev</span><i class="stp-appbtn">Scan again</i></div></div>
+        </div>
+      </div>
+      <span class="to-pass stp-only" data-at="5-6:show">✓ PASS</span>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .to-grid { display: grid; gap: 14px; }
+  @media (min-width: 860px) { .to-grid { grid-template-columns: minmax(0, 1fr) 226px; align-items: start; } }
+  .to-side { display: grid; gap: 10px; justify-items: center; }
+  .to-phases { display: flex; gap: 6px; }
+  .to-phases span { padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 12px; color: var(--text-3); transition: all 0.3s; }
+  .to-phases span[data-now='on'] { border-color: var(--accent); color: var(--text); background: color-mix(in oklab, var(--accent) 16%, transparent); font-weight: 700; }
+  .to-phone { height: 330px; }
+  .to-fake { gap: 10px; }
+  .to-k { color: #64748b !important; text-transform: uppercase; letter-spacing: 0.05em; }
+  .to-btn { font-style: normal; padding: 8px 12px; border-radius: 10px; background: #1e293b; color: #fff; font-size: 12px; font-weight: 600; }
+  .to-btn[data-now='press'] { box-shadow: 0 0 0 3px #38bdf8; animation: to-press 0.6s var(--ease-out); }
+  @keyframes to-press { 40% { transform: scale(0.94); } }
+  .to-card { display: grid; justify-items: center; gap: 6px; width: 100%; padding: 14px 10px; border-radius: 16px; background: #fff; color: #0f172a; font-size: 12.5px; }
+  .to-ok { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #22c55e; color: #fff; font-weight: 800; }
+  .to-lab { color: #64748b !important; font-weight: 700; letter-spacing: 0.08em; }
+  .to-pass { padding: 4px 12px; border-radius: 999px; background: color-mix(in oklab, var(--ok) 20%, transparent); color: var(--text); font: 700 13px var(--font-mono); }
+  @media (prefers-reduced-motion: reduce) { .to-btn[data-now='press'] { animation: none; } }
+</style>

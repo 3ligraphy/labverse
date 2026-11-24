@@ -1,0 +1,75 @@
+---
+/**
+ * Lab 07 · Part 8 — EAS Update or a new build: an installed build has native code (fixed) and JavaScript (can be
+ * replaced). An update carries only JavaScript and images, and only to builds with the same runtime version; a
+ * native change needs a new build. <UpdateVsBuild />
+ */
+import Stepper from './Stepper.astro';
+
+const STEPS = [
+  { title: 'An installed build has two layers', text: 'The app file on a phone has **native code** (Kotlin / Swift: the camera, the vibration motor, the permission texts, the icon) and **JavaScript** (your screens, `parseScan`, the styles). The native layer is fixed inside the file.', ms: 5600 },
+  { title: 'A JavaScript change → `eas update`', text: 'You fix a bug in `parseScan.ts` — only JavaScript. `eas update --channel preview` uploads the new JavaScript to Expo’s servers, for the builds made with the preview profile.', ms: 5600 },
+  { title: 'Next start: the phone downloads it', text: 'The next time the app starts, it asks Expo for an update, downloads the new JavaScript, and runs it. No store review, no new install.', ms: 5200 },
+  { title: 'A native change cannot travel in an update', text: 'A new native package, a new permission text in `app.json`, a new icon: these change the **native** layer, and an update only carries JavaScript and images. The phone still runs the old native code.', ms: 5800 },
+  { title: 'So: a new build', text: '`eas build` makes a new app file with a new **runtime version**. People install it; from then on, updates for the new runtime version reach it. An update never reaches a build with a different runtime version.', ms: 5800 },
+];
+---
+<Stepper label="EAS Update or a new build?" steps={STEPS} class="ub">
+  <div class="ub-grid">
+    <div class="ub-change">
+      <p class="stp-k2">the change</p>
+      <code class="ub-chg stp-only" data-at="2-3:show">src/scan/parseScan.ts <b>(JavaScript)</b></code>
+      <code class="ub-chg ub-native stp-only" data-at="4-5:show">app.json · plugins / permission text <b>(native)</b></code>
+      <span class="ub-cmd mono stp-only" data-at="2-3:show">$ eas update --channel preview</span>
+      <span class="ub-cmd mono stp-only" data-at="5:show">$ eas build --profile preview</span>
+    </div>
+
+    <div class="ub-cloud stp-only" data-at="2-3:show 5:show">
+      <span class="ub-k">Expo’s servers</span>
+      <span class="ub-pack stp-only" data-at="2-3:show">update · runtime 1.0.0</span>
+      <span class="ub-pack ub-new stp-only" data-at="5:show">new build · runtime 1.1.0</span>
+    </div>
+
+    <div class="ub-phone">
+      <span class="ub-k">the app on a phone</span>
+      <div class="ub-layer ub-js" data-at="3:new">
+        <b>JavaScript</b><small class="stp-only" data-at="1-2:show 4:show">screens, parseScan, styles</small><small class="stp-only" data-at="3:show">✓ new parseScan, after a restart</small><small class="stp-only" data-at="5:show">from the new build</small>
+      </div>
+      <div class="ub-layer ub-native" data-at="4:stuck 5:new">
+        <b>Native code · runtime <span class="ub-swap"><span class="stp-only" data-at="1-4:show">1.0.0</span><span class="stp-only" data-at="5:show">1.1.0</span></span></b>
+        <small class="stp-only" data-at="1-3:show">camera, haptics, permission texts, icon</small>
+        <small class="stp-only" data-at="4:show">✕ an update cannot change this</small>
+        <small class="stp-only" data-at="5:show">✓ the new build is installed</small>
+      </div>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .ub-grid { display: grid; gap: 14px; align-items: center; }
+  @media (min-width: 860px) { .ub-grid { grid-template-columns: minmax(0, 1fr) 180px minmax(0, 1fr); } }
+  .ub-change, .ub-phone { display: grid; gap: 8px; align-content: start; }
+  .ub-change { grid-template-areas: 'k' 'chg' 'cmd'; }
+  .ub-change > .stp-k2 { grid-area: k; }
+  .ub-change > .ub-chg { grid-area: chg; }
+  .ub-change > .ub-cmd { grid-area: cmd; }
+  .ub-chg { justify-self: start; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--ok); background: var(--code-bg); font-size: 12.5px; color: var(--text); }
+  .ub-chg b { color: var(--ok); }
+  .ub-chg.ub-native { border-color: var(--warn); }
+  .ub-chg.ub-native b { color: var(--warn); }
+  .ub-cmd { justify-self: start; padding: 5px 10px; border-radius: 8px; background: #0b0f17; color: #e2e8f0; font-size: 12px; }
+  .ub-cloud { display: grid; gap: 8px; justify-items: center; padding: 14px 10px; border-radius: 18px; border: 1px dashed var(--line-2); background: var(--bg-2); }
+  .ub-cloud > .ub-pack { grid-row: 2; grid-column: 1; }
+  .ub-k { font-size: 11.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .ub-pack { padding: 6px 10px; border-radius: 10px; background: color-mix(in oklab, var(--ok) 18%, transparent); color: var(--text); font: 600 12px var(--font-mono); text-align: center; }
+  .ub-new { background: color-mix(in oklab, var(--accent) 22%, transparent); }
+  .ub-phone { padding: 14px; border-radius: 24px; background: #0f172a; box-shadow: inset 0 0 0 6px #0b0f17; }
+  .ub-phone .ub-k { color: #64748b; }
+  .ub-layer { display: grid; gap: 3px; padding: 10px 12px; border-radius: 12px; border: 1px solid #1e293b; background: #111827; transition: border-color 0.3s, box-shadow 0.3s; }
+  .ub-layer b { color: #fff; font-size: 13px; }
+  .ub-layer small { grid-row: 2; grid-column: 1; color: #94a3b8; font-size: 12px; }
+  .ub-swap { display: inline-grid; }
+  .ub-swap > span { grid-area: 1 / 1; }
+  .ub-layer[data-now='new'] { border-color: #22c55e; box-shadow: 0 0 0 3px rgb(34 197 94 / 0.25); }
+  .ub-layer[data-now='stuck'] { border-color: #f87171; box-shadow: 0 0 0 3px rgb(248 113 113 / 0.25); }
+</style>

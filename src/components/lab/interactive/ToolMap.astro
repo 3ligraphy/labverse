@@ -1,0 +1,84 @@
+---
+/**
+ * Lab 07 · Part 1 — the eight tools of the lab, with their logos, in the order the app needs them: the phone's
+ * hardware (build), the tests, the deployment — and the old package that is not used any more. <ToolMap />
+ */
+import Stepper from './Stepper.astro';
+
+const logoFiles = import.meta.glob<ImageMetadata>('/src/assets/tools/*.svg', { eager: true, import: 'default' });
+const logo = (name: string) => logoFiles[`/src/assets/tools/${name}.svg`]?.src;
+
+const STAGES = [
+  { id: 'hw', n: 2, title: 'Hardware', parts: 'Parts 3–4', tools: [
+    { logo: 'expo', name: 'expo-camera', job: 'Shows the live camera and reads QR codes' },
+    { logo: 'expo', name: 'expo-haptics', job: 'Makes the phone vibrate' },
+  ] },
+  { id: 'test', n: 3, title: 'Testing', parts: 'Parts 5–7', tools: [
+    { logo: 'jest', name: 'Jest', job: 'Runs the tests and says PASS or FAIL' },
+    { logo: 'testing-library', name: 'React Native Testing Library', job: 'Draws one screen in a test and presses its buttons' },
+    { logo: 'maestro', name: 'Maestro', job: 'Drives the real app on a phone, step by step' },
+  ] },
+  { id: 'ship', n: 4, title: 'Deployment', parts: 'Parts 8–9', tools: [
+    { logo: 'expo', name: 'EAS Build', job: 'Turns the project into an app file (APK, AAB, iPhone)' },
+    { logo: 'expo', name: 'EAS Submit', job: 'Uploads a finished build to Google Play or the App Store' },
+    { logo: 'expo', name: 'EAS Update', job: 'Sends new JavaScript to apps already installed' },
+  ] },
+];
+
+const STEPS = [
+  { title: 'One app, three stages', text: 'The lab follows the life of one app, **Smart QR**: first you build it with the phone’s hardware, then you test it, then you ship it to phones. Each stage has its own tools.', ms: 4200 },
+  { title: 'Hardware: the phone’s parts', text: 'Two **packages** your app imports. `expo-camera` shows the camera and reads the codes; `expo-haptics` plays short vibrations. A package brings the native code that talks to the phone’s hardware.', ms: 5200 },
+  { title: 'Testing: code that checks your code', text: '**Jest** finds the test files, runs them on your computer and prints PASS or FAIL. **React Native Testing Library** draws one screen inside a Jest test. **Maestro** taps through the whole running app, like a person.', ms: 6000 },
+  { title: 'Deployment: from your project to phones', text: 'Three services of **EAS** (Expo Application Services), all on Expo’s servers: **Build** makes the app file, **Submit** sends it to a store, **Update** sends new JavaScript to the apps people already installed.', ms: 6000 },
+  { title: 'Not used any more: expo-barcode-scanner', text: 'You will find this package in old tutorials. It was **removed** from Expo: reading QR codes is now part of `expo-camera`. Do not install it.', ms: 5000 },
+];
+---
+<Stepper label="The eight tools of this lab" steps={STEPS} class="tm">
+  <div class="tm-flow">
+    {STAGES.map((s, i) => (
+      <section class="tm-stage" data-at={`1:all ${s.n}:on 5:dim ${[2, 3, 4].filter((k) => k !== s.n).join(',')}:dim`}>
+        <header class="tm-head"><span class="tm-num mono">{i + 1}</span><b>{s.title}</b><small class="mono">{s.parts}</small></header>
+        <ul class="tm-tools">
+          {s.tools.map((t, j) => (
+            <li class="tm-tool" style={`--d:${j * 0.12}s`}>
+              <span class="tm-logo">{logo(t.logo) && <img src={logo(t.logo)} alt="" width="22" height="22" />}</span>
+              <span class="tm-txt"><b>{t.name}</b><small>{t.job}</small></span>
+            </li>
+          ))}
+        </ul>
+        {i < STAGES.length - 1 && <span class="tm-arrow" aria-hidden="true">→</span>}
+      </section>
+    ))}
+  </div>
+  <div class="tm-old stp-only" data-at="5:show">
+    <span class="tm-logo"><img src={logo('expo')} alt="" width="22" height="22" /></span>
+    <span class="tm-txt"><b><s>expo-barcode-scanner</s></b><small>removed — QR codes are read by <code>expo-camera</code> now</small></span>
+    <span class="tm-x" aria-hidden="true">✕</span>
+  </div>
+</Stepper>
+
+<style>
+  .tm-flow { display: grid; gap: 12px; }
+  @media (min-width: 900px) { .tm-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; } }
+  .tm-stage { position: relative; display: grid; gap: 10px; align-content: start; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-2); transition: opacity 0.35s var(--ease-out), border-color 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out); }
+  .tm-stage[data-now='dim'] { opacity: 0.38; }
+  .tm-stage[data-now='on'] { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent); }
+  .tm-head { display: flex; align-items: center; gap: 8px; }
+  .tm-num { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 800; }
+  .tm-head b { font-size: 15px; color: var(--text); }
+  .tm-head small { margin-left: auto; font-size: 11.5px; color: var(--text-3); }
+  .tm-tools { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 7px; }
+  .tm-tool { display: flex; align-items: center; gap: 10px; margin: 0 !important; padding: 8px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+  :global(.tm[data-step]) .tm-stage[data-now='on'] .tm-tool { animation: tm-in 0.45s var(--ease-out) both; animation-delay: var(--d); }
+  @keyframes tm-in { from { opacity: 0; transform: translateY(6px); } }
+  .tm-logo { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 9px; background: #fff; box-shadow: 0 0 0 1px var(--line); }
+  .tm-txt { display: grid; gap: 1px; min-width: 0; }
+  .tm-txt b { font-size: 13.5px; color: var(--text); }
+  .tm-txt small { font-size: 12.5px; line-height: 1.4; color: var(--text-2); }
+  .tm-arrow { display: none; }
+  @media (min-width: 900px) { .tm-arrow { display: block; position: absolute; right: -21px; top: 18px; color: var(--accent-text); font-size: 18px; font-weight: 800; } }
+  .tm-old { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--danger); background: color-mix(in oklab, var(--danger) 8%, transparent); }
+  .tm-old s { color: var(--text-2); }
+  .tm-x { margin-left: auto; color: var(--danger); font-weight: 800; font-size: 18px; }
+  @media (prefers-reduced-motion: reduce) { :global(.tm[data-step]) .tm-stage[data-now='on'] .tm-tool { animation: none; } .tm-stage { transition: none; } }
+</style>

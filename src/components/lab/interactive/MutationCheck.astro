@@ -1,0 +1,63 @@
+---
+/**
+ * Lab 07 · Part 6 — how Check tests YOUR tests: they run twice, on the real parseScan (they must pass) and on a
+ * broken copy of it (they must fail). A weak test passes on both, so it cannot see the bug. <MutationCheck />
+ */
+import Stepper from './Stepper.astro';
+import { highlightLines } from '@/lab/ui/highlight-static';
+
+const GOOD = "if (result.ok) expect(result.kind).toBe('wifi');";
+const WEAK = 'expect(result.ok).toBe(true);';
+const REAL = "return { ok: true, kind: 'wifi', label: 'Wi-Fi network', value };";
+const BROKEN = "return { ok: true, kind: 'text', label: 'Text', value };";
+const [good, weak, real, broken] = [GOOD, WEAK, REAL, BROKEN].map((c) => highlightLines(c)[0]);
+
+const STEPS = [
+  { title: 'You write a test for the Wi-Fi code', text: 'Your test gives `parseScan` a Wi-Fi code and checks the answer. But is the check strong enough to notice a **bug**? Check finds out by running your tests **twice**.', ms: 5000 },
+  { title: 'Run 1: on the real parseScan → must PASS', text: 'First on the real `parseScan`. A good test passes here: the real code is right. A test that fails on the real code is a wrong test.', ms: 5000 },
+  { title: 'Run 2: on a broken copy', text: 'Then Check makes a **broken copy** of `parseScan`: one line changed so a Wi-Fi code comes back as `kind: \'text\'`. This is the kind of mistake a real change can make.', ms: 5400 },
+  { title: 'A strong test → FAILS on the broken copy ✓', text: '`expect(result.kind).toBe(\'wifi\')` sees `\'text\'` and **fails**. That is what we want: your test **caught the bug**. Check line: “your tests fail when parseScan calls a Wi-Fi code plain text” ✓.', ms: 6000 },
+  { title: 'A weak test → still PASSES ✕', text: '`expect(result.ok).toBe(true)` only checks `ok`. The broken copy still gives `ok: true`, so this test **passes on both** — it cannot see the bug. Check says: “Your tests still pass on a broken …”. Fix: expect the exact value.', ms: 6400 },
+];
+---
+<Stepper label="How Check tests your tests" steps={STEPS} class="mc">
+  <div class="mc-tests">
+    <p class="stp-k2">your test checks…</p>
+    <code class="mc-line" data-at="1-4:on 5:dim" set:html={good} />
+    <code class="mc-line mc-weak stp-only" data-at="5:show" set:html={weak} />
+  </div>
+  <div class="mc-runs">
+    <div class="mc-run" data-at="2:on 3-5:done">
+      <b>Run 1 · the real <code>parseScan</code></b>
+      <code class="mc-src" set:html={real} />
+      <span class="mc-res mc-pass stp-only" data-at="2-5:show">✓ PASS — must pass</span>
+    </div>
+    <div class="mc-run stp-only" data-at="3-5:show">
+      <b>Run 2 · a broken copy</b>
+      <code class="mc-src mc-broken" set:html={broken} />
+      <span class="mc-res mc-fail stp-only" data-at="4:show">✕ FAIL — your test caught the bug ✓</span>
+      <span class="mc-res mc-bad stp-only" data-at="5:show">✓ PASS — the test cannot see the bug ✕</span>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .mc-tests { display: grid; gap: 6px; margin-bottom: 12px; }
+  .mc-line { justify-self: start; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--code-bg); font-size: 12.5px; color: var(--cm-var); transition: opacity 0.3s; overflow-wrap: anywhere; }
+  .mc-line[data-now='on'] { border-color: var(--ok); }
+  .mc-line[data-now='dim'] { opacity: 0.4; }
+  .mc-weak { border-color: var(--warn); }
+  .mc-runs { display: grid; gap: 12px; }
+  @media (min-width: 820px) { .mc-runs { grid-template-columns: 1fr 1fr; } }
+  .mc-run { display: grid; gap: 8px; align-content: start; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-2); transition: border-color 0.3s, opacity 0.3s; }
+  .mc-run[data-now='on'] { border-color: var(--accent); }
+  .mc-run[data-now='done'] { opacity: 0.75; }
+  .mc-run b { font-size: 14px; color: var(--text); }
+  .mc-src { padding: 7px 10px; border-radius: 8px; background: var(--code-bg); font-size: 12px; color: var(--cm-var); overflow-wrap: anywhere; }
+  .mc-broken { box-shadow: inset 3px 0 var(--danger); }
+  .mc-res { justify-self: start; padding: 4px 10px; border-radius: 999px; font: 700 12.5px var(--font-mono); color: var(--text); }
+  .mc-run > .mc-res { grid-row: 3; grid-column: 1; }
+  .mc-pass { background: color-mix(in oklab, var(--ok) 18%, transparent); }
+  .mc-fail { background: color-mix(in oklab, var(--ok) 18%, transparent); }
+  .mc-bad { background: color-mix(in oklab, var(--danger) 18%, transparent); }
+</style>

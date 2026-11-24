@@ -104,3 +104,28 @@ test('every phone picture of a CodeTour exists and is a small webp', () => {
     assert.ok(statSync(file).size <= 160 * 1024, `${src} is small`);
   }
 });
+
+const VISUAL = /<(Shot|Clip|CodeTour|Demo|ToolMap|ExpoGoBuild|PermissionFlow|ScanReads|TestRun|TestLayers|MutationCheck|MockSwap|TestOrder|FlowPlayer|EasPipeline|UpdateVsBuild|JsonRules|WifiSplit|ReturnGates|LockTimeline|HapticTiming|FlipState)\b/;
+
+test('every one of the 21 exercises is explained above it, in every part: how it works or the code, a visual, then “Your turn”', () => {
+  const groups = blocks(mdx.slice(mdx.indexOf('<Part n="1"')));
+  assert.equal(groups.length, 21);
+  // exercises with nothing between them (Exercises 3 and 4) share the explanation above the first one
+  let shared = '';
+  for (const b of groups) {
+    const text = b.before.trim() ? b.before : shared;
+    shared = text;
+    assert.match(text, /#### (② How it works|③ The code, line by line|③ The project, file by file)/, `${b.id}: “How it works” or “The code” above it`);
+    assert.match(text, /#### ④ Your turn/, `${b.id}: “④ Your turn” above it`);
+    assert.match(text, VISUAL, `${b.id}: a picture, a recording, an animation or a code tour above it`);
+    assert.ok(proseWords(text) >= 35, `${b.id}: ${proseWords(text)} words of explanation`);
+  }
+});
+
+test('the code tours of the testing parts show what Jest and Maestro print beside the code', () => {
+  for (const code of ['PARSE_TEST', 'SCREEN_TEST', 'MAESTRO_FLOW']) {
+    assert.match(mdx, new RegExp(`<CodeTour [^>]*code=\{P\.${code}\}[^>]*consoleTitle="(npm test|maestro test)"`), `${code}: an output box`);
+  }
+  for (const code of ['PACKAGE_JSON', 'TSCONFIG', 'EAS_JSON', 'APP_JSON']) assert.match(mdx, new RegExp(`<CodeTour [^>]*code=\{P\.${code}\}[^>]*lang="json"`), `${code}: coloured as JSON`);
+  assert.match(mdx, /<CodeTour [^>]*code=\{P\.MAESTRO_FLOW\}[^>]*lang="yaml"/, 'the flow: coloured as YAML');
+});
