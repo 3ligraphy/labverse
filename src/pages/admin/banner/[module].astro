@@ -112,7 +112,8 @@ const pickable = (await hubData()).cards.filter((c) => a.can('module.build', c.s
       const result = await response.json().catch(() => ({}));
       if (!response.ok) { say(result.error ?? 'Could not save.'); return; }
       banners = id ? banners.map((item) => item.id === id ? result.banner : item) : [result.banner, ...banners];
-      reset(); render(); say('Saved as a draft. Publish it when students should see it.', true);
+      // editing a published banner keeps it published: students see the new text at once
+      reset(); render(); say(result.banner?.published ? 'Saved. Students see the new text now.' : 'Saved as a draft. Publish it when students should see it.', true);
     });
     cancel.addEventListener('click', reset);
     list.addEventListener('click', async (event) => {
