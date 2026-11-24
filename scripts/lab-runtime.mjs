@@ -36,7 +36,9 @@ export function buildLabRuntime() {
     outfile: OUTFILE,
     // any library asking for 'react-native' gets react-native-web (the real package can't run in a browser)
     alias: { 'react-native': 'react-native-web' },
-    define: { 'process.env.NODE_ENV': '"production"', __DEV__: 'false' },
+    // `global` is Node's name for the global object; react-native-web uses it (global.cancelAnimationFrame when an
+    // animation stops, global.performance), and a browser only has `globalThis`
+    define: { 'process.env.NODE_ENV': '"production"', __DEV__: 'false', global: 'globalThis' },
   });
   buildSync({
     ...common,
