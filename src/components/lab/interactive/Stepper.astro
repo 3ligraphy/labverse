@@ -1,0 +1,119 @@
+---
+/**
+ * The shell of every step-through animation ("How it works"): the animation itself goes in the slot, and its CSS
+ * reads the figure's data-step (1…n), e.g. `:global(.rg[data-step='3']) .rg-gate { … }`. Under it: one caption per
+ * step (markdown `code` and **bold**), then ← Back · ▶ Play · dots · Next →. Behaviour: src/lab/ui/stepper.ts.
+ *
+ * <Stepper label="How the screen picks what to draw" class="rg" steps={[{ title: '…', text: '…', ms: 4000 }]}>…</Stepper>
+ */
+import { inline } from '@/lib/content';
+
+type Step = { title: string; text: string; ms?: number };
+interface Props {
+  label: string;
+  steps: Step[];
+  class?: string;
+}
+const { label, steps, class: cls } = Astro.props;
+if (!steps.length) throw new Error(`<Stepper label="${label}">: steps are required`);
+---
+<figure class:list={['stp', cls]} data-stepper data-step="1" data-reveal data-free aria-label={label} tabindex="-1">
+  <p class="stp-k mono"><span aria-hidden="true">▶</span> {label}</p>
+  <div class="stp-stage"><slot /></div>
+  <div class="stp-say" aria-live="polite">
+    <ol class="stp-list" data-stp-say>
+      {steps.map((s, i) => (
+        <li data-ms={s.ms ?? ''} hidden={i > 0}>
+          <span class="stp-n mono">{i + 1} / {steps.length}</span>
+          <b set:html={inline(s.title)} />
+          <p set:html={inline(s.text)} />
+        </li>
+      ))}
+    </ol>
+  </div>
+  <div class="stp-nav">
+    <button type="button" class="stp-btn" data-stp-prev disabled>← Back</button>
+    <button type="button" class="stp-btn stp-play" data-stp-play aria-pressed="false">▶ Play</button>
+    <div class="stp-dots">
+      {steps.map((s, i) => (
+        <button type="button" class="stp-dot" data-stp-dot={i} aria-label={`Step ${i + 1}: ${s.title.replace(/[`*]/g, '')}`} aria-current={i === 0 ? 'step' : undefined}></button>
+      ))}
+    </div>
+    <button type="button" class="btn btn-primary btn-sm stp-next" data-stp-next>Next →</button>
+  </div>
+</figure>
+
+<script>
+  import { wireSteppers } from '@/lab/ui/stepper';
+  wireSteppers();
+  document.addEventListener('astro:page-load', () => wireSteppers());
+</script>
+
+<style>
+  .stp { margin: 22px 0 30px; display: grid; gap: 12px; padding: clamp(14px, 2.4vw, 22px); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); outline: none; }
+  .stp-k { margin: 0 !important; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--accent-text); }
+  .stp-k span { font-size: 9px; margin-right: 4px; }
+  .stp-stage { min-width: 0; }
+
+  .stp-say { padding: 12px 14px; border-radius: 12px; background: var(--bg-2); }
+  .stp-list { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; }
+  /* every caption sits in the same cell: the box keeps the height of the longest one, so the page never jumps */
+  .stp-list > li { grid-area: 1 / 1; margin: 0 !important; display: grid; gap: 3px; align-content: start; }
+  .stp-list > li[hidden] { display: grid; visibility: hidden; }
+  .stp-n { font-size: 12px; color: var(--text-3); }
+  .stp-list b { font-size: 15.5px; color: var(--text); }
+  .stp-list p { margin: 0 !important; font-size: 14.5px; line-height: 1.6; color: var(--text-2); }
+  .stp-list :global(code) { font-size: 0.88em; }
+
+  .stp-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .stp-btn { padding: 7px 13px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 13px var(--font-body); cursor: pointer; }
+  .stp-btn:hover:not(:disabled) { border-color: var(--text-3); }
+  .stp-btn:disabled { opacity: 0.45; cursor: default; }
+  .stp-btn:focus-visible, .stp-dot:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .stp-play[aria-pressed='true'] { border-color: var(--accent); color: var(--accent-text); }
+  .stp-dots { display: flex; gap: 6px; flex: 1; justify-content: center; min-width: 80px; }
+  .stp-dot { width: 9px; height: 9px; padding: 0; border-radius: 50%; border: 0; background: var(--line-2); cursor: pointer; transition: background 0.2s var(--ease-out), transform 0.2s var(--ease-out); }
+  .stp-dot[aria-current='step'] { background: var(--accent); transform: scale(1.25); }
+  .stp-next { margin-left: auto; }
+  @media (max-width: 520px) { .stp-dots { order: 3; flex-basis: 100%; } }
+
+  /* ---- shared pieces of the animations (they live in the slot, so :global) ---- */
+  /* parts that appear only at some steps: data-at="3-5:show" */
+  .stp :global(.stp-only) { transition: opacity 0.35s var(--ease-out), visibility 0.35s, transform 0.35s var(--ease-out); }
+  .stp :global(.stp-only:not([data-now])), .stp :global(.stp-only[data-now='']) { opacity: 0; visibility: hidden; transform: translateY(4px); }
+  /* and the other way round: parts that step aside at some steps: data-at="6:hide" */
+  .stp :global([data-now='hide']) { opacity: 0; visibility: hidden; }
+
+  /* code: one span.stp-ln per line; data-now = run (being checked) · match (this runs) · stop (return early) · skip · dim */
+  .stp :global(.stp-code) { margin: 0; padding: 10px 0; border-radius: 12px; border: 1px solid var(--line); background: var(--code-bg); color: var(--cm-var); font: 12.5px/1.65 var(--font-mono); overflow-x: auto; white-space: pre; }
+  .stp :global(.stp-ln) { display: block; padding: 0 12px 0 10px; border-left: 3px solid transparent; transition: background-color 0.3s var(--ease-out), border-color 0.3s var(--ease-out), opacity 0.3s var(--ease-out); }
+  .stp :global(.stp-ln[data-now='run']) { border-left-color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
+  .stp :global(.stp-ln[data-now='match']) { border-left-color: var(--ok); background: color-mix(in oklab, var(--ok) 15%, transparent); }
+  .stp :global(.stp-ln[data-now='stop']) { border-left-color: var(--danger); background: color-mix(in oklab, var(--danger) 13%, transparent); }
+  .stp :global(.stp-ln[data-now='skip']), .stp :global(.stp-ln[data-now='dim']) { opacity: 0.38; }
+  .stp :global(.stp-code .c) { color: var(--text-3); }
+
+  /* a value the code works with, e.g. permission = null */
+  .stp :global(.stp-chip) { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 12.5px/1.4 var(--font-mono); overflow-wrap: anywhere; }
+  .stp :global(.stp-chip b) { color: var(--accent-text); }
+  .stp :global(.stp-k2) { margin: 0 0 6px !important; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+
+  /* the Smart QR phone (always the app's own dark colours) */
+  .stp :global(.stp-phone) { justify-self: center; width: 210px; height: 380px; padding: 8px; border-radius: 32px; background: #0b0f17; box-shadow: inset 0 0 0 2px #1e293b, 0 18px 40px -24px rgb(0 0 0 / 0.6); }
+  .stp :global(.stp-screen) { position: relative; height: 100%; overflow: hidden; border-radius: 25px; background: #0f172a; color: #e2e8f0; font: 12.5px/1.4 var(--font-body); }
+  .stp :global(.stp-scr) { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 16px; text-align: center; }
+  .stp :global(.stp-scr b) { font-size: 15px; color: #fff; }
+  .stp :global(.stp-scr small) { color: #cbd5e1; font-size: 11.5px; }
+  .stp :global(.stp-appbtn) { font-style: normal; font-weight: 700; padding: 8px 14px; border-radius: 12px; background: #0ea5e9; color: #fff; font-size: 12px; }
+  .stp :global(.stp-appbtn.light) { background: rgb(255 255 255 / 0.14); font-weight: 600; }
+  .stp :global(.stp-cam) { background: radial-gradient(circle at 50% 40%, #334155, #0b0f17 72%); }
+  .stp :global(.stp-qrframe) { width: 112px; height: 112px; border-radius: 14px; box-shadow: 0 0 0 3px #38bdf8; }
+
+  /* the Console under the phone */
+  .stp :global(.stp-console) { display: grid; align-content: start; gap: 2px; min-height: 92px; padding: 8px 10px; border-radius: 10px; background: #0b0f17; color: #cbd5e1; font: 11.5px/1.5 var(--font-mono); }
+  .stp :global(.stp-console > span:first-child) { color: #64748b; }
+  @media (prefers-reduced-motion: reduce) {
+    .stp-dot, .stp :global(.stp-only), .stp :global(.stp-ln) { transition: none; }
+    .stp :global(.stp-only:not([data-now])), .stp :global(.stp-only[data-now='']) { transform: none; }
+  }
+</style>

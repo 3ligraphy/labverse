@@ -19,7 +19,8 @@ interface Props {
   shots?: One[];
   w: number;
   h: number;
-  frame?: 'phone' | 'browser' | 'none';
+  /** device: a picture of the lab page's own phone (it has its frame already) */
+  frame?: 'phone' | 'browser' | 'none' | 'device';
   url?: string;
   caption?: string;
   notes?: Note[];
@@ -92,6 +93,12 @@ for (const s of list) if (!s.alt?.trim()) throw new Error(`<Shot src="${s.src}">
   .shot-phone .shot-frame { width: 100%; padding: 7px; border-radius: 30px; background: #0c0f14; box-shadow: 0 1px 0 color-mix(in oklab, #fff 14%, transparent) inset, 0 18px 40px -22px rgb(0 0 0 / 0.55); }
   .shot-phone .shot-pic, .shot-phone .shot-pic img { border-radius: 23px; }
   .shot-phone .shot-pic { overflow: hidden; }
+
+  /* device: the lab page's phone, captured with its own frame and see-through corners */
+  .shot-device .shot-item { width: min(250px, 70vw); }
+  .shot-device.shot-row .shot-item { width: min(205px, 42vw); }
+  .shot-device .shot-frame { background: none; }
+  .shot-device .shot-pic img { filter: drop-shadow(0 16px 26px rgb(0 0 0 / 0.28)); }
 
   /* browser: the dashboard in a window with an address bar */
   .shot-browser, .shot-none { justify-items: stretch; }

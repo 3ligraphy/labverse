@@ -239,3 +239,15 @@ test('axios is built in (Lab 05: fetch or Axios)', async () => {
   assert.equal(r.rendered, true);
   assert.match(await d.text(), /functionfunctionfunction/);
 });
+
+test('react-native-web’s note that useNativeDriver is missing (true in every browser) never reaches the Console', async () => {
+  const messages: { type: string; text?: string }[] = [];
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const runtime = createRuntime({ container, post: (m) => messages.push(m as { type: string; text?: string }) });
+  runtime.log('warn', ['Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`.']);
+  runtime.log('log', ['Scanned:', 'https://expo.dev']);
+  runtime.log('warn', ['Your own warning about useNativeDriver stays']);
+  assert.deepEqual(messages.filter((m) => m.type === 'log').map((m) => m.text), ['Scanned: https://expo.dev', 'Your own warning about useNativeDriver stays']);
+  assert.deepEqual(await runtime.rpc('logs', []), ['Scanned: https://expo.dev', 'Your own warning about useNativeDriver stays'], 'the checks do not see it either');
+});

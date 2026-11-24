@@ -208,22 +208,28 @@ export function CameraView(props: AnyProps): ReactNode {
     View,
     { style: [{ flex: 1, overflow: 'hidden', backgroundColor: '#0b0f17' }, style], testID, dataSet: { rn: 'CameraView' } },
     on && createElement(View, { style: { position: 'absolute', top: '22%', left: '18%', width: '64%', height: '40%', borderRadius: 24, backgroundColor: '#243047', opacity: 0.6 } }),
+    // the sample codes sit in the middle of the viewfinder, where a real code would be held — clear of the app's own
+    // texts at the top (a hint at top 72) and its buttons at the bottom
     createElement(
       View,
-      { style: { position: 'absolute', top: 52, left: 10, right: 10, gap: 6, padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 5 } },
-      createElement(Text, { style: { color: '#e2e8f0', fontSize: 11, fontWeight: '700', letterSpacing: 0.4 } }, on ? `${facing === 'front' ? 'Front' : 'Back'} camera · tap a code to hold it in front of the camera` : 'Camera off: no permission'),
-      on &&
-        createElement(
-          View,
-          { style: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 } },
-          ...SAMPLE_CODES.map((c) =>
-            createElement(
-              Pressable,
-              { key: c.label, accessibilityRole: 'button', onPress: () => scan(c.data), style: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, backgroundColor: '#f8fafc' } },
-              createElement(Text, { style: { fontSize: 11, fontWeight: '700', color: '#0f172a' } }, `QR: ${c.label}`),
+      { style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 5 }, pointerEvents: 'box-none' },
+      createElement(
+        View,
+        { style: { width: '80%', maxWidth: 250, gap: 7, padding: 9, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center' } },
+        createElement(Text, { style: { color: '#e2e8f0', fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textAlign: 'center' } }, on ? `${facing === 'front' ? 'Front' : 'Back'} camera · tap a code to hold it in front of the camera` : 'Camera off: no permission'),
+        on &&
+          createElement(
+            View,
+            { style: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 } },
+            ...SAMPLE_CODES.map((c) =>
+              createElement(
+                Pressable,
+                { key: c.label, accessibilityRole: 'button', onPress: () => scan(c.data), style: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, backgroundColor: '#f8fafc' } },
+                createElement(Text, { style: { fontSize: 11, fontWeight: '700', color: '#0f172a' } }, `QR: ${c.label}`),
+              ),
             ),
           ),
-        ),
+      ),
     ),
     children,
   );

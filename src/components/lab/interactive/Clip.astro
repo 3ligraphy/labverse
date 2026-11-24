@@ -1,0 +1,121 @@
+---
+/**
+ * A short real recording of the lab page (Lab 07: "What you will build"): silent, looping, played only while it is
+ * on screen; with less motion asked for it waits for ▶. The steps under it say what happens, in order, so the
+ * clip still teaches when the video cannot load.
+ *
+ * <Clip src="/labs/lab-07/clips/step-a.mp4" poster="/labs/lab-07/clips/step-a.webp" alt="…" w={360} h={740}
+ *       frame="phone" title="Step A on the lab phone" steps={['Press **Start scanning**', '…']} />
+ */
+import { inline } from '@/lib/content';
+
+interface Props {
+  src: string;
+  poster: string;
+  alt: string;
+  w: number;
+  h: number;
+  /** device: a recording of the lab page's phone + Console (its frame is in the video) */
+  frame?: 'phone' | 'none' | 'device';
+  title?: string;
+  steps: string[];
+}
+const { src, poster, alt, w, h, frame = 'none', title, steps } = Astro.props;
+if (!alt?.trim()) throw new Error(`<Clip src="${src}">: alt text is required`);
+if (!steps?.length) throw new Error(`<Clip src="${src}">: steps are required (they explain the clip in words)`);
+---
+<figure class:list={['clip', `clip-${frame}`]} data-clip data-reveal data-free>
+  <div class="clip-media">
+    <div class="clip-frame">
+      <video class="clip-video" muted loop playsinline preload="none" poster={poster} width={w} height={h} aria-label={alt} data-clip-video>
+        <source src={src} type="video/mp4" />
+      </video>
+      <button type="button" class="clip-big" data-clip-big aria-label="Play the recording" hidden>▶</button>
+    </div>
+    <div class="clip-bar">
+      <span class="clip-tag mono">● recorded on this page</span>
+      <button type="button" class="clip-btn" data-clip-toggle aria-pressed="false">▶ Play</button>
+      <button type="button" class="clip-btn" data-clip-replay>↺ Replay</button>
+    </div>
+  </div>
+  <figcaption class="clip-cap">
+    {title && <b class="clip-title">{title}</b>}
+    <ol class="clip-steps">
+      {steps.map((s) => <li set:html={inline(s)} />)}
+    </ol>
+  </figcaption>
+</figure>
+
+<script>
+  import { autoplayAllowed, shouldRun } from '@/lab/ui/stepper';
+
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-clip]:not([data-wired])').forEach((fig) => {
+      fig.dataset.wired = '1';
+      const video = fig.querySelector<HTMLVideoElement>('[data-clip-video]')!;
+      const big = fig.querySelector<HTMLButtonElement>('[data-clip-big]')!;
+      const toggle = fig.querySelector<HTMLButtonElement>('[data-clip-toggle]')!;
+      const replay = fig.querySelector<HTMLButtonElement>('[data-clip-replay]')!;
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      // "wanted": the clip should be playing whenever it can be seen (auto-play, or the student pressed Play)
+      let wanted = autoplayAllowed(reduced);
+      let visible = false;
+
+      const label = () => {
+        const on = !video.paused;
+        toggle.textContent = on ? '❚❚ Pause' : '▶ Play';
+        toggle.setAttribute('aria-pressed', String(on));
+        big.hidden = on || (wanted && visible);
+      };
+      const apply = () => {
+        if (shouldRun(visible, document.hidden, wanted)) {
+          video.play().catch(() => { wanted = false; label(); }); // the browser refused auto-play: wait for ▶
+        } else if (!video.paused) video.pause();
+        label();
+      };
+      const start = () => { wanted = true; apply(); };
+
+      toggle.addEventListener('click', () => { wanted = video.paused; apply(); });
+      big.addEventListener('click', start);
+      replay.addEventListener('click', () => { video.currentTime = 0; start(); });
+      video.addEventListener('play', label);
+      video.addEventListener('pause', label);
+      document.addEventListener('visibilitychange', apply);
+      new IntersectionObserver(([e]) => { visible = e.isIntersecting && e.intersectionRatio >= 0.5; apply(); }, { threshold: [0, 0.5, 1] }).observe(fig);
+      big.hidden = wanted;
+      label();
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .clip { margin: 22px 0 30px; display: grid; gap: 16px 26px; align-items: center; }
+  .clip-media { display: grid; gap: 8px; justify-items: center; min-width: 0; }
+  .clip-frame { position: relative; overflow: hidden; background: #0c0f14; }
+  .clip-video { display: block; width: 100%; height: auto; background: #0c0f14; }
+
+  .clip-phone { grid-template-columns: minmax(0, 1fr); }
+  .clip-phone .clip-frame { width: min(270px, 74vw); padding: 7px; border-radius: 30px; box-shadow: 0 1px 0 color-mix(in oklab, #fff 14%, transparent) inset, 0 18px 40px -22px rgb(0 0 0 / 0.55); }
+  .clip-phone .clip-video { border-radius: 23px; }
+  @media (min-width: 760px) { .clip-phone { grid-template-columns: auto minmax(0, 1fr); } }
+  .clip-none .clip-frame { width: 100%; border-radius: var(--r-md); border: 1px solid var(--line); }
+  .clip-device { grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 760px) { .clip-device { grid-template-columns: auto minmax(0, 1fr); } }
+  .clip-device .clip-frame { width: min(250px, 72vw); background: none; overflow: visible; }
+  .clip-device .clip-video { border-radius: 36px 36px 11px 11px; filter: drop-shadow(0 16px 26px rgb(0 0 0 / 0.3)); }
+
+  .clip-big { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; border: 0; background: color-mix(in oklab, var(--accent) 92%, transparent); color: var(--accent-ink); font-size: 22px; cursor: pointer; box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.6); }
+  .clip-big:focus-visible, .clip-btn:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .clip-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 8px; }
+  .clip-tag { font-size: 11.5px; color: var(--text-3); }
+  .clip-btn { padding: 5px 11px; border-radius: var(--r-full); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 600 12.5px var(--font-body); cursor: pointer; }
+  .clip-btn:hover { border-color: var(--text-3); }
+
+  .clip-cap { display: grid; gap: 8px; min-width: 0; }
+  .clip-title { font-size: 15.5px; color: var(--text); }
+  .clip-steps { margin: 0 !important; padding-left: 1.3em !important; display: grid; gap: 6px; }
+  .clip-steps li { margin: 0 !important; font-size: 14.5px; line-height: 1.55; color: var(--text-2); }
+  .clip-steps li::marker { color: var(--accent-text); font-weight: 700; }
+  .clip-steps :global(code) { font-size: 0.88em; }
+</style>

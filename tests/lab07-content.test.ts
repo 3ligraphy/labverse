@@ -12,15 +12,15 @@ const { EXERCISE_IDS, BLOCKS } = await import('../src/lab/exercises/lab-07/meta.
 const { demos } = await import('../src/lab/exercises/lab-07/demos.ts');
 const project = (await import('../src/lab/exercises/lab-07/project.ts')) as unknown as Record<string, string>;
 
-test('ten parts: 7 + 8 + 12 + 30 (with the break) + 12 + 25 + 15 + 12 + 13 + 11 = 145 minutes', () => {
+test('ten parts: 7 + 8 + 12 + 50 (explained step by step, with the break) + 12 + 25 + 15 + 12 + 13 + 11 = 165 minutes', () => {
   const parts = parseLabOutline(mdx);
   assert.deepEqual(parts.map((p) => p.n), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
-  assert.deepEqual(parts.map((p) => minutes(p.time)), [7, 8, 12, 30, 12, 25, 15, 12, 13, 11]);
+  assert.deepEqual(parts.map((p) => minutes(p.time)), [7, 8, 12, 50, 12, 25, 15, 12, 13, 11]);
   const total = parts.reduce((a, p) => a + minutes(p.time), 0);
-  assert.equal(total, 145);
-  assert.ok(total <= 150, 'never more than 150 minutes');
-  assert.equal(formatMinutes(total), '2 h 25 min');
-  assert.match(mdx, /estimatedTime: '2 h 25 min'/);
+  assert.equal(total, 165);
+  assert.ok(total <= 210, 'never more than 3 h 30 min');
+  assert.equal(formatMinutes(total), '2 h 45 min');
+  assert.match(mdx, /estimatedTime: '2 h 45 min'/);
   assert.match(mdx, /Break · 5 minutes/, 'the break is on the page');
   // the parts on the page and the blocks of meta.ts have the same titles
   assert.deepEqual(parts.map((p) => p.title), BLOCKS.map((b) => b.title.replace(' (and a 5-minute break)', '')));
@@ -48,7 +48,7 @@ test('every screenshot is a small webp in /labs/lab-07/ with a real alt text, an
   const srcs = shots.flatMap((s) => [...s.matchAll(/src[:=]\s*["']([^"']+)["']/g)].map((m) => m[1]));
   assert.ok(shots.length >= 6 && srcs.length >= 10, `${shots.length} screenshot blocks, ${srcs.length} pictures`);
   for (const src of srcs) {
-    assert.match(src, /^\/labs\/lab-07\/[\w-]+\.webp$/);
+    assert.match(src, /^\/labs\/lab-07\/([\w-]+\/)?[\w-]+\.webp$/);
     const file = new URL(`../public${src}`, import.meta.url);
     assert.ok(existsSync(file), `${src} exists`);
     assert.ok(statSync(file).size <= 160 * 1024, `${src} is small`);
@@ -59,7 +59,8 @@ test('every screenshot is a small webp in /labs/lab-07/ with a real alt text, an
 });
 
 test('every code walk-through shows a real project file and points at lines that exist', () => {
-  const walks = [...mdx.matchAll(/<CodeWalk([\s\S]*?)\]\} \/>/g)].map((m) => m[1]);
+  // CodeWalk, and CodeTour (the walk-through with the phone beside the code)
+  const walks = [...mdx.matchAll(/<Code(?:Walk|Tour)([\s\S]*?)\]\} \/>/g)].map((m) => m[1]);
   assert.ok(walks.length >= 15, `${walks.length} walk-throughs`);
   const wifiFix = /export const WIFI_FIX = `([\s\S]*?)`;/.exec(mdx)![1];
   for (const w of walks) {

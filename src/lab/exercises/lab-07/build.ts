@@ -26,7 +26,7 @@ export const ex05: CodeExercise = {
   entry: 'App.tsx',
   freshDevice: true,
   prompt:
-    'The scanner opens the camera **without asking**, so it shows “Camera error: Camera permission is not granted”. In `ScannerScreen.tsx`, fill the three **TODO Step A** lines: read the permission with `useCameraPermissions()`, show “Checking camera permission…” while it is `null`, and when it is not granted show “Camera permission needed” with **Allow camera** (or **Open settings** when the phone will not ask again). Try it: press **Start scanning**, then answer the dialog.',
+    'The scanner opens the camera **without asking**, so it shows “Camera error: Camera permission is not granted”. Write the Step A code from the walk-through above (the lines marked **+**) in `ScannerScreen.tsx`, at the three **TODO Step A** comments: read the permission with `useCameraPermissions()`, show “Checking camera permission…” while it is `null`, and when it is not granted show “Camera permission needed” with **Allow camera** (or **Open settings** when the phone will not ask again). Try it: press **Start scanning**, then answer the dialog.',
   files: projectFiles(SCANNER_A),
   checks: [
     {
@@ -118,7 +118,7 @@ export const ex06: CodeExercise = {
   entry: 'App.tsx',
   freshDevice: true,
   prompt:
-    'The camera works but reads nothing. Fill the **TODO Step B** lines: give `CameraView` the two props that read QR codes and send each one to `handleScan`, then add a **lock** (`useRef`) so one code is handled once — and opened again by **Scan again**. Try it: open the camera and press **QR: Website**. Watch the **Console**: each `Scanned:` line is one call of `handleScan`.',
+    'The camera works but reads nothing. Write the Step B code from the walk-through above at the four **TODO Step B** comments: give `CameraView` the two props that read QR codes and send each one to `handleScan`, then add a **lock** (`useRef`) so one code is handled once — and opened again by **Scan again**. Try it: open the camera and press **QR: Website**. Watch the **Console**: each `Scanned:` line is one call of `handleScan`.',
   files: projectFiles(SCANNER_B),
   checks: [
     {
@@ -203,7 +203,7 @@ export const ex07: CodeExercise = {
   entry: 'App.tsx',
   freshDevice: true,
   prompt:
-    'The result card calls `successFeedback()` or `errorFeedback()` when it opens, but both are empty. In `src/scan/feedback.ts`, make them play the phone’s **Success** and **Error** vibrations, inside `try / catch` like `tapFeedback`. In the preview a vibration shakes the phone and writes `Haptics: …` in the **Console**.',
+    'The result card calls `successFeedback()` or `errorFeedback()` when it opens, but both are empty. Write the Step C code from the walk-through above in `src/scan/feedback.ts`: make them play the phone’s **Success** and **Error** vibrations, inside `try / catch` like `tapFeedback`. In the preview a vibration shakes the phone and writes `Haptics: …` in the **Console**.',
   files: { [FEEDBACK_FILE]: FEEDBACK_STARTER, ...projectFiles(SCANNER_D, FEEDBACK_STARTER) },
   checks: [
     {
@@ -284,7 +284,7 @@ export const ex08: CodeExercise = {
   frame: 'phone',
   entry: 'App.tsx',
   freshDevice: true,
-  prompt: '**Flip camera** does nothing yet. Fill **TODO Step D** in `flipCamera`: a small tap (`tapFeedback()`), then switch `facing` between `\'back\'` and `\'front\'`. The viewfinder says which camera is on.',
+  prompt: '**Flip camera** does nothing yet. Write the Step D code from the walk-through above at **TODO Step D** in `flipCamera`: a small tap (`tapFeedback()`), then switch `facing` between `\'back\'` and `\'front\'`. The viewfinder says which camera is on.',
   files: projectFiles(SCANNER_D),
   checks: [
     {

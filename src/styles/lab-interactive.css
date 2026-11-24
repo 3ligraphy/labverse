@@ -11,6 +11,10 @@
   --cm-kw: #cf222e; --cm-str: #0a3069; --cm-com: #6e7781; --cm-num: #0550ae; --cm-tag: #116329;
   --cm-attr: #8250df; --cm-fn: #8250df; --cm-type: #953800; --cm-prop: #0550ae; --cm-punc: #57606a; --cm-var: #1f2328;
 }
+/* coloured code built on the server (src/lab/ui/highlight-static.ts): the editor's colours */
+.tk-kw { color: var(--cm-kw); } .tk-str { color: var(--cm-str); } .tk-com { color: var(--cm-com); font-style: italic; }
+.tk-num { color: var(--cm-num); } .tk-tag { color: var(--cm-tag); } .tk-attr { color: var(--cm-attr); } .tk-fn { color: var(--cm-fn); }
+.tk-type { color: var(--cm-type); } .tk-prop { color: var(--cm-prop); } .tk-punc { color: var(--cm-punc); } .tk-var { color: var(--cm-var); }
 
 /* ---------- interactive lab layout: full width, prose stays readable ---------- */
 .doc.is-interactive { display: block; }
@@ -249,6 +253,10 @@ a.lp-ex[href]:hover, a.lp-ex[href]:focus-visible { color: var(--text); text-deco
 .mt-hole { font-size: 12px; color: var(--text-3); }
 .mt-slot[data-state='pass'] { border-style: solid; border-color: var(--ok); background: var(--ok-soft); }
 .mt-slot[data-state='fail'] { border-style: solid; border-color: var(--danger); background: var(--danger-soft); }
+/* phones: a long code chip (e.g. screen.getByRole('button', { name: 'Allow camera' })) wraps instead of widening the page */
+.chip-d { max-width: 100%; overflow-wrap: anywhere; }
+.mt-pool > *, .mt-row > * { min-width: 0; }
+@media (max-width: 560px) { .mt-row { grid-template-columns: minmax(0, 1fr); } .mt-slot { min-width: 0; } }
 
 /* label (mock shop screen) */
 .lb { display: grid; gap: 18px; align-items: start; }

@@ -1,0 +1,94 @@
+---
+/**
+ * Lab 07 · Part 4 Step A — how ScannerScreen picks its screen: React runs the component from the top, the first
+ * `return` it meets draws the phone, and a new permission value makes React run it again from the top.
+ * <ReturnGates />
+ */
+import Stepper from './Stepper.astro';
+import { highlightLines } from '@/lab/ui/highlight-static';
+
+const LINES: [string, string][] = [
+  ['export default function ScannerScreen({ onBack }: Props) {', '1:run 3:run 5-6:run'],
+  ['  const [permission, requestPermission] = useCameraPermissions();', '1:run 3:run 5-6:run'],
+  ['  …', ''],
+  ['  if (!permission) {', '2:match 3-6:skip'],
+  ['    return <Text>Checking camera permission…</Text>;', '2:match 3-6:skip'],
+  ['  }', '2:match 3-6:skip'],
+  ['', ''],
+  ['  if (!permission.granted) {', '2:dim 3:run 4-5:match 6:skip'],
+  ['    return (', '2:dim 4-5:match 6:skip'],
+  ['      <Text>Camera permission needed</Text> …', '2:dim 4-5:match 6:skip'],
+  ['      {permission.canAskAgain ? (', '2:dim 4-5:match 6:skip'],
+  ['        <AppButton title="Allow camera" onPress={requestPermission} />', '2:dim 4:match 5:dim 6:skip'],
+  ['      ) : (', '2:dim 4:dim 5:match 6:skip'],
+  ['        <AppButton title="Open settings" onPress={() => Linking.openSettings()} />', '2:dim 4:dim 5:match 6:skip'],
+  ['      )}', '2:dim 4-5:match 6:skip'],
+  ['    );', '2:dim 4-5:match 6:skip'],
+  ['  }', '2:dim 4-5:match 6:skip'],
+  ['', ''],
+  ['  if (result) { … }   // a scanned code: Step B', '2:dim 4-5:dim 6:skip'],
+  ['  return <CameraView … />;', '2:dim 4-5:dim 6:match'],
+  ['}', ''],
+];
+const HL = highlightLines(LINES.map(([t]) => t).join('\n'));
+
+const STEPS = [
+  { title: 'React runs your component from the top', text: 'To draw the scanner, React runs `ScannerScreen` line by line, from the first line down. It stops at the **first `return`** it meets: what that `return` gives is the screen on the phone.', ms: 4200 },
+  { title: 'First run: `permission` is `null`', text: 'The hook is still asking the phone, so it gives `null` (no value yet). `!permission` means “there is no value” → **true**. So the first `return` runs: the phone shows **Checking camera permission…**. The lines under it do not run.', ms: 5200 },
+  { title: 'A new value → React runs it again', text: 'The phone answers: not allowed yet, but it may ask. The hook gets this new value, and a new value makes React run `ScannerScreen` **again, from the top**. Now `permission` is an object, so `!permission` is **false**: this `if` is skipped.', ms: 5400 },
+  { title: '`!permission.granted` is true → ask', text: '`granted` is `false`, so `!permission.granted` is **true** and this `return` runs. Inside it, `canAskAgain ? A : B` picks A because `canAskAgain` is true: the **Allow camera** button. Pressing it calls `requestPermission`, and the phone shows its dialog.', ms: 5600 },
+  { title: 'Refused twice → Open settings', text: 'After two **Don’t allow**, Android stops asking: `canAskAgain` is **false**. The same `return` runs, but `? :` now picks the part after `:` — the **Open settings** button. Only the phone’s Settings can turn the camera on now.', ms: 5400 },
+  { title: 'Allowed → the camera', text: 'The user allowed the camera: `granted` is **true**. Both `if`s are skipped, there is no result yet, and the **last `return`** draws the camera. The order of the `if`s is the order of the questions.', ms: 5200 },
+];
+---
+<Stepper label="How the screen picks what to draw" steps={STEPS} class="rg">
+  <div class="rg-grid">
+    <div class="rg-left">
+      <div class="rg-values" aria-label="What the hook gives">
+        <span class="rg-name mono">permission =</span>
+        <span class="rg-stack">
+          <span class="stp-chip stp-only" data-at="1-2:show"><b>null</b> (still asking the phone)</span>
+          <span class="stp-chip stp-only" data-at="3-4:show">{'{ granted: '}<b>false</b>{', canAskAgain: '}<b>true</b>{' }'}</span>
+          <span class="stp-chip stp-only" data-at="5:show">{'{ granted: '}<b>false</b>{', canAskAgain: '}<b>false</b>{' }'}</span>
+          <span class="stp-chip stp-only" data-at="6:show">{'{ granted: '}<b>true</b>{', … }'}</span>
+        </span>
+      </div>
+      <div class="rg-codewrap">
+        <span class="rg-again mono stp-only" data-at="3:show 5-6:show">↻ runs again, from the top</span>
+        <pre class="stp-code" aria-label="ScannerScreen, shortened">{LINES.map(([, at], i) => <span class="stp-ln" data-at={at} set:html={HL[i] || ' '} />)}</pre>
+      </div>
+    </div>
+
+    <div class="rg-right">
+      <div class="stp-phone" aria-hidden="true">
+        <div class="stp-screen">
+          <div class="stp-scr stp-only" data-at="1:show"><small>React is drawing…</small></div>
+          <div class="stp-scr stp-only" data-at="2-3:show"><span class="rg-spin"></span><small>Checking camera permission…</small></div>
+          <div class="stp-scr stp-only" data-at="4:show"><b>Camera permission needed</b><small>Smart QR uses the camera only to read QR codes.</small><i class="stp-appbtn">Allow camera</i><i class="stp-appbtn light">Back</i></div>
+          <div class="stp-scr stp-only" data-at="5:show"><b>Camera permission needed</b><small>Smart QR uses the camera only to read QR codes.</small><i class="stp-appbtn">Open settings</i><i class="stp-appbtn light">Back</i></div>
+          <div class="stp-scr stp-cam stp-only rg-cam" data-at="6:show"><small class="rg-camlabel">Back camera</small><span class="stp-qrframe"></span><small>Point the camera at a QR code</small></div>
+        </div>
+      </div>
+      <p class="rg-cap">The phone shows what the <b>first</b> matching <code>return</code> gives.</p>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .rg-grid { display: grid; gap: 16px; }
+  @media (min-width: 820px) { .rg-grid { grid-template-columns: minmax(0, 1fr) 226px; align-items: start; } }
+  .rg-left { display: grid; gap: 10px; min-width: 0; }
+  .rg-values { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .rg-name { font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+  .rg-stack { display: grid; }
+  .rg-stack > span { grid-area: 1 / 1; justify-self: start; }
+  .rg-codewrap { position: relative; min-width: 0; }
+  .rg-again { position: absolute; top: 8px; right: 10px; z-index: 1; padding: 3px 9px; border-radius: 999px; background: color-mix(in oklab, var(--warn) 22%, var(--surface)); color: var(--text); font-size: 11.5px; font-weight: 700; }
+  .rg-right { display: grid; gap: 8px; justify-items: center; }
+  .rg-cap { margin: 0 !important; max-width: 220px; font-size: 13px; line-height: 1.5; color: var(--text-2); text-align: center; }
+  .rg-cam { justify-content: space-between; padding: 26px 16px 34px; }
+  .rg-camlabel { padding: 2px 9px; border-radius: 999px; background: rgb(0 0 0 / 0.45); }
+  .rg-spin { width: 22px; height: 22px; border-radius: 50%; border: 3px solid rgb(255 255 255 / 0.2); border-top-color: #38bdf8; animation: rg-spin 0.9s linear infinite; }
+  @keyframes rg-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .rg-spin { animation: none; } }
+</style>

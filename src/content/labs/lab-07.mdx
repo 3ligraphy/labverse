@@ -3,7 +3,7 @@ number: 7
 title: 'Hardware, Testing and Deployment — Camera, Haptics, Jest, Maestro and EAS'
 description: 'Build a Smart QR Scanner with the phone’s hardware: the camera permission, reading QR codes with expo-camera, the front and back camera, and vibration feedback with expo-haptics. Then test it on three levels — Jest unit tests, React Native Testing Library component tests and a Maestro end-to-end flow — and turn it into an installable app with EAS Build, then learn EAS Submit and EAS Update. Everything runs in the browser, nothing to install: the code, the phone, the tests (Run tests) and the Maestro flows (Run flow). Real screenshots and terminal output from a phone and a computer, and 21 checked exercises.'
 difficulty: Intermediate
-estimatedTime: '2 h 25 min'
+estimatedTime: '2 h 45 min'
 skills: [expo-camera, Permissions, QR codes, expo-haptics, Jest, React Native Testing Library, Maestro, EAS Build, EAS Submit, EAS Update]
 roadmapStage: advanced
 interactive: true
@@ -300,92 +300,368 @@ Two rules from Expo’s documentation shape Smart QR:
 You can name the three permission states, the four CameraView props Smart QR uses, why one code is read many times, and why Smart QR vibrates after the camera closes.
 </Checkpoint>
 
-<Part n="4" title="Build the scanner" time="30 min" />
+<Part n="4" title="Build the scanner" time="50 min" />
 
-You build `ScannerScreen.tsx` and `feedback.ts` in **four steps**, each one in the editor below it: write the code, try it on the phone, and press **Check** until every line is green. Each step starts where the last one ended.
+In this part you write the scanner yourself, in **four steps**. Every step has the same four parts, always in this order — first you understand, then you write:
 
-First, the three files the scanner uses. They are finished:
-
-<CodeWalk file="src/scan/parseScan.ts" code={P.PARSE_SCAN} steps={[
-  { lines: 2, text: '`ScanKind`: the five kinds of content the app understands. A type made of fixed texts (a **union**): TypeScript allows only these five.' },
-  { lines: [5, 7], text: '`ScanResult` is one of two shapes: a good scan (`ok: true` with a kind, a label and the value) or a bad scan (`ok: false` with an error). Checking `result.ok` tells TypeScript which shape it is.' },
-  { lines: 9, text: 'The longest text the card will show: 500 characters.' },
-  { lines: 11, text: 'It accepts a string, `null` or `undefined` — a function that must never crash on strange input.' },
-  { lines: 12, text: '`data ?? \'\'` turns null or undefined into an empty text; `.trim()` removes spaces at both ends.' },
-  { lines: 13, text: 'A lowercase copy, so `HTTPS://` and `https://` are treated the same.' },
-  { lines: [15, 20], text: 'The two bad cases first: an empty code and a code that is too long. Each `return` ends the function.' },
-  { lines: [21, 32], text: 'Then the kinds, by how the text starts: `https://` or `http://` → website, `wifi:` → Wi-Fi, `mailto:` → email, `tel:` → phone.' },
-  { lines: 33, text: 'Anything else is plain text.' },
+<Cards cols={4} items={[
+  { tag: '①', icon: 'camera', title: 'What you will build', text: 'Real pictures and a short recording of the lab phone: what the step adds.' },
+  { tag: '②', icon: 'play', title: 'How it works', text: 'An animation of what happens inside. Press **Play**, or go one step at a time with **Next**.' },
+  { tag: '③', icon: 'book', title: 'The code, line by line', text: 'The new code in colour, with the phone beside it. The lines you write are marked **+**.' },
+  { tag: '④', icon: 'check', title: 'Your turn', text: 'The exercise: write the code, try it on the phone, press **Check**.' },
 ]} />
 
-<CodeWalk file="src/components/ScanFrame.tsx" code={P.SCAN_FRAME} steps={[
-  { lines: 4, text: 'The frame is 250 × 250 points.' },
-  { lines: 7, text: 'An `Animated.Value`: a number the animation changes without drawing the component again. `useRef(…).current` keeps the same one for the whole life of the screen.' },
-  { lines: [9, 15], text: 'A loop of two steps: from 0 to 1 in 1.5 seconds, then back to 0. `useNativeDriver: true` lets the phone run the animation without JavaScript.' },
-  { lines: [16, 17], text: 'Start it when the frame appears; the function returned by `useEffect` stops it when the frame disappears (the **cleanup**).' },
-  { lines: 20, text: '`interpolate` turns 0…1 into 0…246 points: how far down the line moves.' },
-  { lines: [23, 31], text: 'Four corner pieces and the moving line, inside the frame.' },
-  { lines: 36, text: 'The frame covers the whole screen (`position: \'absolute\'` with all four sides 0). `pointerEvents: \'none\'` lets touches go through it to the buttons below.' },
-]} />
+The four steps, and what the lab phone does after each one:
 
-<CodeWalk file="src/components/ResultCard.tsx" code={P.RESULT_CARD} steps={[
-  { lines: [3, 5], text: 'The result’s type, the two vibrations from `feedback.ts` (you write them in Step C), and the button.' },
-  { lines: 10, text: '`appear` goes from 0 to 1 when the card opens: it drives the fade-in and the zoom.' },
-  { lines: [12, 18], text: 'When the card opens: a good result plays the success vibration, a bad one the error vibration. The camera is closed now, so iPhones feel it too.' },
-  { lines: 19, text: 'A spring animation from 0 to 1: the card pops in.' },
-  { lines: 20, text: 'Run again when `result` changes (a new scan).' },
-  { lines: 22, text: 'The size: 80 % at the start, 100 % at the end.' },
-  { lines: [27, 29], text: 'A green ✓ for a good scan, a red ! for a bad one.' },
-  { lines: [30, 33], text: 'The label (“Website”) and the value — or “Can’t use this code” and the error. `selectable` lets the user copy the text.' },
-  { lines: [34, 38], text: 'Only for websites: **Open link**. `Linking.openURL` asks the phone to open the address in the browser.' },
-  { lines: 39, text: '**Scan again** calls `onScanAgain`, which ScannerScreen gives.' },
+<Shot frame="device" w={600} h={1242} shots={[
+  { src: '/labs/lab-07/part4/a-needed.webp', alt: 'After Step A: the lab phone shows Camera permission needed with an Allow camera button', label: 'A · Ask for the camera' },
+  { src: '/labs/lab-07/part4/b-result.webp', alt: 'After Step B: the result card with a green check, WEBSITE and https://expo.dev', label: 'B · Read a code, once' },
+  { src: '/labs/lab-07/part4/c-error.webp', alt: 'After Step C: the error card with a red mark, Can’t use this code and This QR code is empty', label: 'C · Feel the result' },
+  { src: '/labs/lab-07/part4/d-front.webp', alt: 'After Step D: the camera screen with the label Front camera', label: 'D · Flip the camera' },
+]} caption="Each step starts where the last one ended. All four steps change two files: `src/screens/ScannerScreen.tsx` (Steps A, B, D) and `src/scan/feedback.ts` (Step C)." />
+
+The packages this part uses:
+
+<Cards cols={3} items={[
+  { logos: ['expo'], tag: 'package · Steps A, B, D', title: 'expo-camera', text: '`useCameraPermissions` asks the user for the camera. `CameraView` shows the camera and reads QR codes.' },
+  { logos: ['expo'], tag: 'package · Step C', title: 'expo-haptics', text: 'Short vibrations: a **success** pattern, an **error** pattern, and a small **tap**.' },
+  { logos: ['react'], tag: 'React · every step', title: 'useState · useRef · useEffect', text: 'A value the screen remembers, a value that changes at once without drawing again, and code that runs after a screen appears.' },
 ]} />
 
 ### Step A · Ask for the camera
+
+#### ① What you will build
+
+Right now the scanner opens the camera **without asking**, so the lab phone shows “Camera error: Camera permission is not granted”. A phone protects its camera: an app may use it only after the user says yes. After this step, the scanner asks first — in four screens:
+
+<Shot frame="device" w={600} h={1242} shots={[
+  { src: '/labs/lab-07/part4/a-checking.webp', alt: 'The lab phone shows only the text Checking camera permission…', label: '1 · Checking…' },
+  { src: '/labs/lab-07/part4/a-needed.webp', alt: 'Camera permission needed, Smart QR uses the camera only to read QR codes, Allow camera and Back buttons', label: '2 · The app explains why' },
+  { src: '/labs/lab-07/part4/a-dialog.webp', alt: 'The phone’s dialog: Allow this app to take pictures and record video? with While using the app, Only this time and Don’t allow', label: '3 · The phone asks' },
+  { src: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen: Point the camera at a QR code, the blue frame with the sample codes, Back, Flip camera and Use sample QR', label: '4 · Allowed: the camera' },
+]} caption="Screen 3 is the **phone’s own** dialog. Your app cannot change its buttons: it can only ask, and read the answer." />
+
+The same path on the lab phone, as a recording:
+
+<Clip frame="device" src="/labs/lab-07/clips/step-a.mp4" poster="/labs/lab-07/clips/step-a.webp" w={560} h={1333} alt="Recording of the lab phone: Start scanning, Checking camera permission, Camera permission needed, Allow camera, the phone’s dialog, While using the app, the camera opens" title="Step A on the lab phone" steps={[
+  'The app starts on the home screen. The finger presses **Start scanning**.',
+  'For a moment the screen says **Checking camera permission…** — the app is still asking the phone.',
+  'The phone answers “not allowed yet”: the app shows **Camera permission needed** and **Allow camera**.',
+  '**Allow camera** makes the phone show its own dialog.',
+  '**While using the app** allows the camera: the camera opens, and the Console says `Camera permission: allowed`.',
+]} />
+
+When the user presses **Don’t allow** two times, Android never shows its dialog again. Then the app offers **Open settings** — the only way left to turn the camera on:
+
+<Shot frame="device" w={600} h={1242} shots={[
+  { src: '/labs/lab-07/part4/a-settings.webp', alt: 'Camera permission needed with an Open settings button instead of Allow camera', label: 'After two refusals' },
+  { src: '/labs/lab-07/part4/a-settings-page.webp', alt: 'The lab phone’s Settings page for the camera: Allow only while using the app, Ask every time, Don’t allow, Back to the app', label: 'Open settings → the Settings page' },
+]} />
+
+#### ② How it works
+
+Three ideas explain the whole step:
+
+- **A hook** is a function whose name starts with `use`. React lets you call it only at the top of a component. `useCameraPermissions()` comes from `expo-camera` and tells your component what the user answered.
+- **React runs your component again.** A component is a function that React runs to draw the screen. When a hook or a state gets a new value, React runs the whole function again, from the first line.
+- **The first `return` decides the screen.** `return` ends a function. The first `return` that runs gives the screen; the lines under it do not run.
+
+Watch the three ideas work together. Press **Play**, or **Next** for one step at a time:
+
+<ReturnGates />
+
+#### ③ The code, line by line
+
+This is `ScannerScreen.tsx` **after** Step A. The lines marked **+** are the ones you write. Press **Next**: the lines light up, the phone shows what they do, and the text under the code explains them.
+
+<CodeTour file="src/screens/ScannerScreen.tsx" title="Step A · ask for the camera" code={P.SCANNER_B} logo="react" added={[16, 37, 38, 39, 40, 41, 42, 43, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58]} steps={[
+  { lines: 3, title: 'Where the hook comes from', tool: 'expo-camera', shot: '/labs/lab-07/part4/a-home.webp', alt: 'The Smart QR home screen with the Start scanning button', console: [], phone: 'Nothing changes on the screen: an `import` only makes names ready to use.', text: `This line is already in the file. It takes three names from the \`expo-camera\` package:
+
+- \`CameraView\` — the component that shows the camera.
+- \`useCameraPermissions\` — the hook that reads the camera permission and asks for it.
+- \`CameraType\` — a type with two values, \`'back'\` and \`'front'\`. The word \`type\` in front says it is used only by TypeScript, never when the app runs.` },
+  { lines: 16, title: 'Read the permission (you write this)', tool: 'expo-camera', shot: '/labs/lab-07/part4/a-checking.webp', alt: 'Checking camera permission…', phone: 'At the very start the hook has no answer yet.', text: `The first line you write, at the top of the component. \`useCameraPermissions()\` gives back **two things in an array**. The square brackets on the left take them out and give each one a name:
+
+- \`permission\` — what the phone has answered so far.
+- \`requestPermission\` — a function. Calling it makes the phone show its permission dialog.
+
+You choose the two names, but the order is fixed: first the answer, then the function. At the very start \`permission\` is \`null\` — the hook is still asking the phone.` },
+  { lines: [37, 43], title: 'No answer yet: show “Checking camera permission…”', tool: 'react', phone: 'This screen lasts less than a second on a real phone.', text: `\`!\` means **not**. \`!permission\` is \`true\` when \`permission\` has no value yet (\`null\`). Then this \`return\` gives a small screen with one text.
+
+Because \`return\` ends the function, nothing below this block runs while \`permission\` is \`null\`. That matters: the next block reads \`permission.granted\`, and reading \`.granted\` of \`null\` would crash the app with “Cannot read properties of null”.` },
+  { lines: [45, 49], title: 'Not allowed yet: explain why', tool: 'react', shot: '/labs/lab-07/part4/a-needed.webp', alt: 'Camera permission needed with the sentence Smart QR uses the camera only to read QR codes', phone: 'The phone answered: not allowed yet. React ran the component again.', text: `When the phone answers, the hook gets a new value and React runs \`ScannerScreen\` again, from the top. Now \`permission\` is an object, so the first \`if\` is skipped.
+
+\`permission.granted\` is \`true\` only when the user allowed the camera, so \`!permission.granted\` is \`true\` when the camera is **not** allowed yet. Then this \`return\` draws a title and one sentence that says **why** the app needs the camera. Users say yes more often when they know why — and both app stores ask apps to explain.` },
+  { lines: [50, 51], title: '“Allow camera” calls `requestPermission`', tool: 'expo-camera', shot: '/labs/lab-07/part4/a-dialog.webp', alt: 'The phone’s dialog over the app: While using the app, Only this time, Don’t allow', phone: '**Allow camera** was pressed: the phone shows its own dialog.', text: `\`permission.canAskAgain\` says if the phone will still show its dialog. \`condition ? A : B\` picks **A** when the condition is true and **B** when it is false. Inside JSX it is wrapped in \`{ }\`.
+
+The button gets \`onPress={requestPermission}\` — the name of the function, **without \`()\`**. We hand the button the function itself, and the button calls it later, when it is pressed. With \`()\` the function would run at once, while the screen is being drawn.
+
+The user’s answer goes back into the hook, and React runs the component again.` },
+  { lines: [52, 54], title: 'Refused twice: “Open settings”', tool: 'react-native', shot: '/labs/lab-07/part4/a-settings.webp', alt: 'Camera permission needed with Open settings', phone: 'After two **Don’t allow**, the phone never shows its dialog again.', text: `On Android, after **Don’t allow** two times, the phone stops showing the dialog: \`canAskAgain\` becomes \`false\`, and \`? :\` picks the part after \`:\` — the **Open settings** button.
+
+\`Linking.openSettings()\` (from React Native) opens this app’s page in the phone’s Settings, the only place where the user can still allow the camera. Here the button gets \`() => Linking.openSettings()\`: an **arrow function** that calls \`openSettings\` when the button is pressed. We need the arrow because \`openSettings\` must be called *with* \`()\` — and \`onPress={Linking.openSettings()}\` would open Settings at once, while drawing.` },
+  { lines: 53, title: 'In Settings, the user turns the camera on', tool: 'react-native', shot: '/labs/lab-07/part4/a-settings-page.webp', alt: 'The Settings page: Allow only while using the app, Ask every time, Don’t allow', phone: 'The lab phone’s stand-in for the phone’s Settings page.', text: `This is the page **Open settings** opens (on the lab phone, a stand-in for the real Settings app). When the user chooses **Allow only while using the app** and goes back, the hook gets a new answer — \`granted: true\` — and React runs the component again.` },
+  { lines: [55, 58], title: '“Back” and the end of the block', tool: 'react', phone: '**Back** returns to the home screen.', text: `**Back** calls \`onBack\`, the function \`App.tsx\` gave this screen as a prop: the app goes back to the home screen. Then the block ends: \`</View>\` closes the screen, \`);\` ends the \`return\`, and \`}\` ends the \`if\`.` },
+  { lines: [60, 66], title: 'Allowed: the last `return` draws the camera', tool: 'expo-camera', shot: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen with the blue frame, the sample codes and the buttons', console: ['Camera permission: allowed'], phone: 'The camera is open. The Console shows the answer.', text: `\`granted\` is \`true\` now, so both \`if\`s are skipped. There is no \`result\` yet (that comes in Step B), so the **last \`return\`** runs: the camera, with the scan frame and the buttons on top.
+
+The order of the \`if\`s is the order of the questions: first “no answer yet?”, then “not allowed?”, and only then the camera. If the camera came first, it would open without permission — the error you saw at the start.` },
+]} />
+
+#### ④ Your turn · Exercise 5
+
+In the exercise, `ScannerScreen.tsx` has three **TODO Step A** comments. They mark where the **+** lines go:
+
+<Shot frame="none" w={1600} h={1143} src="/labs/lab-07/part4/editor-a.webp" alt="The exercise editor with ScannerScreen.tsx: a TODO Step A comment at line 16, and two TODO Step A comments at lines 37 and 38" notes={[{ x: 2.5, y: 12.1, label: 'Line 16: replace this comment with the hook line `const [permission, requestPermission] = useCameraPermissions();`' }, { x: 2.5, y: 86.2, label: 'Lines 37–38: replace these two comments with the two `if` blocks: “Checking…” and “Camera permission needed”' }]} />
+
+Write the code, then try it on the phone: press **Start scanning**, answer the dialog, and also try **Don’t allow** two times. When it works, press **Check** — each green line is one thing that works.
 
 <Exercise id="lab-07--step-a-permission" />
 
 ### Step B · Read a code, once
 
+#### ① What you will build
+
+The camera opens now, but it reads nothing. After this step, a QR code in front of the camera opens the **result card** with what is inside it. On the lab phone the codes are buttons: **QR: Website** holds that code in front of the camera.
+
+<Clip frame="device" src="/labs/lab-07/clips/step-b.mp4" poster="/labs/lab-07/clips/step-b.webp" w={560} h={1432} alt="Recording of the lab phone: the camera is open, QR: Website is pressed, the result card opens with https://expo.dev and the Console shows one Scanned line" title="Step B on the lab phone" steps={[
+  'The camera is open. The finger presses **QR: Website**: that code is now “in front of the camera”.',
+  'The result card opens: a green check, **WEBSITE**, and the text inside the code, `https://expo.dev`.',
+  'The Console shows **one** line, `Scanned: https://expo.dev` — one code, one result.',
+]} />
+
+Each kind of code gives its own card:
+
+<Shot frame="device" w={600} h={1242} shots={[
+  { src: '/labs/lab-07/part4/b-result.webp', alt: 'Result card WEBSITE https://expo.dev with Open link and Scan again', label: 'QR: Website' },
+  { src: '/labs/lab-07/part4/b-text.webp', alt: 'Result card TEXT Room 3.12 with Scan again', label: 'QR: Text' },
+  { src: '/labs/lab-07/part4/b-wifi.webp', alt: 'Result card WI-FI NETWORK showing the whole code WIFI:S:Lab-5G;T:WPA;P:secret123;; including the password', label: 'QR: Wi-Fi — the password shows!' },
+  { src: '/labs/lab-07/part4/c-error.webp', alt: 'Error card: Can’t use this code, This QR code is empty', label: 'QR: Empty code' },
+]} caption="Look at the Wi-Fi card: it shows the **password** (`P:secret123`). That is a real privacy bug — you fix it in Part 10." />
+
+#### ② How it works
+
+A QR code holds only **text**: `https://expo.dev`, `Room 3.12`, or `WIFI:S:Lab-5G;T:WPA;P:secret123;;` (a Wi-Fi network). The camera reads that text and gives it to your code. This step solves two problems:
+
+1. The camera must look for **QR codes**, and send each one it reads to your function — two props of `CameraView`.
+2. The camera reads the **same** code again and again, as long as it is in front of the lens. One code must give **one** result.
+
+The second problem, and its fix — a **lock** — step by step:
+
+<LockTimeline />
+
+Try it yourself: switch the lock off and on, press a code, and count the lines in the Console.
+
 <Demo id="scan-lock" />
+
+`handleScan` turns the text into a result with `parseScan`, a finished file. Read what it gives for each code — the phone shows the card each result makes:
+
+<CodeTour file="src/scan/parseScan.ts" title="Finished file · what is inside a QR code" code={P.PARSE_SCAN} steps={[
+  { lines: 2, title: 'Five kinds of content', shot: '/labs/lab-07/part4/b-text.webp', alt: 'Result card TEXT Room 3.12', console: [], phone: 'One kind of card per kind of content.', text: '`ScanKind` lists the five kinds of content the app understands. A type made of fixed texts like this is a **union**: TypeScript allows only these five values.' },
+  { lines: [5, 7], title: 'A good scan or a bad scan', text: `\`ScanResult\` is one of two shapes:
+
+- a good scan: \`ok: true\`, with a \`kind\`, a \`label\` (the title on the card) and the \`value\` (the text);
+- a bad scan: \`ok: false\`, with an \`error\` message.
+
+Checking \`result.ok\` tells TypeScript which shape it has, so it lets you read \`kind\` only on a good scan.` },
+  { lines: [11, 13], title: 'Clean the text first', text: `\`parseScan\` accepts a string, \`null\` or \`undefined\`: it must never crash, whatever the camera gives. \`data ?? ''\` turns \`null\` or \`undefined\` into an empty text, and \`.trim()\` removes the spaces at both ends. \`lower\` is a lowercase copy, so \`HTTPS://\` and \`https://\` are treated the same.` },
+  { lines: [15, 20], title: 'The two bad cases', shot: '/labs/lab-07/part4/c-error.webp', alt: 'Error card: This QR code is empty', phone: '**QR: Empty code** (three spaces) → `ok: false`.', text: 'An empty code, and a code longer than 500 characters (`MAX_LENGTH`, line 9). Each `return` ends the function at once, with `ok: false` and the message the card shows.' },
+  { lines: [21, 23], title: 'A website', shot: '/labs/lab-07/part4/b-result.webp', alt: 'Result card WEBSITE https://expo.dev', phone: '**QR: Website** → kind `website`. Only websites get **Open link**.', text: '`startsWith` checks how the text begins. `https://` or `http://` → a website. `||` means **or**: one of the two is enough.' },
+  { lines: [24, 26], title: 'A Wi-Fi network', shot: '/labs/lab-07/part4/b-wifi.webp', alt: 'Result card WI-FI NETWORK with the whole code and its password', phone: '**QR: Wi-Fi** → the whole code, with the password. Part 10 fixes this.', text: 'A Wi-Fi QR code starts with `WIFI:`. This branch returns the **whole** text as the value — so the card shows the password too. You fix it in Part 10.' },
+  { lines: [27, 32], title: 'An email or a phone number', text: '`mailto:` → an email address; `tel:` → a phone number. These two are the standard beginnings for QR codes that open the mail app or the phone app.' },
+  { lines: 33, title: 'Anything else is text', shot: '/labs/lab-07/part4/b-text.webp', alt: 'Result card TEXT Room 3.12', phone: '**QR: Text** → kind `text`.', text: 'When no `if` matched, the code is plain text, like `Room 3.12`. This is the last line, so `parseScan` always returns a result.' },
+]} />
+
+On top of the camera the scanner draws the blue frame with the moving line — another finished file:
+
+<CodeTour file="src/components/ScanFrame.tsx" title="Finished file · the scan frame" code={P.SCAN_FRAME} logo="react" steps={[
+  { lines: 4, title: 'The size', tool: 'react', shot: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen with the blue frame', console: [], phone: 'The blue frame and its moving line.', text: 'The frame is 250 × 250 points. (React Native measures in **points**, not pixels, so the frame has the same size on every phone.)' },
+  { lines: 7, title: 'A number for the animation', tool: 'react-native', text: '`Animated.Value` is a number that an animation changes **without** drawing the component again. `useRef(…).current` keeps the same number for the whole life of the screen.' },
+  { lines: [9, 15], title: 'A loop of two moves', tool: 'react-native', text: '`Animated.loop` repeats a `sequence` of two moves for ever: from 0 to 1 in 1.5 seconds (down), then back to 0 (up). `useNativeDriver: true` lets the phone run the animation by itself, without JavaScript.' },
+  { lines: [16, 17], title: 'Start, and stop when the screen closes', tool: 'react', text: '`loop.start()` runs when the frame appears. The function that `useEffect` returns runs when the frame **disappears** (the **cleanup**): `loop.stop()`. Without it the animation would keep running after the camera closed.' },
+  { lines: 20, title: 'From 0…1 to points', tool: 'react-native', text: '`interpolate` turns the number 0…1 into 0…246 points: how far down the line is.' },
+  { lines: [23, 31], title: 'Four corners and the line', tool: 'react-native', text: 'Four corner pieces, and the line that moves with `transform: [{ translateY }]`.' },
+  { lines: 36, title: 'Touches go through', tool: 'react-native', text: 'The frame covers the whole screen (`position: \'absolute\'` with all four sides at 0). `pointerEvents: \'none\'` lets every touch go through it to the buttons and codes below.' },
+]} />
+
+#### ③ The code, line by line
+
+`ScannerScreen.tsx` **after** Step B. Six new lines (**+**): two props for the camera and four for the lock.
+
+<CodeTour file="src/screens/ScannerScreen.tsx" title="Step B · read a code, once" code={P.SCANNER_D} logo="react" added={[20, 23, 24, 30, 70, 71]} steps={[
+  { lines: 70, title: 'Look for QR codes only (you write this)', tool: 'expo-camera', shot: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen', console: ['Camera permission: allowed'], phone: 'The camera looks for QR codes.', text: `A new prop of \`CameraView\`. Its value is an **object**, so it has two pairs of braces: the outer \`{ }\` says “a JavaScript value comes here”, the inner \`{ }\` is the object itself.
+
+\`barcodeTypes: ['qr']\` — a list with one kind: QR codes. Without this prop the camera also reads the barcodes on products (EAN, Code 128, …).` },
+  { lines: 71, title: 'Send each code to handleScan (you write this)', tool: 'expo-camera', text: `\`onBarcodeScanned\` is a function the camera calls **each time it reads a code**. The camera gives it one object, here named \`scan\`:
+
+- \`scan.data\` — the text inside the code, e.g. \`https://expo.dev\`;
+- \`scan.type\` — the kind of code, \`'qr'\`.
+
+\`(scan) => handleScan(scan.data)\` is an arrow function: it takes the object and passes only the text to \`handleScan\`.` },
+  { lines: 20, title: 'The lock (you write this)', tool: 'react', text: `\`useRef(false)\` makes a box that keeps one value while React draws the screen again and again. You read and change the value with \`.current\`.
+
+\`locked.current\` starts as \`false\`: the lock is **open**. Why not \`useState\`? A state changes only when React draws the screen again — the camera’s next read can come before that. A ref changes **at once**, and changing it does not draw the screen again.` },
+  { lines: 23, title: 'Closed? Stop here (you write this)', tool: 'react', text: '`if (locked.current) return;` — when the lock is already closed, `return` ends `handleScan` on its **first line**. Nothing else runs: no log, no new result, no vibration.' },
+  { lines: 24, title: 'Open? Close it now (you write this)', tool: 'react', text: 'The first read finds the lock open, goes past line 23, and closes it at once: `locked.current = true;`. Every read after this one stops at line 23.' },
+  { lines: [25, 26], title: 'Log it, and make the result', tool: 'react', shot: '/labs/lab-07/part4/b-result.webp', alt: 'Result card WEBSITE https://expo.dev', console: ['Camera permission: allowed', 'Scanned: https://expo.dev'], phone: 'One code → **one** `Scanned:` line, one result card.', text: `These two lines were already there. \`console.log\` writes the code’s text to the Console — one line per call, so you can count the calls.
+
+\`setResult(parseScan(data))\` turns the text into a result and keeps it in the \`result\` state. A new state makes React run \`ScannerScreen\` again.` },
+  { lines: [61, 63], title: 'A result replaces the camera', tool: 'react', text: '`if (result)` is now true, so this `return` draws the **ResultCard** instead of the camera. The camera is not drawn any more, so it closes.' },
+  { lines: [29, 31], title: 'Scan again: open the lock (you write line 30)', tool: 'react', shot: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen again', phone: '**Scan again** → the camera is back, ready for the next code.', text: '**Scan again** on the card calls `scanAgain`. `locked.current = false;` opens the lock, and `setResult(null)` removes the result, so the last `return` draws the camera again — ready for the next code.' },
+]} />
+
+#### ④ Your turn · Exercise 6
+
+The four **TODO Step B** comments in the exercise:
+
+<Shot frame="none" w={1600} h={2208} src="/labs/lab-07/part4/editor-b.webp" alt="The exercise editor with ScannerScreen.tsx and four TODO Step B comments: the lock, stop if closed, open the lock again, and the camera props" notes={[{ x: 2.5, y: 6.3, label: 'Line 20: the lock — `const locked = useRef(false);`' }, { x: 2.5, y: 11.6, label: 'Line 23: `if (locked.current) return;` then `locked.current = true;`' }, { x: 2.5, y: 22.3, label: 'Line 29: `locked.current = false;`' }, { x: 2.5, y: 93.8, label: 'Line 69: the two camera props, `barcodeScannerSettings` and `onBarcodeScanned`' }]} />
+
+Open the camera and press **QR: Website**. Watch the **Console**: each `Scanned:` line is one call of `handleScan`. With the lock there is exactly one. Then press **Check**.
 
 <Exercise id="lab-07--step-b-scan-once" />
 
 ### Step C · Feel the result
 
-<Exercise id="lab-07--step-c-feedback" />
+#### ① What you will build
 
-<CodeWalk file="src/scan/feedback.ts" title="The finished file" code={P.FEEDBACK} steps={[
-  { lines: 1, text: '`import * as Haptics` puts everything expo-haptics exports in one object: `Haptics.notificationAsync`, `Haptics.NotificationFeedbackType`, …' },
-  { lines: 4, text: '`async`: the function can `await`. The vibration call returns a Promise.' },
-  { lines: [5, 6], text: 'Play the success pattern, and wait until the phone has started it.' },
-  { lines: [7, 9], text: 'A phone without a vibration motor throws an error. `catch` swallows it: the app works without vibration.' },
-  { lines: [13, 19], text: 'The same shape with the error pattern.' },
-  { lines: [22, 28], text: 'The small tap for a changed choice, used by Flip camera.' },
+After a scan the phone should **vibrate**: a short *success* pattern for a good code, and an *error* pattern for a bad one. A computer has no vibration motor, so the lab phone **shakes**, and the Console names the pattern that played.
+
+<Clip frame="device" src="/labs/lab-07/clips/step-c.mp4" poster="/labs/lab-07/clips/step-c.webp" w={560} h={1533} alt="Recording of the lab phone: QR: Website opens the result card and the phone shakes with Haptics: notification success; Scan again, QR: Empty code opens the error card with Haptics: notification error" title="Step C on the lab phone" steps={[
+  '**QR: Website** — the result card opens and the phone shakes: `Haptics: notification success`.',
+  '**Scan again**, then **QR: Empty code** — the error card opens.',
+  'A different pattern plays: `Haptics: notification error`.',
 ]} />
+
+<Shot frame="device" w={600} h={1242} shots={[
+  { src: '/labs/lab-07/part4/b-result.webp', alt: 'The result card for a good code: a green check, WEBSITE, https://expo.dev', label: 'Good code → Success' },
+  { src: '/labs/lab-07/part4/c-error.webp', alt: 'The result card for a bad code: a red mark, Can’t use this code, This QR code is empty', label: 'Bad code → Error' },
+]} caption="Two patterns you can tell apart without looking at the screen: **Success** is short and light, **Error** is longer and stronger." />
+
+#### ② How it works
+
+- **`expo-haptics`** plays the phone’s own vibration patterns (Part 3 showed all of them). Smart QR uses two: **Success** and **Error**.
+- **`async` / `await`.** Asking the phone to vibrate takes a moment. `notificationAsync` gives back a **Promise** — a value that is ready a little later. `await` waits for it, and `await` can only be used inside an `async` function.
+- **`try` / `catch`.** Some phones and tablets have no vibration motor; there the call throws an error. `try { … } catch { … }` catches the error, so the app keeps working.
+- **When.** iPhones switch haptics off while the camera is on. So Smart QR vibrates when the **result card** appears — after the camera has closed.
+
+<HapticTiming />
+
+#### ③ The code, line by line
+
+`src/scan/feedback.ts` **after** Step C. You write the two functions at the top; the third one, `tapFeedback`, is finished — use it as your model.
+
+<CodeTour file="src/scan/feedback.ts" title="Step C · feel the result" code={P.FEEDBACK} logo="expo" added={[4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18, 19]} steps={[
+  { lines: 1, title: 'Everything from expo-haptics, in one name', tool: 'expo-haptics', shot: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen', console: ['Camera permission: allowed'], phone: 'Nothing to feel yet.', text: '`import * as Haptics` puts everything the package exports into one object called `Haptics`: `Haptics.notificationAsync`, `Haptics.NotificationFeedbackType`, `Haptics.selectionAsync`, …' },
+  { lines: [22, 28], title: 'Your model: the finished tapFeedback', tool: 'expo-haptics', text: `Read the finished function first — the two you write have the same shape:
+
+- \`export async function\` — other files can import it (\`export\`), and it can use \`await\` (\`async\`);
+- \`try { await … }\` — ask the phone for the vibration and wait until it has started;
+- \`catch { … }\` — a phone without a motor throws an error; we do nothing, and the app goes on.` },
+  { lines: [4, 6], title: 'The success vibration (you write this)', tool: 'expo-haptics', shot: '/labs/lab-07/part4/b-result.webp', alt: 'Result card WEBSITE https://expo.dev', console: ['Camera permission: allowed', 'Scanned: https://expo.dev', 'Haptics: notification success'], phone: 'A good code: the phone plays the **success** pattern.', text: '`Haptics.notificationAsync(…)` plays one of three patterns: `Success`, `Warning` or `Error`. The pattern is a value of `Haptics.NotificationFeedbackType`. `await` waits until the phone has started it.' },
+  { lines: [7, 9], title: 'No motor? Catch the error (you write this)', tool: 'expo-haptics', text: 'If the phone has no vibration motor, `notificationAsync` throws an error. `catch` catches it. The comment says why the block is empty: nothing to do — the app works without vibration.' },
+  { lines: [13, 18], title: 'The error vibration (you write this)', tool: 'expo-haptics', shot: '/labs/lab-07/part4/c-error.webp', alt: 'Error card: This QR code is empty', console: ['Camera permission: allowed', 'Scanned:', 'Haptics: notification error'], phone: 'A bad code: the phone plays the **error** pattern.', text: 'The same shape, with `Haptics.NotificationFeedbackType.Error`: a different pattern, so the user can feel that something went wrong without looking.' },
+]} />
+
+Who calls these functions? `ResultCard` — a finished file — as soon as it appears:
+
+<CodeTour file="src/components/ResultCard.tsx" title="Finished file · the result card" code={P.RESULT_CARD} logo="react" steps={[
+  { lines: [3, 5], title: 'What the card uses', tool: 'react', shot: '/labs/lab-07/part4/b-result.webp', alt: 'Result card WEBSITE https://expo.dev', console: ['Scanned: https://expo.dev', 'Haptics: notification success'], phone: 'The card for a good code.', text: 'The result’s type, the two vibrations you wrote in `feedback.ts`, and the app’s button.' },
+  { lines: 10, title: 'A number for the pop-in', tool: 'react-native', text: '`appear` goes from 0 to 1 when the card opens. It drives two animations at once: the fade-in and the zoom.' },
+  { lines: [12, 18], title: 'Vibrate when the card appears', tool: 'react', text: `\`useEffect\` runs its function **after** the card is on the screen — when the camera is already closed, so iPhones vibrate too.
+
+A good result (\`result.ok\`) plays the success vibration; a bad one plays the error vibration.` },
+  { lines: [19, 20], title: 'Pop in — and only for a new result', tool: 'react-native', text: '`Animated.spring` moves `appear` from 0 to 1 with a small bounce. The list `[result, appear]` at the end tells React: run this effect again only when `result` changes — one vibration per scan.' },
+  { lines: 22, title: '80 % → 100 %', tool: 'react-native', text: '`interpolate` turns 0…1 into a size: 80 % at the start, 100 % at the end.' },
+  { lines: [27, 29], title: '✓ or !', tool: 'react-native', shot: '/labs/lab-07/part4/c-error.webp', alt: 'Error card: Can’t use this code, This QR code is empty', console: ['Scanned:', 'Haptics: notification error'], phone: 'A bad code: a red **!**.', text: 'A green ✓ for a good scan, a red ! for a bad one. `? :` picks the style and the sign.' },
+  { lines: [30, 33], title: 'The title and the text', tool: 'react-native', text: 'The label (“Website”) and the value — or “Can’t use this code” and the error message. `selectable` lets the user select and copy the text.' },
+  { lines: [34, 38], title: 'Open link — only for websites', tool: 'react-native', shot: '/labs/lab-07/part4/b-result.webp', alt: 'Result card with Open link', console: ['Scanned: https://expo.dev', 'Haptics: notification success'], phone: '**Open link** appears only on a website card.', text: '`&&` draws the link only when both sides are true: a good result **and** the kind is `website`. `Linking.openURL` asks the phone to open the address in its browser.' },
+  { lines: 39, title: 'Scan again', tool: 'react-native', text: '**Scan again** calls `onScanAgain` — the `scanAgain` function `ScannerScreen` gave the card (Step B).' },
+]} />
+
+#### ④ Your turn · Exercise 7
+
+The two **TODO Step C** comments in `feedback.ts`:
+
+<Shot frame="none" w={1600} h={376} src="/labs/lab-07/part4/editor-c.webp" alt="The exercise editor with feedback.ts: two TODO Step C comments above the empty functions successFeedback and errorFeedback" notes={[{ x: 2.5, y: 32, label: 'Fill `successFeedback` with the `try / await / catch` of the success pattern' }, { x: 2.5, y: 63.4, label: 'Fill `errorFeedback` the same way, with `Error`' }]} />
+
+Scan **QR: Website**, then **QR: Empty code**: the phone shakes, and the Console names each pattern. Then press **Check**.
+
+<Exercise id="lab-07--step-c-feedback" />
 
 ### Step D · Flip the camera
 
+#### ① What you will build
+
+**Flip camera** switches between the back camera and the front camera, with a small tap you can feel.
+
+<Clip frame="device" src="/labs/lab-07/clips/step-d.mp4" poster="/labs/lab-07/clips/step-d.webp" w={560} h={1432} alt="Recording of the lab phone: Flip camera switches the label from Back camera to Front camera and back, each press logging Haptics: selection" title="Step D on the lab phone" steps={[
+  'The camera is open on the **back** camera.',
+  'The finger presses **Flip camera**: a small tap (`Haptics: selection`), and the label says **Front camera**.',
+  'A second press goes back to the **back** camera, with another tap.',
+]} />
+
+<Shot frame="device" w={600} h={1242} shots={[
+  { src: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen with the label Back camera', label: 'Back camera' },
+  { src: '/labs/lab-07/part4/d-front.webp', alt: 'The camera screen with the label Front camera', label: 'After Flip camera' },
+]} />
+
+#### ② How it works
+
+A phone has two cameras: the **back** camera (for QR codes, documents, photos) and the **front** camera (for the user’s face). `CameraView` shows one of them, chosen by its prop `facing`: `'back'` or `'front'`.
+
+- **`facing` is a state** — a value the screen remembers (Lab 02: `useState`). Changing it with `setFacing` makes React run `ScannerScreen` again, and `CameraView` gets the new side.
+- **The button does two things, in order:** a small tap you can feel, then the switch.
+- **The switch uses a function.** `setFacing` can take the new value, or a function that gets the current value and returns the new one. The function form is safer: React always passes the newest value.
+
+Watch one press, step by step:
+
+<FlipState />
+
+#### ③ The code, line by line
+
+The finished `ScannerScreen.tsx`. Step D adds two lines (**+**) inside `flipCamera`.
+
+<CodeTour file="src/screens/ScannerScreen.tsx" title="Step D · flip the camera" code={P.SCANNER} logo="react" added={[35, 36]} steps={[
+  { lines: 17, title: 'The state: which camera is on', tool: 'react', shot: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen with Back camera', console: ['Camera permission: allowed'], phone: 'The back camera.', text: '`useState<CameraType>(\'back\')` keeps which camera is on. It starts as `\'back\'`. `<CameraType>` tells TypeScript the state can only be `\'back\'` or `\'front\'`.' },
+  { lines: 70, title: 'The camera reads it', tool: 'expo-camera', text: '`facing={facing}` gives the state to `CameraView`. When the state changes, React draws the screen again and the camera switches sides.' },
+  { lines: 80, title: 'The button', tool: 'react', text: '`onPress={flipCamera}` — the name of the function, without `()`: the button calls it when it is pressed (the same rule as in Step A).' },
+  { lines: 35, title: 'A small tap first (you write this)', tool: 'expo-haptics', console: ['Camera permission: allowed', 'Haptics: selection'], phone: 'The finger presses **Flip camera**: a small tap.', text: '`tapFeedback()` is the finished function from `feedback.ts`: the lightest vibration, the one phones play when a choice changes.' },
+  { lines: 36, title: 'Switch sides (you write this)', tool: 'react', shot: '/labs/lab-07/part4/d-front.webp', alt: 'The camera screen with Front camera', phone: 'The front camera.', text: `\`setFacing\` gets a **function** instead of a value. React calls it with the **current** value, and the function returns the new one: \`current === 'back' ? 'front' : 'back'\`.
+
+Why a function? Because React always passes the newest value. With \`setFacing(facing === 'back' ? 'front' : 'back')\`, two quick presses could both read the old \`facing\` and leave the camera on the same side.` },
+]} />
+
+#### ④ Your turn · Exercise 8
+
+The last **TODO** of the scanner, inside `flipCamera`:
+
+<Shot frame="none" w={1600} h={276} src="/labs/lab-07/part4/editor-d.webp" alt="The exercise editor: the empty flipCamera function with one TODO Step D comment" notes={[{ x: 2.5, y: 50, label: 'Line 35: `tapFeedback();` then `setFacing((current) => …)`' }]} />
+
+Replace the comment with the two lines. Then open the camera and press **Flip camera** two times: the label goes from **Back camera** to **Front camera** and back, and the Console shows one `Haptics: selection` line per press. Then press **Check**.
+
 <Exercise id="lab-07--step-d-flip" />
 
-The finished screen, line by line:
+### The finished scanner
 
-<CodeWalk file="src/screens/ScannerScreen.tsx" title="The finished scanner" code={P.SCANNER} steps={[
-  { lines: [1, 8], text: 'React’s hooks, React Native’s parts, the camera (`CameraView`, `useCameraPermissions` and the `CameraType` type), the parser, the tap vibration, and the three components.' },
-  { lines: [10, 11], text: 'The text the **Use sample QR** button sends. Tests use it, because a test has no QR code to point at.' },
-  { lines: 16, text: 'Step A: the permission and the function that asks for it.' },
-  { lines: [17, 19], text: 'Three states: which camera is on, the result of the last scan (`null` while scanning), and a camera error message.' },
-  { lines: 20, text: 'Step B: the lock. A **ref** changes at once and does not draw the screen again.' },
-  { lines: [22, 27], text: 'handleScan: stop if the lock is closed; otherwise close it, write the code to the log, and turn the text into a result. Setting `result` shows the ResultCard.' },
-  { lines: [29, 32], text: 'scanAgain: open the lock, then clear the result. The camera comes back.' },
-  { lines: [34, 37], text: 'Step D: a small tap, then switch `facing`. The function form gets the current value, so it is always right.' },
-  { lines: [39, 45], text: 'State 1 — `permission` is `null`: the hook is still asking the phone.' },
-  { lines: [47, 60], text: 'State 2 — not granted: explain why, then **Allow camera** (calls `requestPermission`), or **Open settings** when `canAskAgain` is false. **Back** returns home.' },
-  { lines: [62, 64], text: 'A scan happened: show the result card instead of the camera. This closes the camera.' },
-  { lines: [68, 74], text: 'State 3 — the camera: which side, QR codes only, each read goes to `handleScan`, and errors are kept in `cameraError`.' },
-  { lines: [75, 77], text: 'On top of the camera: the scan frame, a hint, and the error message if there is one (`&&` shows it only when it is not null).' },
-  { lines: [78, 82], text: 'The buttons. `__DEV__` is true in Expo Go and false in a store build: **Use sample QR** exists only while you develop.' },
+All four steps together. The whole file, one part at a time:
+
+<CodeTour file="src/screens/ScannerScreen.tsx" title="The finished scanner" code={P.SCANNER} logo="react" steps={[
+  { lines: [1, 8], title: 'Imports', tool: 'react', shot: '/labs/lab-07/part4/a-home.webp', alt: 'The home screen', console: [], phone: 'The app starts on the home screen.', text: 'React’s hooks, React Native’s parts, the camera (`CameraView`, `useCameraPermissions` and the `CameraType` type), the parser, the tap vibration, and the three components.' },
+  { lines: [10, 11], title: 'The sample code', tool: 'react', text: 'The text the **Use sample QR** button sends. Tests use it too, because a test has no QR code to point at.' },
+  { lines: 16, title: 'Step A: the permission', tool: 'expo-camera', shot: '/labs/lab-07/part4/a-checking.webp', alt: 'Checking camera permission…', text: 'The permission, and the function that asks for it.' },
+  { lines: [17, 19], title: 'Three states', tool: 'react', text: 'Which camera is on, the result of the last scan (`null` while scanning), and a camera error message.' },
+  { lines: 20, title: 'Step B: the lock', tool: 'react', text: 'A **ref**: it changes at once and does not draw the screen again.' },
+  { lines: [22, 27], title: 'handleScan', tool: 'react', shot: '/labs/lab-07/part4/b-result.webp', alt: 'The result card', console: ['Camera permission: allowed', 'Scanned: https://expo.dev', 'Haptics: notification success'], text: 'Stop if the lock is closed; otherwise close it, write the code to the Console, and turn the text into a result. Setting `result` shows the ResultCard.' },
+  { lines: [29, 32], title: 'scanAgain', tool: 'react', shot: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen', console: ['Camera permission: allowed'], text: 'Open the lock, then clear the result. The camera comes back.' },
+  { lines: [34, 37], title: 'Step D: flipCamera', tool: 'react', shot: '/labs/lab-07/part4/d-front.webp', alt: 'The front camera', console: ['Camera permission: allowed', 'Haptics: selection'], text: 'A small tap, then switch `facing`. The function form always gets the newest value.' },
+  { lines: [39, 45], title: 'State 1 — no answer yet', tool: 'react', shot: '/labs/lab-07/part4/a-checking.webp', alt: 'Checking camera permission…', console: [], text: '`permission` is `null`: the hook is still asking the phone.' },
+  { lines: [47, 60], title: 'State 2 — not allowed', tool: 'expo-camera', shot: '/labs/lab-07/part4/a-needed.webp', alt: 'Camera permission needed', text: 'Explain why, then **Allow camera** (calls `requestPermission`), or **Open settings** when `canAskAgain` is false. **Back** returns home.' },
+  { lines: [62, 64], title: 'A scan happened', tool: 'react', shot: '/labs/lab-07/part4/b-result.webp', alt: 'The result card', console: ['Camera permission: allowed', 'Scanned: https://expo.dev', 'Haptics: notification success'], text: 'Show the result card instead of the camera. This closes the camera.' },
+  { lines: [68, 74], title: 'State 3 — the camera', tool: 'expo-camera', shot: '/labs/lab-07/part4/a-camera.webp', alt: 'The camera screen', console: ['Camera permission: allowed'], text: 'Which side, QR codes only, each read goes to `handleScan`, and errors are kept in `cameraError`.' },
+  { lines: [75, 77], title: 'On top of the camera', tool: 'react-native', text: 'The scan frame, a hint, and the error message if there is one (`&&` shows it only when it is not `null`).' },
+  { lines: [78, 82], title: 'The buttons', tool: 'react-native', text: '`__DEV__` is true while you develop (Expo Go) and false in a store build: **Use sample QR** exists only while you develop.' },
 ]} />
+
+The same scanner on a real Android phone (an emulator, in Expo Go):
 
 <Shot frame="phone" w={540} h={1202} shots={[
   { src: '/labs/lab-07/phone-camera.webp', alt: 'Smart QR scanning on an Android emulator: the camera shows a room, the blue frame and the hint Point the camera at a QR code', label: 'Scanning' },
@@ -393,7 +669,7 @@ The finished screen, line by line:
 ]} caption="The Android emulator’s back camera shows a 3-D room. Real QR codes need a phone; on the emulator use **Use sample QR**." />
 
 <Checkpoint title="Break · 5 minutes">
-Your scanner asks for the camera, reads a code once, vibrates on the result and flips the camera — in the browser and on your phone. Take a 5-minute break.
+Your scanner asks for the camera, reads a code once, vibrates on the result and flips the camera — and you know what every line does. Take a 5-minute break.
 </Checkpoint>
 
 <Part n="5" title="Testing: three tools, three layers" time="12 min" />

@@ -1,0 +1,87 @@
+---
+/**
+ * Lab 07 · Part 4 Step D — Flip camera: `facing` is a state that CameraView reads; the button plays a small tap,
+ * then `setFacing` with a function turns the current side into the other one, and React draws again.
+ * <FlipState />
+ */
+import Stepper from './Stepper.astro';
+import { highlightLines } from '@/lab/ui/highlight-static';
+
+const LINES: [string, string][] = [
+  ["const [facing, setFacing] = useState<CameraType>('back');", '1:match 4:match'],
+  ['', ''],
+  ['function flipCamera() {', '2:run 5:run'],
+  ['  tapFeedback();', '2:match 5:match'],
+  ["  setFacing((current) => (current === 'back' ? 'front' : 'back'));", '3:match 5:match'],
+  ['}', ''],
+  ['', ''],
+  ['<CameraView facing={facing} … />', '1:match 4:match'],
+  ['<AppButton title="Flip camera" testID="flip-camera" onPress={flipCamera} />', '2:run 5:run'],
+];
+const HL = highlightLines(LINES.map(([t]) => t).join('\n'));
+
+const STEPS = [
+  { title: '`facing` is a state', text: '`useState<CameraType>(\'back\')` keeps **which camera is on**. It starts as `\'back\'`. `<CameraView facing={facing} />` reads it, so the phone shows the back camera.', ms: 4600 },
+  { title: 'Press Flip camera', text: 'The button’s `onPress` is `flipCamera` (no `()`: React calls it when the button is pressed). Its first line, `tapFeedback()`, plays the small **selection** tap.', ms: 4600 },
+  { title: 'The function form of `setFacing`', text: '`setFacing` gets a **function**, not a value. React calls it with the **current** value (`\'back\'`), and the function gives back the other side: `current === \'back\' ? \'front\' : \'back\'` → `\'front\'`.', ms: 5800 },
+  { title: 'React draws the screen again', text: 'The state changed, so React runs `ScannerScreen` again. `facing` is now `\'front\'`, `CameraView` gets `facing=\'front\'`, and the phone shows the **front** camera.', ms: 4800 },
+  { title: 'Press again: back to `\'back\'`', text: 'The same function turns `\'front\'` into `\'back\'`. Because React always passes the **newest** value, two fast presses still end on the right side.', ms: 4800 },
+];
+---
+<Stepper label="Flip camera, step by step" steps={STEPS} class="fs">
+  <div class="fs-grid">
+    <div class="fs-left">
+      <div class="fs-state">
+        <span class="fs-name mono">facing =</span>
+        <span class="fs-stack">
+          <span class="stp-chip stp-only" data-at="1-3:show 5:show"><b>'back'</b></span>
+          <span class="stp-chip stp-only fs-front" data-at="4:show"><b>'front'</b></span>
+        </span>
+      </div>
+      <pre class="stp-code" aria-label="Flip camera in ScannerScreen">{LINES.map(([, at], i) => <span class="stp-ln" data-at={at} set:html={HL[i] || ' '} />)}</pre>
+      <div class="fs-machines">
+        <div class="fs-machine stp-only" data-at="3:show"><span class="stp-chip">'back'</span><span class="fs-fn mono">→ (current) =&gt; current === 'back' ? 'front' : 'back' →</span><span class="stp-chip fs-front"><b>'front'</b></span></div>
+        <div class="fs-machine stp-only" data-at="5:show"><span class="stp-chip">'front'</span><span class="fs-fn mono">→ (current) =&gt; current === 'back' ? 'front' : 'back' →</span><span class="stp-chip"><b>'back'</b></span></div>
+      </div>
+    </div>
+
+    <div class="fs-right">
+      <div class="stp-phone" aria-hidden="true">
+        <div class="stp-screen">
+          <div class="stp-scr stp-cam fs-cam stp-only" data-at="1-3:show 5:show"><small class="fs-pill">Back camera</small><span class="stp-qrframe"></span><span class="fs-btns"><i class="stp-appbtn light">Back</i><i class="stp-appbtn light fs-flip">Flip camera</i></span></div>
+          <div class="stp-scr stp-cam fs-cam fs-camfront stp-only" data-at="4:show"><small class="fs-pill">Front camera</small><span class="stp-qrframe"></span><span class="fs-btns"><i class="stp-appbtn light">Back</i><i class="stp-appbtn light fs-flip">Flip camera</i></span></div>
+        </div>
+      </div>
+      <div class="stp-console" aria-label="Console">
+        <span>Console</span>
+        <span class="stp-only" data-at="2-5:show">Haptics: selection</span>
+        <span class="stp-only" data-at="5:show">Haptics: selection</span>
+      </div>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .fs-grid { display: grid; gap: 16px; }
+  @media (min-width: 820px) { .fs-grid { grid-template-columns: minmax(0, 1fr) 226px; align-items: start; } }
+  .fs-left { display: grid; gap: 10px; min-width: 0; }
+  .fs-right { display: grid; gap: 10px; }
+  .fs-state { display: flex; align-items: center; gap: 8px; }
+  .fs-name { font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+  .fs-stack, .fs-machines { display: grid; }
+  .fs-stack > span, .fs-machines > div { grid-area: 1 / 1; }
+  .fs-stack > span { justify-self: start; }
+  .fs-front { border-color: var(--accent); }
+  .fs-machine { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--line-2); }
+  .fs-fn { font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
+  .fs-cam { justify-content: space-between; padding: 24px 10px 26px; }
+  .fs-camfront { background: radial-gradient(circle at 50% 38%, #3b3355, #0b0f17 72%); }
+  .fs-pill { padding: 2px 9px; border-radius: 999px; background: rgb(0 0 0 / 0.45); }
+  .fs-btns { display: flex; gap: 6px; }
+  .fs-btns i { padding: 6px 9px; font-size: 11px; }
+  :global(.fs[data-step='2']) .fs-flip, :global(.fs[data-step='5']) .fs-flip { box-shadow: 0 0 0 3px #38bdf8; animation: fs-press 0.6s var(--ease-out); }
+  @keyframes fs-press { 40% { transform: scale(0.9); } }
+  :global(.fs[data-step='4']) .fs-camfront .stp-qrframe { animation: fs-flipin 0.6s var(--ease-out); }
+  @keyframes fs-flipin { from { transform: rotateY(90deg); } }
+  @media (prefers-reduced-motion: reduce) { :global(.fs[data-step='2']) .fs-flip, :global(.fs[data-step='5']) .fs-flip, :global(.fs[data-step='4']) .fs-camfront .stp-qrframe { animation: none; } }
+</style>

@@ -1,0 +1,110 @@
+---
+/**
+ * Lab 07 · Part 4 Step C — when Smart QR vibrates: the camera is on (iPhone: haptics off) → a read sets the
+ * result → the card replaces the camera → ResultCard's useEffect → `await notificationAsync(Success)` → a phone
+ * without a motor throws and `catch` keeps the app running. <HapticTiming />
+ */
+import Stepper from './Stepper.astro';
+import { highlightLines } from '@/lab/ui/highlight-static';
+
+const LINES: [string, string][] = [
+  ['// ScannerScreen.tsx', ''],
+  ['setResult(parseScan(data));', '2:match 3-6:dim'],
+  ['if (result) return <ResultCard result={result} … />;', '3:match 4-6:dim'],
+  ['', ''],
+  ['// ResultCard.tsx', ''],
+  ['useEffect(() => {', '4:match 5-6:dim'],
+  ['  if (result.ok) successFeedback();', '4:match 5-6:dim'],
+  ['  else errorFeedback();', '4:dim 5-6:dim'],
+  ['}, [result]);', '4:match 5-6:dim'],
+  ['', ''],
+  ['// feedback.ts', ''],
+  ['export async function successFeedback() {', '5:run 6:run'],
+  ['  try {', '5:match 6:match'],
+  ['    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);', '5:match 6:stop'],
+  ['  } catch {', '5:dim 6:match'],
+  ['    // no vibration motor: the app still works', '5:dim 6:match'],
+  ['  }', ''],
+  ['}', ''],
+];
+const HL = highlightLines(LINES.map(([t]) => t).join('\n'));
+
+const STEPS = [
+  { title: 'The camera is on', text: 'The scanner shows the camera. While the camera is **active**, an iPhone switches haptics **off**: a vibration asked for now is not felt. (Android would play it.)', ms: 4600 },
+  { title: 'A code is read', text: '`handleScan` runs and calls `setResult(parseScan(data))`: the result is now in the state.', ms: 4000 },
+  { title: 'The card replaces the camera', text: 'A new state makes React run `ScannerScreen` again. `if (result)` now returns the **ResultCard**, so the camera is not drawn any more: the camera **closes**.', ms: 4800 },
+  { title: 'ResultCard’s `useEffect` runs', text: '`useEffect` runs **after** the card is on the screen. `result.ok` is `true`, so it calls `successFeedback()` (a bad code would call `errorFeedback()`).', ms: 4600 },
+  { title: '`await`: ask the phone and wait', text: '`successFeedback` is an `async` function. `await Haptics.notificationAsync(…Success)` asks the phone for the **success** pattern and waits until the phone has started it. The camera is closed, so **every** phone vibrates — iPhones too.', ms: 5600 },
+  { title: 'No motor? `catch` it', text: 'Some phones and tablets have **no vibration motor**: then the call throws an error. `catch` catches it and does nothing, so the app goes on — the card still shows. Without `try / catch` the error would break the screen.', ms: 5600 },
+];
+---
+<Stepper label="When the phone vibrates" steps={STEPS} class="ht">
+  <div class="ht-grid">
+    <div class="ht-left">
+      <div class="ht-lanes" aria-hidden="true">
+        <span class="ht-lk">Screen</span>
+        <div class="ht-bar"><i class="ht-seg ht-a">camera</i><i class="ht-seg ht-b ht-card stp-only" data-at="3-6:show">result card</i></div>
+        <span class="ht-lk">Camera</span>
+        <div class="ht-bar"><i class="ht-seg ht-a ht-on">on</i><i class="ht-seg ht-b ht-off stp-only" data-at="3-6:show">off</i></div>
+        <span class="ht-lk">Vibration (iPhone)</span>
+        <div class="ht-bar"><i class="ht-seg ht-a ht-block">off while the camera is on</i><i class="ht-mark ht-pulse stp-only" data-at="5:show">≋ Success</i><i class="ht-mark ht-nomotor stp-only" data-at="6:show">✕ no motor → catch</i></div>
+        <span class="ht-track"><span class="ht-cursor"></span></span>
+      </div>
+      <pre class="stp-code" aria-label="The code that runs, in order">{LINES.map(([, at], i) => <span class="stp-ln" data-at={at} set:html={HL[i] || ' '} />)}</pre>
+    </div>
+
+    <div class="ht-right">
+      <div class="stp-phone ht-phone" aria-hidden="true">
+        <div class="stp-screen">
+          <div class="stp-scr stp-cam stp-only ht-cam" data-at="1-2:show"><small class="ht-pill">Back camera</small><span class="stp-qrframe"></span><small>Point the camera at a QR code</small></div>
+          <div class="stp-scr stp-only" data-at="3-6:show">
+            <div class="ht-cardui"><span class="ht-ok">✓</span><small class="ht-lab">WEBSITE</small><span class="ht-val">https://expo.dev</span><i class="stp-appbtn">Scan again</i></div>
+          </div>
+        </div>
+      </div>
+      <div class="stp-console" aria-label="Console">
+        <span>Console</span>
+        <span class="stp-only" data-at="2-6:show">Scanned: https://expo.dev</span>
+        <span class="stp-only" data-at="5:show">Haptics: notification success</span>
+      </div>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .ht-grid { display: grid; gap: 16px; }
+  @media (min-width: 860px) { .ht-grid { grid-template-columns: minmax(0, 1fr) 226px; align-items: start; } }
+  .ht-left { display: grid; gap: 12px; min-width: 0; }
+  .ht-right { display: grid; gap: 10px; justify-items: stretch; }
+
+  .ht-lanes { position: relative; display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 7px 10px; align-items: center; }
+  .ht-lk { font-size: 12px; font-weight: 700; color: var(--text-2); }
+  .ht-bar { position: relative; height: 26px; border-radius: 8px; background: var(--bg-2); overflow: hidden; }
+  .ht-seg { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 8px; font: normal 600 11.5px/1 var(--font-body); color: var(--text); white-space: nowrap; overflow: hidden; }
+  .ht-a { left: 0; width: 52%; }
+  .ht-b { left: 52%; right: 0; }
+  .ht-seg.ht-a { background: color-mix(in oklab, #38bdf8 22%, transparent); }
+  .ht-card { background: color-mix(in oklab, var(--ok) 24%, transparent); }
+  .ht-off { background: color-mix(in oklab, var(--text-3) 16%, transparent); color: var(--text-2); }
+  .ht-seg.ht-block { background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--danger) 20%, transparent) 0 6px, transparent 6px 12px); color: var(--text-2); }
+  .ht-mark { position: absolute; top: 3px; bottom: 3px; left: 60%; display: flex; align-items: center; padding: 0 8px; border-radius: 6px; font: normal 700 11.5px/1 var(--font-body); white-space: nowrap; }
+  .ht-pulse { background: var(--ok); color: #06210f; }
+  .ht-nomotor { background: color-mix(in oklab, var(--danger) 85%, #000); color: #fff; }
+  .ht-track { position: absolute; top: -4px; bottom: -4px; left: 128px; right: 0; pointer-events: none; }
+  .ht-cursor { position: absolute; top: 0; bottom: 0; left: 22%; width: 2px; background: var(--accent-text); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent); transition: left 0.6s var(--ease-out); }
+  :global(.ht[data-step='2']) .ht-cursor { left: 47%; }
+  :global(.ht[data-step='3']) .ht-cursor { left: 53%; }
+  :global(.ht[data-step='4']) .ht-cursor { left: 57%; }
+  :global(.ht[data-step='5']) .ht-cursor, :global(.ht[data-step='6']) .ht-cursor { left: 62%; }
+
+  .ht-cam { justify-content: space-between; padding: 26px 16px 34px; }
+  .ht-pill { padding: 2px 9px; border-radius: 999px; background: rgb(0 0 0 / 0.45); }
+  .ht-cardui { width: 100%; display: grid; justify-items: center; gap: 7px; padding: 16px 12px; border-radius: 18px; background: #fff; color: #0f172a; }
+  .ht-ok { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #22c55e; color: #fff; font-size: 20px; font-weight: 800; }
+  .ht-lab { color: #64748b !important; font-weight: 700; letter-spacing: 0.08em; }
+  .ht-val { font-size: 13px; }
+  :global(.ht[data-step='5']) .ht-phone { animation: ht-shake 0.5s ease-in-out 2; }
+  @keyframes ht-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-5px) rotate(-1deg); } 40% { transform: translateX(5px) rotate(1deg); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+  @media (max-width: 520px) { .ht-lanes { grid-template-columns: 84px minmax(0, 1fr); } .ht-track { left: 94px; } }
+  @media (prefers-reduced-motion: reduce) { .ht-cursor { transition: none; } :global(.ht[data-step='5']) .ht-phone { animation: none; } }
+</style>

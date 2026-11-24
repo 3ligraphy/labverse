@@ -80,6 +80,9 @@ function ErrorScreen({ info }: { info: LabErrorInfo }) {
   );
 }
 
+/** warnings react-native-web prints about running in a browser (true for every app on the lab phone): not shown */
+const STAND_IN_NOTES = [/^Animated: `useNativeDriver` is not supported because the native animated module is missing/];
+
 export function createRuntime(opts: { container: HTMLElement; post: Post; onFrame?: (frame: RunRequest['frame']) => void; loadAsset?: (name: string) => Promise<ArrayBuffer> }) {
   const { container, post } = opts;
   // phone pop-ups (the camera permission dialog) are drawn in the app's own screen
@@ -259,6 +262,9 @@ export function createRuntime(opts: { container: HTMLElement; post: Post; onFram
         }
       })
       .join(' ');
+    // react-native-web's notes about the browser itself, not about the student's code: they would only hide the
+    // student's own lines (Smart QR's `useNativeDriver: true` is right on a phone)
+    if (level === 'warn' && STAND_IN_NOTES.some((note) => note.test(text))) return;
     logs.push(text);
     if (logs.length > 200) logs.shift();
     post({ type: 'log', level, text });

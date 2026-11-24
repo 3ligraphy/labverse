@@ -1,0 +1,117 @@
+---
+/**
+ * Lab 07 · Part 4 Step B — one QR code, many reads: without a lock handleScan runs for every read; with the useRef
+ * lock the first read closes it and the others stop at the first line; why a ref and not a state; Scan again.
+ * <LockTimeline />
+ */
+import Stepper from './Stepper.astro';
+import { highlightLines } from '@/lab/ui/highlight-static';
+
+const LINES: [string, string][] = [
+  ['const locked = useRef(false);    // the lock: false = open', '2:skip 3:match'],
+  ['', ''],
+  ['function handleScan(data: string) {', '2:run 4-5:run'],
+  ['  if (locked.current) return;    // closed? stop here', '2:skip 4:run 5:stop'],
+  ['  locked.current = true;         // close it', '2:skip 4:match 5:dim'],
+  ["  console.log('Scanned:', data);", '2:match 4:match 5:dim'],
+  ['  setResult(parseScan(data));', '2:match 4:match 5:dim'],
+  ['}', ''],
+  ['', ''],
+  ['function scanAgain() {', '7:run'],
+  ['  locked.current = false;        // open it again', '2:skip 7:match'],
+  ['  setResult(null);', '7:match'],
+  ['}', ''],
+];
+const TILES = [
+  { n: 1, at: '1-2:show 4-6:pass' },
+  { n: 2, at: '1-2:show 5-6:stop' },
+  { n: 3, at: '1-2:show 5-6:stop' },
+  { n: 4, at: '1-2:show 5-6:stop' },
+  { n: 5, at: '1-2:show 5-6:stop' },
+];
+const HL = highlightLines(LINES.map(([t]) => t).join('\n'));
+
+const STEPS = [
+  { title: 'The camera reads every frame', text: 'A camera takes many pictures (frames) every second. While a QR code is in front of it, `onBarcodeScanned` runs for **every frame** that shows the code — here 5 reads in less than one second. Each read calls `handleScan`.', ms: 5000 },
+  { title: 'Without a lock: 5 results', text: 'With no lock, every call runs to the end: 5 **Scanned:** lines in the Console, the result set 5 times, 5 vibrations. The user held up **one** code.', ms: 4800 },
+  { title: 'The lock: a ref that starts open', text: '`useRef(false)` makes a box that keeps a value while the screen draws again and again. You read and change it with `.current`. `locked.current` is `false`: the lock is **open**.', ms: 4800 },
+  { title: 'Read 1 passes and closes the lock', text: '`if (locked.current) return;` → `false`, so the function goes on. `locked.current = true;` **closes** the lock at once. Then the code is written to the Console and turned into the result.', ms: 5200 },
+  { title: 'Reads 2–5 stop at the first line', text: 'Now `locked.current` is `true`, so `return` ends `handleScan` **on its first line**. Nothing else runs: still **one** Scanned: line, one result, one vibration.', ms: 4800 },
+  { title: 'Why a ref and not a state?', text: 'A state changes only when React draws the screen again — and reads 2 and 3 can arrive **before** that, still seeing the old `false`. A ref changes **at once**: read 2 already sees `true`. A ref also does not draw the screen again.', ms: 6200 },
+  { title: 'Scan again opens the lock', text: '**Scan again** calls `scanAgain`: `locked.current = false` opens the lock, and `setResult(null)` removes the result, so the camera comes back — ready for the next code.', ms: 4800 },
+];
+---
+<Stepper label="Why one QR code needs a lock" steps={STEPS} class="lt">
+  <div class="lt-reads" aria-hidden="true">
+    <span class="lt-k mono">camera reads →</span>
+    {TILES.map((t) => (
+      <span class="lt-tile stp-only" data-at={t.at} style={`--d:${(t.n - 1) * 0.16}s`}>
+        <svg viewBox="0 0 20 20" width="18" height="18"><path d="M2 2h6v6H2zM12 2h6v6h-6zM2 12h6v6H2zM12 12h2v2h-2zM16 16h2v2h-2zM14 14h2v2h-2z" fill="currentColor" /></svg>
+        <small>read {t.n}</small>
+      </span>
+    ))}
+  </div>
+
+  <div class="lt-grid">
+    <div class="lt-main">
+      <pre class="stp-code lt-code" data-at="6:hide" aria-label="The lock in ScannerScreen">{LINES.map(([, at], i) => <span class="stp-ln" data-at={at} set:html={HL[i] || ' '} />)}</pre>
+      <div class="lt-why stp-only" data-at="6:show">
+        <p class="stp-k2">The same lock, made two ways — read 1 arrives, then read 2 a moment later:</p>
+        <div class="lt-row lt-row-bad"><code>const [locked, setLocked] = useState(false)</code><span>read 1 calls <code>setLocked(true)</code>, but <code>locked</code> stays <code>false</code> until React draws the screen again → reads 2 and 3 pass too → <b>3 results ✕</b></span></div>
+        <div class="lt-row lt-row-good"><code>const locked = useRef(false)</code><span>read 1 sets <code>locked.current = true</code> → it is <code>true</code> at once → read 2 stops on the first line → <b>1 result ✓</b></span></div>
+      </div>
+    </div>
+
+    <div class="lt-side">
+      <div class="lt-lock" aria-label="The lock">
+        <span class="stp-chip stp-only" data-at="3:show 7:show">locked.current = <b>false</b> · 🔓 open</span>
+        <span class="stp-chip stp-only lt-closed" data-at="4-6:show">locked.current = <b>true</b> · 🔒 closed</span>
+        <span class="stp-chip stp-only lt-none" data-at="1-2:show">no lock yet</span>
+      </div>
+      <div class="stp-console" aria-label="Console">
+        <span>Console</span>
+        <span class="stp-only" data-at="2:show 4-7:show">Scanned: https://expo.dev</span>
+        <span class="stp-only" data-at="2:show">Scanned: https://expo.dev</span>
+        <span class="stp-only" data-at="2:show">Scanned: https://expo.dev</span>
+        <span class="stp-only" data-at="2:show">Scanned: https://expo.dev</span>
+        <span class="stp-only" data-at="2:show">Scanned: https://expo.dev</span>
+      </div>
+      <span class="lt-verdict lt-bad stp-only" data-at="2:show">✕ one code → 5 results, 5 vibrations</span>
+      <span class="lt-verdict lt-good stp-only" data-at="5:show">✓ one code → one result</span>
+    </div>
+  </div>
+</Stepper>
+
+<style>
+  .lt-reads { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 54px; }
+  .lt-k { font-size: 12px; font-weight: 700; color: var(--text-2); }
+  .lt-tile { display: grid; justify-items: center; gap: 2px; width: 58px; padding: 6px 4px; border-radius: 10px; border: 2px solid var(--line-2); background: var(--bg-2); color: var(--text); }
+  .lt-tile small { font-size: 11px; color: var(--text-2); }
+  :global(.lt[data-step='1']) .lt-tile { animation: lt-in 0.45s var(--ease-out) both; animation-delay: var(--d); }
+  .lt-tile[data-now='pass'] { border-color: var(--ok); background: color-mix(in oklab, var(--ok) 14%, var(--bg-2)); }
+  .lt-tile[data-now='pass'] small::after { content: ' ✓'; color: var(--ok); }
+  .lt-tile[data-now='stop'] { border-color: var(--danger); background: color-mix(in oklab, var(--danger) 10%, var(--bg-2)); opacity: 0.75; }
+  .lt-tile[data-now='stop'] small::after { content: ' ✕'; color: var(--danger); }
+  @keyframes lt-in { from { opacity: 0; transform: translateX(-10px) scale(0.9); } }
+
+  .lt-grid { display: grid; gap: 14px; margin-top: 4px; }
+  @media (min-width: 820px) { .lt-grid { grid-template-columns: minmax(0, 1fr) 280px; align-items: start; } }
+  .lt-main { display: grid; min-width: 0; }
+  .lt-main > * { grid-area: 1 / 1; min-width: 0; }
+  .lt-code { transition: opacity 0.35s var(--ease-out), visibility 0.35s; }
+  .lt-why { align-self: start; display: grid; gap: 8px; }
+  .lt-side { display: grid; gap: 10px; align-content: start; }
+  .lt-lock { display: grid; }
+  .lt-lock > span { grid-area: 1 / 1; justify-self: start; white-space: nowrap; overflow-wrap: normal; font-size: 12px; }
+  .lt-closed { border-color: var(--ok); }
+  .lt-none { color: var(--text-3); }
+  .lt-verdict { justify-self: start; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+  .lt-bad { background: color-mix(in oklab, var(--danger) 16%, transparent); color: var(--text); }
+  .lt-good { background: color-mix(in oklab, var(--ok) 16%, transparent); color: var(--text); }
+
+  .lt-row { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
+  .lt-row code { font-size: 0.9em; }
+  .lt-row-bad { border-left: 4px solid var(--danger); }
+  .lt-row-good { border-left: 4px solid var(--ok); }
+  @media (prefers-reduced-motion: reduce) { :global(.lt[data-step='1']) .lt-tile { animation: none; } }
+</style>

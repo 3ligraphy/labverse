@@ -1,0 +1,250 @@
+---
+/**
+ * A code walk-through with the phone beside it (Lab 07): coloured code with line numbers; at each step the lines that
+ * matter light up, the phone shows what that code does on the screen (a real picture of the lab phone) with its
+ * Console, and UNDER both a wide panel explains the step in detail: what is being explained now, the package it
+ * comes from (logo), and the explanation itself (paragraphs and `- ` bullets, `code`, **bold**).
+ *
+ * <CodeTour file="src/screens/ScannerScreen.tsx" code={P.SCANNER_B} logo="react" added={[16, 38, 39]} steps={[
+ *   { lines: 16, title: 'Read the permission', tool: 'expo-camera', text: '…', shot: '/labs/lab-07/part4/a-needed.webp',
+ *     alt: '…', console: ['Camera permission: not asked yet'], phone: 'What the user sees now' },
+ * ]} />
+ * A step without `shot` / `console` / `phone` keeps the previous step's ones.
+ */
+import { inline } from '@/lib/content';
+import { highlightLines } from '@/lab/ui/highlight-static';
+
+type Step = { lines: number | number[]; title: string; text: string; tool?: string; shot?: string; alt?: string; console?: string[]; phone?: string };
+interface Props {
+  file: string;
+  code: string;
+  steps: Step[];
+  title?: string;
+  /** a file name in src/assets/tools (react, expo, …) shown before the file name */
+  logo?: string;
+  /** lines the student writes in the exercise: marked with + */
+  added?: number[];
+}
+const { file, code, steps, title, logo, added = [] } = Astro.props;
+if (!steps.length) throw new Error(`<CodeTour file="${file}">: steps are required`);
+
+const logoFiles = import.meta.glob<ImageMetadata>('/src/assets/tools/*.svg', { eager: true, import: 'default' });
+const logoSrc = (name?: string) => (name ? logoFiles[`/src/assets/tools/${name}.svg`]?.src : undefined);
+/** the packages a step can name, with their logo */
+const TOOLS: Record<string, { name: string; logo: string }> = {
+  'expo-camera': { name: 'expo-camera', logo: 'expo' },
+  'expo-haptics': { name: 'expo-haptics', logo: 'expo' },
+  expo: { name: 'Expo', logo: 'expo' },
+  react: { name: 'React', logo: 'react' },
+  'react-native': { name: 'React Native', logo: 'react' },
+};
+
+const html = highlightLines(code.replace(/\n$/, ''));
+const range = (s: Step) => {
+  const l = Array.isArray(s.lines) ? s.lines : [s.lines];
+  return l.length === 2 && l[1] > l[0] ? Array.from({ length: l[1] - l[0] + 1 }, (_, i) => l[0] + i) : l;
+};
+for (const s of steps) for (const n of range(s)) if (n < 1 || n > html.length) throw new Error(`<CodeTour file="${file}">: line ${n} does not exist`);
+const where = (ls: number[]) => (ls.length > 1 ? `lines ${ls[0]}–${ls[ls.length - 1]}` : `line ${ls[0]}`);
+
+/** paragraphs (blank line between) and bullet lists (lines starting with "- ") */
+const block = (s: string) =>
+  s.trim().split(/\n\s*\n/).map((par) => {
+    const ls = par.split('\n');
+    return ls.every((l) => /^\s*- /.test(l))
+      ? `<ul>${ls.map((l) => `<li>${inline(l.replace(/^\s*- /, ''))}</li>`).join('')}</ul>`
+      : `<p>${inline(par.replace(/\s*\n\s*/g, ' '))}</p>`;
+  }).join('');
+
+// what the phone shows at each step: a step without its own picture / Console / caption keeps the last one
+const shots: { src: string; alt: string }[] = [];
+let shotAt = -1;
+let consoleNow: string[] = [];
+let phoneNow = '';
+const data = steps.map((s) => {
+  if (s.shot) {
+    const known = shots.findIndex((x) => x.src === s.shot);
+    shotAt = known >= 0 ? known : shots.push({ src: s.shot, alt: s.alt ?? '' }) - 1;
+  }
+  if (s.console) consoleNow = s.console;
+  if (s.phone !== undefined) phoneNow = s.phone;
+  return { lines: range(s), shot: shotAt, console: consoleNow, phone: phoneNow, tool: s.tool ? TOOLS[s.tool] : undefined };
+});
+for (const s of shots) if (!s.alt.trim()) throw new Error(`<CodeTour file="${file}">: the picture ${s.src} needs alt text`);
+const hasPhone = shots.length > 0;
+---
+<figure class:list={['ct', { 'ct-nophone': !hasPhone }]} data-ct data-reveal data-free>
+  <figcaption class="ct-head">
+    {logoSrc(logo) && <span class="ct-logo"><img src={logoSrc(logo)} alt="" width="20" height="20" /></span>}
+    <span class="ct-file mono">{file}</span>
+    {title && <b class="ct-title">{title}</b>}
+    <span class="ct-count mono" data-ct-count>Step 1 of {steps.length}</span>
+  </figcaption>
+
+  <div class="ct-body">
+    <div class="ct-codewrap">
+      <pre class="ct-code" tabindex="0" aria-label={`Code of ${file}`} data-ct-code>{html.map((l, i) => (
+        <span class:list={['ct-l', { add: added.includes(i + 1) }]} data-ct-line={i + 1}><i aria-hidden="true">{i + 1}</i><b class="ct-mark" aria-hidden="true">{added.includes(i + 1) ? '+' : ' '}</b><span set:html={l || ' '} />{'\n'}</span>
+      ))}</pre>
+    </div>
+
+    {hasPhone && (
+      <div class="ct-phone">
+        <p class="ct-k mono">On the lab phone now</p>
+        <div class="ct-device">
+          {shots.map((s, i) => <img src={s.src} alt={s.alt} width="600" height="1242" loading="lazy" decoding="async" class:list={{ on: i === data[0].shot }} data-ct-shot={i} />)}
+        </div>
+        <div class="ct-console" aria-label="Console" data-ct-console>
+          <span class="ct-console-k">Console</span>
+          {data[0].console.map((l) => <span>{l}</span>)}
+        </div>
+      </div>
+    )}
+  </div>
+
+  <div class="ct-explain" aria-live="polite">
+    {steps.map((s, i) => (
+      <section class="ct-say" data-ct-say={i} hidden={i > 0}>
+        <p class="ct-now mono">
+          <span>Now explaining · {where(data[i].lines)}</span>
+          {data[i].tool && <span class="ct-tool">{logoSrc(data[i].tool!.logo) && <img src={logoSrc(data[i].tool!.logo)} alt="" width="14" height="14" />}{data[i].tool!.name}</span>}
+        </p>
+        <h4 class="ct-h" set:html={inline(s.title)} />
+        <div class="ct-text" set:html={block(s.text)} />
+        {hasPhone && data[i].phone && <p class="ct-onphone"><span aria-hidden="true">📱</span> <span set:html={inline(data[i].phone)} /></p>}
+      </section>
+    ))}
+  </div>
+
+  <div class="ct-nav">
+    <button type="button" class="btn btn-ghost btn-sm" data-ct-prev disabled>← Back</button>
+    <div class="ct-dots">{steps.map((s, i) => <button type="button" class="ct-dot" data-ct-dot={i} aria-label={`Step ${i + 1}: ${s.title.replace(/[`*]/g, '')}`} aria-current={i === 0 ? 'step' : undefined}></button>)}</div>
+    <button type="button" class="btn btn-primary btn-sm" data-ct-next>Next →</button>
+    <button type="button" class="ct-all" data-ct-all aria-expanded="false">Show every step</button>
+  </div>
+  <ol class="ct-list" data-ct-list hidden>
+    {steps.map((s, i) => <li><span class="mono">{where(data[i].lines)}</span> <b set:html={inline(s.title)} /><div set:html={block(s.text)} /></li>)}
+  </ol>
+  <script type="application/json" data-ct-steps set:html={JSON.stringify(data.map((d) => ({ lines: d.lines, shot: d.shot, console: d.console }))).replace(/</g, '\\u003c')} />
+</figure>
+
+<script>
+  type Step = { lines: number[]; shot: number; console: string[] };
+  const wire = () =>
+    document.querySelectorAll<HTMLElement>('[data-ct]:not([data-wired])').forEach((root) => {
+      root.dataset.wired = '1';
+      const steps = JSON.parse(root.querySelector('[data-ct-steps]')!.textContent!) as Step[];
+      const lines = [...root.querySelectorAll<HTMLElement>('[data-ct-line]')];
+      const says = [...root.querySelectorAll<HTMLElement>('[data-ct-say]')];
+      const shots = [...root.querySelectorAll<HTMLImageElement>('[data-ct-shot]')];
+      const dots = [...root.querySelectorAll<HTMLButtonElement>('[data-ct-dot]')];
+      const consoleBox = root.querySelector<HTMLElement>('[data-ct-console]');
+      const count = root.querySelector<HTMLElement>('[data-ct-count]')!;
+      const prev = root.querySelector<HTMLButtonElement>('[data-ct-prev]')!;
+      const next = root.querySelector<HTMLButtonElement>('[data-ct-next]')!;
+      const all = root.querySelector<HTMLButtonElement>('[data-ct-all]')!;
+      const list = root.querySelector<HTMLElement>('[data-ct-list]')!;
+      const code = root.querySelector<HTMLElement>('[data-ct-code]')!;
+      let at = 0;
+      const show = (i: number) => {
+        at = Math.max(0, Math.min(steps.length - 1, i));
+        const s = steps[at];
+        lines.forEach((l) => l.classList.toggle('on', s.lines.includes(Number(l.dataset.ctLine))));
+        says.forEach((el, j) => (el.hidden = j !== at));
+        shots.forEach((img) => img.classList.toggle('on', Number(img.dataset.ctShot) === s.shot));
+        dots.forEach((d, j) => (j === at ? d.setAttribute('aria-current', 'step') : d.removeAttribute('aria-current')));
+        if (consoleBox) {
+          consoleBox.replaceChildren(Object.assign(document.createElement('span'), { className: 'ct-console-k', textContent: 'Console' }));
+          for (const line of s.console) consoleBox.append(Object.assign(document.createElement('span'), { textContent: line }));
+        }
+        count.textContent = `Step ${at + 1} of ${steps.length}`;
+        prev.disabled = at === 0;
+        next.disabled = at === steps.length - 1;
+        // keep the lit lines in view inside the code box (not the page)
+        const first = lines.find((l) => l.classList.contains('on'));
+        if (first) code.scrollTo({ top: Math.max(0, first.offsetTop - 56), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      };
+      prev.addEventListener('click', () => show(at - 1));
+      next.addEventListener('click', () => show(at + 1));
+      dots.forEach((d, j) => d.addEventListener('click', () => show(j)));
+      root.addEventListener('keydown', (e) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); show(at + 1); }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); show(at - 1); }
+      });
+      all.addEventListener('click', () => {
+        list.hidden = !list.hidden;
+        all.setAttribute('aria-expanded', String(!list.hidden));
+        all.textContent = list.hidden ? 'Show every step' : 'Hide the list';
+      });
+      show(0);
+    });
+  wire();
+  document.addEventListener('astro:page-load', wire);
+</script>
+
+<style>
+  .ct { margin: 24px 0 34px; display: grid; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); overflow: hidden; box-shadow: 0 18px 40px -34px rgb(0 0 0 / 0.5); }
+  .ct-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .ct-logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: #fff; box-shadow: 0 0 0 1px var(--line); }
+  .ct-logo img { width: 18px; height: 18px; }
+  .ct-file { font-size: 12.5px; color: var(--text); padding: 3px 9px; border-radius: 6px; background: var(--code-bg); border: 1px solid var(--line); }
+  .ct-title { font-size: 14.5px; color: var(--text); }
+  .ct-count { margin-left: auto; font-size: 12px; color: var(--text-2); }
+
+  .ct-body { display: grid; min-width: 0; }
+  @media (min-width: 900px) { .ct-body { grid-template-columns: minmax(0, 1fr) 272px; } }
+  /* the code box fills its row (as tall as the phone beside it) and scrolls inside */
+  .ct-codewrap { position: relative; min-width: 0; height: 380px; background: var(--code-bg); }
+  @media (min-width: 900px) { .ct-codewrap { height: auto; min-height: 470px; } }
+  .ct-nophone .ct-codewrap { height: auto; min-height: 0; }
+  .ct-code { position: absolute; inset: 0; margin: 0; overflow: auto; padding: 12px 0; background: var(--code-bg); font: 13px/1.75 var(--font-mono); color: var(--cm-var); }
+  .ct-nophone .ct-code { position: relative; max-height: 470px; }
+  .ct-code:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
+  .ct-l { display: block; padding: 0 16px 0 0; white-space: pre; border-left: 3px solid transparent; transition: background-color 0.25s, opacity 0.25s, border-color 0.25s; }
+  .ct-l i { display: inline-block; width: 3em; padding-right: 0.6em; text-align: right; font-style: normal; color: var(--text-3); user-select: none; }
+  .ct-mark { display: inline-block; width: 1.4em; font-weight: 700; color: var(--ok); user-select: none; }
+  .ct-l.add { background: color-mix(in oklab, var(--ok) 7%, transparent); }
+  .ct-code:has(.ct-l.on) .ct-l:not(.on) { opacity: 0.6; }
+  .ct-l.on { opacity: 1; border-left-color: var(--accent); background: color-mix(in oklab, var(--accent) 16%, transparent); }
+  .ct-l.on i { color: var(--accent-text); font-weight: 700; }
+
+  .ct-phone { display: grid; gap: 8px; align-content: start; justify-items: center; padding: 14px 14px 16px; border-left: 1px solid var(--line); background: color-mix(in oklab, var(--bg-2) 70%, var(--surface)); }
+  @media (max-width: 899px) { .ct-phone { border-left: 0; border-top: 1px solid var(--line); } }
+  .ct-k { margin: 0 !important; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-text); }
+  .ct-device { display: grid; width: 214px; }
+  .ct-device img { grid-area: 1 / 1; width: 100%; height: auto; opacity: 0; transform: scale(0.98); transition: opacity 0.35s var(--ease-out), transform 0.35s var(--ease-out); }
+  .ct-device img.on { opacity: 1; transform: none; }
+  .ct-console { width: 100%; display: grid; gap: 2px; min-height: 64px; padding: 8px 10px; border-radius: 10px; background: #0b0f17; color: #cbd5e1; font: 11.5px/1.5 var(--font-mono); overflow-wrap: anywhere; }
+  .ct-console :global(.ct-console-k) { color: #64748b; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .ct-explain { display: grid; padding: 18px clamp(16px, 2.6vw, 26px) 6px; border-top: 1px solid var(--line); }
+  /* every step's text sits in the same cell: the panel keeps the height of the longest, so the page never jumps */
+  .ct-say { grid-area: 1 / 1; display: grid; gap: 8px; align-content: start; }
+  .ct-say[hidden] { display: grid; visibility: hidden; }
+  .ct-now { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 !important; font-size: 12px; font-weight: 700; color: var(--accent-text); letter-spacing: 0.03em; }
+  .ct-tool { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 4px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font-weight: 600; letter-spacing: 0; }
+  .ct-tool img { padding: 2px; border-radius: 50%; background: #fff; }
+  .ct-h { margin: 0 !important; font-size: 1.22rem; line-height: 1.3; letter-spacing: -0.01em; color: var(--text); }
+  .ct-text { display: grid; gap: 8px; max-width: 92ch; }
+  .ct-text :global(p) { margin: 0 !important; font-size: 15.5px; line-height: 1.7; color: var(--text); }
+  .ct-text :global(ul) { margin: 0 !important; padding-left: 1.25em !important; display: grid; gap: 4px; }
+  .ct-text :global(li) { margin: 0 !important; font-size: 15px; line-height: 1.6; color: var(--text); }
+  .ct-text :global(li::marker) { color: var(--accent-text); }
+  .ct-onphone { margin: 2px 0 0 !important; padding: 8px 12px; border-radius: 10px; background: color-mix(in oklab, var(--accent) 10%, transparent); font-size: 14px; line-height: 1.55; color: var(--text); }
+  .ct-text :global(code), .ct-h :global(code), .ct-onphone :global(code), .ct-list :global(code) { font-size: 0.88em; }
+
+  .ct-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 12px clamp(16px, 2.6vw, 26px) 16px; }
+  .ct-dots { display: flex; gap: 6px; flex: 1; justify-content: center; min-width: 80px; }
+  .ct-dot { width: 9px; height: 9px; padding: 0; border: 0; border-radius: 50%; background: var(--line-2); cursor: pointer; transition: transform 0.2s, background 0.2s; }
+  .ct-dot[aria-current='step'] { background: var(--accent); transform: scale(1.25); }
+  .ct-dot:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .ct-all { border: 0; background: none; padding: 4px 2px; color: var(--accent-text); font: 600 13px var(--font-body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  @media (max-width: 560px) { .ct-dots { order: 3; flex-basis: 100%; } }
+  .ct-list { margin: 0 !important; padding: 14px 20px 18px 40px !important; border-top: 1px solid var(--line); display: grid; gap: 12px; color: var(--text); }
+  .ct-list li { margin: 0 !important; display: grid; gap: 4px; }
+  .ct-list .mono { font-size: 12px; color: var(--text-2); }
+  .ct-list :global(p) { margin: 0 !important; font-size: 14.5px; line-height: 1.6; }
+  .ct-list :global(ul) { margin: 0 !important; padding-left: 1.2em !important; }
+  @media (prefers-reduced-motion: reduce) { .ct-l, .ct-device img, .ct-dot { transition: none; } }
+</style>
