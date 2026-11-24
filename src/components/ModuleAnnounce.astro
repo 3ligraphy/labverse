@@ -40,7 +40,7 @@ const { module, color = '#7cb1ff' } = Astro.props;
 
 <script>
   import { onPageLoad } from '@/scripts/page-load';
-  type Banner = { id: string; title: string; message: string; ctaLabel: string; ctaHref: string };
+  type Banner = { id: string; title: string; message: string; ctaLabel: string; ctaHref: string; updated_at?: string };
   onPageLoad(async () => {
     const bar = document.querySelector<HTMLElement>('[data-mann]');
     if (!bar || bar.dataset.wired) return;
@@ -49,7 +49,9 @@ const { module, color = '#7cb1ff' } = Astro.props;
     const data = await fetch(`/api/platform/banner?module=${encodeURIComponent(module)}`).then((response) => response.ok ? response.json() : null).catch(() => null);
     const banner = data?.banner as Banner | null;
     if (!banner) return;
-    try { if (localStorage.getItem(`module-banner:dismissed:${banner.id}`)) return; } catch { /* private mode */ }
+    // a dismissed banner stays dismissed until staff change it: an edited banner (new text) is shown again
+    const dismissed = `module-banner:dismissed:${banner.id}:${banner.updated_at ?? ''}`;
+    try { if (localStorage.getItem(dismissed)) return; } catch { /* private mode */ }
     bar.querySelector('[data-mann-title]')!.textContent = banner.title;
     bar.querySelector('[data-mann-message]')!.textContent = banner.message;
     const link = bar.querySelector<HTMLAnchorElement>('[data-mann-cta]')!;
@@ -57,7 +59,7 @@ const { module, color = '#7cb1ff' } = Astro.props;
     bar.dataset.id = banner.id;
     bar.hidden = false;
     bar.querySelector('[data-mann-close]')!.addEventListener('click', () => {
-      try { localStorage.setItem(`module-banner:dismissed:${banner.id}`, '1'); } catch { /* private mode */ }
+      try { localStorage.setItem(dismissed, '1'); } catch { /* private mode */ }
       bar.classList.add('out');
       setTimeout(() => (bar.hidden = true), 220);
     });
