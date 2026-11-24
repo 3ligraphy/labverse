@@ -80,17 +80,17 @@ test('every code walk-through shows a real project file and points at lines that
   }
 });
 
-test('the downloads exist: the starter project and four QR codes', () => {
-  const dir = new URL('../public/labs/lab-07/', import.meta.url);
-  const zip = new URL('smart-qr-starter.zip', dir);
+test('the starter project is downloadable (to run Smart QR on a computer later)', () => {
+  const zip = new URL('../public/labs/lab-07/smart-qr-starter.zip', import.meta.url);
   assert.ok(existsSync(zip));
   assert.ok(statSync(zip).size < 1024 * 1024, 'the starter is under 1 MB');
   assert.match(mdx, /\(\/labs\/lab-07\/smart-qr-starter\.zip\)/);
-  for (const qr of ['qr-website', 'qr-wifi', 'qr-text', 'qr-email']) {
-    const svg = readFileSync(new URL(`${qr}.svg`, dir), 'utf8');
-    assert.match(svg, /^<svg [^>]*viewBox="0 0 (\d+) \1"/, `${qr} is a square SVG`);
-    assert.ok(mdx.includes(`/labs/lab-07/${qr}.svg`), `${qr} is on the page`);
-  }
+});
+
+test('nothing to install: no task asks for a terminal, an emulator, Java or an account on the lab PC', () => {
+  assert.doesNotMatch(mdx, /<Task /, 'no hands-on task outside the page');
+  assert.match(mdx, /Nothing to install/);
+  for (const id of ['lab-07--unit-tests', 'lab-07--component-tests', 'lab-07--maestro-run', 'lab-07--eas-config']) assert.ok(mdx.includes(`<Exercise id="${id}" />`), `${id} runs in the browser`);
 });
 
 test('no Expo account, project id or personal data in the lab', () => {

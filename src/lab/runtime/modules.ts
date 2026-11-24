@@ -85,7 +85,16 @@ function missingImport(name: string) {
 }
 const SHADOWED = ['Text', 'Image'] as const;
 
-export function createModuleSystem(builtins: Builtins, files: Record<string, string>) {
+/**
+ * Test runs (Lab 07): `globals` are extra names every file sees (describe, test, expect, jest…); `mock` is asked first
+ * for every import, so `jest.mock('expo-camera', …)` can hand a fake package to the files under test.
+ */
+export type ModuleOptions = {
+  globals?: Record<string, unknown>;
+  mock?: (spec: string, from: string) => { found: true; value: unknown } | { found: false };
+};
+
+export function createModuleSystem(builtins: Builtins, files: Record<string, string>, options: ModuleOptions = {}) {
   const cache = new Map<string, { exports: Record<string, unknown> }>();
   const shadows = SHADOWED.map(missingImport);
   // stops a loop that never ends (see compile.ts) instead of freezing the preview
@@ -102,6 +111,8 @@ export function createModuleSystem(builtins: Builtins, files: Record<string, str
 
   function requireFrom(from: string) {
     return (spec: string): unknown => {
+      const mocked = options.mock?.(spec, from);
+      if (mocked?.found) return mocked.value;
       if (own(builtins, spec)) return builtins[spec];
       if (/\.(css|scss|sass)$/.test(spec)) return {};
       if (spec.startsWith('@expo-google-fonts/')) return googleFontsModule();
@@ -135,8 +146,9 @@ export function createModuleSystem(builtins: Builtins, files: Record<string, str
   function run(path: string, code: string, module: { exports: Record<string, unknown> }) {
     // `localStorage`: the sandboxed preview has none; this is the one `import 'expo-sqlite/localStorage/install'` adds on a phone
     // `__DEV__`: true, like an app started with `npx expo start` (in Expo Go or a development build)
-    const factory = new Function('require', 'module', 'exports', '__labLoop', 'process', 'localStorage', '__DEV__', ...SHADOWED, `${code}\n//# sourceURL=lab:///${path}`);
-    factory(requireFrom(path), module, module.exports, loopGuard, process, localStoragePolyfill, true, ...shadows);
+    const names = Object.keys(options.globals ?? {});
+    const factory = new Function('require', 'module', 'exports', '__labLoop', 'process', 'localStorage', '__DEV__', ...SHADOWED, ...names, `${code}\n//# sourceURL=lab:///${path}`);
+    factory(requireFrom(path), module, module.exports, loopGuard, process, localStoragePolyfill, true, ...shadows, ...names.map((n) => options.globals![n]));
   }
 
   return {

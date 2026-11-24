@@ -1,7 +1,7 @@
 ---
 number: 7
 title: 'Hardware, Testing and Deployment — Camera, Haptics, Jest, Maestro and EAS'
-description: 'Build a Smart QR Scanner with the phone’s hardware: the camera permission, reading QR codes with expo-camera, the front and back camera, and vibration feedback with expo-haptics. Then test it on three levels — Jest unit tests, React Native Testing Library component tests and a Maestro end-to-end flow — and turn it into an installable app with EAS Build, then learn EAS Submit and EAS Update. Real screenshots from an Android phone emulator, real terminal output, and 17 checked exercises.'
+description: 'Build a Smart QR Scanner with the phone’s hardware: the camera permission, reading QR codes with expo-camera, the front and back camera, and vibration feedback with expo-haptics. Then test it on three levels — Jest unit tests, React Native Testing Library component tests and a Maestro end-to-end flow — and turn it into an installable app with EAS Build, then learn EAS Submit and EAS Update. Everything runs in the browser, nothing to install: the code, the phone, the tests (Run tests) and the Maestro flows (Run flow). Real screenshots and terminal output from a phone and a computer, and 21 checked exercises.'
 difficulty: Intermediate
 estimatedTime: '2 h 25 min'
 skills: [expo-camera, Permissions, QR codes, expo-haptics, Jest, React Native Testing Library, Maestro, EAS Build, EAS Submit, EAS Update]
@@ -15,60 +15,43 @@ objectives:
   - Explain unit, component and end-to-end tests, and choose the right one for a bug
   - Write and run Jest unit tests and React Native Testing Library component tests, with fake packages (jest.mock)
   - Read a failing test — the test name, the Expected / Received difference and the code frame
-  - Write a Maestro flow and run it on the Android emulator
-  - Configure EAS Build profiles in eas.json, build an installable APK, and explain APK and AAB and app signing
+  - Write a Maestro flow and run it on a phone
+  - Give the app its id and configure EAS Build profiles in eas.json, and explain APK and AAB and app signing
   - Explain EAS Submit and EAS Update, and choose between an update and a new build
 prerequisites:
   - 'Labs 01–06: components, props, useState, useEffect, async / await'
-  - 'A lab PC with Node.js 22.13 or newer, VS Code and the Android emulator — or your own phone with Expo Go'
-  - 'For Part 7: Java 17 or newer (Android Studio already has one)'
-  - 'For Part 9: a free Expo account (sign up at expo.dev)'
+  - 'A computer with a browser (Chrome or Edge). Nothing to install: the editor, the phone, the tests and the Maestro flows all run on this page'
 expectedResult:
-  description: 'The Smart QR Scanner on your phone: it asks for the camera, reads a QR code once, shows what is inside it with a vibration, flips the camera, and never shows a Wi-Fi password. 12 Jest tests pass, the Maestro flow passes, and an EAS preview build gives you an APK to install.'
-  screen: ['Smart QR · Start scanning', 'Camera permission needed · Allow camera', 'Point the camera at a QR code', '✓ WEBSITE · https://expo.dev · Open link · Scan again', 'Tests: 12 passed, 12 total', 'expo.dev: Build artifact APK · Succeeded']
+  description: 'The Smart QR Scanner on the lab phone: it asks for the camera, reads a QR code once, shows what is inside it with a vibration, flips the camera, and never shows a Wi-Fi password. Run tests passes 13 tests, Run flow passes the Maestro flow, and app.json and eas.json are ready for an EAS build.'
+  screen: ['Smart QR · Start scanning', 'Camera permission needed · Allow camera', 'Point the camera at a QR code', '✓ WEBSITE · https://expo.dev · Open link · Scan again', 'Tests: 13 passed, 13 total', 'Take screenshot scan-result... COMPLETED']
 troubleshooting:
   - problem: 'The camera opens but shows “Camera error: Camera permission is not granted”'
     cause: 'The screen shows CameraView before the user allowed the camera.'
     solution: 'Check the permission first: `if (!permission) …` (loading), `if (!permission.granted) …` (ask), and only then `<CameraView />` (Part 4, Step A).'
   - problem: 'Allow camera does nothing, and no dialog appears'
     cause: 'The user refused twice before, so the phone no longer asks (`canAskAgain` is false) — or the button does not call `requestPermission`.'
-    solution: 'Show **Open settings** (`Linking.openSettings()`) when `canAskAgain` is false. To start again on a phone: Settings → Apps → Expo Go → Permissions → Camera.'
-  - problem: 'The camera preview is black on the Android emulator'
-    cause: 'The emulator’s camera is set to None.'
-    solution: 'Device Manager → the emulator’s ⋮ menu → Edit → Advanced settings → Back camera: VirtualScene (a 3-D room) or Webcam0. Or press **Use sample QR**, which needs no camera.'
-  - problem: 'handleScan runs again and again for one QR code'
+    solution: 'Show **Open settings** (`Linking.openSettings()`) when `canAskAgain` is false. On the lab phone, Open settings opens a Settings page where the camera can be allowed again.'
+  - problem: 'handleScan runs again and again for one QR code (several Scanned: lines)'
     cause: 'The camera calls onBarcodeScanned for every frame that shows the code.'
     solution: 'Add the lock: `const locked = useRef(false);`, then `if (locked.current) return; locked.current = true;` in handleScan, and `locked.current = false;` in scanAgain.'
-  - problem: 'No vibration on an iPhone'
+  - problem: 'Run tests: “Unable to find an element with text: …”'
+    cause: 'The words differ from the screen (a getBy query needs the whole text), or the element appears a moment later.'
+    solution: 'Copy the text from the phone exactly. For something that appears after a press, use `await screen.findByText(…)`: it waits.'
+  - problem: 'Run tests: “Matcher error: received value must be a mock function”'
+    cause: 'toHaveBeenCalledWith was used on a real function: the package was not replaced by a mock.'
+    solution: "Add `jest.mock('expo-haptics');` at the top of the test file, or check a `jest.fn()`."
+  - problem: 'Check says “Your tests still pass on a broken …”'
+    cause: 'The test runs the code but does not check the part that broke.'
+    solution: "Expect the exact value: `toEqual` the whole object, `toBe('wifi')` for the kind, `toHaveBeenCalledWith(…Error)` for the vibration."
+  - problem: 'Run flow: “Element not found: Text matching regex: …”'
+    cause: 'Maestro matches the whole text of an element, and the words or letters differ.'
+    solution: 'Use the exact text from the screen, or tap by id: `- tapOn: { id: "sample-scan" }`.'
+  - problem: 'app.json or eas.json “is not valid JSON”'
+    cause: 'A missing comma or quote, or a comma after the last item.'
+    solution: 'Every key and text in double quotes; a comma between items, none after the last one.'
+  - problem: 'No vibration on an iPhone (in a real app)'
     cause: 'iPhones turn haptics off while the camera is active, in Low Power Mode, and when System Haptics is off.'
-    solution: 'Play the vibration after the camera closes (Smart QR does it in ResultCard), and check Low Power Mode and Settings → Sounds & Haptics → System Haptics.'
-  - problem: 'VS Code underlines describe, test or expect: “Cannot find name”'
-    cause: 'TypeScript does not load Jest’s types.'
-    solution: 'Install `@types/jest` and add `"types": ["jest"]` to `compilerOptions` in tsconfig.json.'
-  - problem: 'Jest fails with “Cannot find module test-renderer”'
-    cause: 'React Native Testing Library 14 needs the `test-renderer` package next to it.'
-    solution: '`npm install --save-dev test-renderer`'
-  - problem: '`npm install` prints “install-scripts … @parcel/watcher … blocked”'
-    cause: 'Newer npm versions ask before running install scripts. This package already comes ready-made for Windows.'
-    solution: 'Nothing to do: the project runs and the tests pass. Read the warning, do not approve scripts you do not know.'
-  - problem: 'Expo Go on the emulator: “Failed to download remote update”'
-    cause: 'The emulator cannot reach the dev server at the address in the link.'
-    solution: 'Run `adb reverse tcp:8081 tcp:8081`, then open `exp://127.0.0.1:8081` (or press `a` in the Expo terminal again).'
-  - problem: '“maestro is not recognized as an internal or external command”'
-    cause: 'Maestro’s bin folder is not on the PATH, or the terminal was opened before you changed it.'
-    solution: 'Close and open the terminal after `setx`. Check with `maestro --version`.'
-  - problem: 'Maestro says Java is missing, or JAVA_HOME is not set'
-    cause: 'Maestro needs Java 17 or newer.'
-    solution: 'Use the Java inside Android Studio: `$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"` and `$env:Path = "$env:JAVA_HOME\bin;$env:Path"`, then `java -version`.'
-  - problem: 'Maestro: “Element not found: Text matching regex: Start scanning”'
-    cause: 'The app never opened: the Expo server is not running, or APP_URL is wrong.'
-    solution: 'Keep `npx expo start` running, run `adb reverse tcp:8081 tcp:8081`, and pass `-e APP_URL=exp://127.0.0.1:8081`.'
-  - problem: '“eas is not recognized” or “eas: command not found”'
-    cause: 'EAS CLI is not installed globally, or the terminal was opened before.'
-    solution: '`npm install --global eas-cli`, open a new terminal, then `eas --version`.'
-  - problem: 'The APK does not install on the phone'
-    cause: 'Android blocks apps from unknown sources, or an older Smart QR with another signature is installed.'
-    solution: 'Allow your browser to install apps (Settings → Apps → Special app access → Install unknown apps), and uninstall the old Smart QR first.'
+    solution: 'Play the vibration after the camera closes (Smart QR does it in ResultCard).'
 resources:
   - { label: 'Expo — Camera (expo-camera)', href: 'https://docs.expo.dev/versions/latest/sdk/camera/' }
   - { label: 'Expo — Haptics (expo-haptics)', href: 'https://docs.expo.dev/versions/latest/sdk/haptics/' }
@@ -155,45 +138,33 @@ The project, file by file. The files with a ★ are the ones you write in this l
 You know what Smart QR does, and which tool each part of the lab uses: two packages for the hardware, three tools for testing, three EAS services for deployment.
 </Checkpoint>
 
-<Part n="2" title="Set up the project" time="8 min" />
+<Part n="2" title="The project in your browser" time="8 min" />
 
-You start from a **starter project**: everything is there except the parts you write. Its packages are already listed in `package.json`, so one `npm install` gets them all.
+There is **nothing to install** in this lab. The whole Smart QR project runs on this page: each exercise shows the project’s files in an editor, and the phone next to it runs them. Your code is the same code a real Expo project runs on a phone; only the phone is a stand-in.
 
-<Task n="2.1" title="Download and start the project" time="4 min">
-
-1. Download **[smart-qr-starter.zip](/labs/lab-07/smart-qr-starter.zip)** and unzip it (right-click → Extract All).
-2. In VS Code: **File → Open Folder** → `smart-qr-scanner`. Open the terminal: **Terminal → New Terminal**.
-3. Run:
-
-<Terminal title="VS Code — Terminal" lines={[
-  '$ npm install',
-  '# a minute or two; a few warnings are normal',
-  '$ npx expo start',
-  'Starting Metro Bundler',
-  '[qr]',
-  '> › Metro waiting on exp://192.168.1.5:8081',
-  '› Scan the QR code above with Expo Go (Android) or the Camera app (iOS)',
-  '› Press a │ open Android',
-  '› Press r │ reload app',
-  '# Ctrl + C stops the server',
+<Cards cols={3} items={[
+  { tag: 'the same as a phone', icon: 'check', title: 'Your code', text: 'The same files, imports and packages (`expo-camera`, `expo-haptics`). What passes here runs unchanged in Expo Go.' },
+  { tag: 'a stand-in', icon: 'camera', title: 'The camera', text: 'A browser has no phone camera, so the camera shows **sample QR codes**: tap one to hold it in front of the camera. The permission dialog has the phone’s three buttons.' },
+  { tag: 'a stand-in', icon: 'phone', title: 'The vibration', text: 'A computer has no vibration motor, so each vibration shakes the phone and writes a line in the **Console** (`Haptics: notification success`).' },
 ]} />
 
-</Task>
+<Shot frame="phone" w={540} h={1202} src="/labs/lab-07/phone-home.webp" alt="Smart QR home screen in Expo Go on an Android phone emulator: the QR logo, Smart QR, Scan a QR code and feel the result, Start scanning" caption="The same project on a real Android phone (an emulator, in Expo Go). The files you write on this page run there unchanged." />
 
-<Explain parts={[['npm install', 'download every package listed in package.json into node_modules'], ['npx expo start', 'start the dev server: it sends your JavaScript to Expo Go'], ['exp://192.168.1.5:8081', 'the address of your PC on the Wi-Fi, port 8081 (yours is different)']]} />
+The tests and the end-to-end flows run here too. On a computer they need Node, Java and an Android emulator; on this page:
 
-<Task n="2.2" title="Open it on your phone or on the emulator" time="3 min">
+<Compare
+  title="On a computer, or on this page?"
+  a={{ name: 'On a computer', tag: 'installed tools' }}
+  b={{ name: 'On this page', tag: 'nothing to install' }}
+  rows={[
+    { label: 'Run the unit and component tests', a: '`npm test` in a terminal (Jest)', b: 'the **Run tests** button: the same test files, the same output' },
+    { label: 'Run a Maestro flow', a: '`maestro test flow.yaml` with an emulator open', b: 'the **Run flow** button: the same YAML, played on this page’s phone' },
+    { label: 'See the app', a: 'Expo Go on a phone, or the Android emulator', b: 'the phone next to the editor', better: 'b' },
+    { label: 'Build the app file (APK)', a: '`eas build` sends the project to Expo’s servers', b: 'you prepare `app.json` and `eas.json`; Part 9 shows a real build' },
+  ]}
+/>
 
-- **Your phone:** open **Expo Go** (same Wi-Fi as the PC) and scan the QR code. On an iPhone, scan it with the **Camera** app.
-- **The emulator:** start it from Android Studio’s Device Manager, then press `a` in the terminal.
-
-If the emulator shows **“Failed to download remote update”**, run `adb reverse tcp:8081 tcp:8081` and press `a` again.
-
-</Task>
-
-<Shot frame="phone" w={540} h={1202} src="/labs/lab-07/phone-home.webp" alt="Smart QR home screen in Expo Go on an Android emulator" caption="The starter works up to here. **Start scanning** opens a scanner that is not finished yet: you build it in Part 4." />
-
-Three ways to run an Expo app. You use the first now and the third in Part 9:
+Expo Go and builds still matter: they decide how an app reaches real phones (Part 8).
 
 <Compare
   title="Expo Go or your own build?"
@@ -204,11 +175,11 @@ Three ways to run an Expo app. You use the first now and the third in Part 9:
     { label: 'Native packages', a: 'Only the ones inside Expo Go (expo-camera and expo-haptics are)', b: 'Any package you add' },
     { label: 'app.json settings (icon, permission texts, plugins)', a: 'Not used: Expo Go has its own', b: 'Used', better: 'b' },
     { label: 'Your changes', a: 'Appear at once (Fast Refresh)', b: 'JavaScript: with an update. Native: a new build', better: 'a' },
-    { label: 'Share with others', a: 'They need your PC running', b: 'Install link, or the stores', better: 'b' },
+    { label: 'Share with others', a: 'They need your computer running', b: 'Install link, or the stores', better: 'b' },
   ]}
   picks={[
     { situation: 'You are writing the scanner and want to see each change in a second.', answer: 'a', why: 'Expo Go reloads your JavaScript at once.' },
-    { situation: 'A classmate at home wants to try your app.', answer: 'b', why: 'A build (an APK) runs without your PC.' },
+    { situation: 'A classmate at home wants to try your app.', answer: 'b', why: 'A build (an APK) runs without your computer.' },
     { situation: 'You want your own text in the iPhone camera dialog.', answer: 'b', why: 'Permission texts come from app.json plugins, which only your own build uses.' },
   ]}
 />
@@ -247,7 +218,7 @@ The files that are already finished. Read them once — every screen uses them:
 <Exercise id="lab-07--expo-go-predict" />
 
 <Checkpoint>
-The starter runs on your phone or emulator, and you know which settings Expo Go uses and which ones need your own build.
+You know what runs on this page and what is a stand-in, and which settings Expo Go uses and which ones need your own build.
 </Checkpoint>
 
 <Part n="3" title="Camera and haptics: how they work" time="12 min" />
@@ -331,10 +302,7 @@ You can name the three permission states, the four CameraView props Smart QR use
 
 <Part n="4" title="Build the scanner" time="30 min" />
 
-You build `ScannerScreen.tsx` and `feedback.ts` in **four steps**. Each step works the same way:
-
-1. Solve it **here** in the editor: press **Check** until every line is green.
-2. Copy the same lines into **your project** in VS Code, save, and try it on your phone (real camera, real vibration).
+You build `ScannerScreen.tsx` and `feedback.ts` in **four steps**, each one in the editor below it: write the code, try it on the phone, and press **Check** until every line is green. Each step starts where the last one ended.
 
 First, the three files the scanner uses. They are finished:
 
@@ -377,12 +345,6 @@ First, the three files the scanner uses. They are finished:
 
 <Exercise id="lab-07--step-a-permission" />
 
-<Task n="4.1" title="Step A on your phone" time="2 min">
-
-Copy your Step A lines into `src/screens/ScannerScreen.tsx` in VS Code and save. On the phone: **Start scanning** → **Allow camera** → **While using the app**. The real camera opens.
-
-</Task>
-
 ### Step B · Read a code, once
 
 <Demo id="scan-lock" />
@@ -405,21 +367,6 @@ Copy your Step A lines into `src/screens/ScannerScreen.tsx` in VS Code and save.
 ### Step D · Flip the camera
 
 <Exercise id="lab-07--step-d-flip" />
-
-<Task n="4.2" title="The whole scanner on your phone" time="3 min">
-
-Copy Steps B, C and D into your project. Then scan these codes from this page with your phone (open the page on the PC screen):
-
-<div className="qr-codes" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', margin: '14px 0' }}>
-  <figure style={{ margin: 0, textAlign: 'center' }}><img src="/labs/lab-07/qr-website.svg" alt="QR code with the website https://expo.dev" width="150" height="150" style={{ borderRadius: '8px' }} /><figcaption>Website</figcaption></figure>
-  <figure style={{ margin: 0, textAlign: 'center' }}><img src="/labs/lab-07/qr-wifi.svg" alt="QR code with a Wi-Fi network called Lab-5G and its password" width="150" height="150" style={{ borderRadius: '8px' }} /><figcaption>Wi-Fi</figcaption></figure>
-  <figure style={{ margin: 0, textAlign: 'center' }}><img src="/labs/lab-07/qr-text.svg" alt="QR code with the text Room 3.12" width="150" height="150" style={{ borderRadius: '8px' }} /><figcaption>Text</figcaption></figure>
-  <figure style={{ margin: 0, textAlign: 'center' }}><img src="/labs/lab-07/qr-email.svg" alt="QR code with the email address ta@example.com" width="150" height="150" style={{ borderRadius: '8px' }} /><figcaption>Email</figcaption></figure>
-</div>
-
-You should feel one vibration per code. On the emulator there is no paper to scan: use **Use sample QR**.
-
-</Task>
 
 The finished screen, line by line:
 
@@ -473,22 +420,22 @@ For any bug you can say which test sees it first: a unit test, a component test,
 
 <Part n="6" title="Unit and component tests" time="25 min" />
 
-### A · How Jest is set up
+### A · How a project gets Jest
 
-The starter already has Jest. In a new Expo project you would install it with these commands (from Expo’s guide; on macOS and Linux leave out the quotes around `--`):
+On a computer, a new Expo project gets its test tools with these commands (from Expo’s guide; on macOS and Linux leave out the quotes around `--`). On this page they are ready: the **Run tests** button does what `npm test` does.
 
-<Terminal title="A new project — set up the tests (Windows)" lines={[
+<Terminal title="A new project on a computer — set up the tests (Windows)" lines={[
   '$ npx expo install jest-expo jest @types/jest "--" --dev',
   '$ npx expo install @testing-library/react-native "--" --dev',
   '$ npm install --save-dev test-renderer',
-  '# if a package lands under "dependencies" instead of "devDependencies", it still works',
+  '# then npm test runs every file in __tests__/',
 ]} />
 
 <CodeWalk file="package.json" code={P.PACKAGE_JSON} steps={[
   { lines: [5, 12], text: '**dependencies**: what the app needs on the phone. `expo-camera` and `expo-haptics` are here.' },
-  { lines: [13, 21], text: '**devDependencies**: tools used only on your PC. They never go into the app.' },
+  { lines: [13, 21], text: '**devDependencies**: tools used only on a computer. They never go into the app.' },
   { lines: 14, text: 'React Native Testing Library: draws components in tests.' },
-  { lines: 15, text: 'The TypeScript types of Jest, so VS Code knows `describe`, `test` and `expect`.' },
+  { lines: 15, text: 'The TypeScript types of Jest, so the editor knows `describe`, `test` and `expect`.' },
   { lines: [17, 18], text: 'Jest itself, and `jest-expo`: Jest’s settings for Expo projects.' },
   { lines: 19, text: '`test-renderer`: what React Native Testing Library 14 uses to draw components without a phone.' },
   { lines: 27, text: '`npm test` runs `jest` once: every test, then a summary.' },
@@ -518,61 +465,15 @@ A test file has three words: `describe` groups tests, `test` is one test with a 
   { lines: 35, text: '`\'x\'.repeat(501)`: a text of 501 x’s, one more than the limit.' },
 ]} />
 
-<Task n="6.1" title="Run the tests" time="2 min">
+Run it. The output is the one `npm test` prints on a computer:
 
-In the VS Code terminal (stop Expo with Ctrl + C, or open a second terminal with **+**):
-
-<Terminal title="VS Code — Terminal" lines={[
-  '$ npx jest __tests__/parseScan-test.ts --verbose',
-  'PASS __tests__/parseScan-test.ts',
-  '  parseScan',
-  '    √ a website link is a website (2 ms)',
-  '    √ email and phone codes are recognized (1 ms)',
-  '    √ anything else is plain text',
-  '    √ spaces around the code are removed (1 ms)',
-  '    √ a very long code is an error',
-  '',
-  'Test Suites: 1 passed, 1 total',
-  'Tests:       5 passed, 5 total',
-]} />
-
-Your starter has 5 unit tests: two are still **TODO** comments. (`npm test` runs every test file; `npx jest <file>` runs one.)
-
-</Task>
-
-<Task n="6.2" title="Write the two missing unit tests" time="6 min">
-
-In `__tests__/parseScan-test.ts`, replace the two **TODO** comments with tests: a Wi-Fi code is a Wi-Fi network, and an empty code is an error (three inputs: `''`, `'    '` and `null`). Run `npm test`: 7 unit tests pass.
-
-<Hints hints={[
-  'Copy the shape of the first test: `test(\'…\', () => { const result = parseScan(…); expect(…)…; });`',
-  'Wi-Fi: check `result.ok` with `toBe(true)`, then `result.kind` with `toBe(\'wifi\')` inside `if (result.ok)`.',
-  'Empty: `expect(parseScan(\'\')).toEqual({ ok: false, error: \'This QR code is empty.\' });` and the same for the other two inputs.',
-]}>
-
-```ts
-test('a Wi-Fi code is a Wi-Fi network', () => {
-  const result = parseScan('WIFI:S:Lab-5G;T:WPA;P:secret123;;');
-  expect(result.ok).toBe(true);
-  if (result.ok) expect(result.kind).toBe('wifi');
-});
-
-test('an empty code is an error', () => {
-  expect(parseScan('')).toEqual({ ok: false, error: 'This QR code is empty.' });
-  expect(parseScan('    ')).toEqual({ ok: false, error: 'This QR code is empty.' });
-  expect(parseScan(null)).toEqual({ ok: false, error: 'This QR code is empty.' });
-});
-```
-
-</Hints>
-
-</Task>
+<Demo id="unit-tests-run" />
 
 ### C · Read a failing test
 
-A failing test is not bad news: it shows exactly where the code and the test disagree. This is real output after one word of a test was changed:
+A failing test is not bad news: it shows exactly where the code and the test disagree. This is real output from a computer, after one word of a test was changed:
 
-<Terminal title="VS Code — Terminal" lines={[
+<Terminal title="npm test on a computer" lines={[
   '$ npm test',
   '! FAIL __tests__/parseScan-test.ts',
   '  ● parseScan › an empty code is an error',
@@ -606,15 +507,13 @@ A failing test is not bad news: it shows exactly where the code and the test dis
 
 <Exercise id="lab-07--jest-failure" />
 
-<Task n="6.3" title="Break a test on purpose, then fix it" time="2 min">
+Now write tests yourself. **Check** runs them twice: on the real `parseScan` (they must pass) and on a broken copy of it (they must fail — a test that cannot see the bug is no help).
 
-In your new “empty code” test, change `'This QR code is empty.'` to `'The code is empty.'` in the first line. Run `npm test` and find the three parts above in your own output. Then change it back: all tests pass again.
-
-</Task>
+<Exercise id="lab-07--unit-tests" />
 
 ### D · Component tests: one screen
 
-A component test draws **one screen** on your PC, with **fakes** for what a PC does not have: a camera and a vibration motor. `jest.mock` swaps a package for a fake one in one test file.
+A component test draws **one screen**, with **fakes** for what a computer does not have: a camera and a vibration motor. `jest.mock` swaps a package for a fake one in one test file.
 
 <CodeWalk file="test-utils/fakeCamera.tsx" code={P.FAKE_CAMERA} steps={[
   { lines: 3, text: 'This file pretends to be `expo-camera` in the tests. It exports the same names the scanner imports.' },
@@ -644,101 +543,29 @@ A component test draws **one screen** on your PC, with **fakes** for what a PC d
 
 <Exercise id="lab-07--test-order" />
 
-<Task n="6.4" title="Write the two missing component tests" time="7 min">
+<Exercise id="lab-07--component-tests" />
 
-In `__tests__/ScannerScreen-test.tsx`, replace the two **TODO** comments: (1) when the phone will not ask again, the screen shows **Open settings** and no **Allow camera**; (2) an empty code shows “This QR code is empty.” and the **Error** vibration. Part 4 must be finished for these tests to pass.
-
-<Hints hints={[
-  'Test 1: `givePermission({ granted: false, canAskAgain: false });` then render. Use `getByRole` for the button that must be there and `queryByRole` for the one that must not.',
-  '“Not there” is `expect(screen.queryByRole(…)).not.toBeOnTheScreen();`',
-  'Test 2 is the website test with `fake-scan-empty`, the text `This QR code is empty.` and `NotificationFeedbackType.Error`.',
-]}>
-
-```tsx
-test('sends the user to the settings when the phone will not ask again', async () => {
-  givePermission({ granted: false, canAskAgain: false });
-  await render(<ScannerScreen onBack={jest.fn()} />);
-
-  expect(screen.getByRole('button', { name: 'Open settings' })).toBeOnTheScreen();
-  expect(screen.queryByRole('button', { name: 'Allow camera' })).not.toBeOnTheScreen();
-});
-
-test('an empty code shows an error and the error vibration', async () => {
-  givePermission({ granted: true, canAskAgain: true });
-  await render(<ScannerScreen onBack={jest.fn()} />);
-
-  const user = userEvent.setup();
-  await user.press(screen.getByTestId('fake-scan-empty'));
-
-  expect(await screen.findByText('This QR code is empty.')).toBeOnTheScreen();
-  expect(Haptics.notificationAsync).toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Error);
-});
-```
-
-</Hints>
-
-</Task>
-
-All tests together:
-
-<Terminal title="VS Code — Terminal" lines={[
-  '$ npm test',
-  '  console.log',
-  '    Scanned: https://expo.dev',
-  '',
-  '      at log (src/screens/ScannerScreen.tsx:25:13)',
-  '',
-  'Test Suites: 2 passed, 2 total',
-  '> Tests:       12 passed, 12 total',
-  'Snapshots:   0 total',
-  'Time:        3.258 s',
-]} />
-
-Jest also prints the `console.log` lines your code wrote while the tests ran, with the file and the line.
+The runner also prints the `console.log` lines your code wrote while the tests ran (`Scanned: https://expo.dev`), with the file and the line, as Jest does.
 
 <Checkpoint>
-`npm test` shows 12 passed tests: 7 unit tests for parseScan and 5 component tests for the scanner, with a fake camera and fake haptics.
+**Run tests** shows 12 passed tests: 7 unit tests for parseScan and 5 component tests for the scanner, with a fake camera and fake haptics — and each new test fails on the bug it was written for.
 </Checkpoint>
 
 <Part n="7" title="Maestro: test the whole journey" time="15 min" />
 
-Maestro drives the **real app** on the emulator: it taps what a user taps and checks what a user sees. A test is a **flow**: a YAML file (a text format of `name: value` lines and `-` lists). Maestro finds elements by their **text** or by their **id** (your `testID`).
+Maestro drives the **real app**: it taps what a user taps and checks what a user sees. A test is a **flow**: a YAML file (a text format of `name: value` lines and `-` lists). Maestro finds elements by their **text** or by their **id** (your `testID`).
 
-<Task n="7.1" title="Install Maestro (Windows)" time="4 min">
-
-1. Check Java (Maestro needs 17 or newer): `java -version`. If it is missing, use the one inside Android Studio, in this terminal:
-
-<Terminal title="PowerShell" lines={[
-  '$ $env:JAVA_HOME = "C:\\Program Files\\Android\\Android Studio\\jbr"',
-  '$ $env:Path = "$env:JAVA_HOME\\bin;$env:Path"',
-  '$ java -version',
-  'openjdk version "25.0.3" 2026-04-21',
-  '# any version 17 or newer works',
-]} />
-
-2. Download **maestro.zip** from [github.com/mobile-dev-inc/maestro/releases](https://github.com/mobile-dev-inc/maestro/releases/latest) and extract it to `C:\maestro` (so that `C:\maestro\bin\maestro.bat` exists).
-3. Add it to the PATH, then open a **new** terminal:
-
-<Terminal title="PowerShell" lines={[
-  '$ setx PATH "$env:PATH;C:\\maestro\\bin"',
-  '# close this terminal and open a new one',
-  '$ maestro --version',
-  '2.12.1',
-]} />
-
-On macOS and Linux: `curl -fsSL "https://get.maestro.mobile.dev" | bash`.
-
-</Task>
+On a computer, Maestro is a program that needs Java and an Android emulator. On this page, **Run flow** plays the same YAML file on the page’s phone, step by step, and prints the steps the way Maestro does.
 
 The flow, line by line:
 
 <CodeWalk file=".maestro/scan-sample.yaml" code={P.MAESTRO_FLOW} steps={[
   { lines: 1, text: '`appId`: which app the flow drives. In Expo Go, the app is Expo Go itself: `host.exp.exponent`.' },
   { lines: 2, text: '`---` ends the settings. Everything below is a step.' },
-  { lines: 3, text: '`stopApp`: close Expo Go, so every run starts the same way.' },
-  { lines: 4, text: '`openLink`: open your project in Expo Go. `${APP_URL}` is filled in from the command line (`-e APP_URL=…`).' },
+  { lines: 3, text: '`stopApp`: close the app, so every run starts the same way.' },
+  { lines: 4, text: '`openLink`: open your project (in Expo Go). `${APP_URL}` is filled in from the command line (`-e APP_URL=…`).' },
   { lines: [5, 7], text: 'Wait up to 60 seconds (60000 ms) until **Start scanning** is visible: the first load of the JavaScript can be slow.' },
-  { lines: 8, text: '`tapOn: "Start scanning"`: tap the element with this text.' },
+  { lines: 8, text: '`tapOn: "Start scanning"`: tap the element with this text. The text must match the element’s whole text.' },
   { lines: [9, 14], text: 'Tap **Allow camera** and the dialog’s **While using the app** — `optional: true` means: if they are not there (the camera was allowed before), go on without failing.' },
   { lines: [15, 16], text: '`id: "sample-scan"`: tap the element whose `testID` is `sample-scan`. ids do not change when you change a button’s text.' },
   { lines: 17, text: '`assertVisible`: the step fails if this text is not on the screen. Maestro waits a few seconds first.' },
@@ -748,12 +575,11 @@ The flow, line by line:
 
 <Exercise id="lab-07--maestro-order" />
 
-<Task n="7.2" title="Run the flow on the emulator" time="5 min">
+<Exercise id="lab-07--maestro-run" />
 
-Your starter’s flow ends with a **TODO**: add the last three steps (two `assertVisible` and the `takeScreenshot`) from the walkthrough above. Then, with the emulator open and `npx expo start` running in another terminal:
+The same flow on a real Android emulator, with the Maestro program on a computer (real output):
 
-<Terminal title="PowerShell — in smart-qr-scanner" lines={[
-  '$ adb reverse tcp:8081 tcp:8081',
+<Terminal title="maestro test on a computer" lines={[
   '$ maestro test .maestro/scan-sample.yaml -e APP_URL=exp://127.0.0.1:8081',
   'Running on Pixel_10_Pro_XL',
   ' > Flow scan-sample',
@@ -769,15 +595,11 @@ Your starter’s flow ends with a **TODO**: add the last three steps (two `asser
   'Take screenshot scan-result... COMPLETED',
 ]} />
 
-`adb reverse` lets the emulator reach the Expo server on your PC as `127.0.0.1`. Watch the emulator while the flow runs: Maestro taps by itself.
-
-</Task>
-
-<Shot frame="phone" w={540} h={1202} src="/labs/lab-07/maestro-screenshot.webp" alt="The screenshot Maestro saved at the end of the flow: the result card with WEBSITE https://expo.dev and Scan again" caption="The picture `takeScreenshot` saved. Maestro reached the result without a person touching the emulator." />
+<Shot frame="phone" w={540} h={1202} src="/labs/lab-07/maestro-screenshot.webp" alt="The screenshot Maestro saved at the end of the flow on the Android emulator: the result card with WEBSITE https://expo.dev and Scan again" caption="The picture `takeScreenshot` saved on the emulator. Maestro reached the result without a person touching the phone." />
 
 When a step fails, Maestro stops and says which one. Real output, after the flow was copied to `scan-fail.yaml` with one line changed to expect `https://expo.com`:
 
-<Terminal title="PowerShell" lines={[
+<Terminal title="maestro test on a computer" lines={[
   '$ maestro test .maestro/scan-fail.yaml -e APP_URL=exp://127.0.0.1:8081',
   ' > Flow scan-fail',
   'Tap on "Start scanning"... COMPLETED',
@@ -790,10 +612,10 @@ When a step fails, Maestro stops and says which one. Real output, after the flow
   'C:\\Users\\you\\.maestro\\tests\\2026-11-23_200728',
 ]} />
 
-**WARNED** is not a failure: the camera was already allowed, and the step was optional. **FAILED** is the real problem: the screen shows `.dev`, the flow expected `.com`. The debug folder holds a screenshot of the moment it failed.
+**WARNED** is not a failure: the camera was already allowed, and the step was optional. **FAILED** is the real problem: the screen shows `.dev`, the flow expected `.com`. Try the same in your flow above: change one letter of the text and press **Run flow** again.
 
 <Checkpoint>
-Maestro installed, and your flow passes on the emulator from a fresh start to the result card.
+Your flow passes on the page’s phone, from a new phone to the result card — the same file that passed on a real Android emulator.
 </Checkpoint>
 
 <Part n="8" title="Deployment: EAS Build, Submit, Update" time="12 min" />
@@ -877,45 +699,27 @@ The rule: an update reaches only builds with the same **runtime version** — th
 You can say what each profile builds, why the preview profile makes an APK and production an AAB, what signing is, and when `eas update` is enough.
 </Checkpoint>
 
-<Part n="9" title="EAS Build hands-on" time="13 min" />
+<Part n="9" title="EAS Build: configure and watch a real build" time="13 min" />
 
-Now build Smart QR for real. You need a free account at **expo.dev** (sign up with an email or GitHub).
+A build needs two things from the project: the app’s own **id** (in `app.json`) and the **profiles** (in `eas.json`). Prepare both here; then follow a real build of Smart QR from start to install.
 
-<Task n="9.1" title="Install EAS CLI and log in" time="3 min">
+<Exercise id="lab-07--eas-config" />
 
-<Terminal title="PowerShell" lines={[
+On a computer with Node, these are the commands that build it. `eas-cli` is installed once, and every student uses their own free account at expo.dev:
+
+<Terminal title="On a computer — once per computer, then once per project" lines={[
   '$ npm install --global eas-cli',
-  '$ eas --version',
-  'eas-cli/27.11.0 win32-x64 node-v24.16.0',
   '$ eas login',
   '# type your Expo email or username, then your password',
-  '$ eas whoami',
-  '# prints your Expo username: you are logged in',
-]} />
-
-`--global` installs the `eas` command for every project. Type your password yourself: it is never shown.
-
-</Task>
-
-<Task n="9.2" title="Give the app your id and link it to EAS" time="3 min">
-
-1. In `app.json`, change `com.yourname.smartqr` (two places: `ios.bundleIdentifier` and `android.package`) to your own, for example `com.mona.smartqr`: lowercase letters, numbers and dots only.
-2. Link the project and create `eas.json`:
-
-<Terminal title="PowerShell — in smart-qr-scanner" lines={[
   '$ eas init',
   '# creates the project on expo.dev and writes its id into app.json (extra.eas.projectId)',
   '$ eas build:configure',
-  '# it asks which platforms: choose All. It writes eas.json with the development, preview and production profiles',
+  '# writes eas.json with the development, preview and production profiles',
 ]} />
 
-3. In `eas.json`, add the APK line to **preview** (as in Part 8): `"android": { "buildType": "apk" }`.
+Then the build itself. These lines are real, from the build of Smart QR made for this lab (only the account name was changed):
 
-</Task>
-
-<Task n="9.3" title="Start the build" time="5 min">
-
-<Terminal title="PowerShell — in smart-qr-scanner" lines={[
+<Terminal title="eas build on a computer" lines={[
   '$ eas build --platform android --profile preview',
   'Resolved "preview" environment for the build.',
   'No remote versions are configured for this project, versionCode will be initialized based on the value from the local project.',
@@ -930,32 +734,28 @@ Now build Smart QR for real. You need a free account at **expo.dev** (sign up wi
   'See logs: https://expo.dev/accounts/your-account/projects/smart-qr-scanner/builds/…',
 ]} />
 
-These lines are real (only the account name was changed). What happened, in order:
+What happened, in order:
 
 1. **versionCode 1** — Android’s build number. EAS keeps it (`appVersionSource: "remote"`).
-2. **Keystore** — EAS made your signing key and keeps it for you. Every later build is signed with it.
-3. **Uploaded** — your project (1.2 MB without `node_modules`) went to Expo’s servers.
-4. **See logs** — open this link to watch the build.
+2. **Keystore** — EAS made the signing key and keeps it. Every later build is signed with it.
+3. **Uploaded** — the project (1.2 MB without `node_modules`) went to Expo’s servers.
+4. **See logs** — this link shows the build while it runs.
 
-The free plan waits in a queue. This build waited **38 minutes** in the queue, then built in **8 minutes**. If yours is not ready before the end of the lab, the link keeps working: install it at home. Leave the terminal open or close it — the build runs on Expo’s servers either way.
-
-</Task>
-
-When the build is done, the link shows the build page. Open it **on the Android phone** and press **Install** (or scan the QR code the terminal prints):
+The free plan waits in a queue: this build waited **38 minutes**, then built in **8 minutes**. When it is done, the link shows the build page. Opened **on an Android phone**, **Install** puts the app on it:
 
 <Shot frame="browser" w={1280} h={412} url="expo.dev/accounts/…/projects/smart-qr-scanner/builds/…" src="/labs/lab-07/expo-build-page.webp" alt="The expo.dev page of the build: Build artifact APK, Android internal distribution build, an Install button and Succeeded" caption="**Build artifact · APK · Succeeded.** Anyone with the link can install it on Android. (The account name is blurred in this picture.)" />
 
-<Shot frame="phone" w={540} h={1202} src="/labs/lab-07/apk-home.webp" alt="Smart QR running as its own app from the APK, without Expo Go: the home screen with Start scanning" caption="The installed APK: Smart QR is its own app now, with its own icon. No Expo Go, no PC. **Use sample QR** is gone too: `__DEV__` is false in a build." />
+<Shot frame="phone" w={540} h={1202} src="/labs/lab-07/apk-home.webp" alt="Smart QR running as its own app from the APK, without Expo Go: the home screen with Start scanning" caption="The installed APK: Smart QR is its own app now, with its own icon. No Expo Go, no computer. **Use sample QR** is gone too: `__DEV__` is false in a build." />
 
 <Exercise id="lab-07--eas-predict" />
 
 <Checkpoint>
-Your build was started: EAS made your keystore, and the build link is in your terminal. When it finishes you have an APK anyone can install.
+`app.json` has your app’s id and `eas.json` makes a preview APK: the two files a real `eas build` reads. You can say what each line of the build output means.
 </Checkpoint>
 
 <Part n="10" title="Final challenge and recap" time="11 min" />
 
-Scan the **Wi-Fi** code again: the card shows the whole code — **with the password**. That is a real privacy bug: anyone who looks at the screen sees it. Fix it.
+Scan the **Wi-Fi** code: the card shows the whole code — **with the password**. That is a real privacy bug: anyone who looks at the screen sees it. Fix it, then prove the fix with a test, like a real change.
 
 <Exercise id="lab-07--wifi-name" />
 
@@ -967,28 +767,14 @@ Scan the **Wi-Fi** code again: the card shows the whole code — **with the pass
   { lines: 7, text: 'Return the name only. `name || \'Hidden network\'`: an empty name falls back to the text “Hidden network”. The password is never returned.' },
 ]} />
 
-<Task n="10.1" title="Finish it like a real change" time="4 min">
-
-1. Make the same change in your project, and scan the Wi-Fi QR code from Part 4 with your phone: the card shows **Lab-5G**.
-2. Add a unit test, then run `npm test` (13 tests):
-
-```ts
-test('a Wi-Fi code shows the network name, never the password', () => {
-  const result = parseScan('WIFI:S:Lab-5G;T:WPA;P:secret123;;');
-  expect(result).toMatchObject({ ok: true, kind: 'wifi', value: 'Lab-5G' });
-});
-```
-
-3. Decide how it reaches the installed APKs: only `parseScan.ts` changed (JavaScript), so **`eas update`** is enough — once the build contains `expo-updates`.
-
-</Task>
+How does this fix reach phones that already have the app? Only `parseScan.ts` changed — JavaScript — so **`eas update`** is enough (Part 8), once the build contains `expo-updates`.
 
 ### What you can do now
 
 <Cards cols={3} items={[
   { tag: 'hardware', icon: 'camera', title: 'Camera and haptics', points: ['+ ask for a permission and handle every answer', '+ read QR codes once with a lock', '+ vibrate at the right moment, on every phone'] },
   { tag: 'testing', icon: 'bug', title: 'Three layers', points: ['+ unit tests for logic (Jest)', '+ component tests with fakes (React Native Testing Library)', '+ an end-to-end flow (Maestro)'] },
-  { tag: 'deployment', icon: 'rocket', title: 'EAS', points: ['+ profiles in eas.json, APK or AAB', '+ signing with a keystore', '+ submit to stores, update without a build'] },
+  { tag: 'deployment', icon: 'rocket', title: 'EAS', points: ['+ the app id and the profiles in eas.json, APK or AAB', '+ signing with a keystore', '+ submit to stores, update without a build'] },
 ]} />
 
 ### Acceptance criteria
@@ -1000,9 +786,9 @@ Your Smart QR is complete when:
 - [ ] A good code plays the Success vibration, an empty code the Error vibration
 - [ ] **Flip camera** switches the camera with a small tap
 - [ ] A Wi-Fi code shows the network name and never the password
-- [ ] `npm test` passes: at least 13 tests (unit + component)
-- [ ] `maestro test .maestro/scan-sample.yaml` passes on the emulator
-- [ ] An EAS preview build was started (the build link is your proof)
+- [ ] **Run tests** passes: 8 unit tests and 5 component tests, each new one failing on the bug it was written for
+- [ ] **Run flow** passes: the Maestro flow reaches the result card
+- [ ] `app.json` has your own id and `eas.json` makes a preview APK
 
 ### Questions to check yourself
 
@@ -1015,6 +801,8 @@ Your Smart QR is complete when:
 7. Why does the Maestro flow use `optional: true` for the permission dialog?
 8. When do you need a new build, and when is `eas update` enough?
 
+Later, to run Smart QR on your own computer and phone: the project is in [smart-qr-starter.zip](/labs/lab-07/smart-qr-starter.zip) (`npm install`, then `npx expo start`, and Expo Go on the phone).
+
 <Checkpoint title="Lab 07">
-You built an app that uses the phone’s hardware, tested it on three levels, and turned it into an installable app with EAS — and you know how to ship the next change.
+You built an app that uses the phone’s hardware, tested it on three levels, and prepared it for a real EAS build — all in the browser — and you know how to ship the next change.
 </Checkpoint>

@@ -2,7 +2,8 @@
  * The live preview on the lab page: a sandboxed iframe (no access to the site, its cookies or storage)
  * that runs the student's compiled files. Implements PreviewDriver so checks can press/type/read it.
  */
-import type { DeviceSnapshot, Found, Frame, FromRuntime, LabErrorInfo, LogLevel, PreviewDriver, Query, RemoteOp, ToRuntime } from '../runtime/protocol.ts';
+import type { DeviceSnapshot, Found, Frame, FromRuntime, LabErrorInfo, LogLevel, PreviewDriver, Query, RemoteOp, TestRun, ToRuntime } from '../runtime/protocol.ts';
+import { compileAll } from './compile.ts';
 
 /** A runtime message without its `__lab` marker (Omit on each member of the union, not on the union). */
 type WithoutLab<T> = T extends unknown ? Omit<T, '__lab'> : never;
@@ -171,12 +172,16 @@ export class LabPreview implements PreviewDriver {
   }
 
   private rpc<T>(method: string, ...args: unknown[]): Promise<T> {
+    return this.rpcWithin<T>(RPC_TIMEOUT, method, ...args);
+  }
+
+  private rpcWithin<T>(timeout: number, method: string, ...args: unknown[]): Promise<T> {
     const id = ++this.seq;
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.rpcs.delete(id);
         reject(new Error(`The preview didn’t answer (${method}).`));
-      }, RPC_TIMEOUT);
+      }, timeout);
       this.rpcs.set(id, { resolve: resolve as (v: unknown) => void, reject, timer });
       this.send({ type: 'rpc', id, method, args });
     });
@@ -217,6 +222,20 @@ export class LabPreview implements PreviewDriver {
   /** Lab 06: erase everything the phone stored */
   async resetDevice() {
     await this.rpc('reset-device');
+  }
+
+  /** Lab 07: runs Jest-style test files in the preview (files as written; a syntax error is reported as a failed file) */
+  async runTests(files: Record<string, string>, paths?: string[]): Promise<TestRun> {
+    const compiled = compileAll(files);
+    if (!compiled.ok) {
+      return {
+        files: compiled.errors.map((e) => ({ file: e.file, tests: [], logs: [], ms: 0, error: { message: `SyntaxError: ${e.message}${e.hint ? `
+${e.hint}` : ''}`, where: { file: e.file, line: e.line, column: e.column } } })),
+        ms: 0,
+      };
+    }
+    await this.ready;
+    return this.rpcWithin<TestRun>(60_000, 'run-tests', compiled.files, paths);
   }
   /** Lab 06 Realtime: a change from the student's other device */
   async remote(op: RemoteOp) {

@@ -1,8 +1,11 @@
 /** Lab 07 live examples — editable, not graded. Each one shows one idea before its exercises. */
 import type { Demo } from '../types.ts';
 import { projectFiles } from './project.ts';
+import { unitTestDemo } from './runners.ts';
 
 export const demos: Record<string, Demo> = {
+  'unit-tests-run': unitTestDemo,
+
   'smart-qr-app': {
     id: 'smart-qr-app',
     title: 'The finished Smart QR Scanner',

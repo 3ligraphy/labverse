@@ -71,6 +71,12 @@ function nodeRunner() {
       resetDevice: async () => {
         await runtime.rpc('reset-device', []);
       },
+      // the lab's test runner, as LabPreview.runTests does it in the browser
+      runTests: async (files: Record<string, string>, paths?: string[]) => {
+        const compiled = compileAll(files);
+        if (!compiled.ok) throw new Error(JSON.stringify(compiled.errors));
+        return (await runtime.rpc('run-tests', [compiled.files, paths])) as never;
+      },
     },
   };
 }
@@ -78,7 +84,7 @@ function nodeRunner() {
 type Ex = (typeof exercises)[number];
 const codeExercises = exercises.filter((e): e is Extract<Ex, { kind: 'code' | 'fix' }> => e.kind === 'code' || e.kind === 'fix');
 
-test('registry: ids match meta.ts in page order, numbered 1…17, three hints and a full solution each', () => {
+test('registry: ids match meta.ts in page order, numbered 1…21, three hints and a full solution each', () => {
   assert.deepEqual(exercises.map((e) => e.id), EXERCISE_IDS);
   assert.deepEqual(exercises.map((e) => e.n), exercises.map((_, i) => i + 1));
   for (const e of exercises) {
@@ -90,17 +96,17 @@ test('registry: ids match meta.ts in page order, numbered 1…17, three hints an
     assert.equal(meta.kind, e.kind, `${e.id}: meta.ts says the same kind`);
     assert.equal(meta.title, e.title, `${e.id}: meta.ts has the same title`);
   }
-  assert.equal(exercises.length, 17);
+  assert.equal(exercises.length, 21);
   assert.equal(FINAL_ID, 'lab-07--wifi-name');
   assert.equal(EXERCISES.filter((e) => e.final).map((e) => e.id).join(), FINAL_ID);
   assert.ok(INTERACTIVE_LABS['lab-07'], 'Lab 07 is registered as an interactive lab');
   assert.deepEqual(BLOCKS.map((b) => b.part), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 });
 
-test('time: practice is 4 · 3 · 7 · 22 · 4 · 11 · 4 · 8 · 3 · 8 minutes per part (74 of the 145)', () => {
+test('time: practice is 4 · 3 · 7 · 22 · 4 · 21 · 10 · 8 · 8 · 9 minutes per part (96 of the 145)', () => {
   const perPart = BLOCKS.map((b) => EXERCISES.filter((m) => m.block === b.part).reduce((sum, m) => sum + exercises.find((e) => e.id === m.id)!.minutes, 0));
-  assert.deepEqual(perPart, [4, 3, 7, 22, 4, 11, 4, 8, 3, 8]);
-  assert.equal(perPart.reduce((a, b) => a + b, 0), 74);
+  assert.deepEqual(perPart, [4, 3, 7, 22, 4, 21, 10, 8, 8, 9]);
+  assert.equal(perPart.reduce((a, b) => a + b, 0), 96);
   // the blocks' times run from 0 to 145 without a gap
   let end = 0;
   for (const b of BLOCKS) {

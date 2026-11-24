@@ -1,8 +1,12 @@
-/** Lab 07 · Part 10 — the final challenge: a Wi-Fi code shows the network name, never the password. Exercise 17 (8 min). */
+/**
+ * Lab 07 · Part 10 — the final challenge: a Wi-Fi code shows the network name, never the password, and a unit test
+ * that proves it (it passes on the fix and fails on the old parseScan). Exercise 21 (9 min).
+ */
 import type { RunContext } from '../../engine/checks.ts';
 import type { CodeExercise } from '../types.ts';
 import { LAB_ID } from './meta.ts';
-import { PARSE_SCAN, projectFiles } from './project.ts';
+import { PARSE_SCAN, PARSE_TEST, projectFiles } from './project.ts';
+import { UNIT_TEST, allPass, catches } from './runners.ts';
 import { PARSE_FILE, code, openCamera, scan, waitForResult, waitForText } from './shared.ts';
 
 const id = (name: string) => `${LAB_ID}--${name}`;
@@ -33,6 +37,17 @@ export const PARSE_FINAL_SOLUTION = PARSE_SCAN.replace(
   }`,
 );
 
+const LAST = '\n});\n';
+if (!PARSE_TEST.endsWith(LAST)) throw new Error('lab-07 final: the unit test file changed');
+/** the unit tests, with the place for the final challenge's test */
+export const PARSE_TEST_FINAL_STARTER = `${PARSE_TEST.slice(0, -LAST.length)}\n\n  // TODO (final challenge): a Wi-Fi code shows the network name, never the password${LAST}`;
+export const PARSE_TEST_FINAL_SOLUTION = `${PARSE_TEST.slice(0, -LAST.length)}
+
+  test('a Wi-Fi code shows the network name, never the password', () => {
+    const result = parseScan('WIFI:S:Lab-5G;T:WPA;P:secret123;;');
+    expect(result).toMatchObject({ ok: true, kind: 'wifi', value: 'Lab-5G' });
+  });${LAST}`;
+
 /** Home → camera → QR: Wi-Fi; the result card's text, or null when the camera did not open */
 async function scanWifi(c: RunContext) {
   const cam = await openCamera(c.app);
@@ -43,17 +58,18 @@ async function scanWifi(c: RunContext) {
 
 export const ex17: CodeExercise = {
   id: id('wifi-name'),
-  n: 17,
+  n: 21,
   title: 'Final: the Wi-Fi name, never the password',
-  minutes: 8,
+  minutes: 9,
   level: 6,
   kind: 'code',
   frame: 'phone',
   entry: 'App.tsx',
   freshDevice: true,
+  runner: { kind: 'tests', files: [UNIT_TEST] },
   prompt:
-    'Scan **QR: Wi-Fi**: the result card shows the whole code, **password included**. In `src/scan/parseScan.ts`, make a Wi-Fi code show only the network name (`Lab-5G`), and “Hidden network” when the code has no name. Every other kind of code must still work.',
-  files: { [PARSE_FILE]: PARSE_FINAL_STARTER, ...projectFiles() },
+    'Scan **QR: Wi-Fi**: the result card shows the whole code, **password included**. (1) In `src/scan/parseScan.ts`, make a Wi-Fi code show only the network name (`Lab-5G`), and “Hidden network” when the code has no name; every other kind of code must still work. (2) In the test file, replace the **TODO** with a test that proves it, and press **Run tests**.',
+  files: { [PARSE_FILE]: PARSE_FINAL_STARTER, [UNIT_TEST]: PARSE_TEST_FINAL_STARTER, ...projectFiles() },
   checks: [
     {
       id: 'name',
@@ -103,6 +119,25 @@ export const ex17: CodeExercise = {
         return /This QR code is empty\./.test(await waitForResult(c.app)) || 'An empty code no longer shows “This QR code is empty.”';
       },
     },
+    {
+      id: 'test-written',
+      label: 'a new test expects the network name `Lab-5G` on its own',
+      fail: "In place of the TODO: a test with `parseScan('WIFI:S:Lab-5G;T:WPA;P:secret123;;')` that expects `value: 'Lab-5G'`.",
+      // the old tests only use Lab-5G inside the whole Wi-Fi code; the new one expects the name as its own text
+      static: (c) => /['"`]Lab-5G['"`]/.test(code(c.files, UNIT_TEST)),
+    },
+    {
+      id: 'test-passes',
+      label: 'all the unit tests pass on your fixed parseScan (8 or more)',
+      fail: 'Press **Run tests** and fix the test that fails.',
+      run: (c) => allPass(c, [UNIT_TEST], 8),
+    },
+    {
+      id: 'test-proves',
+      label: 'your new test fails on the old parseScan (the one that showed the password)',
+      fail: "Your tests still pass on the old parseScan. Expect the name: `expect(result).toMatchObject({ kind: 'wifi', value: 'Lab-5G' });`",
+      run: (c) => catches(c, { [PARSE_FILE]: PARSE_SCAN }, [UNIT_TEST], "Your tests still pass on the old parseScan, which shows the password. Expect the name: `expect(result).toMatchObject({ kind: 'wifi', value: 'Lab-5G' });`"),
+    },
   ],
   hints: [
     'Cut the text after `WIFI:` into fields: `value.slice(5).split(\';\')` gives `[\'S:Lab-5G\', \'T:WPA\', \'P:secret123\', \'\', \'\']`.',
@@ -111,8 +146,8 @@ export const ex17: CodeExercise = {
   ],
   solution: {
     explain: 'A Wi-Fi QR code is fields separated by `;`. The app keeps the field it needs (S: the name) and never puts the password (P:) on the screen.',
-    files: { [PARSE_FILE]: PARSE_FINAL_SOLUTION },
+    files: { [PARSE_FILE]: PARSE_FINAL_SOLUTION, [UNIT_TEST]: PARSE_TEST_FINAL_SOLUTION },
   },
-  success: 'Now finish it like a real change: a unit test on your PC (Part 10, step 2), then decide how it ships. Only JavaScript changed, so `eas update` is enough.',
-  challenge: 'On your PC, add to `__tests__/parseScan-test.ts`: `expect(parseScan(\'WIFI:S:Lab-5G;T:WPA;P:secret123;;\')).toMatchObject({ kind: \'wifi\', value: \'Lab-5G\' });` and run `npm test`.',
+  success: 'A real change, finished: the fix, a test that fails without it, and the decision how it ships. Only JavaScript changed, so `eas update` is enough.',
+  challenge: "Test the hidden network too: `expect(parseScan('WIFI:T:WPA;P:x;;')).toMatchObject({ value: 'Hidden network' });` and press Run tests.",
 };

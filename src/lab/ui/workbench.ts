@@ -6,6 +6,8 @@ import { openInEditor } from './open-in-editor.ts';
 import { compileAll } from '../engine/compile.ts';
 import { evaluate, lintFiles, type AppRunner } from '../engine/checks.ts';
 import { LabPreview } from '../engine/preview.ts';
+import { formatRun } from '../engine/test-report.ts';
+import { flowLines, runFlow } from '../engine/maestro.ts';
 import type { CodeExercise, Demo } from '../exercises/types.ts';
 import type { LabErrorInfo, LogLevel } from '../runtime/protocol.ts';
 import { createEditor, type LabEditor } from './editor.ts';
@@ -83,6 +85,8 @@ export class Workbench {
       ),
     );
     const starterCode = Object.values(this.starter).join('\n');
+    // Lab 07: run the test files (npm test) or a Maestro flow (maestro test) with nothing installed
+    if (src.runner) this.wb.append(this.runnerPanel(src.runner));
     if (STORAGE_IMPORT.test(starterCode)) {
       this.device = new DevicePanel({
         restart: () => this.preview.rerun(),
@@ -138,6 +142,33 @@ export class Workbench {
 
     this.preview = this.newPreview();
     void this.refresh();
+  }
+
+  /** A terminal under the editor and the phone: the command, a Run button, and the output as Jest or Maestro prints it. */
+  private runnerPanel(runner: NonNullable<CodeExercise['runner']>) {
+    const flowFile = runner.files?.[0] ?? '';
+    const command = runner.kind === 'tests' ? `npm test${runner.files?.length === 1 ? ` -- ${runner.files[0]}` : ''}` : `maestro test ${flowFile}`;
+    const out = h('pre', { class: 'wb-term-out', 'aria-live': 'polite' }, h('span', { class: 'dim' }, runner.kind === 'tests' ? 'Press Run tests: the test files run here, the way npm test runs them on a PC.' : 'Press Run flow: Maestro taps through the app on the phone above, step by step.'));
+    const button = h('button', { type: 'button', class: 'btn btn-primary btn-sm' }, runner.kind === 'tests' ? '▶ Run tests' : '▶ Run flow');
+    button.addEventListener('click', async () => {
+      this.sync();
+      button.disabled = true;
+      out.replaceChildren(h('span', { class: 'dim' }, runner.kind === 'tests' ? 'Running the tests…' : 'Running the flow on the phone…'));
+      try {
+        let lines: { text: string; tone: string }[];
+        if (runner.kind === 'tests') lines = formatRun(await this.preview.runTests(this.files, runner.files), this.files);
+        else {
+          await this.refresh(); // the phone runs the code as it is now
+          lines = flowLines(await runFlow(this.files[flowFile] ?? '', this.preview, { name: flowFile.split('/').pop()?.replace(/\.ya?ml$/, '') ?? 'flow' }));
+        }
+        out.replaceChildren(...lines.map((l) => h('span', l.tone ? { class: l.tone } : null, `${l.text}\n`)));
+      } catch (error) {
+        out.replaceChildren(h('span', { class: 'fail' }, (error as Error).message));
+      } finally {
+        button.disabled = false;
+      }
+    });
+    return h('section', { class: 'wb-term', 'aria-label': runner.kind === 'tests' ? 'Test results' : 'Maestro flow' }, h('header', { class: 'wb-term-head' }, h('span', { class: 'mono' }, `$ ${command}`), button), out);
   }
 
   private newPreview() {

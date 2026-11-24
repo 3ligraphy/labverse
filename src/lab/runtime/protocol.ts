@@ -23,6 +23,15 @@ export type LabErrorInfo = {
 
 export type LogLevel = 'log' | 'info' | 'warn' | 'error';
 
+/** Lab 07: the result of running Jest-style test files in the preview (src/lab/runtime/testing.ts). */
+export type TestWhere = { file: string; line: number; column: number };
+export type TestError = { message: string; where?: TestWhere };
+export type TestCaseResult = { path: string[]; name: string; status: 'passed' | 'failed' | 'skipped' | 'todo'; ms: number; error?: TestError };
+export type TestLog = { level: LogLevel; text: string; where?: TestWhere };
+/** `error`: the file itself could not run (a failing import, a syntax error), so none of its tests ran */
+export type TestFileResult = { file: string; tests: TestCaseResult[]; error?: TestError; logs: TestLog[]; ms: number };
+export type TestRun = { files: TestFileResult[]; ms: number };
+
 export type FromRuntime = (
   | { type: 'ready' }
   | { type: 'rendered'; id: number }
@@ -83,6 +92,8 @@ export interface PreviewDriver {
   resetDevice?(): Promise<void>;
   /** Lab 06: a write to the practice project from the student's other device (Realtime sends it to this phone) */
   remote?(op: RemoteOp): Promise<void>;
+  /** Lab 07: run Jest-style test files (`files` as written, `paths` = the test files to run; default: every test file) */
+  runTests?(files: Record<string, string>, paths?: string[]): Promise<TestRun>;
 }
 
 /** A change made in the practice project by "your tablet": the same user, another device. */

@@ -1,6 +1,7 @@
-/** Lab 07 · Parts 8–9 — EAS Update or a new build, eas.json and app.json settings, what a build gives you. Exercises 14–16. */
-import type { MatchExercise, PredictExercise } from '../types.ts';
+/** Lab 07 · Parts 8–9 — EAS Update or a new build, eas.json and app.json settings, what a build gives you. Exercises 17–20. */
+import type { CodeExercise, MatchExercise, PredictExercise } from '../types.ts';
 import { LAB_ID } from './meta.ts';
+import { APP_JSON, EAS_JSON, projectFiles } from './project.ts';
 
 const id = (name: string) => `${LAB_ID}--${name}`;
 
@@ -13,7 +14,7 @@ const options = (correct: 'update' | 'build', updateWhy: string, buildWhy: strin
 
 export const ex14: PredictExercise = {
   id: id('update-or-build'),
-  n: 14,
+  n: 17,
   title: 'eas update or a new build?',
   minutes: 4,
   level: 5,
@@ -64,7 +65,7 @@ export const ex14: PredictExercise = {
 
 export const ex15: MatchExercise = {
   id: id('config-match'),
-  n: 15,
+  n: 18,
   title: 'What does each setting do?',
   minutes: 4,
   level: 5,
@@ -94,7 +95,7 @@ export const ex15: MatchExercise = {
 
 export const ex16: PredictExercise = {
   id: id('eas-predict'),
-  n: 16,
+  n: 20,
   title: 'What will this build give you?',
   minutes: 3,
   level: 5,
@@ -152,4 +153,125 @@ eas build --platform android --profile preview`,
     text: '1 · an .apk with a link — 2 · the signing key — 3 · an .aab with the number + 1 — 4 · a Play Developer account, the app in the Play Console, a service account key in Expo',
   },
   success: 'Part 9 runs the first command for real. Keep the link: your classmates can install your app from it.',
+};
+
+/* ------------------------------------------------------------------ Part 9: get the project ready for EAS Build */
+
+/** eas.json as `eas build:configure` writes it (eas-cli 27.11.0), before the APK line is added */
+const EAS_CONFIGURED = `{
+  "cli": {
+    "version": ">= 27.11.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
+`;
+
+const readJson = (text: string | undefined): { ok: true; value: Record<string, any> } | { ok: false; error: string } => {
+  try {
+    const value = JSON.parse(text ?? '');
+    return value && typeof value === 'object' ? { ok: true, value } : { ok: false, error: 'The file must hold one { … } object.' };
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+};
+const APP_ID = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+
+export const exEasConfig: CodeExercise = {
+  id: id('eas-config'),
+  n: 19,
+  title: 'Get the project ready for EAS Build',
+  minutes: 5,
+  level: 5,
+  kind: 'code',
+  frame: 'phone',
+  entry: 'App.tsx',
+  prompt:
+    'Before the first build, the app needs its own id and the build profiles. In `app.json`, change `com.yourname.smartqr` (two places) to your own id, for example `com.mona.smartqr`. `eas.json` is the file `eas build:configure` wrote: make the **preview** profile build an APK.',
+  files: { 'app.json': APP_JSON, 'eas.json': EAS_CONFIGURED, ...projectFiles() },
+  checks: [
+    {
+      id: 'json',
+      label: 'both files are valid JSON',
+      fail: 'A comma or a quote is missing.',
+      static: (c) => {
+        for (const f of ['app.json', 'eas.json']) {
+          const r = readJson(c.files[f]);
+          if (!r.ok) return `\`${f}\` is not valid JSON: ${r.error}. Every key and text is in double quotes, and items are separated by commas (none after the last one).`;
+        }
+        return true;
+      },
+    },
+    {
+      id: 'package',
+      label: 'Android: your own `package` (lowercase, dots, not `yourname`)',
+      fail: 'In app.json → android → `"package": "com.yourname.smartqr"`: put your own name, for example `"com.mona.smartqr"`.',
+      static: (c) => {
+        const r = readJson(c.files['app.json']);
+        const pkg = r.ok ? r.value.expo?.android?.package : undefined;
+        if (typeof pkg !== 'string') return 'app.json needs `expo.android.package`.';
+        if (/yourname/.test(pkg)) return 'The package still says `yourname`: put your own name in it, for example `com.mona.smartqr`.';
+        return APP_ID.test(pkg) || `\`${pkg}\` is not a valid package: lowercase letters, numbers and dots, at least two parts (like com.mona.smartqr).`;
+      },
+    },
+    {
+      id: 'bundle',
+      label: 'iPhone: the same id in `bundleIdentifier`',
+      fail: 'In app.json → ios → `"bundleIdentifier"`: the same id as the Android package.',
+      static: (c) => {
+        const r = readJson(c.files['app.json']);
+        if (!r.ok) return false;
+        const { android, ios } = r.value.expo ?? {};
+        return (typeof ios?.bundleIdentifier === 'string' && ios.bundleIdentifier === android?.package) || 'Use the same id in `ios.bundleIdentifier` as in `android.package`.';
+      },
+    },
+    {
+      id: 'apk',
+      label: '`preview` makes an internal APK',
+      fail: 'In eas.json → build → preview, add `"android": { "buildType": "apk" }` (keep `"distribution": "internal"`).',
+      static: (c) => {
+        const r = readJson(c.files['eas.json']);
+        const p = r.ok ? r.value.build?.preview : undefined;
+        if (!p) return 'eas.json needs `build.preview`.';
+        if (p.distribution !== 'internal') return 'Keep `"distribution": "internal"` in preview: the build is shared with a link.';
+        return p.android?.buildType === 'apk';
+      },
+    },
+    {
+      id: 'production',
+      label: '`production` still makes the store build (an AAB) and raises the build number',
+      fail: 'Leave production as it was: `"production": { "autoIncrement": true }`.',
+      static: (c) => {
+        const r = readJson(c.files['eas.json']);
+        const p = r.ok ? r.value.build?.production : undefined;
+        if (!p) return 'eas.json needs `build.production`.';
+        if (p.android?.buildType === 'apk') return 'Production must stay an AAB for Google Play: remove `buildType: apk` from production.';
+        return p.autoIncrement === true;
+      },
+    },
+  ],
+  hints: [
+    'Both files are JSON: keys and texts in double quotes, a comma between items, none after the last one.',
+    'app.json has the id twice: `ios.bundleIdentifier` and `android.package`. Use the same one, for example `com.mona.smartqr`.',
+    'In eas.json the preview profile becomes `"preview": { "distribution": "internal", "android": { "buildType": "apk" } }`.',
+  ],
+  solution: {
+    explain: 'The id names the app in the stores and can never change after the first upload. The preview profile makes an APK to share with a link; production stays an AAB for Google Play.',
+    files: { 'app.json': APP_JSON.replaceAll('com.yourname.smartqr', 'com.mona.smartqr'), 'eas.json': EAS_JSON },
+  },
+  success: 'With these two files, `eas build --platform android --profile preview` builds the APK you install from a link (Part 9 shows a real run).',
 };

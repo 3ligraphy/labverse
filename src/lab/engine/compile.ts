@@ -121,6 +121,9 @@ function guardLoops(code: string, ast: Node): string {
   return out;
 }
 
+/** A Jest test file: in a __tests__ folder, or named like parseScan-test.ts / parseScan.test.tsx (jest-expo's pattern). */
+export const isTestFile = (path: string) => /(^|\/)__tests__\//.test(path) || /[.-]test\.[jt]sx?$/.test(path);
+
 export function compileFile(path: string, code: string): { ok: true; code: string } | { ok: false; error: CompileError } {
   let ast: Node;
   try {
@@ -136,8 +139,10 @@ export function compileFile(path: string, code: string): { ok: true; code: strin
     return { ok: false, error: { file: path, message: explained.message, line: at, column: at === line ? column + 1 : 1, ...(explained.hint ? { hint: explained.hint } : null) } };
   }
   try {
+    // test files (Lab 07): jest.mock(…) calls move above the imports, as Jest does, so the fake package is used
+    const jest = isTestFile(path) ? (['jest'] as const) : [];
     const out = transform(guardLoops(code, ast), {
-      transforms: /\.ts$/.test(path) ? ['typescript', 'imports'] : ['typescript', 'jsx', 'imports'],
+      transforms: /\.ts$/.test(path) ? ['typescript', 'imports', ...jest] : ['typescript', 'jsx', 'imports', ...jest],
       jsxRuntime: 'automatic',
       production: true,
       filePath: path,

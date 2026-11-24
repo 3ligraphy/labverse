@@ -1,4 +1,4 @@
-/** Lab 07 · Parts 5–7 — testing: which layer, reading Jest, RNTL tools, test order, the Maestro flow. Exercises 9–13. */
+/** Lab 07 · Parts 5–7 — testing: which layer, reading Jest, RNTL tools, test order, the Maestro flow. Exercises 9, 10, 12, 13, 15. */
 import type { MatchExercise, OrderExercise, PredictExercise } from '../types.ts';
 import { LAB_ID } from './meta.ts';
 
@@ -35,7 +35,7 @@ export const ex10: PredictExercise = {
   id: id('jest-failure'),
   n: 10,
   title: 'Read a failing test',
-  minutes: 4,
+  minutes: 3,
   level: 4,
   kind: 'predict',
   prompt: 'This is real Jest output from the Smart QR project after one line of a test was changed. Read it, then answer.',
@@ -108,9 +108,9 @@ export const ex10: PredictExercise = {
 
 export const ex11: MatchExercise = {
   id: id('rntl-match'),
-  n: 11,
+  n: 12,
   title: 'Find, press, check: the test tools',
-  minutes: 4,
+  minutes: 3,
   level: 5,
   kind: 'match',
   mono: true,
@@ -138,9 +138,9 @@ export const ex11: MatchExercise = {
 
 export const ex12: OrderExercise = {
   id: id('test-order'),
-  n: 12,
+  n: 13,
   title: 'A component test, in order',
-  minutes: 3,
+  minutes: 2,
   level: 5,
   kind: 'order',
   mono: true,
@@ -168,9 +168,9 @@ export const ex12: OrderExercise = {
 
 export const ex13: OrderExercise = {
   id: id('maestro-order'),
-  n: 13,
+  n: 15,
   title: 'The Maestro flow, in order',
-  minutes: 4,
+  minutes: 3,
   level: 5,
   kind: 'order',
   mono: true,

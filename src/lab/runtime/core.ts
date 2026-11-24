@@ -8,6 +8,7 @@ import * as RN from './rn-shim.ts';
 import { createBuiltins } from './builtins.ts';
 import { createModuleSystem, LabError, locate } from './modules.ts';
 import { createDomDriver } from './driver-dom.ts';
+import { runTests } from './testing.ts';
 import { createRouterApp } from '../../runner/router-shim.tsx';
 import { setPlatform } from './tw.ts';
 import { setSafeArea } from './safe-area.ts';
@@ -234,6 +235,9 @@ export function createRuntime(opts: { container: HTMLElement; post: Post; onFram
       case 'reset-device':
         resetDevice();
         return null;
+      // Lab 07: run Jest-style test files (compiled), the way `npm test` would
+      case 'run-tests':
+        return runTests(args[0] as Record<string, string>, args[1] as string[] | undefined);
       // Lab 06 Realtime: a write from the student's other device (the same user, signed in on a tablet)
       case 'remote':
         practiceRemote(args[0] as RemoteOp);

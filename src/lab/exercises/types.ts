@@ -41,7 +41,15 @@ export type CodeExercise = Base & {
   target?: { html: string; caption: string };
   /** Lab 06: Check starts on an empty phone (storage erased, Wi-Fi on, the practice cloud back to its first rows) */
   freshDevice?: boolean;
+  /** Lab 07: a Run button under the editor — Jest-style test files, or a Maestro flow on the preview phone */
+  runner?: Runner;
 };
+
+/**
+ * Lab 07: `tests` runs test files like `npm test` (files: which ones; default every test file); `flow` plays the
+ * Maestro flow in files[0] on the preview phone, like `maestro test`.
+ */
+export type Runner = { kind: 'tests' | 'flow'; files?: string[] };
 
 export type OrderExercise = Base & {
   kind: 'order';
@@ -87,4 +95,6 @@ export type Demo = {
   readOnly?: string[];
   /** "Try this" suggestions for the live demo */
   tryThis?: string[];
+  /** Lab 07: a Run button (tests or a Maestro flow), as in code exercises */
+  runner?: Runner;
 };
