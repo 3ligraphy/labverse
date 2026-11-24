@@ -72,8 +72,8 @@ const nav = d ? [
 
         <section id="results" class="pj-sec pj-split" data-pj-results hidden>
           <div>
-            <h2 class="h-2">Your proposal result</h2>
-            <p class="muted pjr-intro">Type your student ID to see your group, the idea approved for it and your feedback. Only your own group is shown.</p>
+            <h2 class="h-2" data-pjr-title>Your proposal result</h2>
+            <p class="muted pjr-intro" data-pjr-intro>Type your student ID to see your group, the idea approved for it and your feedback. Only your own group is shown.</p>
           </div>
           <div class="pjr">
             <form class="pjr-form" data-pjr-form novalidate>
@@ -331,6 +331,11 @@ const nav = d ? [
     const data = await fetch('/api/project/result').then((r) => (r.ok ? r.json() : null)).catch(() => null);
     if (!data?.items?.length) return;
     sec.dataset.wired = '1';
+    // once the Phase 1 marks are published, the box is about Phase 1 (the proposal feedback, if published, comes after)
+    if (data.items.some((i: { marks?: boolean }) => i.marks)) {
+      sec.querySelector('[data-pjr-title]')!.textContent = 'Your Phase 1 result';
+      sec.querySelector('[data-pjr-intro]')!.textContent = 'Type your student ID to see your group’s Phase 1 marks and your TA’s comment. Only your own group is shown.';
+    }
     sec.hidden = false;
     if (link) link.hidden = false;
     const form = sec.querySelector<HTMLFormElement>('[data-pjr-form]')!;
@@ -352,14 +357,17 @@ const nav = d ? [
           <table class="pjr-marks"><tbody>${p.criteria.map((c) => `<tr><td>${esc(c.label)}</td><td class="mono">${c.score ?? '–'} / ${c.max}</td></tr>`).join('')}</tbody></table>
           ${p.comment ? `<p class="pjr-fb">${esc(p.comment)}</p>` : ''}
         </div>`;
+    // the item's own feedback; with Phase 1 marks the TA's comment is under the marks, so an empty feedback block is left out
+    const feedback = (r: Result) =>
+      r.feedback ? `<div class="pjr-block"><span class="pjr-label">Feedback</span><p class="pjr-fb">${esc(r.feedback)}</p></div>`
+      : r.phase1 ? '' : '<div class="pjr-block"><span class="pjr-label">Feedback</span><p class="pjr-none">No feedback.</p></div>';
     const card = (r: Result) => `
       <article class="pjr-card">
         <p class="pjr-item mono">${esc(r.item)}</p>
         <h3 class="pjr-group">${esc(r.group)}</h3>
         <div class="pjr-block pjr-team"><span class="pjr-label">Members</span><ul class="pjr-members">${r.members.map((m) => `<li><span>${esc(m.name)}</span><span class="mono">${esc(m.id)}</span></li>`).join('')}</ul></div>
         <div class="pjr-block"><span class="pjr-label">Approved idea</span>${r.idea ? `<p class="pjr-idea">${esc(r.idea)}</p>` : '<p class="pjr-none">No idea approved yet. Check again later or ask your TA.</p>'}</div>
-        ${called(r) ? callNote : `<div class="pjr-block"><span class="pjr-label">Feedback</span>${r.feedback ? `<p class="pjr-fb">${esc(r.feedback)}</p>` : '<p class="pjr-none">No feedback.</p>'}</div>
-        ${r.phase1 && r.phase1.call !== true ? marks(r.phase1) : ''}`}
+        ${called(r) ? callNote : `${feedback(r)}${r.phase1 && r.phase1.call !== true ? marks(r.phase1) : ''}`}
       </article>`;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();

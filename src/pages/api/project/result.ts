@@ -1,6 +1,7 @@
 /**
  * A student's proposal result (public, for /project). Only items whose results staff have published are shown.
- *   GET                      { items: [{ id, title }] }  the published items (so the page knows to show the box)
+ *   GET                      { items: [{ id, title, marks? }] }  the published items (so the page knows to show the box);
+ *                            `marks: true` on the item whose Phase 1 marks are published (the box is then titled Phase 1)
  *   GET ?studentId=…         { results: [{ item, group, members, idea, feedback, phase1 }] }  the student's own group only
  *                            (phase1: the marks, or { call: true } when the group is called in to discuss its project)
  * Lookups are limited per network address, so nobody can try every ID; members come with their IDs so teammates can find each other.
@@ -37,7 +38,7 @@ export const GET: APIRoute = async ({ url, request, clientAddress }) => {
     const published = files.filter((f, i) => cleanRelease(releases[i]).published || f.id === marksOn);
     const studentId = (url.searchParams.get('studentId') ?? '').trim().toUpperCase();
     if (!studentId) {
-      return new Response(JSON.stringify({ items: published.map((f) => ({ id: f.id, title: f.title })) }), {
+      return new Response(JSON.stringify({ items: published.map((f) => ({ id: f.id, title: f.title, ...(f.id === marksOn ? { marks: true } : {}) })) }), {
         headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=0, s-maxage=30, stale-while-revalidate=60' },
       });
     }
