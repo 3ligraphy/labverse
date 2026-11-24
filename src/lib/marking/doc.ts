@@ -7,7 +7,7 @@
  * admins change the load, the item and publishing. Everyone who saves a group's marks is kept in its `editors`.
  * Pure functions, unit-tested (tests/marking.test.ts).
  */
-import { CRITERIA, MAX_COMMENT, SECTIONS, cleanScores, totals, type CriterionId, type Scores } from './rubric.ts';
+import { CRITERIA, MAX_COMMENT, SECTIONS, cleanScore, cleanScores, totals, type CriterionId, type Scores } from './rubric.ts';
 import { cleanAnswers, type Answers } from './assistant.ts';
 
 export const MARKING_KEY = 'marking:phase1';
@@ -125,6 +125,19 @@ export function applyMarks(doc: MarkingDoc, m: Marker, group: number, input: { s
     ...(Object.keys(help).length ? { help } : {}),
   };
   return { ok: true };
+}
+
+/** A comment as it is saved: Windows line ends, spaces at the end of each line and text past the limit removed. */
+export const cleanComment = (v: unknown) => cleanText(v, MAX_COMMENT);
+
+/**
+ * Does a draft (what the form holds: marks as typed text, the comment) differ from the saved marks? Both are compared
+ * the way a save stores them, so the form right after Save is never an "unsaved draft" (for example a comment line
+ * that ended with a space, which the save removes).
+ */
+export function draftDiffers(draft: { scores: Partial<Record<CriterionId, unknown>>; comment: string }, saved: Pick<GroupMarks, 'scores' | 'comment'> | undefined): boolean {
+  for (const c of CRITERIA) if (cleanScore(draft.scores[c.id], c.max) !== (saved?.scores[c.id] ?? null)) return true;
+  return cleanComment(draft.comment) !== (saved?.comment ?? '');
 }
 
 /** Calls a group to discuss its project with its TA (on), or lifts the call (off). Same rights as marking the group. */

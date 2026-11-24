@@ -6,7 +6,7 @@
  */
 import { CRITERIA, MAX_COMMENT, SECTIONS, TOTAL_MAX, cleanScore, totals, type CriterionId, type Scores } from '@/lib/marking/rubric';
 import { HELPERS, LEVELS, RULES, explain, suggest, type Answers, type Question } from '@/lib/marking/assistant';
-import { canEdit, myRow, type MarkingDoc, type Marker } from '@/lib/marking/doc';
+import { canEdit, draftDiffers, myRow, type MarkingDoc, type Marker } from '@/lib/marking/doc';
 import { parseMarkingFile, type ParsedRow } from '@/lib/marking/xlsx-read';
 import { createProjectPanel, wireAppBuilds } from '@/scripts/project-panel';
 import { autoMark, groupsMarkedBy, readEvidence, taPattern, type AutoMark } from '@/lib/marking/automark';
@@ -98,6 +98,17 @@ export function initMarking(root: HTMLElement) {
   };
   const taOf = (n: number) => data.doc.tas.find((t) => t.groups.includes(n))?.name ?? '';
   const marksOf = (n: number) => data.doc.marks[String(n)];
+  /**
+   * This browser's draft for a group, typed by the signed-in TA, only while it differs from the saved marks (compared
+   * the way a save stores them). A draft that matches the saved marks is old: it is removed.
+   */
+  const pendingDraft = (n: number): Draft | null => {
+    const d = drafts.get(n);
+    if (!d || d.by !== data.me.email) return null;
+    if (draftDiffers(d, marksOf(n))) return d;
+    drafts.del(n);
+    return null;
+  };
   /** the AI button: the group is called in to discuss its project (its students see only the call) */
   const callOf = (n: number) => data.doc.calls?.[String(n)];
   /** everyone who saved the group's marks (part of its marking), first to last */
@@ -160,7 +171,7 @@ export function initMarking(root: HTMLElement) {
       const m = marksOf(g.number);
       const t = m ? totals(m.scores) : null;
       const done = isMarked(g.number);
-      const draft = editable(g.number) && drafts.get(g.number)?.by === data.me.email;
+      const draft = editable(g.number) && pendingDraft(g.number) !== null;
       const status = (callOf(g.number) ? '<span class="mk-flag ai">Called to discuss</span> ' : '') + (changed.has(g.number)
         ? '<span class="mk-flag warn">Members changed since marked</span>'
         : done
@@ -226,8 +237,7 @@ export function initMarking(root: HTMLElement) {
     const g = data.groups.find((x) => x.number === n)!;
     const m = marksOf(n);
     const can = editable(n);
-    const draft = can ? drafts.get(n) : null;
-    const use = draft && draft.by === data.me.email ? draft : null;
+    const use = can ? pendingDraft(n) : null;
     help = JSON.parse(JSON.stringify(use?.help ?? m?.help ?? {})) as Help;
     const change = data.changes.find((c) => c.group === n);
     $('[data-mk-d-title]').textContent = `Group ${n}${g.idea ? ` · ${g.idea}` : ''}`;
@@ -516,11 +526,10 @@ export function initMarking(root: HTMLElement) {
   function writeDraft() {
     window.clearTimeout(draftTimer);
     if (!current || !editable(current)) return;
-    const m = marksOf(current);
-    const s = formScores();
-    const same = CRITERIA.every((c) => s[c.id] === m?.scores[c.id]) && commentBox().value.trim() === (m?.comment ?? '').trim();
-    if (same) drafts.del(current);
-    else drafts.set(current, snapshot());
+    // compared the way a save stores the marks: the form right after Save is never a draft
+    const d = snapshot();
+    if (draftDiffers(d, marksOf(current))) drafts.set(current, d);
+    else drafts.del(current);
   }
   function saveDraft() {
     window.clearTimeout(draftTimer);
