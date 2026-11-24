@@ -48,10 +48,10 @@ test('what a student sees: the call alone while called, else marks only when com
   applyMarks(d, ta, 4, { scores: { uc_actors: 1 } }, ['B1']);
 
   assert.equal(studentPhase1(d, 3, false), null, 'not published: nothing');
-  const shown = studentPhase1(d, 3, true);
-  assert.ok(shown && shown.call === false);
-  assert.equal(shown.total, 30);
-  assert.equal(shown.comment, 'Fix the activity diagram.');
+  // students get the letter grade and the TA's comment only: no marks, no totals (not even in the data sent)
+  assert.deepEqual(studentPhase1(d, 3, true), { call: false, grade: 'A', comment: 'Fix the activity diagram.' });
+  applyMarks(d, ta, 5, { scores: { ...FULL, ui_screens: 0, ar_pattern: 0, ar_impl: 0, ar_reason: 0 } }, ['C1']);
+  assert.deepEqual(studentPhase1(d, 5, true), { call: false, grade: 'C', comment: null }, '15/30 = 50% is a C; no comment is null');
   assert.equal(studentPhase1(d, 4, true), null, 'half-marked: nothing');
   assert.equal(studentPhase1(d, null, true), null, 'no group: nothing');
 

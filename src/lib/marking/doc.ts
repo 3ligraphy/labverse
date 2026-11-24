@@ -7,7 +7,7 @@
  * admins change the load, the item and publishing. Everyone who saves a group's marks is kept in its `editors`.
  * Pure functions, unit-tested (tests/marking.test.ts).
  */
-import { CRITERIA, MAX_COMMENT, SECTIONS, cleanScore, cleanScores, totals, type CriterionId, type Scores } from './rubric.ts';
+import { CRITERIA, MAX_COMMENT, cleanScore, cleanScores, totals, type CriterionId, type Scores } from './rubric.ts';
 import { cleanAnswers, type Answers } from './assistant.ts';
 
 export const MARKING_KEY = 'marking:phase1';
@@ -148,11 +148,8 @@ export function setCall(doc: MarkingDoc, m: Marker, group: number, on: boolean, 
   return { ok: true };
 }
 
+/** What a student is told about their Phase 1 marking: the letter grade and the TA's comment, never the marks. */
 export type StudentMarks = {
-  sections: { title: string; max: number; score: number }[];
-  criteria: { label: string; max: number; score: number | null }[];
-  total: number;
-  percent: number;
   grade: string;
   comment: string | null;
 };
@@ -160,7 +157,8 @@ export type StudentPhase1 = { call: true } | ({ call: false } & StudentMarks);
 
 /**
  * What a student of `group` sees for Phase 1 on the Project page: while the group is called, only the call
- * (no marks, no feedback); otherwise their marks once all 9 are in and the marks are published; else nothing.
+ * (no grade, no feedback); otherwise their letter grade and the TA's comment once all 9 marks are in and the marks
+ * are published; else nothing.
  */
 export function studentPhase1(doc: MarkingDoc, group: number | null, marksPublished: boolean): StudentPhase1 | null {
   if (group === null) return null;
@@ -169,15 +167,8 @@ export function studentPhase1(doc: MarkingDoc, group: number | null, marksPublis
   if (!m) return null;
   const t = totals(m.scores);
   if (!t.grade || t.missing.length) return null;
-  return {
-    call: false,
-    sections: SECTIONS.map((s) => ({ title: s.title, max: s.max, score: t.sections[s.id] })),
-    criteria: CRITERIA.map((c) => ({ label: c.label, max: c.max, score: m.scores[c.id] ?? null })),
-    total: t.total,
-    percent: t.percent,
-    grade: t.grade,
-    comment: m.comment || null,
-  };
+  // the letter grade and the comment only: the marks and totals are not sent to students at all
+  return { call: false, grade: t.grade, comment: m.comment || null };
 }
 
 /**

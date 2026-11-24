@@ -271,10 +271,7 @@ const nav = d ? [
   :global(.pjr-fb) { margin: 0 !important; white-space: pre-wrap; color: var(--text); line-height: 1.6; }
   :global(.pjr-call .pjr-fb) { padding: 10px 12px; border: 1px solid color-mix(in oklab, var(--warn) 45%, var(--line)); border-radius: 8px; background: color-mix(in oklab, var(--warn) 10%, transparent); }
   :global(.pjr-none) { margin: 0 !important; color: var(--text-3); }
-  :global(.pjr-score) { margin: 0 !important; font-size: 1.05rem; color: var(--text); }
-  :global(.pjr-marks) { width: 100%; min-width: 0 !important; border-collapse: collapse; font-size: 14px; }
-  :global(.pjr-marks td) { padding: 5px 0 !important; border-bottom: 1px solid var(--line); color: var(--text-2); }
-  :global(.pjr-marks td.mono) { text-align: right; color: var(--text); white-space: nowrap; }
+  :global(.pjr-grade) { margin: 0 !important; font: 800 2.25rem/1 var(--font-display, var(--font-body)); letter-spacing: -.02em; color: var(--text); }
 </style>
 
 <script>
@@ -334,7 +331,7 @@ const nav = d ? [
     // once the Phase 1 marks are published, the box is about Phase 1 (the proposal feedback, if published, comes after)
     if (data.items.some((i: { marks?: boolean }) => i.marks)) {
       sec.querySelector('[data-pjr-title]')!.textContent = 'Your Phase 1 result';
-      sec.querySelector('[data-pjr-intro]')!.textContent = 'Type your student ID to see your group’s Phase 1 marks and feedback. Only your own group is shown.';
+      sec.querySelector('[data-pjr-intro]')!.textContent = 'Type your student ID to see your group’s Phase 1 grade and feedback. Only your own group is shown.';
     }
     sec.hidden = false;
     if (link) link.hidden = false;
@@ -358,7 +355,8 @@ const nav = d ? [
     }));
     const msg = sec.querySelector<HTMLElement>('[data-pjr-msg]')!;
     const out = sec.querySelector<HTMLElement>('[data-pjr-out]')!;
-    type Marks = { call?: false; sections: { title: string; max: number; score: number }[]; criteria: { label: string; max: number; score: number | null }[]; total: number; percent: number; grade: string; comment: string | null };
+    // students see the letter grade and the TA's comment only (the marks are not sent: src/lib/marking/doc.ts studentPhase1)
+    type Marks = { call?: false; grade: string; comment: string | null };
     type Phase1 = Marks | { call: true };
     type Result = { item: string; group: string; members: { name: string; id: string }[]; idea: string; feedback: string | null; phase1?: Phase1 | null };
     // the group is called in to discuss its project with its TA: no marks and no feedback until then
@@ -368,11 +366,8 @@ const nav = d ? [
           <p class="pjr-fb"><b>Come to a discussion about your project.</b> Your TA needs to discuss your project with your group before your Phase 1 marks and feedback are released. Ask your TA for a time, and bring your project ready to run.</p>
         </div>`;
     const marks = (p: Marks) => `
-        <div class="pjr-block"><span class="pjr-label">Phase 1 marks</span>
-          <p class="pjr-score"><b>${p.total}</b> / 30 · ${p.percent} / 100 · grade <b>${esc(p.grade)}</b></p>
-          <table class="pjr-marks"><tbody>${p.criteria.map((c) => `<tr><td>${esc(c.label)}</td><td class="mono">${c.score ?? '–'} / ${c.max}</td></tr>`).join('')}</tbody></table>
-        </div>
-        ${p.comment ? `<div class="pjr-block"><span class="pjr-label">Phase 1 feedback</span><p class="pjr-fb">${esc(p.comment)}</p></div>` : ''}`;
+        <div class="pjr-block"><span class="pjr-label">Phase 1 grade</span><p class="pjr-grade">${esc(p.grade)}</p></div>
+        <div class="pjr-block"><span class="pjr-label">Phase 1 feedback</span>${p.comment ? `<p class="pjr-fb">${esc(p.comment)}</p>` : '<p class="pjr-none">No written feedback.</p>'}</div>`;
     // the item's own feedback; with Phase 1 marks the TA's comment is under the marks, so an empty feedback block is left out
     const feedback = (r: Result) =>
       r.feedback ? `<div class="pjr-block"><span class="pjr-label">Feedback</span><p class="pjr-fb">${esc(r.feedback)}</p></div>`

@@ -3,7 +3,8 @@
  *   GET                      { items: [{ id, title, marks? }] }  the published items (so the page knows to show the box);
  *                            `marks: true` on the item whose Phase 1 marks are published (the box is then titled Phase 1)
  *   GET ?studentId=…         { results: [{ item, group, members, idea, feedback, phase1 }] }  the student's own group only
- *                            (phase1: the marks, or { call: true } when the group is called in to discuss its project)
+ *                            (phase1: { grade, comment } — the letter grade and the TA's comment, never the marks —
+ *                            or { call: true } when the group is called in to discuss its project)
  * Lookups are limited per network address, so nobody can try every ID; members come with their IDs so teammates can find each other.
  * Each lookup that finds a group is recorded, so staff can see who has checked (admin feedback page).
  */
