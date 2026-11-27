@@ -11,6 +11,7 @@ import { introComputingTypeDrawLab } from '../src/lib/platform/seeds/intro-compu
 import { shippedSeeds } from '../src/lib/platform/seeds/index.ts';
 import { NEW_QUESTIONS, SHEET_QUESTIONS, MIXED, CHALLENGES } from '../src/lib/platform/seeds/intro-computing-ultimate-questions.ts';
 import { gradeCpp } from '../src/lab/cpp/grade.ts';
+import { minutes, formatMinutes } from '../src/lib/lab.ts';
 import { SOLUTIONS } from './support/ultimate-solutions.ts';
 
 const flow = introComputingUltimateLab();
@@ -24,6 +25,21 @@ test('Lab 4 compiles: the 15 topics in lecture order, then Mixed, then the 10 ch
   const parts = flow.nodes.filter((n) => n.type === 'part').map((n) => n.data.title);
   assert.equal(TOPICS.length, 15);
   assert.deepEqual(parts, [...TOPICS.map((t) => t.title), 'Mixed concepts', 'The 10 challenges']);
+});
+
+test('the start of Lab 4 is kept as written (no field silently replaced by a default)', () => {
+  const s = sanitizeFlow(flow, 'lab');
+  assert.ok(s.ok);
+  const raw = flow.nodes[0].data;
+  const kept = s.value.nodes[0].data;
+  for (const k of Object.keys(raw)) assert.equal(kept[k], raw[k], `start field ${k}`);
+});
+
+test('the time on the module card is the sum of the part times (the lab page adds them up)', () => {
+  const parts = flow.nodes.filter((n) => n.type === 'part');
+  const total = parts.reduce((a, p) => a + minutes(p.data.time), 0);
+  assert.equal(flow.nodes[0].data.estimatedTime, formatMinutes(total));
+  assert.ok(total >= 20 * 60, `${formatMinutes(total)}: about 4 to 5 minutes for each of the ~280 questions`);
 });
 
 test('Lab 4 fits in one flow, with room to spare (the builder still opens it)', () => {

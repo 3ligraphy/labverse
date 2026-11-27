@@ -17,6 +17,7 @@ import { ID_HINT, NAME_RE, STUDENT_ID_RE as ID_RE } from '@/lib/identity';
 import { ALWAYS_OPEN } from '@/lib/progress/mode';
 import { weekKey } from '@/lib/attendance/weekly';
 import { OUTAGE } from '@/lib/outage';
+import { readingId } from '@/lib/progress/reading';
 
 const read = <T>(key: string, fallback: T, store: Storage = localStorage): T => {
   try {
@@ -393,7 +394,8 @@ function initReadingTracker() {
   reading?.stop();
   reading = null;
   const lab = labId();
-  const tasks = Array.from(document.querySelectorAll<HTMLElement>('.task[data-task], [data-exercise]'));
+  // builder C++/AI blocks have an empty data-exercise (a gate marker): no id, so they are not watched
+  const tasks = Array.from(document.querySelectorAll<HTMLElement>('.task[data-task], [data-exercise]')).filter((el) => readingId(el.dataset));
   if (!lab || !tasks.length || !('IntersectionObserver' in window)) return;
   const get = () => read<Pending>(viewsKey(lab), { seen: [], sec: 0, sent: [] });
   const timers = new Map<Element, number>();
@@ -408,7 +410,7 @@ function initReadingTracker() {
     (entries) =>
       entries.forEach((e) => {
         const target = e.target as HTMLElement;
-        const n = target.dataset.task ?? target.dataset.exercise!;
+        const n = readingId(target.dataset)!;
         const inView = e.isIntersecting && (e.intersectionRatio >= 0.4 || e.intersectionRect.height >= window.innerHeight * 0.5);
         if (inView && !timers.has(e.target)) timers.set(e.target, window.setTimeout(() => markSeen(n), SEEN_MS));
         if (!inView && timers.has(e.target)) {

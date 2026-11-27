@@ -19,21 +19,21 @@ export const ULTIMATE_SLUG = 'ultimate-revision';
 
 /** the topics, in the order of the lectures (Lectures 3–9 and the lab sheets) */
 export const TOPICS = [
-  { id: 't1', title: 'Output: cout, \\n and \\t', time: '25 min' },
-  { id: 't2', title: 'Values: variables, types, const and assignment', time: '35 min' },
-  { id: 't3', title: 'Input: cin and getline', time: '25 min' },
-  { id: 't4', title: 'Calculating: operators, cmath and algorithm', time: '60 min' },
-  { id: 't5', title: 'Choosing: if, else if, else, and, or, not', time: '55 min' },
-  { id: 't6', title: 'Characters and ASCII', time: '30 min' },
-  { id: 't7', title: 'Strings: length, [ ], at, find, substr, stoi, to_string', time: '35 min' },
-  { id: 't8', title: 'Programs with strings', time: '70 min' },
-  { id: 't9', title: 'Vectors and complex numbers (Programs 21 to 30)', time: '55 min' },
-  { id: 't10', title: 'Sets of numbers and statistics (Programs 3 to 8)', time: '40 min' },
-  { id: 't11', title: 'From flowchart and pseudocode to code (Lecture 6)', time: '45 min' },
-  { id: 't12', title: 'while loops', time: '55 min' },
-  { id: 't13', title: 'for loops', time: '70 min' },
-  { id: 't14', title: 'do..while, break and continue', time: '35 min' },
-  { id: 't15', title: 'Nested loops', time: '40 min' },
+  { id: 't1', title: 'Output: cout, \\n and \\t', time: '45 min' },
+  { id: 't2', title: 'Values: variables, types, const and assignment', time: '1 h' },
+  { id: 't3', title: 'Input: cin and getline', time: '40 min' },
+  { id: 't4', title: 'Calculating: operators, cmath and algorithm', time: '1 h 40 min' },
+  { id: 't5', title: 'Choosing: if, else if, else, and, or, not', time: '1 h 20 min' },
+  { id: 't6', title: 'Characters and ASCII', time: '40 min' },
+  { id: 't7', title: 'Strings: length, [ ], at, find, substr, stoi, to_string', time: '50 min' },
+  { id: 't8', title: 'Programs with strings', time: '2 h 15 min' },
+  { id: 't9', title: 'Vectors and complex numbers (Programs 21 to 30)', time: '1 h 45 min' },
+  { id: 't10', title: 'Sets of numbers and statistics (Programs 3 to 8)', time: '50 min' },
+  { id: 't11', title: 'From flowchart and pseudocode to code (Lecture 6)', time: '1 h 15 min' },
+  { id: 't12', title: 'while loops', time: '1 h' },
+  { id: 't13', title: 'for loops', time: '1 h 55 min' },
+  { id: 't14', title: 'do..while, break and continue', time: '45 min' },
+  { id: 't15', title: 'Nested loops', time: '45 min' },
 ] as const;
 export type TopicId = (typeof TOPICS)[number]['id'];
 
@@ -105,8 +105,9 @@ export function introComputingUltimateLab(): Flow {
     { id: 'root', type: 'start', data: {
       title: 'The ultimate coding revision',
       description: 'Every topic of the lectures, practised by typing code: the programs of Labs 1 to 3 and of the lab sheets, new questions on every topic, mixed questions, and 10 challenges that combine everything. Each program is checked by running it on several inputs.',
-      difficulty: 'Beginner to advanced',
-      estimatedTime: '12 h',
+      // one level only (Beginner, Intermediate or Advanced): the topics start easy and the challenges are hard
+      difficulty: 'Intermediate',
+      estimatedTime: '22 h 45 min',
       objectives: [
         'Write every kind of program from the lectures, without help: output, input, calculations, selection, characters and strings',
         'Write while, for and do..while loops, with break and continue, and nested loops',
@@ -116,10 +117,10 @@ export function introComputingUltimateLab(): Flow {
       access: 'Open any time (no session, still tracked)',
     } },
     ...TOPICS.flatMap(topic),
-    part('mixed', 'Mixed concepts', '90 min'),
+    part('mixed', 'Mixed concepts', '2 h'),
     task('mixed-all', 'Mixed concepts', '', 'Each question mixes several topics. Read it all first, plan the steps, then type the code.'),
     ...MIXED,
-    part('challenges', 'The 10 challenges', '3 h'),
+    part('challenges', 'The 10 challenges', '3 h 20 min'),
     task('challenges-all', 'The 10 challenges', '', 'Long programs that use everything: input, calculations, selection, characters, strings and loops. Plan on paper first.'),
     ...CHALLENGES,
   ]);
