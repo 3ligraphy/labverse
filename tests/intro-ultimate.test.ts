@@ -3,7 +3,7 @@
 // lab-sheet programs, then new questions), mixed concepts and 10 challenges — every program checked by running it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { compileLab, sanitizeFlow, type Block } from '../src/lib/platform/core.ts';
+import { compileLab, sanitizeFlow, MAX_NODES, type Block } from '../src/lib/platform/core.ts';
 import { introComputingUltimateLab, ULTIMATE_SLUG, TOPICS } from '../src/lib/platform/seeds/intro-computing-ultimate.ts';
 import { introComputingModule, introComputingRevisionLab } from '../src/lib/platform/seeds/intro-computing-revision.ts';
 import { introComputingPracticeLab } from '../src/lib/platform/seeds/intro-computing-practice.ts';
@@ -26,6 +26,10 @@ test('Lab 4 compiles: the 15 topics in lecture order, then Mixed, then the 10 ch
   assert.deepEqual(parts, [...TOPICS.map((t) => t.title), 'Mixed concepts', 'The 10 challenges']);
 });
 
+test('Lab 4 fits in one flow, with room to spare (the builder still opens it)', () => {
+  assert.ok(flow.nodes.length <= MAX_NODES - 20, `${flow.nodes.length} nodes of ${MAX_NODES}`);
+});
+
 test('every program of Labs 1–3 is in Lab 4 once, word for word (same text, same checks)', () => {
   const sources = [[1, introComputingRevisionLab()], [2, introComputingPracticeLab()], [3, introComputingTypeDrawLab()]] as const;
   let n = 0;
@@ -33,7 +37,9 @@ test('every program of Labs 1–3 is in Lab 4 once, word for word (same text, sa
     for (const node of src.nodes.filter((x) => x.type === 'cpp')) {
       const copies = flow.nodes.filter((x) => x.id === `l${lab}-${node.id}`);
       assert.equal(copies.length, 1, `l${lab}-${node.id} is in Lab 4 once`);
-      assert.deepEqual(copies[0].data, node.data, `l${lab}-${node.id} is word for word`);
+      const { tag, ...same } = copies[0].data;
+      assert.deepEqual(same, node.data, `l${lab}-${node.id} is word for word`);
+      assert.equal(tag, `Lab ${lab}`, `l${lab}-${node.id} is tagged Lab ${lab}`);
       n += 1;
     }
   }
@@ -84,6 +90,18 @@ test('every check of Lab 4 is read as written: no warnings, a regex never swallo
   }
 });
 
+test('every question of Lab 4 shows where it comes from: Lab 1, 2 or 3, a lab sheet, a lecture, or New', () => {
+  const asked = blocks.filter((b) => b.kind === 'cpp' || b.kind === 'cppanswer') as Extract<Block, { kind: 'cpp' | 'cppanswer' }>[];
+  assert.ok(asked.length > 150);
+  for (const b of asked) {
+    const id = idOf(b);
+    const want = /^l([123])-/.exec(id)?.[1];
+    if (want) assert.equal(b.tag, `Lab ${want}`, id);
+    else if (/^s-/.test(id)) assert.match(b.tag, /^(Wk(3|6|9|10) sheet|Lecture [3-9])$/, id);
+    else assert.equal(b.tag, 'New', id);
+  }
+});
+
 test('every program of Lab 4 has a reference solution that passes all its checks', () => {
   assert.ok(progs.length > 0);
   for (const b of progs) {
@@ -119,13 +137,55 @@ test('reference solutions use only lecture content: no arrays, no functions of y
   }
 });
 
-test('topics 1 to 10: five or more new questions each, ids n<topic>-<k>', () => {
-  for (let t = 1; t <= 10; t += 1) {
+test('every topic: five or more new questions, ids n<topic>-<k> (a flowchart to watch: n<topic>-<k>-flow)', () => {
+  for (let t = 1; t <= 15; t += 1) {
     const fresh = NEW_QUESTIONS[`t${t}` as keyof typeof NEW_QUESTIONS] ?? [];
-    assert.ok(fresh.length >= 5, `topic ${t}: ${fresh.length} new questions`);
-    for (const n of fresh) assert.match(n.id, new RegExp(`^n${t}-\\d+$`));
+    const asked = fresh.filter((n) => n.type === 'cpp' || n.type === 'cppanswer');
+    assert.ok(asked.length >= 5, `topic ${t}: ${asked.length} new questions`);
+    for (const n of fresh) assert.match(n.id, new RegExp(`^n${t}-\\d+${n.type === 'flowchart' ? '-flow' : ''}$`));
   }
   assert.ok((SHEET_QUESTIONS.t4 ?? []).some((n) => n.id === 's-p10'), 'sheet Program 10 is in topic 4');
+});
+
+test('the lab-sheet and lecture questions of the loop topics are all there, in their topic', () => {
+  const inTopic = (t: string) => (SHEET_QUESTIONS[t as keyof typeof SHEET_QUESTIONS] ?? []).map((n) => n.id);
+  const want: Record<string, string[]> = {
+    t5: ['s-w9-q3a', 's-w9-q3b', 's-w9-q3c1', 's-w9-q3c2', 's-w9-q3c3'],
+    t11: Array.from({ length: 10 }, (_, i) => `s-l6-e${i + 1}`),
+    t12: [9, 10, 11, 12, 13, 14, 15].map((p) => `s-w9-p${p}`).concat('s-w9-q2'),
+    t13: ['s-w10-p16', 's-w10-p17', ...[9, 10, 11, 12, 13, 14, 15].map((p) => `s-w10-r${p}`), 's-w10-a1', 's-w10-a2', 's-w10-a3', 's-w10-a4', 's-w10-b1', 's-w10-b2', 's-w10-b3', 's-w10-b4', 's-w10-c', 's-l8-e2', 's-l8-vary', 's-l8-e3', 's-l8-e4', 's-l8-stars', 's-l8-null', 's-l8-trace', 's-l8-e5'],
+    t14: ['s-l8-e1', 's-l6-try', 's-l8-break', 's-l8-continue'],
+    t15: ['s-l9-e1', 's-l9-t1', 's-l9-t2', 's-l9-t3', 's-l9-e2', 's-l9-e3'],
+  };
+  for (const [t, ids] of Object.entries(want)) for (const id of ids) assert.ok(inTopic(t).includes(id), `${id} is in ${t}`);
+});
+
+test('a flowchart question keeps its flowchart just above it, to watch (Lecture 6 examples, new flowchart questions)', () => {
+  const ids = flow.nodes.map((x) => x.id);
+  const charts = flow.nodes.filter((x) => x.type === 'flowchart' && !x.id.startsWith('l3-'));
+  assert.ok(charts.length >= 13);
+  for (const c of charts) {
+    const code = c.id.replace(/-flow$/, '');
+    assert.equal(ids[ids.indexOf(c.id) + 1], code, `${code} comes right after its flowchart`);
+    assert.equal(c.data.mode, 'Show it running');
+  }
+  for (let e = 1; e <= 10; e += 1) assert.ok(ids.includes(`s-l6-e${e}-flow`), `Lecture 6 Example ${e} has its flowchart`);
+});
+
+test('find the errors (Wk10 2 b): the starter is the sheet’s broken code, and it does not pass', () => {
+  const sheet: Record<string, RegExp> = { b1: /for i = 0; i < 5; i\+\+\n/, b2: /for \( i = 0; i < 5; i\+\+ \) ;\n\s+cout << "hello"\n/, b3: /for \( i = 0, i > 5; i\+\+ \)/, b4: /for \( i = 0; i <= 5; i\+\+ \)/ };
+  for (const [b, re] of Object.entries(sheet)) {
+    const block = progs.find((x) => idOf(x) === `s-w10-${b}`);
+    assert.ok(block, `s-w10-${b}`);
+    assert.match(block.starter, re, `s-w10-${b} starts with the sheet's code`);
+  }
+});
+
+test('an endless loop does not freeze the page: the check stops it and says so', () => {
+  const block = progs.find((x) => idOf(x) === 's-w9-p9');
+  assert.ok(block);
+  const r = gradeCpp('#include <iostream>\nusing namespace std;\n\nint main() {\n    int n = 1;\n    while (n <= 99) {\n        cout << n;\n    }\n    return 0;\n}\n', block.checks);
+  assert.ok(r.results.some((x) => /never stop/.test(x.message ?? '')), JSON.stringify(r.results[0]));
 });
 
 export { MIXED, CHALLENGES };

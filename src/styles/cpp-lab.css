@@ -44,6 +44,9 @@
 .cx-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
 .cx-kind { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; letter-spacing: .04em; color: color-mix(in oklab, var(--kc) 70%, var(--text)); }
 .cx-kind-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--kc); }
+/* where the question comes from (Lab 2, Wk9 sheet, Lecture 8 …); new questions in the "ok" colour */
+.cx-tag { display: inline-flex; align-items: center; font-size: 11px; line-height: 1.6; letter-spacing: .04em; padding: 0 8px; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--kc) 32%, var(--line)); background: color-mix(in oklab, var(--kc) 7%, transparent); color: var(--text-2); }
+.cx-tag.is-new { border-color: color-mix(in oklab, var(--ok) 45%, var(--line)); background: color-mix(in oklab, var(--ok) 10%, transparent); color: color-mix(in oklab, var(--ok) 75%, var(--text)); }
 .cx-title { margin: 0 !important; font-size: 1.06rem; font-weight: 650; color: var(--text); }
 .cx-goal > :first-child, .cx-q > :first-child { margin-top: 0 !important; }
 .cx-goal > :last-child, .cx-q > :last-child { margin-bottom: 0 !important; }

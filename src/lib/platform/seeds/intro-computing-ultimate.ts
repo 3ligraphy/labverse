@@ -58,11 +58,11 @@ const FROM_LABS: Record<TopicId, [1 | 2 | 3, string][]> = {
 
 const SOURCES = { 1: introComputingRevisionLab(), 2: introComputingPracticeLab(), 3: introComputingTypeDrawLab() } as const;
 
-/** a node of Lab 1, 2 or 3, word for word (only its id changes: l<lab>-<id>) */
+/** a node of Lab 1, 2 or 3, word for word (its id becomes l<lab>-<id>, and it is tagged with its lab) */
 export function reuse(lab: 1 | 2 | 3, id: string): N {
   const node = SOURCES[lab].nodes.find((n) => n.id === id);
   if (!node) throw new Error(`Lab ${lab} has no node ${id}`);
-  return { id: `l${lab}-${id}`, type: node.type, data: { ...(node.data as Record<string, string>) } };
+  return { id: `l${lab}-${id}`, type: node.type, data: { ...(node.data as Record<string, string>), tag: `Lab ${lab}` } };
 }
 
 /** the flowchart a Lab 3 code question was written from — the perfect one, to watch */
@@ -94,9 +94,9 @@ function topic(t: (typeof TOPICS)[number]): N[] {
   return [
     part(t.id, t.title, t.time),
     ...(labs.length || sheet.length
-      ? [task(`${t.id}-labs`, 'From the labs, as they are', '', 'These questions come from Labs 1 to 3 and from the lab sheets, word for word. Type every program yourself: paste is blocked.'), ...labs, ...sheet]
+      ? [task(`${t.id}-labs`, 'From the labs and lectures, as they are', '', 'These questions come from Labs 1 to 3, the lab sheets and the lectures, word for word: the tag on each one says where. Type every program yourself: paste is blocked.'), ...labs, ...sheet]
       : []),
-    ...(fresh.length ? [task(`${t.id}-new`, 'New questions', '', 'New questions on the same topic, from easy to hard.'), ...fresh] : []),
+    ...(fresh.length ? [task(`${t.id}-new`, 'New questions', '', 'New questions on the same topic, from easy to hard (tagged New).'), ...fresh] : []),
   ];
 }
 

@@ -42,6 +42,7 @@ const gate = b.kind === 'cppvisual' || (b.kind === 'flowchart' && !graded) ? { '
 <section class={`cx-block cx-k-${b.kind}`} data-cpp data-cpp-id={b.id} data-graded={graded ? '' : undefined} {...gate}>
   <header class="cx-head">
     <span class="cx-kind mono"><span class="cx-kind-dot" aria-hidden="true"></span>{kindLabel}</span>
+    {(b.kind === 'cpp' || b.kind === 'cppanswer') && b.tag && <span class:list={['cx-tag mono', { 'is-new': b.tag === 'New' }]} title="Where this question comes from">{b.tag}</span>}
     {b.kind === 'cpp' && <h4 class="cx-title">{b.title}</h4>}
     {b.kind === 'parsons' && <h4 class="cx-title">{b.title}</h4>}
     {b.kind === 'flowchart' && <h4 class="cx-title">{b.title}</h4>}

@@ -348,7 +348,15 @@ export function parse(src: string): Program {
       let init: Stmt | null = null;
       if (eat(';')) init = null;
       else if (typeLength()) init = declaration(parseType());
-      else { const e = expr(); expect(';'); init = { ...pos, k: 'expr', e }; }
+      else {
+        // for (i = 1, j = 0; …): the first part may set several variables, separated by commas
+        const list = [assignment()];
+        while (eat(',')) list.push(assignment());
+        expect(';');
+        init = list.length === 1
+          ? { ...pos, k: 'expr', e: list[0] }
+          : { ...pos, k: 'block', body: list.map((e): Stmt => ({ line: e.line, col: e.col, k: 'expr', e })), endLine: pos.line };
+      }
       const cond = is(';') ? null : expr();
       expect(';');
       const step = is(')') ? null : expr();

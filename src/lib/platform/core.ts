@@ -271,9 +271,10 @@ export const LAB_NODES = {
       { key: 'checks', label: 'Checks', kind: 'lines', help: 'One per line: name :: in 3 5; expect the product is: 15 — steps: in …, expect …, exact …, not …, code /regex/ message, nocode /regex/ message. No checks = an ungraded playground.', max: 6000 },
       { key: 'hints', label: 'Hints', kind: 'lines', help: 'One per line; students open them one at a time', max: 3000 },
       { key: 'paste', label: 'Pasting code', kind: 'select', options: ['Allowed', 'Blocked'], help: 'Blocked: students type the code themselves, as in the lab test' },
+      { key: 'tag', label: 'Source tag', kind: 'text', placeholder: 'Lab 2', help: 'Optional: a small tag that says where the question comes from (e.g. Lab 2, Wk9 sheet, New).', max: 40 },
     ],
     defaults: {
-      title: 'Your program', goal: 'Write a program that …', paste: 'Allowed', input: '', hints: '',
+      title: 'Your program', goal: 'Write a program that …', paste: 'Allowed', input: '', hints: '', tag: '',
       starter: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello!\\n";\n    return 0;\n}\n',
       checks: 'Says hello :: expect Hello!',
     },
@@ -300,8 +301,9 @@ export const LAB_NODES = {
       { key: 'answers', label: 'Accepted answers', kind: 'lines', help: 'A value: every accepted form, one per line (e.g. 6 and 6.0). What the user types: the output it must produce. Not used for “what it prints”.', max: 1000 },
       { key: 'caps', label: 'Capital letters', kind: 'select', options: ['Count', 'Do not count'], help: 'For “a value” only. Count: A and a are different answers (as in C++). Do not count: for word answers, e.g. ASCII and ascii.' },
       { key: 'explain', label: 'Explanation (after a right answer)', kind: 'markdown', max: 3000 },
+      { key: 'tag', label: 'Source tag', kind: 'text', placeholder: 'Wk9 sheet', help: 'Optional: a small tag that says where the question comes from (e.g. Lab 2, Wk9 sheet, New).', max: 40 },
     ],
-    defaults: { question: 'What does this program print?', code: 'int x = 3;\nx = x + 2;\ncout << x;', input: '', mode: Object.keys(ANSWER_MODES)[0], answers: '', caps: 'Count', explain: '' },
+    defaults: { question: 'What does this program print?', code: 'int x = 3;\nx = x + 2;\ncout << x;', input: '', mode: Object.keys(ANSWER_MODES)[0], answers: '', caps: 'Count', explain: '', tag: '' },
   },
   parsons: {
     label: 'Order the lines', hint: 'Parsons puzzle: put the code blocks in the right order, then run it', color: '#7ce0a3', glyph: '⇅', kit: 'cpp',
@@ -512,7 +514,8 @@ export type FlowEdge = { from: string; to: string };
 export type Flow = { nodes: FlowNode[]; edges: FlowEdge[] };
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
-export const MAX_NODES = 300;
+/** a lab of up to ~400 shapes: Intro to Computing Lab 4 (the whole revision bank) has about 360 */
+export const MAX_NODES = 400;
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/;
 /** Course pages live in their own folders, so a module or a built-in course lab can't take these addresses. */
@@ -663,9 +666,9 @@ export type Block =
   | { kind: 'browser'; id: string; title: string; url: string; html: string; height: 'Short' | 'Medium' | 'Tall'; caption: string }
   | { kind: 'websandbox'; id: string; title: string; goal: string; hint: string; starter: string }
   | { kind: 'clickpath'; title: string; steps: string[] }
-  | { kind: 'cpp'; id: string; title: string; goal: string; starter: string; input: string; checks: CppCheck[]; hints: string[]; paste: boolean }
+  | { kind: 'cpp'; id: string; title: string; goal: string; starter: string; input: string; checks: CppCheck[]; hints: string[]; paste: boolean; tag: string }
   | { kind: 'cpppredict'; id: string; question: string; code: string; input: string; options: { text: string; correct: boolean }[]; explain: string; trace: boolean }
-  | { kind: 'cppanswer'; id: string; question: string; code: string; input: string; mode: 'output' | 'value' | 'input'; answers: string[]; ignoreCase: boolean; explain: string }
+  | { kind: 'cppanswer'; id: string; question: string; code: string; input: string; mode: 'output' | 'value' | 'input'; answers: string[]; ignoreCase: boolean; explain: string; tag: string }
   | { kind: 'parsons'; id: string; title: string; goal: string; code: string; input: string }
   | { kind: 'cppvisual'; id: string; visual: string; text: string; caption: string }
   | { kind: 'flowchart'; id: string; title: string; goal: string; mode: FlowMode; chart: Chart; input: string; bank: string[]; checks: string; solution?: Chart }
@@ -811,7 +814,7 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
         const title = d.title || 'C++ exercise';
         push({
           kind: 'cpp', id, title, goal: d.goal ?? '', starter: d.starter ?? '', input: d.input ?? '', checks,
-          hints: (d.hints ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean), paste: d.paste !== 'Blocked',
+          hints: (d.hints ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean), paste: d.paste !== 'Blocked', tag: (d.tag ?? '').trim(),
         });
         if (checks.length) {
           exercises[id] = { kind: 'cpp', title, goal: d.goal || undefined, files: { 'main.cpp': d.starter ?? '' }, checks: checks.map((c) => ({ name: c.name, steps: [] })) };
@@ -835,7 +838,7 @@ export function compileLab(flow: Flow, key: string): CompiledLab {
         if (!(d.question ?? '').trim()) { warnings.push('A “Type the answer” question has no question text.'); break; }
         if (mode !== 'output' && !answers.length) { warnings.push(`“${excerptOf(d.question)}” needs at least one accepted answer.`); break; }
         if (mode !== 'value' && !(d.code ?? '').trim()) { warnings.push(`“${excerptOf(d.question)}” needs the C++ code it is about.`); break; }
-        push({ kind: 'cppanswer', id, question: d.question ?? '', code: d.code ?? '', input: d.input ?? '', mode, answers, ignoreCase: mode === 'value' && d.caps === 'Do not count', explain: d.explain ?? '' });
+        push({ kind: 'cppanswer', id, question: d.question ?? '', code: d.code ?? '', input: d.input ?? '', mode, answers, ignoreCase: mode === 'value' && d.caps === 'Do not count', explain: d.explain ?? '', tag: (d.tag ?? '').trim() });
         // many questions read “What does this print?”: the first line of their code tells them apart in the TA's statistics
         const firstLine = (d.code ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
         const title = [excerptOf((d.question ?? '').replace(/[*`]/g, '')), firstLine && excerptOf(firstLine)].filter(Boolean).join(' · ');

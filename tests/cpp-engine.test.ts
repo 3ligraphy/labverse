@@ -357,3 +357,10 @@ test('cmath sin, cos and tan (angles in radians) for the lab sheets’ geometry 
   assert.equal(out(main('const float pi = 3.14159;\n    cout << round(tan(45 * pi / 180) * 100) << " " << round(sin(30 * pi / 180) * 100) << " " << round(cos(60 * pi / 180) * 100);')), '100 50 50');
   assert.equal(out(main('cout << sin(0) << " " << cos(0);')), '0 1');
 });
+
+test('a comma in the first part of a for sets two variables (Wk10 trace c); a missing ; is still an error', () => {
+  const trace = main('int n = 4;\n    int i, j;\n    for (i = 1, j = 0; i <= n; i++)\n    {\n        j += i;\n        cout << "i = " << i << ", j = " << j;\n    }');
+  assert.equal(out(trace), 'i = 1, j = 1i = 2, j = 3i = 3, j = 6i = 4, j = 10');
+  assert.equal(compile(main('int i;\n    for ( i = 0, i > 5; i++ )\n        cout << "hello" ;')).ok, false);
+  assert.equal(compile(main('int a = 1, b = 2;\n    a = 3, b = 4;\n    cout << a;')).ok, false, 'outside a for, a comma still cannot join two expressions');
+});

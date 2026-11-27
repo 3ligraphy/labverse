@@ -3,21 +3,33 @@
  * (their own words) and the new ones. Each program is checked by running it (`in …; expect …`); the reference
  * solutions live in tests/support/ultimate-solutions.ts. Only lecture content: no arrays, no functions of your own.
  */
+import { buildChart, type FStep } from '../../../lab/flow/build.ts';
+
 type N = { id: string; type: string; data: Record<string, string> };
 type Topic = 't1' | 't2' | 't3' | 't4' | 't5' | 't6' | 't7' | 't8' | 't9' | 't10' | 't11' | 't12' | 't13' | 't14' | 't15';
 
 export const SKELETON = '#include <iostream>\nusing namespace std;\n\nint main() {\n\n    return 0;\n}\n';
 
 /** a program to type (paste blocked), checked on several inputs */
-export const prog = (id: string, d: { title: string; goal: string; checks: string[]; starter?: string; hints?: string[] }): N =>
-  ({ id, type: 'cpp', data: { title: d.title, goal: d.goal, starter: d.starter ?? SKELETON, input: '', checks: d.checks.join('\n'), hints: (d.hints ?? []).join('\n'), paste: 'Blocked' } });
+export const prog = (id: string, d: { title: string; goal: string; checks: string[]; starter?: string; hints?: string[]; tag?: string }): N =>
+  ({ id, type: 'cpp', data: { title: d.title, goal: d.goal, starter: d.starter ?? SKELETON, input: '', checks: d.checks.join('\n'), hints: (d.hints ?? []).join('\n'), paste: 'Blocked', tag: d.tag ?? 'New' } });
 
-const answer = (id: string, mode: string, question: string, code: string, answers: string[] = [], input = ''): N =>
-  ({ id, type: 'cppanswer', data: { question, code, input, mode, answers: answers.join('\n'), caps: 'Count', explain: '' } });
-/** type exactly what the code prints (checked against the real output) */
-export const out = (id: string, question: string, code: string, input = '') => answer(id, 'What it prints (the output)', question, code, [], input);
+const answer = (id: string, mode: string, tag: string, question: string, code: string, answers: string[] = [], input = ''): N =>
+  ({ id, type: 'cppanswer', data: { question, code, input, mode, answers: answers.join('\n'), caps: 'Count', explain: '', tag } });
+/** type exactly what the code prints (checked against the real output); tag = where the question comes from */
+export const out = (id: string, tag: string, question: string, code: string, input = '') => answer(id, 'What it prints (the output)', tag, question, code, [], input);
 /** type a value (checked against the accepted forms) */
-export const val = (id: string, question: string, code: string, answers: string[]) => answer(id, 'A value', question, code, answers);
+export const val = (id: string, tag: string, question: string, code: string, answers: string[]) => answer(id, 'A value', tag, question, code, answers);
+/** a flowchart to watch (Show it running), placed above the code question it belongs to: id `<question>-flow` */
+export const flow = (id: string, title: string, goal: string, steps: FStep[], input = ''): N =>
+  ({ id: `${id}-flow`, type: 'flowchart', data: { title, goal, mode: 'Show it running', chart: buildChart(steps), input, bank: '', checks: '', solution: '' } });
+
+/* the checks every loop sheet adds: Wk9 is about while, Wk10 about for */
+const WHILE = ['Uses while :: code /while\\s*\\(/ Use a while loop: this sheet is about while.', 'No for :: nocode /for\\s*\\(/ Use while here: for comes in the Wk10 sheet.'];
+const FOR = ['Uses for :: code /for\\s*\\(/ Use a for loop.', 'No while :: nocode /while\\s*\\(/ Use for here, not while.'];
+const A_LOOP = 'Uses a loop :: code /while\\s*\\(|for\\s*\\(/ Repeat with a loop: do not write the same line many times.';
+const list = (n: number, f: (i: number) => number | string, sep = ' ') => Array.from({ length: n }, (_, i) => f(i)).join(sep);
+const lines = (n: number, text: string) => list(n, () => text, '\\n') + '\\n';
 
 /* ===================================================================== 1 · Output */
 const t1: N[] = [
@@ -112,17 +124,20 @@ const t3: N[] = [
 /* ===================================================================== 4 · Calculating */
 const t4sheet: N[] = [
   prog('s-p10', {
+    tag: 'Wk6 sheet',
     title: 'Program 10: the area of an isosceles triangle',
     goal: '**Lab sheet, Program 10:** Calculate the area of an isosceles triangle, where the user enters the base and one of the two equal angles of the triangle.\n\nAdded constraints (the sheet asks you to add them): the angle is in degrees. Use `const float pi = 3.14159;`. The height is `(base / 2) * tan(angle * pi / 180)` and the area is `base * height / 2`. `tan` comes from `cmath` and works in radians. Print `area: ` and the area.',
     checks: ['Base 10, angle 45 :: in 10 45; expect area: 25', 'Base 6, angle 60 :: in 6 60; expect area: 15.5884', 'Base 4, angle 30 :: in 4 30; expect area: 2.3094', 'Uses tan :: code /tan\\s*\\(/ The height needs tan( ) from cmath.'],
     hints: ['`#include <cmath>` gives you `tan`. Turn degrees into radians: `angle * pi / 180`.'],
   }),
   prog('s-p13', {
+    tag: 'Wk6 sheet',
     title: 'Program 13: the area of a parallelogram (two sides)',
     goal: '**Lab sheet, Program 13:** Calculate the area of a parallelogram, where the user enters the lengths of the long and short sides of the parallelogram.\n\nAdded constraint: two sides are not enough — the user also enters the angle between them, in degrees. The area is `long * short * sin(angle * pi / 180)` with `const float pi = 3.14159;`. Print `area: ` and the area.',
     checks: ['8, 5 and 30 degrees :: in 8 5 30; expect area: 20', '10, 4 and 90 degrees :: in 10 4 90; expect area: 40', '6, 6 and 45 degrees :: in 6 6 45; expect area: 25.4558', 'Uses sin :: code /sin\\s*\\(/ The area needs sin( ) from cmath.'],
   }),
   prog('s-p14', {
+    tag: 'Wk6 sheet',
     title: 'Program 14: the area of a parallelogram (angle, length, height)',
     goal: '**Lab sheet, Program 14:** Calculate the area of a parallelogram, where the user enters the angle, the length, and the height of the parallelogram.\n\nRead the three numbers in this order. Think: does the area need the angle? (It is `length * height`.) Print `area: ` and the area.',
     checks: ['60, 8 and 3 :: in 60 8 3; expect area: 24', '30, 10 and 2.5 :: in 30 10 2.5; expect area: 25', '45, 7 and 7 :: in 45 7 7; expect area: 49'],
@@ -278,21 +293,25 @@ const t8: N[] = [
 /* ===================================================================== 9 · Vectors and complex numbers */
 const t9sheet: N[] = [
   prog('s-p26', {
+    tag: 'Wk6 sheet',
     title: 'Program 26: is it a complex number?',
     goal: '**Lab sheet, Program 26:** Verify that a number entered by the user is a complex number.\n\nLecture 5 uses the format `a + bi` or `a - bi`: a number, a space, `+` or `-`, a space, then a number followed by `i` (the first number may have a minus sign). Read the whole line with `getline` (it has spaces). It is a complex number when:\n\n- there is something before the first space\n- after that space comes `+` or `-`, then a second space\n- the last part has more than one character and ends with `i`\n\nYou can assume that the numbers are numbers (Lecture 5). Print `complex number` or `not a complex number`.',
     checks: ['3 + 4i :: in 3 + 4i; expect complex number; not not a complex', '-2 - 5i :: in -2 - 5i; expect complex number; not not a complex', 'No i :: in 3 + 4; expect not a complex number', 'Not + or - :: in 3 * 4i; expect not a complex number', 'No spaces :: in 34i; expect not a complex number', 'No number before i :: in 3 + i; expect not a complex number', 'Decimals :: in 2.5 - 0.5i; expect complex number; not not a complex', 'Uses getline :: code /getline\\s*\\(\\s*cin/ Read the whole line with getline: it has spaces.'],
   }),
   prog('s-p27', {
+    tag: 'Wk6 sheet',
     title: 'Program 27: the real and imaginary parts',
     goal: '**Lab sheet, Program 27:** Return the real and imaginary parts of a complex number entered by the user.\n\nThe user enters a complex number in the Lecture 5 format, like `3 + 4i` or `-2 - 5i` (the numbers can have decimals). Print:\n\n```\nreal part: 3\nimaginary part: 4\n```\n\nWith `-` in the middle the imaginary part is negative: `-2 - 5i` → `imaginary part: -5`. Use `stod` to turn the text into a number.',
     checks: ['3 + 4i :: in 3 + 4i; expect real part: 3; expect imaginary part: 4', '-2 - 5i :: in -2 - 5i; expect real part: -2; expect imaginary part: -5', 'Decimals :: in 1.5 - 0.5i; expect real part: 1.5; expect imaginary part: -0.5', 'Real part 0 :: in 0 + 7i; expect real part: 0; expect imaginary part: 7', 'Uses stod :: code /sto[dfi]\\s*\\(/ Turn the parts into numbers with stod.'],
   }),
   prog('s-p28', {
+    tag: 'Wk6 sheet',
     title: 'Program 28: the complex conjugate',
     goal: '**Lab sheet, Program 28:** Generate the complex conjugate of a complex number entered by the user.\n\nThe conjugate of `a + bi` is `a - bi`, and the conjugate of `a - bi` is `a + bi`: only the sign in the middle changes. The user enters a number like `3 + 4i` (Lecture 5 format). Print:\n\n```\nconjugate: 3 - 4i\n```',
     checks: ['3 + 4i :: in 3 + 4i; expect conjugate: 3 - 4i', '-2 - 5i :: in -2 - 5i; expect conjugate: -2 + 5i', '0 + 1i :: in 0 + 1i; expect conjugate: 0 - 1i', 'Decimals :: in 1.5 - 2.5i; expect conjugate: 1.5 + 2.5i'],
   }),
   prog('s-p30', {
+    tag: 'Wk6 sheet',
     title: 'Program 30: quaternion, real quaternion or pure quaternion',
     goal: '**Lab sheet, Program 30:** Check if a quaternion entered by the user is a quaternion, a real quaternion, or a pure quaternion.\n\nLecture 5: a quaternion is `q = a + bi + cj + dk`. It is **real** when b, c and d are 0 (`5 + 0i + 0j + 0k`) and **pure** when a is 0 (`0 + 1i + 2j + 3k`). The user enters the four parts with ` + ` between them, like `1 + 2i + 3j + 4k`. Print:\n\n- `not a quaternion` if the format is wrong (the signs must be `+`, and the parts must end with `i`, `j` and `k`, in that order)\n- otherwise `real quaternion` if b, c and d are 0\n- otherwise `pure quaternion` if a is 0\n- otherwise `quaternion`\n\nLecture 5 reads the line with `getline`. You can also read the seven parts (`1`, `+`, `2i`, …) with `cin >>` into seven strings.',
     checks: ['1 + 2i + 3j + 4k :: in 1 + 2i + 3j + 4k; expect quaternion; not real; not pure; not not a', 'Real :: in 5 + 0i + 0j + 0k; expect real quaternion', 'Pure :: in 0 + 1i + 2j + 3k; expect pure quaternion', 'i and j swapped :: in 1 + 2j + 3i + 4k; expect not a quaternion', 'Decimals :: in 2.5 + 0i + 1j + 0k; expect quaternion; not real; not pure; not not a', 'All zero is real :: in 0 + 0i + 0j + 0k; expect real quaternion', 'No k :: in 1 + 2i + 3j + 4; expect not a quaternion'],
@@ -356,9 +375,382 @@ const t10: N[] = [
   }),
 ];
 
+/* ===================================================================== 5 · the Wk9 sheet's True/False questions */
+const TF = (cond: string) => `if (${cond}) { cout << "True"; } else { cout << "False"; }`;
+const TF_ASK = 'What is the value of the condition (True/False)? Here the `{ … }` of the sheet prints `True` or `False`: type what it prints.';
+const t5sheet: N[] = [
+  out('s-w9-q3a', 'Wk9 sheet', `**Wk9 sheet, question 3 a):** ${TF_ASK}`, `int age = 25;\nint score = 85;\n${TF('age >= 18 && score > 80')}`),
+  out('s-w9-q3b', 'Wk9 sheet', `**Wk9 sheet, question 3 b):** ${TF_ASK} (\`&&\` is worked out before \`||\`.)`, `bool isAdmin = true;\nbool hasPassword = false;\nbool isGuest = false;\n${TF('isAdmin || hasPassword && isGuest')}`),
+  out('s-w9-q3c1', 'Wk9 sheet', `**Wk9 sheet, question 3 c), the first if:** ${TF_ASK} (\`!x\` is worked out first.)`, `int x = 5;\n${TF('!x == 0')}`),
+  out('s-w9-q3c2', 'Wk9 sheet', `**Wk9 sheet, question 3 c), the second if:** ${TF_ASK}`, `int x = 5;\n${TF('!(x == 0)')}`),
+  out('s-w9-q3c3', 'Wk9 sheet', `**Wk9 sheet, question 3 c), the third if:** ${TF_ASK}`, `int x = 5;\n${TF('x != 0')}`),
+];
+
+/* ===================================================================== 11 · From flowchart and pseudocode to code */
+const WATCH = 'Press ▶ to watch it run (or step one shape at a time), then type its code in the next exercise.';
+const GRADES20 = '60 59 70 10 90 100 0 61 45 80 75 30 66 59.5 99 20 60 1 85 50';
+const t11sheet: N[] = [
+  flow('s-l6-e1', 'Lecture 6, Example 1: the flowchart', `Feet to centimetres. ${WATCH}`, ['float Lft = 0, Lcm = 0', 'Input Lft', 'Lcm = Lft * 30', 'Output "The length in cm is ", Lcm'], '5'),
+  prog('s-l6-e1', {
+    tag: 'Lecture 6',
+    title: 'Example 1: feet to centimetres',
+    goal: '**Lecture 6, Example 1:** Draw a flowchart to convert the length in feet to centimeter (1 foot = 30 cm). Write its corresponding code in C++.\n\nThe flowchart is above. Type its code, like the lecture: ask `Enter the length in feet: `, read the length (it can have decimals), and print `The length in cm is ` and the length in centimetres.',
+    checks: ['5 feet :: in 5; expect The length in cm is 150', '2.5 feet :: in 2.5; expect The length in cm is 75', '0 feet :: in 0; expect The length in cm is 0', '1.2 feet :: in 1.2; expect The length in cm is 36'],
+  }),
+  flow('s-l6-e2', 'Lecture 6, Example 2: the flowchart', `The area of a rectangle. ${WATCH}`, ['float Width = 0, Length = 0, Area = 0', 'Input Width, Length', 'Area = Length * Width', 'Output "The area is ", Area'], '3 4'),
+  prog('s-l6-e2', {
+    tag: 'Lecture 6',
+    title: 'Example 2: the area of a rectangle',
+    goal: '**Lecture 6, Example 2:** Draw a flowchart that will read the two sides of a rectangle and calculate its area. Write its corresponding code in C++.\n\nAsk `Enter the width and length of rectangle: `, read the two sides and print `The area is ` and the area.',
+    checks: ['3 and 4 :: in 3 4; expect The area is 12', '2.5 and 4 :: in 2.5 4; expect The area is 10', '7 and 7 :: in 7 7; expect The area is 49'],
+  }),
+  flow('s-l6-e3', 'Lecture 6, Example 3: the flowchart', `Single selection: one diamond, and nothing happens on No. ${WATCH}`, ['int Grade = 0', 'Input Grade', { if: 'Grade >= 60', yes: ['Output "Passed"'] }], '75'),
+  prog('s-l6-e3', {
+    tag: 'Lecture 6',
+    title: 'Example 3: passed (single selection)',
+    goal: '**Lecture 6, Example 3 (single selection):** Draw a flowchart that read a student grade and write "passed" if it is greater than or equal 60.\n\nAsk `Enter the grade: `, read a whole number and print `Passed` only when the grade is 60 or more.',
+    checks: ['75 :: in 75; expect Passed', '60 is enough :: in 60; expect Passed', '59 prints nothing :: in 59; not Passed', 'Uses if :: code /if\\s*\\(/ Use an if.'],
+  }),
+  flow('s-l6-e4', 'Lecture 6, Example 4: the flowchart', `Double selection: Yes and No each do something. ${WATCH}`, ['float m1 = 0, m2 = 0, m3 = 0, m4 = 0, finalGrade = 0', 'Input m1, m2, m3, m4', 'finalGrade = (m1 + m2 + m3 + m4) / 4', { if: 'finalGrade >= 60', yes: ['Output "Passed"'], no: ['Output "Failed"'] }], '70 80 90 60'),
+  prog('s-l6-e4', {
+    tag: 'Lecture 6',
+    title: 'Example 4: passed or failed (double selection)',
+    goal: "**Lecture 6, Example 4 (double selection):** Draw a flowchart to determine a student's final grade and indicate whether it is passing or failing. The final grade is calculated as the average of four marks.\n\nLike the lecture's answer: ask `Enter the 4 marks: `, read four marks (decimals allowed); the final grade is their average; print `Passed` if it is 60 or more, otherwise `Failed`.",
+    checks: ['Average 75 :: in 70 80 90 60; expect Passed; not Failed', 'Average 57.5 :: in 50 50 60 70; expect Failed; not Passed', 'Average exactly 60 :: in 60 60 60 60; expect Passed; not Failed', 'Average 50 :: in 100 0 100 0; expect Failed; not Passed', 'Uses else :: code /else/ Use if … else.'],
+  }),
+  flow('s-l6-e5', 'Lecture 6, Example 5: the flowchart', `Multiple selection: the diamonds are tested in order, and only one Output runs. ${WATCH}`, ['float Grade = 0', 'Input Grade', { if: 'Grade >= 90', yes: ['Output "A"'], no: [{ if: 'Grade >= 80', yes: ['Output "B"'], no: [{ if: 'Grade >= 70', yes: ['Output "C"'], no: [{ if: 'Grade >= 60', yes: ['Output "D"'], no: ['Output "F"'] }] }] }] }], '85'),
+  prog('s-l6-e5', {
+    tag: 'Lecture 6',
+    title: 'Example 5: the letter grade (multiple selection)',
+    goal: '**Lecture 6, Example 5 (multiple selection):** Reads a student grade and write the following: A for exam grades greater than or equal to 90, B for grades greater than or equal to 80, C for grades greater than or equal to 70, D for grades greater than or equal to 60, and F for all other grades.\n\nAsk `Enter the student grade: ` (decimals allowed) and print `Grade: ` and the letter.',
+    checks: ['95 :: in 95; expect Grade: A', 'Exactly 90 :: in 90; expect Grade: A', '85 :: in 85; expect Grade: B', '75 :: in 75; expect Grade: C', '65 :: in 65; expect Grade: D', '59.5 :: in 59.5; expect Grade: F', '30 :: in 30; expect Grade: F', 'Uses else if :: code /else\\s+if/ Use if … else if … else.'],
+  }),
+  flow('s-l6-e6', 'Lecture 6, Example 6: the flowchart', `A loop: k starts at 1, the diamond tests k <= 4, and k = k + 1 goes back up. ${WATCH}`, ['int k = 1', { while: 'k <= 4', body: ['Output "Hello world"', 'k = k + 1'] }, 'Output "That\'s all!"']),
+  prog('s-l6-e6', {
+    tag: 'Lecture 6',
+    title: 'Example 6: Hello world four times',
+    goal: '**Lecture 6, Example 6:** Draw a flowchart that print the word "Hello" four times then print "That\'s all!"\n\nThe lecture\'s 3 steps: solve it for one case, find the statements to repeat, then add the 3 expressions around them (start `k = 1`, test `k <= 4`, update `k = k + 1`). Print exactly:\n\n```\nHello world\nHello world\nHello world\nHello world\nThat\'s all!\n```',
+    checks: ["Four times, then That's all! :: exact Hello world\\nHello world\\nHello world\\nHello world\\nThat's all!\\n", A_LOOP],
+  }),
+  flow('s-l6-e7', 'Lecture 6, Example 7: the flowchart', `A loop that reads 20 grades, with a decision inside it. ${WATCH}`, ['int k = 1', 'float Grade = 0', { while: 'k <= 20', body: ['Input Grade', { if: 'Grade >= 60', yes: ['Output "Passed"'] }, 'k = k + 1'] }], GRADES20),
+  prog('s-l6-e7', {
+    tag: 'Lecture 6',
+    title: 'Example 7: 20 grades',
+    goal: '**Lecture 6, Example 7:** Reads 20 students\' grades, and write "passed" if a grade is greater than or equal 60.\n\nRead 20 grades (decimals allowed) in a loop. For each grade of 60 or more, print `Passed` on its own line. Print nothing else (no prompts).',
+    checks: [`11 of 20 pass :: in ${GRADES20}; exact ${lines(11, 'Passed')}`, `All 20 pass :: in ${list(20, () => 100)}; exact ${lines(20, 'Passed')}`, `None pass :: in ${list(20, () => 0)}; not Passed`, A_LOOP],
+  }),
+  flow('s-l6-e8', 'Lecture 6, Example 8: the flowchart', `The same loop, but the user decides how many grades: k <= StudNo. ${WATCH}`, ['int StudNo = 0, k = 1', 'float Grade = 0', 'Input StudNo', { while: 'k <= StudNo', body: ['Input Grade', { if: 'Grade >= 60', yes: ['Output "Passed"'] }, 'k = k + 1'] }], '3 70 50 90'),
+  prog('s-l6-e8', {
+    tag: 'Lecture 6',
+    title: 'Example 8: the user decides how many',
+    goal: '**Lecture 6, Example 8:** Repeat Example 7, but let the user determine the number of students to read.\n\nFirst read the number of students, then that many grades. For each grade of 60 or more, print `Passed` on its own line. Print nothing else.',
+    checks: ['3 students, 2 pass :: in 3 70 50 90; exact Passed\\nPassed\\n', '1 student, 59 :: in 1 59; not Passed', '5 students, all 60 :: in 5 60 60 60 60 60; exact Passed\\nPassed\\nPassed\\nPassed\\nPassed\\n', 'No students :: in 0; not Passed', A_LOOP],
+  }),
+  flow('s-l6-e9', 'Lecture 6, Example 9: the flowchart', `What changes each time is k; the value printed is M = 2 * k. ${WATCH}`, ['int k = 1, M = 0', 'Output "Table 2"', { while: 'k <= 12', body: ['M = 2 * k', 'Output M', 'k = k + 1'] }]),
+  prog('s-l6-e9', {
+    tag: 'Lecture 6',
+    title: 'Example 9: table 2',
+    goal: '**Lecture 6, Example 9:** Print Table 2 of multiplication, from 2x1 to 2x12.\n\nLike the pseudocode: print `Table 2`, then `M = 2 * k` for k from 1 to 12, one value per line:\n\n```\nTable 2\n2\n4\n…\n24\n```',
+    checks: [`Table 2 :: exact Table 2\\n${list(12, (i) => 2 * (i + 1), '\\n')}\\n`, A_LOOP, 'Calculates 2 * k :: nocode /24/ Let the loop calculate the values: do not type them.'],
+  }),
+  flow('s-l6-e10', 'Lecture 6, Example 10: the flowchart', `An accumulator: sum starts at 0 and grows by each number. ${WATCH}`, ['int sum = 0, k = 1, Num = 0', { while: 'k <= 10', body: ['Input Num', 'sum = sum + Num', 'k = k + 1'] }, 'Output "sum = ", sum'], '1 2 3 4 5 6 7 8 9 10'),
+  prog('s-l6-e10', {
+    tag: 'Lecture 6',
+    title: 'Example 10: the sum of 10 numbers',
+    goal: '**Lecture 6, Example 10:** Read 10 numbers and find their summations.\n\nUse an accumulator variable `sum` that starts at 0. Print `sum = ` and the sum.',
+    checks: ['1 to 10 :: in 1 2 3 4 5 6 7 8 9 10; expect sum = 55', 'Ten zeros :: in 0 0 0 0 0 0 0 0 0 0; expect sum = 0', 'With negatives :: in 5 -5 10 -10 1 2 3 4 5 6; expect sum = 21', A_LOOP],
+  }),
+];
+const t11: N[] = [
+  prog('n11-1', {
+    title: 'Pseudocode to code: a discount',
+    goal: 'Type the C++ code of this pseudocode (a price over 100 gets 10% off):\n\n```\nInput price\nif price > 100 then\n    price = price * 0.9\nPrint "to pay: ", price\n```\n\nThe price can have decimals.',
+    checks: ['200 :: in 200; expect to pay: 180', 'Exactly 100: no discount :: in 100; expect to pay: 100', '50 :: in 50; expect to pay: 50', '150.5 :: in 150.5; expect to pay: 135.45'],
+  }),
+  flow('n11-2', 'Flowchart: cold, warm or hot', `Two diamonds: the second one is tested only when the first says No. ${WATCH}`, ['float t = 0', 'Input t', { if: 't < 15', yes: ['Output "cold"'], no: [{ if: 't < 25', yes: ['Output "warm"'], no: ['Output "hot"'] }] }], '20'),
+  prog('n11-2', {
+    title: 'Flowchart to code: cold, warm or hot',
+    goal: 'Type the code of the flowchart above: read a temperature (it can have decimals) and print `cold` (below 15), `warm` (15 up to below 25) or `hot` (25 or more).',
+    checks: ['10 :: in 10; expect cold', '15 is warm :: in 15; expect warm', '24.9 :: in 24.9; expect warm', '25 is hot :: in 25; expect hot', '30 :: in 30; expect hot'],
+  }),
+  prog('n11-3', {
+    title: 'Pseudocode to code: squares',
+    goal: 'Type the C++ code of this pseudocode:\n\n```\nRead n\nInitialize k = 1\nWhile k <= n\n    Print k * k\n    k = k + 1\nEnd while\n```\n\nPrint one value per line, and nothing else.',
+    checks: ['n = 5 :: in 5; exact 1\\n4\\n9\\n16\\n25\\n', 'n = 1 :: in 1; exact 1\\n', 'n = 3 :: in 3; exact 1\\n4\\n9\\n', 'Uses while :: code /while\\s*\\(/ The pseudocode says While: use a while loop.'],
+  }),
+  flow('n11-4', 'Flowchart: count the negative numbers', `A counter inside a loop: count = count + 1 runs only on the Yes arrow. ${WATCH}`, ['int n = 0, k = 1, num = 0, count = 0', 'Input n', { while: 'k <= n', body: ['Input num', { if: 'num < 0', yes: ['count = count + 1'] }, 'k = k + 1'] }, 'Output "negatives: ", count'], '4 3 -1 -7 2'),
+  prog('n11-4', {
+    title: 'Flowchart to code: count the negative numbers',
+    goal: 'Type the code of the flowchart above: read how many numbers, then the numbers (whole numbers). Print `negatives: ` and how many of them are below 0.',
+    checks: ['5 numbers, 3 negative :: in 5 1 -2 3 -4 -5; expect negatives: 3', 'No negatives :: in 3 1 2 3; expect negatives: 0', 'One number :: in 1 -7; expect negatives: 1', 'No numbers :: in 0; expect negatives: 0', A_LOOP],
+  }),
+  flow('n11-5', 'Flowchart: the times table of n', `k goes from 1 to 10; each time, one line of the table. ${WATCH}`, ['int n = 0, k = 1', 'Input n', { while: 'k <= 10', body: ['Output n, " x ", k, " = ", n * k', 'k = k + 1'] }], '3'),
+  prog('n11-5', {
+    title: 'Flowchart to code: the times table of n',
+    goal: 'Type the code of the flowchart above: read a whole number n and print its times table from 1 to 10, one line each:\n\n```\n3 x 1 = 3\n3 x 2 = 6\n…\n3 x 10 = 30\n```',
+    checks: [`Table of 3 :: in 3; exact ${list(10, (i) => `3 x ${i + 1} = ${3 * (i + 1)}`, '\\n')}\\n`, `Table of 7 :: in 7; exact ${list(10, (i) => `7 x ${i + 1} = ${7 * (i + 1)}`, '\\n')}\\n`, `Table of 1 :: in 1; exact ${list(10, (i) => `1 x ${i + 1} = ${i + 1}`, '\\n')}\\n`, A_LOOP],
+  }),
+];
+
+/* ===================================================================== 12 · while loops (Wk9 sheet) */
+const FIFTY = list(50, (i) => i + 1);
+/** Wk9 Programs 9–15: the sheet's words, then the details; Wk10 asks for them again with for */
+const WK9: { p: number; title: string; sheet: string; how: string; checks: string[]; hints?: string[] }[] = [
+  { p: 9, title: 'the numbers divisible by 5', sheet: 'Print the numbers that are divisible by 5, for the integers from 1 to 99.', how: 'One number per line: `5`, `10`, … `95`. A number is divisible by 5 when `n % 5 == 0`.',
+    checks: [`5 to 95 :: exact ${list(19, (i) => 5 * (i + 1), '\\n')}\\n`, 'Lets the loop find them :: nocode /95/ Let the loop find the numbers: do not type them.'] },
+  { p: 10, title: 'the sum and average of 50 integers', sheet: 'Ask the user for 50 integers. The program should then print the sum of the integers, and their average.', how: 'Print `sum: ` and `average: ` on two lines. Careful: `sum / 50` with two whole numbers drops the decimals; use `sum / 50.0`.',
+    checks: [`1 to 50 :: in ${FIFTY}; expect sum: 1275; expect average: 25.5`, `Fifty 2s :: in ${list(50, () => 2)}; expect sum: 100; expect average: 2`, `-1 and 1, 25 times :: in ${list(50, (i) => (i % 2 ? 1 : -1))}; expect sum: 0; expect average: 0`] },
+  { p: 11, title: 'the average of a set of values', sheet: 'Calculate the average value of set values. The user is asked first to enter the number of these values. Then the user is asked to enter these values, one by one. Finally, the program will print the average value.', how: 'The values can have decimals. Print `average: ` and the average.',
+    checks: ['4 values :: in 4 10 20 30 40; expect average: 25', '3 values :: in 3 1 2 2; expect average: 1.66667', '1 value :: in 1 7; expect average: 7', 'Decimals :: in 2 2.5 3.5; expect average: 3'] },
+  { p: 12, title: 'is N a prime?', sheet: 'Read a positive integer N and determine whether N is a prime.', how: 'A prime has exactly two divisors: 1 and itself (so 1 is not a prime). Try every divisor from 2 up to N − 1. Print `prime` or `not prime`.',
+    checks: ['7 :: in 7; expect prime; not not prime', '9 :: in 9; expect not prime', '2 :: in 2; expect prime; not not prime', '15 :: in 15; expect not prime', '1 is not a prime :: in 1; expect not prime', '97 :: in 97; expect prime; not not prime'] },
+  { p: 13, title: 'x to the power y, without cmath', sheet: 'Calculate the power of the two numbers x and y. This program does not use the `cmath` library.', how: 'Read x (it can have decimals) and y (a whole number, 0 or more). Start from 1 and multiply by x, y times. Print `2 to the power 3 is 8`.',
+    checks: ['2 and 3 :: in 2 3; expect 2 to the power 3 is 8', 'Power 0 :: in 5 0; expect 5 to the power 0 is 1', '3 and 4 :: in 3 4; expect 3 to the power 4 is 81', 'Decimals :: in 1.5 2; expect 1.5 to the power 2 is 2.25', 'Negative x :: in -2 3; expect -2 to the power 3 is -8', 'No cmath :: nocode /pow\\s*\\(|cmath/ Do not use pow or cmath: multiply in a loop.'] },
+  { p: 14, title: 'the alphabet in capital letters', sheet: 'Print to the user the English alphabet in capital letters.', how: "Print `ABCDEFGHIJKLMNOPQRSTUVWXYZ` on one line. Let a `char` go from `'A'` to `'Z'`: `c++` moves it to the next letter.",
+    checks: ['A to Z :: exact ABCDEFGHIJKLMNOPQRSTUVWXYZ\\n', 'The loop makes the letters :: nocode /ABCDEF/ Let the loop make the letters: do not type the alphabet.'] },
+  { p: 15, title: 'count the capital letters', sheet: 'Get from the user a string, then the program calculates the number of capital letters in this string.', how: "Read the whole line with `getline`. A capital letter is from `'A'` to `'Z'`. Print `capital letters: ` and the count.",
+    checks: ['Hello World :: in Hello World; expect capital letters: 2', 'ABC def GHI :: in ABC def GHI; expect capital letters: 6', 'None :: in no capitals; expect capital letters: 0', 'With symbols :: in C++ Is FUN!; expect capital letters: 5'] },
+];
+const t12sheet: N[] = [
+  ...WK9.map((q) => prog(`s-w9-p${q.p}`, { tag: 'Wk9 sheet', title: `Program ${q.p}: ${q.title}`, goal: `**Wk9 sheet, Program ${q.p} (using while loop):** ${q.sheet}\n\n${q.how}`, checks: [...q.checks, ...WHILE], hints: q.hints })),
+  out('s-w9-q2', 'Wk9 sheet', '**Wk9 sheet, question 2:** Trace the following snippet of code and show the output (when n = 10). Type exactly what it prints.', 'int n, var;\n\ncin >> n; // Enter n = 10\nvar = 0;\n\nwhile (var < n)\n{\n    cout << var;\n    var = var * 3 + 2;\n}', '10'),
+];
+const t12: N[] = [
+  prog('n12-1', {
+    title: 'Count down',
+    goal: 'Read a whole number n (1 or more). With a while loop, print n, n − 1, … down to 1, one per line, then `Go!`:\n\n```\n3\n2\n1\nGo!\n```',
+    checks: ['From 3 :: in 3; exact 3\\n2\\n1\\nGo!\\n', 'From 1 :: in 1; exact 1\\nGo!\\n', 'From 5 :: in 5; exact 5\\n4\\n3\\n2\\n1\\nGo!\\n', 'Uses while :: code /while\\s*\\(/ Use a while loop.'],
+  }),
+  prog('n12-2', {
+    title: 'The sum of the digits',
+    goal: 'Read a positive whole number. Add up its digits with a while loop: `n % 10` is the last digit and `n / 10` removes it. Print `sum of digits: ` and the sum (for `12345` it is 15).',
+    checks: ['12345 :: in 12345; expect sum of digits: 15', 'One digit :: in 7; expect sum of digits: 7', '1000 :: in 1000; expect sum of digits: 1', '99999 :: in 99999; expect sum of digits: 45', 'Uses while :: code /while\\s*\\(/ Use a while loop.'],
+  }),
+  prog('n12-3', {
+    title: 'Add until 0',
+    goal: 'Read whole numbers until the user enters `0`. Print `sum: ` and the sum of the numbers, then `count: ` and how many numbers were entered (not counting the 0).\n\n```\nsum: 10\ncount: 3\n```\n\n(for `5 3 2 0`).',
+    checks: ['5 3 2 0 :: in 5 3 2 0; expect sum: 10; expect count: 3', 'Only 0 :: in 0; expect sum: 0; expect count: 0', 'With a negative :: in -4 4 10 0; expect sum: 10; expect count: 3', 'Uses while :: code /while\\s*\\(/ Use a while loop: you do not know how many numbers will come.'],
+  }),
+  prog('n12-4', {
+    title: 'How many years to double the money?',
+    goal: 'Read an amount of money and a yearly rate in percent (decimal numbers). Each year the money is multiplied by `1 + rate / 100`. With a while loop, count the years until the money is at least double the start. Print `years: ` and the count.',
+    checks: ['1000 at 10% :: in 1000 10; expect years: 8', '500 at 100% :: in 500 100; expect years: 1', '100 at 7% :: in 100 7; expect years: 11', '200 at 50% :: in 200 50; expect years: 2', 'Uses while :: code /while\\s*\\(/ Use a while loop: you do not know how many years.'],
+  }),
+  prog('n12-5', {
+    title: 'Reverse a number',
+    goal: 'Read a positive whole number and build the number with its digits in reverse order: `reversed = reversed * 10 + n % 10`, then `n = n / 10`, while n is more than 0. Print `reversed: ` and the number (`1234` → `4321`, `1200` → `21`).',
+    checks: ['1234 :: in 1234; expect reversed: 4321', 'One digit :: in 5; expect reversed: 5', 'Zeros at the end :: in 1200; expect reversed: 21', '90817 :: in 90817; expect reversed: 71809', 'Uses while :: code /while\\s*\\(/ Use a while loop.'],
+  }),
+];
+
+/* ===================================================================== 13 · for loops (Wk10 sheet, Lecture 8) */
+const ERRORS_NOTE = 'Find the error(s) in the following code segments and then correct them. (Note that: All these statements should print the word "hello" 5 times)';
+const broken = (code: string) => `#include <iostream>\nusing namespace std;\n\nint main() {\n${code}\n    return 0;\n}\n`;
+const HELLO5 = ['Prints hello 5 times :: exact hellohellohellohellohello'];
+const t13sheet: N[] = [
+  prog('s-w10-p16', {
+    tag: 'Wk10 sheet',
+    title: 'Program 16: reverse a text',
+    goal: '**Wk10 sheet, Program 16 (using for loop):** Get from the user a text. Then, it reverses the order of characters inside the text (hold the reversed text in a variable to print it at the end).\n\nRead the whole line with `getline`. Build the reversed text in a `string` variable, then print it: `hello` → `olleh`.',
+    checks: ['hello :: in hello; expect olleh', 'With spaces :: in C++ is fun; expect nuf si ++C', 'One letter :: in a; expect a', 'Two words :: in Mona Salem; expect melaS anoM', ...FOR],
+  }),
+  prog('s-w10-p17', {
+    tag: 'Wk10 sheet',
+    title: 'Program 17: invert the case',
+    goal: '**Wk10 sheet, Program 17 (using for loop):** Get from the user a text. Then the program inverses the case of every letter in the text. If it is a capital letter, then inverse it to a small letter, and the reverse. Anything else will be kept as it is, then finally print the inversed text.\n\nUse the character codes (Lecture 4): a capital letter + 32 is its small letter, and a small letter − 32 is its capital.',
+    checks: ['Hello World :: in Hello World; expect hELLO wORLD', 'Symbols stay :: in C++ Is FUN!; expect c++ iS fun!', 'Digits stay :: in abc123; expect ABC123', 'ZzZ :: in ZzZ; expect zZz', ...FOR, 'Character codes :: nocode /toupper|tolower/ Use the character codes (+ 32 and - 32), not toupper or tolower.'],
+  }),
+  ...WK9.map((q) => prog(`s-w10-r${q.p}`, { tag: 'Wk10 sheet', title: `Program ${q.p} again, with for: ${q.title}`, goal: `**Wk10 sheet:** Repeat the programs (9-15) using for loop instead of while. **Program ${q.p}:** ${q.sheet}\n\n${q.how}`, checks: [...q.checks, ...FOR], hints: q.hints })),
+  ...([['a1', 'i', '1, 2, 3, 4, 5, 6, 7'], ['a2', 'ii', '3, 8, 13, 18, 23'], ['a3', 'iii', '20, 14, 8, 2, -4, -10'], ['a4', 'iv', '19, 27, 35, 43, 51']] as const).map(([id, n, seq]) => prog(`s-w10-${id}`, {
+    tag: 'Wk10 sheet',
+    title: `Sequence ${n}: ${seq}`,
+    goal: `**Wk10 sheet, 2 a. ${n}:** Write for statements that print the following sequences of values: ${seq}.\n\nPrint them on one line with \`, \` between them (no comma after the last one, no full stop): \`${seq}\`. Find the start, the end and the step of the loop.`,
+    checks: [`${seq} :: exact ${seq}\\n`, 'Uses for :: code /for\\s*\\(/ Use a for statement.'],
+    hints: ['To put `, ` only between the values: print the value, then `if` it is not the last one, print `, `.'],
+  })),
+  ...([['b1', 'i', '    for i = 0; i < 5; i++\n        cout << "hello" ;'], ['b2', 'ii', '    for ( i = 0; i < 5; i++ ) ;\n        cout << "hello"'], ['b3', 'iii', '    for ( i = 0, i > 5; i++ )\n        cout << "hello" ;'], ['b4', 'iv', '    for ( i = 0; i <= 5; i++ )\n        cout << "hello" ;']] as const).map(([id, n, code]) => prog(`s-w10-${id}`, {
+    tag: 'Wk10 sheet',
+    title: `Find the errors ${n}`,
+    goal: `**Wk10 sheet, 2 b. ${n}:** ${ERRORS_NOTE}\n\nThe code with the error(s) is in the editor. Correct it so it prints \`hellohellohellohellohello\` (keep \`cout << "hello" ;\` as it is). Press **Run** first: the messages help you find the errors.`,
+    checks: HELLO5,
+    starter: broken(code),
+    hints: ['A variable must be declared before it is used: `int i` (before the loop, or inside the for: `for (int i = 0; …)`).'],
+  })),
+  out('s-w10-c', 'Wk10 sheet', '**Wk10 sheet, 2 c:** Trace the following code by showing the memory and output screen.\n\nType exactly what the output screen shows: it is all on one line, because there is no `\\n`.', 'int n = 10;\nint i, j;\n\nfor (i = 1, j = 0; i <= n; i++)\n{\n    j += i;\n    cout << "i = " << i << ", j = " << j;\n}'),
+  prog('s-l8-e2', {
+    tag: 'Lecture 8',
+    title: 'Example 2: the sum from 1 to 100',
+    goal: '**Lecture 8, Example 2:** Write the C++ code that gets the sum of numbers from 1 to 100.\n\nUse a for loop and a `sum` that starts at 0 ("Must be 0 to avoid garbage value"). Print `The sum is ` and the sum.',
+    checks: ['1 to 100 :: expect The sum is 5050', 'Uses for :: code /for\\s*\\(/ Use a for loop.', 'The loop calculates :: nocode /5050/ Let the loop calculate the sum: do not type it.'],
+  }),
+  prog('s-l8-vary', {
+    tag: 'Lecture 8',
+    title: 'Varying the control variable',
+    goal: '**Lecture 8, varying control variables:** Write three for statements: vary the control variable from 7 to 77 in steps of 7; from 20 to 2 in steps of -2; over the sequence of values 2, 5, 8, 11, 14, 17. Print each sequence on its own line, with a space after each value.',
+    checks: ['7 to 77, steps of 7 :: expect 7 14 21 28 35 42 49 56 63 70 77', '20 to 2, steps of -2 :: expect 20 18 16 14 12 10 8 6 4 2', '2 to 17, steps of 3 :: expect 2 5 8 11 14 17', 'Three for statements :: code /for[\\s\\S]*for[\\s\\S]*for/ Use three for statements, one for each sequence.'],
+  }),
+  prog('s-l8-e3', {
+    tag: 'Lecture 8',
+    title: 'Example 3: the sum of the even numbers',
+    goal: '**Lecture 8, Example 3:** Get the sum of even numbers from 1 to 100.\n\nStart at 2 and go up in steps of 2 (`i += 2`). Print `The sum is ` and the sum.',
+    checks: ['2 + 4 + … + 100 :: expect The sum is 2550', 'Uses for :: code /for\\s*\\(/ Use a for loop.', 'The loop calculates :: nocode /2550/ Let the loop calculate the sum: do not type it.'],
+  }),
+  prog('s-l8-e4', {
+    tag: 'Lecture 8',
+    title: 'Example 4: sum only the even numbers',
+    goal: '**Lecture 8, Example 4:** Ask the user to enter 10 numbers, and sum only the even numbers.\n\nA number is even when `number % 2 == 0`. Print `The sum is ` and the sum.',
+    checks: ['1 to 10 :: in 1 2 3 4 5 6 7 8 9 10; expect The sum is 30', 'All odd :: in 1 3 5 7 9 11 13 15 17 19; expect The sum is 0', 'Negative and 0 :: in -2 -4 6 0 1 1 1 1 1 8; expect The sum is 8', 'Uses for :: code /for\\s*\\(/ Use a for loop.'],
+  }),
+  out('s-l8-stars', 'Lecture 8', '**Lecture 8:** What is the output?', 'int count;\n\nfor ( count = 0 ; count < 10 ; count++ )\n{\n    cout << "*" ;\n}'),
+  out('s-l8-null', 'Lecture 8', '**Lecture 8:** What output from this loop? Look closely at the end of the `for` line.', 'int count;\n\nfor ( count = 0 ; count < 10 ; count++ );\n{\n    cout << "*" ;\n}'),
+  out('s-l8-trace', 'Lecture 8', '**Lecture 8, trace:** Trace `sum` and `i`. What does it print? (There is no space after `is`.)', 'int sum = 0;\nint i;\nfor (i = 1; i <= 3 ; i++)\n{\n    sum = sum + i;\n}\ncout<<"The sum is"<< sum;'),
+  prog('s-l8-e5', {
+    tag: 'Lecture 8',
+    title: 'Example 5: how many times a letter occurs',
+    goal: "**Lecture 8, Example 5:** Write a C++ program that gets from the user a sentence s, and a letter c. The program prints out the number of the occurrence of the letter c in the sentence s.\n\nRead the sentence with `getline`, then the letter with `cin`. Print like the lecture: `The letter 'a' occurred: 3 times.`",
+    checks: ["banana, a :: in banana\\na; expect The letter 'a' occurred: 3 times.", "hello world, l :: in hello world\\nl; expect The letter 'l' occurred: 3 times.", "C++ is cool, o :: in C++ is cool\\no; expect The letter 'o' occurred: 2 times.", "Not there :: in xyz\\na; expect The letter 'a' occurred: 0 times.", 'Uses for :: code /for\\s*\\(/ Go through the sentence with a for loop.'],
+  }),
+];
+const t13: N[] = [
+  prog('n13-1', {
+    title: 'Factorial',
+    goal: 'Read a whole number n from 0 to 12. Its factorial n! is 1 × 2 × … × n (and 0! is 1). Calculate it with a for loop and print `5! = 120`.',
+    checks: ['5 :: in 5; expect 5! = 120', '0 :: in 0; expect 0! = 1', '1 :: in 1; expect 1! = 1', '10 :: in 10; expect 10! = 3628800', '12 :: in 12; expect 12! = 479001600', 'Uses for :: code /for\\s*\\(/ Use a for loop.'],
+  }),
+  prog('n13-2', {
+    title: 'Count the vowels',
+    goal: 'Read a line of text with `getline`. Count its vowels: `a`, `e`, `i`, `o`, `u`, small or capital. Print `vowels: ` and the count.',
+    checks: ['Hello World :: in Hello World; expect vowels: 3', 'Capitals count too :: in AEIOU aeiou; expect vowels: 10', 'No vowels :: in rhythm; expect vowels: 0', 'C++ Is Fun :: in C++ Is Fun; expect vowels: 2', 'Uses for :: code /for\\s*\\(/ Go through the text with a for loop.'],
+  }),
+  prog('n13-3', {
+    title: 'Is it a palindrome?',
+    goal: 'Read one word. It is a palindrome when it reads the same backwards (`level`). Compare the first letter with the last, the second with the one before the last, and so on. Print `palindrome` or `not a palindrome`.',
+    checks: ['racecar :: in racecar; expect palindrome; not not a', 'level :: in level; expect palindrome; not not a', 'hello :: in hello; expect not a palindrome', 'One letter :: in a; expect palindrome; not not a', 'ab :: in ab; expect not a palindrome', 'abba :: in abba; expect palindrome; not not a', 'Uses for :: code /for\\s*\\(/ Use a for loop.'],
+  }),
+  prog('n13-4', {
+    title: 'Sum, average and largest of n numbers',
+    goal: 'Read how many numbers (1 or more), then the numbers (they can have decimals). Print three lines:\n\n```\nsum: 20\naverage: 5\nlargest: 9\n```\n\n(for `4 3 9 1 7`). Careful with the largest: the numbers can all be negative, so start from the first number, not from 0.',
+    checks: ['4 numbers :: in 4 3 9 1 7; expect sum: 20; expect average: 5; expect largest: 9', 'One number :: in 1 -5; expect sum: -5; expect average: -5; expect largest: -5', 'Decimals :: in 3 2.5 2.5 1; expect sum: 6; expect average: 2; expect largest: 2.5', 'All negative :: in 5 -1 -2 -3 -4 -5; expect sum: -15; expect average: -3; expect largest: -1', 'Uses for :: code /for\\s*\\(/ Use a for loop.'],
+  }),
+  prog('n13-5', {
+    title: 'The Fibonacci numbers',
+    goal: 'Read a whole number n (1 or more). Print the first n Fibonacci numbers on one line with `, ` between them. They start `0, 1`, and each next one is the sum of the two before it: `0, 1, 1, 2, 3, 5, 8`.',
+    checks: ['n = 1 :: in 1; exact 0\\n', 'n = 2 :: in 2; exact 0, 1\\n', 'n = 7 :: in 7; exact 0, 1, 1, 2, 3, 5, 8\\n', 'n = 10 :: in 10; exact 0, 1, 1, 2, 3, 5, 8, 13, 21, 34\\n', 'Uses for :: code /for\\s*\\(/ Use a for loop.'],
+  }),
+];
+
+/* ===================================================================== 14 · do..while, break, continue */
+const t14sheet: N[] = [
+  prog('s-l8-e1', {
+    tag: 'Lecture 8',
+    title: 'The password (do..while)',
+    goal: '**Lecture 8, Example 1 (and Lecture 6, Example 11):** Let the user enter a password, if it is equal to "123", you welcome him. Otherwise, let him try to enter a new one. Write the C++ code using do..while statement.\n\nEach time, print `Enter the password: ` and read the password with `getline`. When it is `123`, print `Welcome!`. The body of a do..while runs at least once.',
+    checks: ['123 at once :: in 123; expect Welcome!', 'Two wrong, then 123 :: in abc\\n999\\n123; expect Enter the password: Enter the password: Enter the password: Welcome!', 'Uses do..while :: code /do\\s*\\{/ Use a do..while loop.'],
+  }),
+  prog('s-l6-try', {
+    tag: 'Lecture 6',
+    title: 'The password: count the wrong tries',
+    goal: '**Lecture 6, try to solve:** Same example, but you need to count how many times he entered his password wrong.\n\nAfter `Welcome!`, print `wrong tries: ` and the number of wrong passwords.',
+    checks: ['Right at once :: in 123; expect Welcome!; expect wrong tries: 0', 'Two wrong :: in abc\\n999\\n123; expect Welcome!; expect wrong tries: 2', 'Four wrong :: in a\\nb\\nc\\nd\\n123; expect wrong tries: 4', 'Uses do..while :: code /do\\s*\\{/ Use a do..while loop.'],
+  }),
+  prog('s-l8-break', {
+    tag: 'Lecture 8',
+    title: 'break: leave the loop early',
+    goal: '**Lecture 8, break example:** A for loop counts `i` from 1 to 10. When `i` is 7, it prints `Found 7! Breaking out of the loop early.` and leaves the loop with `break`. Otherwise it prints `Checking number: ` and `i`. After the loop it prints `The loop has ended.`',
+    checks: [`The whole output :: exact ${list(6, (i) => `Checking number: ${i + 1}`, '\\n')}\\nFound 7! Breaking out of the loop early.\\nThe loop has ended.\\n`, 'Uses break :: code /break\\s*;/ Leave the loop with break;'],
+  }),
+  prog('s-l8-continue', {
+    tag: 'Lecture 8',
+    title: 'continue: skip one turn',
+    goal: '**Lecture 8, continue example:** A for loop counts `i` from 1 to 10. When `i` is 7, it prints `Found 7! Skipping this number.` and jumps to the next turn with `continue`. Otherwise it prints `Processing number: ` and `i`. After the loop it prints `The loop has ended naturally.`',
+    checks: [`The whole output :: exact ${list(6, (i) => `Processing number: ${i + 1}`, '\\n')}\\nFound 7! Skipping this number.\\n${list(3, (i) => `Processing number: ${i + 8}`, '\\n')}\\nThe loop has ended naturally.\\n`, 'Uses continue :: code /continue\\s*;/ Skip the rest of the turn with continue;'],
+  }),
+];
+const t14: N[] = [
+  prog('n14-1', {
+    title: 'A number from 1 to 10',
+    goal: 'Ask `Enter a number from 1 to 10: ` and read a whole number. With a do..while loop, ask again while the number is below 1 or above 10. Then print `you chose ` and the number.',
+    checks: ['7 at once :: in 7; expect you chose 7', 'Three wrong first :: in 0 11 -3 5; expect you chose 5; not you chose 0', '10 is allowed :: in 10; expect you chose 10', 'Uses do..while :: code /do\\s*\\{/ Use a do..while loop.'],
+  }),
+  prog('n14-2', {
+    title: 'Stop at the first negative',
+    goal: 'Read up to 10 whole numbers with a for loop. Stop at the first negative number (`break`): it is not added. Print `sum: ` and the sum of the numbers before it.',
+    checks: ['Stops at -1 :: in 1 2 3 -1; expect sum: 6', 'No negative :: in 5 5 5 5 5 5 5 5 5 5; expect sum: 50', 'Negative first :: in -4; expect sum: 0', 'Not added after it :: in 10 20 -5 30; expect sum: 30', 'Uses break :: code /break\\s*;/ Leave the loop with break;'],
+  }),
+  prog('n14-3', {
+    title: 'Skip the multiples of 3',
+    goal: 'Read a whole number n. Print the numbers from 1 to n, one per line, but skip the multiples of 3 with `continue`.',
+    checks: ['n = 10 :: in 10; exact 1\\n2\\n4\\n5\\n7\\n8\\n10\\n', 'n = 3 :: in 3; exact 1\\n2\\n', 'n = 1 :: in 1; exact 1\\n', 'Uses continue :: code /continue\\s*;/ Skip with continue;'],
+  }),
+  prog('n14-4', {
+    title: 'The first digit in a text',
+    goal: "Read a line with `getline`. Find its first digit (`'0'` to `'9'`) with a for loop, and stop looking with `break`. Print `first digit: 7 at position 4`, or `no digit` if there is none.",
+    checks: ['abc 7 and 9 :: in abc 7 and 9; expect first digit: 7 at position 4', 'No digit :: in no digits here; expect no digit', 'At the start :: in 2024 is here; expect first digit: 2 at position 0', 'At the end :: in x1; expect first digit: 1 at position 1', 'Uses break :: code /break\\s*;/ Stop the loop with break when you find it.'],
+  }),
+  prog('n14-5', {
+    title: 'Guess the number',
+    goal: 'The secret number is 7. With a do..while loop, read guesses until the guess is 7. After a wrong guess print `too low` or `too high`. At the end print `correct! tries: ` and the number of guesses.\n\n```\ntoo low\ntoo high\ncorrect! tries: 3\n```\n\n(for `3 9 7`).',
+    checks: ['3, 9, 7 :: in 3 9 7; exact too low\\ntoo high\\ncorrect! tries: 3\\n', 'Right at once :: in 7; exact correct! tries: 1\\n', 'Seven tries :: in 1 2 3 4 5 6 7; exact too low\\ntoo low\\ntoo low\\ntoo low\\ntoo low\\ntoo low\\ncorrect! tries: 7\\n', 'Too high twice :: in 10 8 7; exact too high\\ntoo high\\ncorrect! tries: 3\\n', 'Uses do..while :: code /do\\s*\\{/ Use a do..while loop.'],
+  }),
+];
+
+/* ===================================================================== 15 · Nested loops (Lecture 9) */
+const NESTED = 'int i, j;\ncout << " i j\\n";\nfor (i = 1; i < 3; ++i) {\n    cout << "Outer\\t" << i << "\\n";\n    for (j = 0; j < i; ++j) {\n        cout << " Inner\\t\\t" << j << "\\n";\n    } /* end of inner loop */\n} /* end of outer loop */';
+const TWO_LOOPS = 'Two loops, one inside the other :: code /for[\\s\\S]*for/ Use a loop inside a loop.';
+const t15sheet: N[] = [
+  prog('s-l9-e1', {
+    tag: 'Lecture 9',
+    title: 'Example 1: the sum of the first n natural numbers',
+    goal: '**Lecture 9, Example 1:** Find the sum of first n Natural Numbers (positive integers such as 1, 2, 3, … n are known as natural numbers).\n\nAsk `Enter a positive integer: `, read `num`, add 1 to num with a for loop, and print `Sum = ` and the sum.',
+    checks: ['10 :: in 10; expect Sum = 55', '1 :: in 1; expect Sum = 1', '100 :: in 100; expect Sum = 5050', '30 :: in 30; expect Sum = 465', 'Uses for :: code /for\\s*\\(/ Use a for loop.'],
+  }),
+  val('s-l9-t1', 'Lecture 9', '**Lecture 9, trace:** How many times is the **outer** loop executed?', NESTED, ['2', '2 times']),
+  val('s-l9-t2', 'Lecture 9', '**Lecture 9, trace:** How many times is the **inner** loop executed, in all?', NESTED, ['3', '3 times']),
+  val('s-l9-t3', 'Lecture 9', '**Lecture 9, trace:** What is the value of `i` after the outer loop terminates?', NESTED, ['3', 'i = 3', 'i=3']),
+  prog('s-l9-e2', {
+    tag: 'Lecture 9',
+    title: "Example 2: Floyd's triangle",
+    goal: "**Lecture 9, Example 2:** Write a C++ program that prints a dynamic sequential number triangle known as Floyd's Triangle for a given number of rows.\n\nRead the number of rows. Row 1 has 1 number, row 2 has 2 numbers, and so on, and the numbers keep counting up. Like the lecture, print each number followed by a space, and end each row with `endl`:\n\n```\n1\n2 3\n4 5 6\n```\n\n(for 3 rows).",
+    checks: ['5 rows :: in 5; expect 1 \\n2 3 \\n4 5 6 \\n7 8 9 10 \\n11 12 13 14 15', '3 rows :: in 3; expect 1 \\n2 3 \\n4 5 6', '1 row :: in 1; expect 1; not 2', TWO_LOOPS],
+  }),
+  prog('s-l9-e3', {
+    tag: 'Lecture 9',
+    title: 'Example 3: a pyramid of stars',
+    goal: '**Lecture 9, Example 3:** Write a C++ program using nested loops that prompts the user for a number of rows (or uses a fixed value of 5) and prints a centered pyramid pattern made of asterisks (*).\n\nRead the number of rows. Row i has `rows - i` spaces, then `2 * i - 1` stars:\n\n```\n  *\n ***\n*****\n```\n\n(for 3 rows).',
+    checks: ['3 rows :: in 3; expect  *\\n ***\\n*****', '5 rows :: in 5; expect *\\n   ***\\n  *****\\n *******\\n*********', '1 row :: in 1; expect *; not **', TWO_LOOPS],
+  }),
+];
+const t15: N[] = [
+  prog('n15-1', {
+    title: 'A rectangle of stars',
+    goal: 'Read the number of rows and of columns. Print a rectangle of `*`: each row has one `*` for each column.\n\n```\n*****\n*****\n*****\n```\n\n(for `3 5`). Print nothing else.',
+    checks: ['3 rows, 5 columns :: in 3 5; exact *****\\n*****\\n*****\\n', '1 by 1 :: in 1 1; exact *\\n', '2 rows, 4 columns :: in 2 4; exact ****\\n****\\n', TWO_LOOPS],
+  }),
+  prog('n15-2', {
+    title: 'A right triangle of stars',
+    goal: 'Read a whole number n. Print n rows: row 1 has one `*`, row 2 has two, and so on.\n\n```\n*\n**\n***\n****\n```\n\n(for 4). Print nothing else.',
+    checks: ['n = 4 :: in 4; exact *\\n**\\n***\\n****\\n', 'n = 1 :: in 1; exact *\\n', 'n = 6 :: in 6; exact *\\n**\\n***\\n****\\n*****\\n******\\n', TWO_LOOPS],
+  }),
+  prog('n15-3', {
+    title: 'The multiplication table, 1 to n',
+    goal: 'Read a whole number n. Print an n × n table: the value in row i and column j is `i * j`. Print each value followed by a tab (`\\t`), and end each row with `endl`:\n\n```\n1\t2\t3\n2\t4\t6\n3\t6\t9\n```\n\n(for 3).',
+    checks: ['n = 3 :: in 3; exact 1\\t2\\t3\\t\\n2\\t4\\t6\\t\\n3\\t6\\t9\\t\\n', 'n = 1 :: in 1; exact 1\\t\\n', `n = 5 :: in 5; exact ${list(5, (i) => list(5, (j) => `${(i + 1) * (j + 1)}\\t`, ''), '\\n')}\\n`, TWO_LOOPS],
+  }),
+  prog('n15-4', {
+    title: 'A count-down triangle',
+    goal: 'Read a whole number n. Row 1 counts down from n to 1, row 2 from n − 1 to 1, and so on, with one space between the numbers:\n\n```\n4 3 2 1\n3 2 1\n2 1\n1\n```\n\n(for 4). Print nothing else.',
+    checks: ['n = 4 :: in 4; exact 4 3 2 1\\n3 2 1\\n2 1\\n1\\n', 'n = 1 :: in 1; exact 1\\n', 'n = 3 :: in 3; exact 3 2 1\\n2 1\\n1\\n', TWO_LOOPS],
+  }),
+  prog('n15-5', {
+    title: 'The prime numbers up to n',
+    goal: 'Read a whole number n. Print every prime number from 2 to n, one per line: an outer loop goes through the numbers, an inner loop tries their divisors. If there is none, print `no primes`.',
+    checks: ['Up to 10 :: in 10; exact 2\\n3\\n5\\n7\\n', 'Up to 2 :: in 2; exact 2\\n', 'Up to 30 :: in 30; exact 2\\n3\\n5\\n7\\n11\\n13\\n17\\n19\\n23\\n29\\n', 'None :: in 1; exact no primes\\n', TWO_LOOPS],
+  }),
+];
+
 /** lab-sheet and lecture questions that were not in Labs 1–3 yet, by topic */
-export const SHEET_QUESTIONS: Partial<Record<Topic, N[]>> = { t4: t4sheet, t9: t9sheet };
+export const SHEET_QUESTIONS: Partial<Record<Topic, N[]>> = { t4: t4sheet, t5: t5sheet, t9: t9sheet, t11: t11sheet, t12: t12sheet, t13: t13sheet, t14: t14sheet, t15: t15sheet };
 /** the new questions, by topic (5 or more each) */
-export const NEW_QUESTIONS: Partial<Record<Topic, N[]>> = { t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 };
+export const NEW_QUESTIONS: Partial<Record<Topic, N[]>> = { t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15 };
 export const MIXED: N[] = [];
 export const CHALLENGES: N[] = [];
