@@ -10,6 +10,7 @@ export type Diag = { line: number; col: number; message: string; hint?: string; 
 /** functions the course uses → the header that provides them */
 export const FUNCTIONS: Record<string, string> = {
   pow: 'cmath', sqrt: 'cmath', floor: 'cmath', ceil: 'cmath', round: 'cmath', abs: 'cmath', fabs: 'cmath', trunc: 'cmath',
+  sin: 'cmath', cos: 'cmath', tan: 'cmath',
   max: 'algorithm', min: 'algorithm',
   stoi: 'string', stod: 'string', stof: 'string', to_string: 'string', getline: 'string',
   toupper: 'cctype', tolower: 'cctype', isdigit: 'cctype', isalpha: 'cctype', isupper: 'cctype', islower: 'cctype', isspace: 'cctype',
@@ -276,12 +277,12 @@ export function check(prog: Program): Diag[] {
       err(e, `There is no function called ${e.name}( ).`, near ? `Did you mean ${near}( )?` : undefined, 'C3861');
       return 'void';
     }
-    if (!e.qualified && !prog.usingStd && !['system', 'toupper', 'tolower', 'isdigit', 'isalpha', 'isupper', 'islower', 'isspace', 'pow', 'sqrt', 'floor', 'ceil', 'round', 'abs', 'fabs', 'trunc'].includes(e.name)) stdName(e, e.name);
+    if (!e.qualified && !prog.usingStd && !['system', 'toupper', 'tolower', 'isdigit', 'isalpha', 'isupper', 'islower', 'isspace', 'pow', 'sqrt', 'floor', 'ceil', 'round', 'abs', 'fabs', 'trunc', 'sin', 'cos', 'tan'].includes(e.name)) stdName(e, e.name);
     needHeader(e, header, `${e.name}( )`);
     const [a, b] = types;
     switch (e.name) {
       case 'pow': if (!args(e, 2)) return 'double'; if (!isNumeric(a) || !isNumeric(b)) err(e, 'pow(x, y) needs two numbers.', undefined, 'C2665'); return 'double';
-      case 'sqrt': case 'floor': case 'ceil': case 'round': case 'fabs': case 'trunc':
+      case 'sqrt': case 'floor': case 'ceil': case 'round': case 'fabs': case 'trunc': case 'sin': case 'cos': case 'tan':
         if (!args(e, 1)) return 'double';
         if (!isNumeric(a)) err(e, `${e.name}( ) needs a number.`, isText(a) ? 'Convert text to a number first with stod(…).' : undefined, 'C2665');
         return a === 'float' ? 'float' : 'double';

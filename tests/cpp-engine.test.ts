@@ -352,3 +352,8 @@ test('values that do not fit: a big literal wraps in an int (C4305), any text in
   assert.equal(text.output, '1');
   assert.ok(text.compiled.warnings.some((w) => w.code === 'C4800'));
 });
+
+test('cmath sin, cos and tan (angles in radians) for the lab sheets’ geometry programs (10 and 13)', () => {
+  assert.equal(out(main('const float pi = 3.14159;\n    cout << round(tan(45 * pi / 180) * 100) << " " << round(sin(30 * pi / 180) * 100) << " " << round(cos(60 * pi / 180) * 100);')), '100 50 50');
+  assert.equal(out(main('cout << sin(0) << " " << cos(0);')), '0 1');
+});

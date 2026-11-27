@@ -9,6 +9,7 @@ import { compileLab, compileModule, nodesOfKits, sanitizeFlow, type Flow, type L
 import { introComputingModule, introComputingRevisionLab } from './intro-computing-revision.ts';
 import { introComputingPracticeLab } from './intro-computing-practice.ts';
 import { introComputingTypeDrawLab } from './intro-computing-type-draw.ts';
+import { introComputingUltimateLab, ULTIMATE_SLUG } from './intro-computing-ultimate.ts';
 import { aiForCodingLab01, aiForCodingModule } from './ai-for-coding.ts';
 import { psychologyTechnologyModule } from './psychology-technology-lab-01.ts';
 import { psychologyTechnologyLab04 } from './psychology-technology-lab-04.ts';
@@ -91,6 +92,9 @@ export function shippedSeeds(): Seed[] {
     // Lab 3: every question is a pair — its perfect flowchart first, then the program (rewrites the lab once)
     { ...seed('intro-to-computing@13', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
       [{ slug: 'type-and-draw', flow: introComputingTypeDrawLab() }]), update: true },
+    // Lab 4: the ultimate coding revision (every topic, all typed code, mixed, 10 challenges) + the Week 10 divider
+    { ...seed('intro-to-computing@14', 'intro-to-computing', introComputingModule(), nodesOfKits(['cpp']),
+      [{ slug: ULTIMATE_SLUG, flow: introComputingUltimateLab() }]), extend: true },
     // AI FOR CODING: a new module in the Neon design, with Lab 01 — prompt engineering and coding agents
     seed('ai-for-coding@1', 'ai-for-coding', aiForCodingModule(), nodesOfKits(['ai']),
       [{ slug: 'lab-01', flow: aiForCodingLab01() }]),

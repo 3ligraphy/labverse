@@ -266,10 +266,10 @@ test('a counter without a starting value is caught: the fill-in loop offers “i
   assert.ok(wrong);
 });
 
-test('the module: three labs in order, all shown, and Lab 3 is the new one', () => {
+test('the module: four labs in order, all shown (Lab 3, then Lab 4 the ultimate revision)', () => {
   const s = shippedState().get('intro-to-computing')!;
   const order = orderFlow(s.module.flow, 'module').filter((n) => n.type === 'lab').map((n) => (n.data as { slug: string }).slug);
-  assert.deepEqual(order, ['revision-week-6', 'revision-practice', 'type-and-draw']);
-  assert.deepEqual(s.labs.map((l) => [l.slug, l.published]), [['revision-week-6', true], ['revision-practice', true], ['type-and-draw', true]]);
+  assert.deepEqual(order, ['revision-week-6', 'revision-practice', 'type-and-draw', 'ultimate-revision']);
+  assert.deepEqual(s.labs.map((l) => [l.slug, l.published]), [['revision-week-6', true], ['revision-practice', true], ['type-and-draw', true], ['ultimate-revision', true]]);
   assert.equal(compileModule(s.module.flow).meta.title, 'Introduction to Computing');
 });

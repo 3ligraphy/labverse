@@ -542,6 +542,10 @@ export class Machine {
       case 'floor': return keep(Math.floor(real(a)));
       case 'ceil': return keep(Math.ceil(real(a)));
       case 'trunc': return keep(Math.trunc(real(a)));
+      // angles in radians (degrees × pi / 180), as in C++
+      case 'sin': return keep(Math.sin(real(a)));
+      case 'cos': return keep(Math.cos(real(a)));
+      case 'tan': return keep(Math.tan(real(a)));
       case 'round': { const x = real(a); return keep(Math.sign(x) * Math.floor(Math.abs(x) + 0.5)); }
       case 'fabs': return keep(Math.abs(real(a)));
       case 'abs': return a.t === 'double' || a.t === 'float' ? keep(Math.abs(real(a))) : convert({ t: 'double', v: Math.abs(real(a)) }, 'int');
