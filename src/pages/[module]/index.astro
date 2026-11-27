@@ -74,7 +74,7 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
             {data.meta.description && <p class="lead mdh-l">{data.meta.description}</p>}
             <div class="mdh-actions">
               {firstLab && <a class="mdh-start" href={labHref(firstLab.lab.slug)}>Start learning <span aria-hidden="true">↗</span></a>}
-              <a class="mdh-browse" href={`${sectionHref('labs')}#workspace`}>Explore the labs <span aria-hidden="true">↓</span></a>
+              <a class="mdh-browse" href={activeTab === 'overview' && !psychology ? '#labs' : `${sectionHref('labs')}#workspace`}>Explore the labs <span aria-hidden="true">↓</span></a>
             </div>
             <div class="mdh-stats">
               <div><b>{pad(data.items.length)}</b><span>Practical labs</span></div>
@@ -126,10 +126,10 @@ const sectionHref = (section: string) => moduleSectionHref(Astro.params.module ?
         {psychology && activeTab !== 'labs' && <PsychologyWorkspace section={activeTab} />}
         {data.module.slug === AI_FOR_CODING_MODULE && activeTab === 'rubric' && <AiRubric />}
         {!psychology && activeTab === 'overview' && skin === 'neon' && <NeonOverview labsHref={`${sectionHref('labs')}#workspace`} />}
-        {!psychology && activeTab === 'overview' && skin !== 'neon' && <div class="module-intro"><h2>Your module workspace</h2><p>Follow the practical labs in order and use the task checkboxes to keep track of your learning.</p><a class="btn btn-primary" href={`${sectionHref('labs')}#workspace`}>Explore the labs →</a></div>}
       </div>
 
-      {activeTab === 'labs' &&
+      {/* the labs, in order: on the Labs tab and straight away on the Overview (like Mobile Development) */}
+      {(activeTab === 'labs' || (activeTab === 'overview' && !psychology)) &&
       <section class="container mdl" id="labs">
         <div class="mdl-heading"><div><p class="mono mdh-k">THE LEARNING PATH</p><h2>Build your understanding.<br /><span>One lab at a time.</span></h2></div><p>Follow the labs in order. Explore the ideas,<br />try them yourself, and make them yours.</p></div>
         {data.items.length === 0 && <EmptyState title="No labs yet." body="Labs appear here once they are published." path={`m/${data.module.slug}/`} />}
