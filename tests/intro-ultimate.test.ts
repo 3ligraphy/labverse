@@ -188,4 +188,17 @@ test('an endless loop does not freeze the page: the check stops it and says so',
   assert.ok(r.results.some((x) => /never stop/.test(x.message ?? '')), JSON.stringify(r.results[0]));
 });
 
-export { MIXED, CHALLENGES };
+test('Mixed concepts: 15 programs m-1 … m-15; the 10 challenges ch-1 … ch-10, each one a loop, a selection and text', () => {
+  assert.deepEqual(MIXED.filter((n) => n.type === 'cpp').map((n) => n.id), Array.from({ length: 15 }, (_, i) => `m-${i + 1}`));
+  assert.deepEqual(CHALLENGES.filter((n) => n.type === 'cpp').map((n) => n.id), Array.from({ length: 10 }, (_, i) => `ch-${i + 1}`));
+  for (let i = 1; i <= 10; i += 1) {
+    const code = SOLUTIONS[`ch-${i}`] ?? '';
+    assert.match(code, /\b(while|for)\s*\(|\bdo\s*\{/, `ch-${i}: a loop`);
+    assert.match(code, /\bif\s*\(/, `ch-${i}: a selection`);
+    assert.match(code, /\b(string|char)\b/, `ch-${i}: a string or a char`);
+  }
+  for (const n of [...MIXED, ...CHALLENGES].filter((x) => x.type === 'cpp')) {
+    assert.ok(n.data.checks.split('\n').filter((l) => / in |expect|exact/.test(l)).length >= 3, `${n.id}: checked on 3 or more runs`);
+  }
+});
+

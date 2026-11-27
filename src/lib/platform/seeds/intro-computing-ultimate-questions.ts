@@ -752,5 +752,142 @@ const t15: N[] = [
 export const SHEET_QUESTIONS: Partial<Record<Topic, N[]>> = { t4: t4sheet, t5: t5sheet, t9: t9sheet, t11: t11sheet, t12: t12sheet, t13: t13sheet, t14: t14sheet, t15: t15sheet };
 /** the new questions, by topic (5 or more each) */
 export const NEW_QUESTIONS: Partial<Record<Topic, N[]>> = { t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15 };
-export const MIXED: N[] = [];
-export const CHALLENGES: N[] = [];
+
+/* ===================================================================== Mixed concepts (easy → hard) */
+export const MIXED: N[] = [
+  prog('m-1', {
+    title: 'The electricity bill',
+    goal: 'Read the kWh used (a whole number). The first 100 kWh cost 0.5 each, the next 100 cost 0.75 each, and every kWh above 200 costs 1.2. If the bill is more than 200, add 10% tax. Print `bill: ` and the amount.\n\n- `150` → `bill: 87.5` (100 × 0.5 + 50 × 0.75)\n- `400` → `bill: 401.5` (365, then + 10%)',
+    checks: ['80 :: in 80; expect bill: 40', '150 :: in 150; expect bill: 87.5', 'Exactly 200 :: in 200; expect bill: 125', '250 :: in 250; expect bill: 185', '300 (with tax) :: in 300; expect bill: 269.5', '400 (with tax) :: in 400; expect bill: 401.5'],
+  }),
+  prog('m-2', {
+    title: 'The shopping bill',
+    goal: 'Read how many items, then for each item its price (a decimal number) and its quantity (a whole number). Print `total: ` and the total. If the total is more than 500, print `discount: ` (10% of the total) and `to pay: ` (the total minus the discount); otherwise print only `to pay: ` and the total.',
+    checks: ['350 :: in 2 100 2 50 3; expect total: 350; expect to pay: 350; not discount', '600 :: in 3 200 2 150 1 10 5; expect total: 600; expect discount: 60; expect to pay: 540', 'Exactly 500 :: in 1 500 1; expect total: 500; expect to pay: 500; not discount', 'Decimals :: in 2 12.5 4 99.99 10; expect total: 1049.9; expect discount: 104.99; expect to pay: 944.91', A_LOOP],
+  }),
+  prog('m-3', {
+    title: 'Even and odd',
+    goal: 'Read how many numbers, then the numbers (whole numbers). Print three lines: `even: ` and how many are even, `odd: ` and how many are odd, then `sum of the even numbers: ` and their sum.',
+    checks: ['1 2 3 4 6 :: in 5 1 2 3 4 6; expect even: 3; expect odd: 2; expect sum of the even numbers: 12', 'All odd :: in 3 1 3 5; expect even: 0; expect odd: 3; expect sum of the even numbers: 0', 'Negative and 0 :: in 4 -2 -3 0 7; expect even: 2; expect odd: 2; expect sum of the even numbers: -2', A_LOOP],
+  }),
+  prog('m-4', {
+    title: 'A Celsius to Fahrenheit table',
+    goal: 'Read a start and an end (whole numbers, the start is not bigger than the end). Print the header `C`, a tab, `F`. Then one row for every 10 degrees from the start up to the end: C, a tab, and F = 1.8 × C + 32.\n\n```\nC\tF\n0\t32\n10\t50\n20\t68\n30\t86\n```\n\n(for `0 30`). Print nothing else.',
+    checks: ['0 to 30 :: in 0 30; exact C\\tF\\n0\\t32\\n10\\t50\\n20\\t68\\n30\\t86\\n', '-10 to 10 :: in -10 10; exact C\\tF\\n-10\\t14\\n0\\t32\\n10\\t50\\n', '25 to 40 :: in 25 40; exact C\\tF\\n25\\t77\\n35\\t95\\n', A_LOOP],
+  }),
+  prog('m-5', {
+    title: 'Count each kind of character',
+    goal: 'Read a line with `getline`. Count its letters (small and capital), digits, spaces, and all other characters. Print four lines: `letters: `, `digits: `, `spaces: ` and `others: `, each with its count.',
+    checks: ['Hello World 2026! :: in Hello World 2026!; expect letters: 10; expect digits: 4; expect spaces: 2; expect others: 1', 'abc :: in abc; expect letters: 3; expect digits: 0; expect spaces: 0; expect others: 0', '1 + 1 = 2 :: in 1 + 1 = 2; expect letters: 0; expect digits: 3; expect spaces: 4; expect others: 2', A_LOOP],
+  }),
+  prog('m-6', {
+    title: 'Mark the answers',
+    goal: 'Read the answer key (one word of letters, like `ABCDA`) and then the student\'s answers (a word of the same length). Print `score: ` and the score out of the number of questions (`score: 4/5`). Then print `wrong: ` and the numbers of the wrong questions (the first question is 1), with a space between them, or `wrong: none`.',
+    checks: ['One wrong :: in ABCDA ABCDB; expect score: 4/5; expect wrong: 5', 'All right :: in AAAA AAAA; expect score: 4/4; expect wrong: none', 'All wrong :: in ABCD DCBA; expect score: 0/4; expect wrong: 1 2 3 4', 'Two wrong :: in ABCABC ABCCBA; expect score: 4/6; expect wrong: 4 6', A_LOOP],
+  }),
+  prog('m-7', {
+    title: 'A word as a staircase',
+    goal: 'Read one word. Print its beginnings, one per line, from one letter to the whole word:\n\n```\nC\nCo\nCod\nCode\n```\n\n(for `Code`). Use a loop and `substr`. Print nothing else.',
+    checks: ['Code :: in Code; exact C\\nCo\\nCod\\nCode\\n', 'One letter :: in a; exact a\\n', 'hello :: in hello; exact h\\nhe\\nhel\\nhell\\nhello\\n', 'Uses substr :: code /substr\\s*\\(/ Take the beginnings with substr.', A_LOOP],
+  }),
+  prog('m-8', {
+    title: 'Digits as words',
+    goal: 'Read a whole number (0 or more). Print each of its digits as a word, with a space between the words: `405` → `four zero five`. `to_string` turns the number into text, so you can go through its digits.',
+    checks: ['405 :: in 405; expect four zero five', '0 :: in 0; expect zero', 'Every digit :: in 1234567890; expect one two three four five six seven eight nine zero', '99 :: in 99; expect nine nine', A_LOOP],
+  }),
+  prog('m-9', {
+    title: 'Is it a valid email? (with a loop)',
+    goal: 'Read an email (one word). It is valid when: it has exactly one `@` (count them with a loop); there is something before the `@`; and after the `@` there is a `.` with something before it and after it. Print `valid` or `not valid`.\n\n- `mona@uni.edu` → `valid`\n- `mona@@uni.edu` → `not valid`',
+    checks: ['mona@uni.edu :: in mona@uni.edu; expect valid; not not valid', 'Two @ :: in mona@@uni.edu; expect not valid', 'Nothing before @ :: in @uni.edu; expect not valid', 'No dot :: in mona@uni; expect not valid', 'Nothing after the dot :: in mona@uni.; expect not valid', 'Dots in the name :: in mona.salem@uni.edu.eg; expect valid; not not valid', 'Nothing before the dot :: in mona@.edu; expect not valid', A_LOOP],
+  }),
+  prog('m-10', {
+    title: 'Perfect numbers',
+    goal: 'Read a whole number n (2 or more). Add up its divisors that are smaller than n. Print `sum of divisors: ` and the sum, then `perfect` if the sum is n, otherwise `not perfect`. (6 is perfect: 1 + 2 + 3 = 6.)',
+    checks: ['6 :: in 6; expect sum of divisors: 6; expect perfect; not not perfect', '28 :: in 28; expect sum of divisors: 28; expect perfect; not not perfect', '12 :: in 12; expect sum of divisors: 16; expect not perfect', 'A prime :: in 7; expect sum of divisors: 1; expect not perfect', '496 :: in 496; expect sum of divisors: 496; expect perfect; not not perfect', A_LOOP],
+  }),
+  prog('m-11', {
+    title: 'Binary to decimal',
+    goal: "Read a binary number as text, like `1011`. If a character is not `0` or `1`, print `not binary`. Otherwise print `decimal: ` and its value: start from 0, and for each character, `value = value * 2 + (c - '0')`.",
+    checks: ['1011 :: in 1011; expect decimal: 11', '0 :: in 0; expect decimal: 0', '11111111 :: in 11111111; expect decimal: 255', 'A 2 in it :: in 1021; expect not binary; not decimal', '100000 :: in 100000; expect decimal: 32', A_LOOP],
+  }),
+  prog('m-12', {
+    title: 'Decimal to binary',
+    goal: 'Read a whole number (0 or more). Print `binary: ` and the number in binary. Build the text from the right: `binary = to_string(n % 2) + binary;` then `n = n / 2;`, while n is more than 0. The binary of 0 is `0`.',
+    checks: ['11 :: in 11; expect binary: 1011', '0 :: in 0; expect binary: 0', '255 :: in 255; expect binary: 11111111', '32 :: in 32; expect binary: 100000', '1 :: in 1; expect binary: 1', 'Uses to_string :: code /to_string\\s*\\(/ Build the text with to_string(n % 2).', A_LOOP],
+  }),
+  prog('m-13', {
+    title: 'The Caesar code for a line',
+    goal: 'Read a line of text with `getline`, then a shift k (0 to 25) with `cin`. Move every letter k places forward in the alphabet: small letters stay small and capitals stay capitals, and after `z` it starts again at `a`. Every other character stays as it is. Print the new line.\n\n- `Hello, World!` and `3` → `Khoor, Zruog!`',
+    checks: ['Hello, World! by 3 :: in Hello, World!\\n3; expect Khoor, Zruog!', 'Wrapping around :: in xyz XYZ\\n2; expect zab ZAB', 'A shift of 0 :: in abc\\n0; expect abc', 'Capitals and digits :: in Zebra 9\\n1; expect Afcsb 9', A_LOOP],
+  }),
+  prog('m-14', {
+    title: 'The longest word',
+    goal: 'Read a line of words with one space between them. Print `words: ` and the number of words, then `longest: ` and the longest word (if several have the same length, the first one). Go through the line letter by letter and build the current word.',
+    checks: ['I love C++ programming :: in I love C++ programming; expect words: 4; expect longest: programming', 'One word :: in one; expect words: 1; expect longest: one', 'All the same length :: in aa bb cc; expect words: 3; expect longest: aa', 'The first of the longest :: in the cat sat on a mat; expect words: 6; expect longest: the', A_LOOP],
+  }),
+  prog('m-15', {
+    title: 'A list of vectors',
+    goal: 'The first line is how many vectors there are; then one vector per line, like `<3, 4>`. Read **every** line with `getline` (turn the first one into a number with `stoi`). Print `sum: ` and the sum of all the vectors, then `longest: ` and the vector with the biggest modulus (the first one if two are as long):\n\n```\nsum: <3, 6>\nlongest: <3, 4>\n```\n\n(for `<1, 2>`, `<3, 4>`, `<-1, 0>`).',
+    checks: ['Three vectors :: in 3\\n<1, 2>\\n<3, 4>\\n<-1, 0>; expect sum: <3, 6>; expect longest: <3, 4>', 'One vector :: in 1\\n<0, 0>; expect sum: <0, 0>; expect longest: <0, 0>', 'As long: the first :: in 2\\n<6, 8>\\n<-10, 0>; expect sum: <-4, 8>; expect longest: <6, 8>', 'Four vectors :: in 4\\n<-5, -5>\\n<1, 1>\\n<0, 9>\\n<2, -2>; expect sum: <-2, 3>; expect longest: <0, 9>', A_LOOP],
+  }),
+];
+
+/* ===================================================================== The 10 challenges */
+const EXACTLY = 'Print exactly these lines and nothing else (no prompts): the checks compare the whole output.';
+export const CHALLENGES: N[] = [
+  prog('ch-1', {
+    title: 'Challenge 1: the class results',
+    goal: `The first line is the number of students n. Then n lines, each with a name (one word) and three marks (decimals allowed). For each student print the name, \`: \`, the average and the letter grade (Lecture 6, Example 5: A from 90, B from 80, C from 70, D from 60, else F). Then print \`class average: \` (the average of the averages), \`best: \` and the name of the best average (the first one if there is a tie), and \`passed: \` and how many averages are 60 or more.\n\nInput:\n\n\`\`\`\n3\nMona 90 80 85\nOmar 50 60 40\nSara 95 100 90\n\`\`\`\n\nOutput:\n\n\`\`\`\nMona: 85 B\nOmar: 50 F\nSara: 95 A\nclass average: 76.6667\nbest: Sara\npassed: 2\n\`\`\`\n\n${EXACTLY}`,
+    checks: ['Three students :: in 3\\nMona 90 80 85\\nOmar 50 60 40\\nSara 95 100 90; exact Mona: 85 B\\nOmar: 50 F\\nSara: 95 A\\nclass average: 76.6667\\nbest: Sara\\npassed: 2\\n', 'One student, exactly 60 :: in 1\\nAli 60 60 60; exact Ali: 60 D\\nclass average: 60\\nbest: Ali\\npassed: 1\\n', 'A tie for the best :: in 4\\nHana 70 75 80\\nKarim 100 90 95\\nNour 59 59 59.5\\nYara 95 90 100; exact Hana: 75 C\\nKarim: 95 A\\nNour: 59.1667 F\\nYara: 95 A\\nclass average: 81.0417\\nbest: Karim\\npassed: 3\\n'],
+    hints: ['Keep the best average so far and its name in two variables; update both only when a new average is bigger (`>`, not `>=`, so the first one stays on a tie).'],
+  }),
+  prog('ch-2', {
+    title: 'Challenge 2: a strong password, step by step',
+    goal: `Read passwords (one word each) until one is strong. A strong password has at least 8 characters, a capital letter, a small letter, a digit, and a symbol (any other character, like \`!\` or \`#\`). For each weak one, print \`weak: \` and what is missing, in this order, with \`, \` between: \`8 characters\`, \`a capital letter\`, \`a small letter\`, \`a digit\`, \`a symbol\`. For the strong one print \`strong after 3 tries\` (\`strong after 1 try\` for one).\n\nInput \`abc\`, \`Abcdefg1\`, \`Abcdefg1!\` (one per line):\n\n\`\`\`\nweak: 8 characters, a capital letter, a digit, a symbol\nweak: a symbol\nstrong after 3 tries\n\`\`\`\n\n${EXACTLY}`,
+    checks: ['Three tries :: in abc\\nAbcdefg1\\nAbcdefg1!; exact weak: 8 characters, a capital letter, a digit, a symbol\\nweak: a symbol\\nstrong after 3 tries\\n', 'Strong at once :: in P@ssw0rd; exact strong after 1 try\\n', 'Missing letters :: in password\\nPASSWORD1\\nPassw0rd#; exact weak: a capital letter, a digit, a symbol\\nweak: a small letter, a symbol\\nstrong after 3 tries\\n'],
+    hints: ['Use four bool variables (capital, small, digit, symbol) set in a loop over the characters, then build the text of what is missing with `+`.'],
+  }),
+  prog('ch-3', {
+    title: 'Challenge 3: squeeze the letters',
+    goal: `Read one word (letters only). Write every run of the same letter as the letter and how many times it repeats: \`aaabccdddd\` → \`a3b1c2d4\`. Print the code, then \`shorter\`, \`longer\` or \`same length\`: the code compared with the word.\n\n\`\`\`\na3b1c2d4\nshorter\n\`\`\`\n\n${EXACTLY}`,
+    checks: ['aaabccdddd :: in aaabccdddd; exact a3b1c2d4\\nshorter\\n', 'abc :: in abc; exact a1b1c1\\nlonger\\n', 'aabb :: in aabb; exact a2b2\\nsame length\\n', 'Twelve z :: in zzzzzzzzzzzz; exact z12\\nshorter\\n', 'Uses to_string :: code /to_string\\s*\\(/ Turn each count into text with to_string.'],
+  }),
+  prog('ch-4', {
+    title: 'Challenge 4: everything about a number',
+    goal: `Read a whole number n (1 or more). Print six lines: \`digits: \` (how many digits), \`sum of digits: \`, \`reversed: \` (the number with its digits in reverse order), \`palindrome: yes\` or \`no\` (it reads the same backwards), \`prime: yes\` or \`no\`, and \`divisors: \` (how many divisors it has, 1 and n included).\n\n\`\`\`\ndigits: 3\nsum of digits: 6\nreversed: 321\npalindrome: no\nprime: no\ndivisors: 4\n\`\`\`\n\n(for \`123\`: its divisors are 1, 3, 41 and 123). \`reversed\` of \`1000\` is \`1\`. ${EXACTLY}`,
+    checks: ['123 :: in 123; exact digits: 3\\nsum of digits: 6\\nreversed: 321\\npalindrome: no\\nprime: no\\ndivisors: 4\\n', '121 :: in 121; exact digits: 3\\nsum of digits: 4\\nreversed: 121\\npalindrome: yes\\nprime: no\\ndivisors: 3\\n', '7 :: in 7; exact digits: 1\\nsum of digits: 7\\nreversed: 7\\npalindrome: yes\\nprime: yes\\ndivisors: 2\\n', '1 is not a prime :: in 1; exact digits: 1\\nsum of digits: 1\\nreversed: 1\\npalindrome: yes\\nprime: no\\ndivisors: 1\\n', '1000 :: in 1000; exact digits: 4\\nsum of digits: 1\\nreversed: 1\\npalindrome: no\\nprime: no\\ndivisors: 16\\n'],
+    hints: ['`to_string(n)` gives the digits as text: its length, its characters and its reverse. A number is prime when it has exactly 2 divisors.'],
+  }),
+  prog('ch-5', {
+    title: 'Challenge 5: a calculator that keeps going',
+    goal: `Read lines with \`getline\` until a line is \`q\`. Each line is a number, a space, an operator, a space and a number, like \`3 + 4\` (the numbers can have decimals). Print \`= \` and the result. The operators are \`+\`, \`-\`, \`*\`, \`/\` and \`^\` (the power: the second number is a whole number, 0 or more; multiply in a loop, no cmath). For \`/\` by 0 print \`error: division by 0\`; for any other operator print \`error: unknown operator\`. At the end print \`operations: \` and how many lines had a result.\n\n\`\`\`\n3 + 4      → = 7\n10 / 4     → = 2.5\n2 ^ 10     → = 1024\n5 / 0      → error: division by 0\n7 % 2      → error: unknown operator\nq          → operations: 3\n\`\`\`\n\n${EXACTLY}`,
+    checks: ['Five lines :: in 3 + 4\\n10 / 4\\n2 ^ 10\\n5 / 0\\n7 % 2\\nq; exact = 7\\n= 2.5\\n= 1024\\nerror: division by 0\\nerror: unknown operator\\noperations: 3\\n', 'Decimals and negatives :: in 1.5 * 4\\n-2 - 3\\nq; exact = 6\\n= -5\\noperations: 2\\n', 'Only q :: in q; exact operations: 0\\n', 'No cmath :: nocode /pow\\s*\\(/ Work out ^ with a loop, not pow.'],
+  }),
+  prog('ch-6', {
+    title: 'Challenge 6: the next day',
+    goal: `Read dates written as \`dd/mm/yyyy\` (one word each) until the word \`end\`. For each date, print \`invalid\` if it is not a real date: the month must be 1 to 12, and the day from 1 to the days of that month (30 for months 4, 6, 9 and 11; February has 28, or 29 in a leap year; the others 31). Otherwise print \`next day: \` and the date of the next day, with two digits for the day and the month.\n\n\`\`\`\n28/02/2024  → next day: 29/02/2024\n28/02/2023  → next day: 01/03/2023\n31/12/2026  → next day: 01/01/2027\n31/04/2026  → invalid\n\`\`\`\n\nA leap year is divisible by 4 but not by 100, or divisible by 400. ${EXACTLY}`,
+    checks: ['Six dates :: in 28/02/2024\\n28/02/2023\\n31/12/2026\\n31/04/2026\\n15/13/2026\\n30/06/2026\\nend; exact next day: 29/02/2024\\nnext day: 01/03/2023\\nnext day: 01/01/2027\\ninvalid\\ninvalid\\nnext day: 01/07/2026\\n', 'Leap years :: in 29/02/2023\\n29/02/2000\\n09/09/1999\\nend; exact invalid\\nnext day: 01/03/2000\\nnext day: 10/09/1999\\n', 'Only end :: in end; not next day; not invalid'],
+  }),
+  prog('ch-7', {
+    title: 'Challenge 7: a text report',
+    goal: `Read a line of text with \`getline\` (words with one space between them). Print five lines: \`words: \`, \`letters: \`, \`vowels: \` (a, e, i, o, u, small or capital), \`sentences: \` (how many \`.\`, \`!\` and \`?\`), and \`title case: \` and the text with the first letter of every word in capitals (the other letters do not change).\n\n\`\`\`\nwords: 6\nletters: 18\nvowels: 6\nsentences: 2\ntitle case: The Cat Sat. Then It Ran!\n\`\`\`\n\n(for \`the cat sat. then it ran!\`). ${EXACTLY}`,
+    checks: ['Two sentences :: in the cat sat. then it ran!; exact words: 6\\nletters: 18\\nvowels: 6\\nsentences: 2\\ntitle case: The Cat Sat. Then It Ran!\\n', 'hello world :: in hello world; exact words: 2\\nletters: 10\\nvowels: 3\\nsentences: 0\\ntitle case: Hello World\\n', 'Capitals and symbols :: in C++ is FUN?; exact words: 3\\nletters: 6\\nvowels: 2\\nsentences: 1\\ntitle case: C++ Is FUN?\\n'],
+    hints: ['A word starts where a character is not a space and it is the first character or the one before it is a space.'],
+  }),
+  prog('ch-8', {
+    title: 'Challenge 8: a complex number calculator',
+    goal: `Read operations until a line is \`q\`. Each operation is three lines (read them with \`getline\`): a complex number, an operator (\`+\`, \`-\` or \`*\`), and a second complex number, in the Lecture 5 format (\`1 + 2i\`, \`3 - 5i\`). A number is in the right format when it has at least 6 characters, a space, then \`+\` or \`-\` after that space, and it ends with \`i\`. If one of the two is not, print \`not a complex number\`. Otherwise print \`= \` and the result in the same format, then \`modulus: \` and its modulus. To multiply: (a + bi)(c + di) = (ac − bd) + (ad + bc)i.\n\n\`\`\`\n1 + 2i, +, 3 - 5i  →  = 4 - 3i\n                       modulus: 5\n2 + 3i, *, 4 - 1i  →  = 11 + 10i\n                       modulus: 14.8661\n\`\`\`\n\n${EXACTLY}`,
+    checks: ['Add, then multiply :: in 1 + 2i\\n+\\n3 - 5i\\n2 + 3i\\n*\\n4 - 1i\\nq; exact = 4 - 3i\\nmodulus: 5\\n= 11 + 10i\\nmodulus: 14.8661\\n', 'Not a complex number :: in 3 + 4\\n-\\n1 + 1i\\nq; exact not a complex number\\n', 'Zero, and i times i :: in 5 - 2i\\n-\\n5 - 2i\\n0 + 1i\\n*\\n0 + 1i\\nq; exact = 0 + 0i\\nmodulus: 0\\n= -1 + 0i\\nmodulus: 1\\n'],
+    hints: ['Without functions of your own, you write the reading of a complex number twice: once for each number.'],
+  }),
+  prog('ch-9', {
+    title: 'Challenge 9: a bank statement',
+    goal: `The first input is the starting balance. Then transactions until the word \`end\`: \`d 200\` is a deposit of 200 and \`w 50\` a withdrawal of 50 (amounts can have decimals). For each one print a line with the type, a tab, the amount, a tab, and the new balance. A withdrawal bigger than the balance is refused: print \`refused\` instead of the balance, and the balance does not change. At the end print \`deposits: \` and \`withdrawals: \` (how many were done) and \`balance: \`.\n\n\`\`\`\nd\t200\t1200\nw\t50\t1150\nw\t5000\trefused\nd\t0.5\t1150.5\ndeposits: 2\nwithdrawals: 1\nbalance: 1150.5\n\`\`\`\n\n(starting from 1000). ${EXACTLY}`,
+    checks: ['Four transactions :: in 1000\\nd 200\\nw 50\\nw 5000\\nd 0.5\\nend; exact d\\t200\\t1200\\nw\\t50\\t1150\\nw\\t5000\\trefused\\nd\\t0.5\\t1150.5\\ndeposits: 2\\nwithdrawals: 1\\nbalance: 1150.5\\n', 'An empty account :: in 0\\nw 1\\nend; exact w\\t1\\trefused\\ndeposits: 0\\nwithdrawals: 0\\nbalance: 0\\n', 'Down to 0 is allowed :: in 50\\nw 50\\nd 25\\nw 25\\nend; exact w\\t50\\t0\\nd\\t25\\t25\\nw\\t25\\t0\\ndeposits: 1\\nwithdrawals: 2\\nbalance: 0\\n'],
+  }),
+  prog('ch-10', {
+    title: 'Challenge 10: guess the word',
+    goal: `The first input is the secret word (small letters). Then one guessed letter per line. After each guess print the word with a space between the letters, showing the letters guessed so far and \`_\` for the others. A letter that is not in the word is a miss. Stop when every letter is shown (print \`you win (misses: 1)\`) or after 6 misses (print \`you lose: the word was cat\`).\n\nInput \`code\`, then \`e\`, \`x\`, \`c\`, \`o\`, \`d\`:\n\n\`\`\`\n_ _ _ e\n_ _ _ e\nc _ _ e\nc o _ e\nc o d e\nyou win (misses: 1)\n\`\`\`\n\nKeep the guessed letters in a \`string\` and use \`find\` to know if a letter was guessed. ${EXACTLY}`,
+    checks: ['Win with 1 miss :: in code\\ne\\nx\\nc\\no\\nd; exact _ _ _ e\\n_ _ _ e\\nc _ _ e\\nc o _ e\\nc o d e\\nyou win (misses: 1)\\n', 'Six misses :: in cat\\nx\\ny\\nz\\nq\\nw\\nv; exact _ _ _\\n_ _ _\\n_ _ _\\n_ _ _\\n_ _ _\\n_ _ _\\nyou lose: the word was cat\\n', 'One guess shows two letters :: in aa\\na; exact a a\\nyou win (misses: 0)\\n', 'Win with 2 misses :: in sun\\ns\\nz\\nu\\nk\\nn; exact s _ _\\ns _ _\\ns u _\\ns u _\\ns u n\\nyou win (misses: 2)\\n'],
+  }),
+];
